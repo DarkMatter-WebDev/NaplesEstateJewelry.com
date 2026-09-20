@@ -5,14 +5,32 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-09-20 (2) — READY TO PUSH: lead-form photo fix + phone contact bar (no SQL, no env vars)
+### 🔴 2026-09-20 (7) — READY TO PUSH: phone contact bar shows on DESKTOP (live now) — one-rule CSS fix staged (no SQL, no env vars)
+
+Found 09-20 during the photo test: `.mobile-contact-bar { display: flex }` beat
+Tailwind's `md:hidden`, so the Call · Text · Directions strip shows at the
+bottom of the seller pages on desktop. Fixed in `globals.css` (base rule
+`display: none`, `flex` only inside the phone media query) + component + test;
+dev-verified at 1024 / 768 / 375 px; gate tsc 0 · lint 0 · 1522/1522 · build 0.
+`CHANGELOG.md` 2026-09-20 (7).
+
+1. ◻ **Owner: push.**
+2. ◻ After the push, on a desktop browser open `/gold-services` — no strip at
+   the bottom; on the phone it is still there.
+
+
+### 🟡 2026-09-20 (2) — PUSHED by the owner 09-20 (not production-checked by Claude): lead-form photo fix + phone contact bar — owner phone tests still open (no SQL, no env vars)
 
 Built per `CHANGELOG.md` 2026-09-20 (2). Owner: "go with c and also test to be
 sure it works, and version b on the bar."
 
 **Owner:**
-1. ◻ Push.
-2. ◻ **iPhone test (the production proof — a dev server has no 6 MB cap):** open
+1. ✅ Pushed 09-20 (owner: "pushed the site batch").
+2. ✅ **Proven on production 09-20 by Claude in the owner's Chrome** (5 PNGs,
+   9.58 MB → posted 0.80 MB → HTTP 200 in 5.5 s → five `.webp` objects 85–130
+   KB; `CHANGELOG.md` 2026-09-20 (7)). One test lead "TEST Photo Upload
+   (Claude)" is in Admin → Inquiries — owner may delete it. ◻ Still worth one
+   run from the iPhone (WebKit's canvas path): open
    `naplesestatejewelry.com/free-evaluation` in Safari → add **4 or more**
    camera-roll photos → fill the form honestly marked as a test → Send. Expect
    "Submission received!" within a few seconds and the email with 4+ photo
@@ -146,7 +164,8 @@ sure it works, and version b on the bar."
      keep, adjust or stop).
    - ◻ **Owner, optional:** auto-tagging off (no site tag, so `gclid` does
      nothing) — say yes and Claude flips it.
-   - ◻ **After the site push:** enable the Coins and Bullion ad group.
+   - ✅ 09-20: site batch pushed → Coins and Bullion ad group ENABLED (reads
+     "Pending"); all five ad groups on, one shared $13.00/day.
    (superseded) ◻ **Claude, once the passkey has paired:** re-enter the Gold keywords + ad
    (scripted, ~1 minute), set $13, Publish → PAUSE at
    once (there is no "create paused" option; no payment method = cannot serve

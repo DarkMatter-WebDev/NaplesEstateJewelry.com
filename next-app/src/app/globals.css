@@ -3100,9 +3100,12 @@ body:has(main[data-no-cookie-notice]) [data-cookie-notice] {
 
 /* Phone contact bar — Call · Text · Directions on the seller pages
    (components/cta/MobileContactBar.tsx; owner-approved mockup B, 2026-09-20).
-   Phones only (`md:hidden` on the element). Fixed, so it shifts no layout; the
-   two :has() rules below give the page room for it and lift the cookie notice
-   clear of it, both server-rendered and JS-free like the /card rule above. */
+   Phones only. ⛔ The hide-on-desktop rule lives HERE, not in a utility class:
+   this block sets `display`, and an unlayered rule always beats Tailwind's
+   layered `md:hidden` — the bar shipped visible on desktop on 2026-09-20
+   because of exactly that. Fixed, so it shifts no layout; the two :has() rules
+   below give the page room for it and lift the cookie notice clear of it, both
+   server-rendered and JS-free like the /card rule above. */
 .mobile-contact-bar {
   --mobile-contact-bar-height: 3.5rem;
   position: fixed;
@@ -3110,7 +3113,7 @@ body:has(main[data-no-cookie-notice]) [data-cookie-notice] {
   right: 0;
   bottom: 0;
   z-index: 30;
-  display: flex;
+  display: none;
   gap: 0.375rem;
   min-height: var(--mobile-contact-bar-height);
   padding: 0.4375rem 0.5rem calc(0.4375rem + env(safe-area-inset-bottom, 0px));
@@ -3151,6 +3154,9 @@ body:has(main[data-no-cookie-notice]) [data-cookie-notice] {
   color: var(--color-on-primary);
 }
 @media (max-width: 767.98px) {
+  .mobile-contact-bar {
+    display: flex;
+  }
   /* Room for the bar, so the footer's last line is never underneath it. */
   body:has([data-mobile-contact-bar]) {
     padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));

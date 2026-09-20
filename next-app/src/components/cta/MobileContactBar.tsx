@@ -15,6 +15,10 @@ import { CONTACT_PHONE_DISPLAY, TEL_HREF, directionsHref, sellerTextBody, smsHre
  *
  * - Mounted ONCE in `[locale]/layout.tsx`; `showsContactBar` decides the pages,
  *   so no ranking page file is edited to carry it.
+ * - Phones only: `.mobile-contact-bar` is `display: none` and only the
+ *   `max-width: 767.98px` query in `globals.css` shows it. ⛔ Not `md:hidden` —
+ *   the unlayered CSS rule beats the Tailwind utility (shipped visible on
+ *   desktop 2026-09-20).
  * - `position: fixed` → no layout shift. The page's bottom padding and the
  *   cookie notice's lift are in `globals.css` (`[data-mobile-contact-bar]`),
  *   resolved with `:has()` so nothing here needs JavaScript or a flash.
@@ -33,7 +37,7 @@ export default function MobileContactBar({ locale }: { locale: string }) {
   return (
     <nav
       data-mobile-contact-bar
-      className="mobile-contact-bar md:hidden"
+      className="mobile-contact-bar"
       aria-label={isEs ? 'Contacto rápido' : 'Quick contact'}
     >
       <a href={TEL_HREF} className="mobile-contact-bar-call" aria-label={`${isEs ? 'Llamar' : 'Call'} ${CONTACT_PHONE_DISPLAY}`}>

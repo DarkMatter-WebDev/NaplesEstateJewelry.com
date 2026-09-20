@@ -8,7 +8,15 @@
 
 **Read this, then `TASKS.md`.**
 
-🟡 **09-20 (2) — BUILT + dev-tested + STAGED, awaiting push (no SQL, no env
+🔴 **09-20 (7) — READY TO PUSH: the phone contact bar is showing on DESKTOP on
+the live seller pages** (an unlayered `display: flex` beat `md:hidden`). One-rule
+fix in `globals.css` + component + test, dev-verified at 1024 / 768 / 375 px,
+gate green, STAGED. 🟢 Same session: **the lead-form photo fix is PROVEN on
+production** — 5 photos, 9.58 MB shrunk to 0.80 MB in the browser, HTTP 200,
+five `.webp` objects in Storage. `CHANGELOG.md` 2026-09-20 (7).
+
+🟡 **09-20 (2) — PUSHED by the owner 09-20 evening; photo fix since proven on
+production by Claude; owner's iPhone run + phone look still open (no SQL, no env
 vars): the lead-form photo fix and the phone contact bar.**
 - Photos are shrunk in the browser to fit Netlify's 6 MB request cap and stored
   as WebP (dev: 24.5 MB → 0.79 MB; 10 photos 61.5 MB → 0.56 MB; too-large path
@@ -41,7 +49,7 @@ vars): the lead-form photo fix and the phone contact bar.**
   Access and security → Security tasks); the owner created it and saves worked
   at once. 🟢 **LIVE since 09-20 ~4:19 PM ET** — owner added billing and said
   "go"; campaign Enabled at $13.00/day, "Pending" while Google reviews the ads;
-  Coins and Bullion stays paused until the site push. Weekly reports 09-27 ·
+  Coins and Bullion enabled the same evening after the owner's site push. Weekly reports 09-27 ·
   10-04 · 10-11 · 10-18. `TASKS.md` top · `CHANGELOG.md` 2026-09-20 (4)–(6). The old
   shell 238-352-7909 (info@surettesystems.com) is abandoned.
 

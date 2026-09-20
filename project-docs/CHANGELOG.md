@@ -1,11 +1,24 @@
 
 # Changelog
 
+## 2026-09-20 (7) — Lead-form photo fix PROVEN on production (5 photos, 9.58 MB → 0.80 MB → five `.webp` objects); 🔴 phone contact bar was showing on DESKTOP — fixed + dev-verified + STAGED, needs a push (no SQL, no env vars)
+
+Owner: "do the test form 5 photos for me, there are random pics to use in /pictures on the computer."
+
+**Photo test (production, owner's Chrome, `naplesestatejewelry.com/free-evaluation`).** Five rack-card PNGs from the owner's Pictures folder, 1.84–2.02 MB each, **9.58 MB total — well over Netlify's 6 MB request cap**, i.e. a submission that would have failed before the fix. (The upload tool cannot read the Pictures folder, so the five files were copied to the session scratch folder, used, and deleted.) Form filled as an obvious test ("TEST Photo Upload (Claude)", "TEST — please ignore…", the business's own phone and email, Naples, contact by email). A `window.fetch` wrapper recorded what the page actually posted to `/api/inquire`: **five `image/jpeg` files, 125–183 KB each, 800,299 bytes total** → **HTTP 200 in 5.5 s** → "Submission received!". Storage (read-only list of `product-images/inquiries/`, service key, no values printed): five new objects at 20:29:01–04Z, all **`.webp` / `image/webp`, 85–130 KB, `max-age=31536000`**; the previous objects in that folder (09-07) are `.jpeg` — the server-side WebP step is new and working. One real test lead now sits in Admin → Inquiries and one notification + one confirmation email went out (only the owner can delete the lead). The owner's own iPhone test is still worth doing once — WebKit's canvas path is the one a desktop Chrome cannot exercise.
+
+**🔴 Bug found during that test: the phone contact bar rendered on desktop.** Live page at 2560 px: `[data-mobile-contact-bar]` computed `display: flex`, 57 px tall, although the element carried `md:hidden`. Cause: `.mobile-contact-bar { display: flex }` in `globals.css` is an unlayered rule, and unlayered CSS always beats Tailwind's layered utilities. It shipped because the bar was only ever checked at phone widths — Claude's miss. Effect while live: a Call · Text · Directions strip along the bottom of the ten seller sections on desktop (links work; nothing is covered except the last 57 px of the footer, since the body padding is phone-only). No SEO effect (same HTML either way).
+- Fix: `globals.css` — the base rule is now `display: none`, and `display: flex` moved inside the existing `@media (max-width: 767.98px)` block. `MobileContactBar.tsx` — the useless `md:hidden` class removed, header comment says why. `mobile-contact-bar.test.ts` — no longer trusts the utility: asserts the base rule is `display: none`, that no base `display: flex` exists, and that the phone query turns it on.
+- Dev check (preview pane, `/gold-services`): 1024 px → `display: none`, body padding 0 · 375 px → `flex`, 57 px, flush to the bottom, body padding 56 px, CALL · TEXT · DIRECTIONS · 768 px → `none`.
+- **Gate:** `npx tsc --noEmit` 0 · `npm run lint` 0 (3 known `<img>` warnings) · `npx vitest run` **1522/1522 (151 files)** · `npm run build` exit 0 from a deleted `.next`, no `.next/cache/turbopack/`.
+
 ## 2026-09-20 (6) — Google Ads campaign "NEJ Sellers - Search" is LIVE at $13.00/day on the owner's word (no code change)
 
 Owner: "billing added, go."
 
 Before the switch: the red "Your account cannot show ads — enter your billing information" banner was gone (the owner added the payment method; Claude never saw or touched billing). **2026-09-20 ~4:19 PM ET** Claude set campaign 24265714239 (account 321-137-8976) from Paused to **Enabled** — the single change made. Read back afterwards: campaign row green · "Pending" (ads still in Google's review — normal; serving starts when they are approved) · budget $13.00/day · "Total: Account $13.00/day". Ad groups: Gold, Silver and Flatware, Estate and Inherited Jewelry, Spanish - Vender Oro = "Pending — all ads under review"; **Coins and Bullion still "Paused"** (its own switch — stays off until the site push gives `/bullion` its hero buttons). Every other setting is as recorded in entry (5); nothing else was edited. The Campaigns page still lists "Drafts in progress: 1" — a leftover of the wizard; a draft cannot serve or spend, left alone.
+
+**Later 09-20 — Coins and Bullion ad group ENABLED.** Owner: "pushed the site batch, enable coins and bullion." (The batch = photo fix + phone contact bar + Text links + `/bullion` hero buttons; per the owner's standing rule Claude did not check production.) Ad group set from Paused to Enabled — the only change; row reads "Pending" like the other four. All five ad groups are now on; the budget is still the single shared $13.00/day.
 
 **What to expect:** $13.00/day is an average — Google may spend up to 2× on a single day but not more than ~$395 in a month (30.4 × $13). Max $6.00 a click. First impressions only after ad approval (usually within one business day).
 

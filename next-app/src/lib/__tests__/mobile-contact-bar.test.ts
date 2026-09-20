@@ -95,7 +95,15 @@ describe('phone contact bar: wiring', () => {
   });
 
   it('is phones-only, shifts no layout, and never deopts static pages', () => {
-    expect(bar).toContain('md:hidden');
+    // The base rule hides it; only the phone media query shows it. An unlayered
+    // `display` in globals.css beats Tailwind's `md:hidden`, which is how the
+    // bar shipped visible on desktop (2026-09-20) — so the utility is not
+    // trusted here and the base rule itself must say `display: none`.
+    expect(css).toMatch(/\.mobile-contact-bar \{[^}]*display: none/);
+    expect(css).not.toMatch(/\n\.mobile-contact-bar \{[^}]*display: flex/);
+    expect(css).toMatch(
+      /@media \(max-width: 767\.98px\) \{\s*\.mobile-contact-bar \{\s*display: flex;/,
+    );
     expect(bar).toContain('usePathname');
     expect(bar).not.toContain('useSearchParams');
     expect(css).toMatch(/\.mobile-contact-bar \{[^}]*position: fixed/);

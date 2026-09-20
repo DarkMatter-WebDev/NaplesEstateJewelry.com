@@ -97,6 +97,14 @@ owner-approved mockup version B). Directions is there because walk-ins lead.
   the notice.
 - Spanish is "Llamar · Texto · Llegar" — "Cómo llegar" does not fit three across
   at 320 px. A label change means re-measuring 320 px in Spanish.
+- ⛔ **Phones-only is enforced in `globals.css`, not by `md:hidden`** (corrected
+  2026-09-20 (7)). A class in `globals.css` that sets `display` is unlayered CSS
+  and always beats a Tailwind utility, so `class="mobile-contact-bar md:hidden"`
+  rendered the bar on desktop in production. The base rule is `display: none`;
+  only `@media (max-width: 767.98px)` sets `display: flex`. General rule: when a
+  custom class sets `display`, put its breakpoint behaviour in the same CSS
+  block — and check every "phones only" element at a desktop width as well as
+  at 375 px before it ships.
 
 ## Customer Call / Text / Directions links come from `contact-links.ts`; a Text link always reaches the owner's cell (2026-09-20)
 
