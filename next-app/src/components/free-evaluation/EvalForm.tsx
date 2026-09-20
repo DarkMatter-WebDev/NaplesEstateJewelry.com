@@ -5,6 +5,7 @@ import FormPrivacyNotice from '@/components/legal/FormPrivacyNotice';
 import { LocationField, PreferredContactField } from '@/components/contact/InquiryPreferenceFields';
 import { parsePreferredContact, preferredContactEmailErrorMessage, preferredContactNeedsEmail } from '@/lib/inquiry-fields';
 import { isValidPhoneNumber, phoneErrorMessage } from '@/lib/phone';
+import { leadPhotosTooLargeMessage, shrinkFormPhotos } from '@/lib/lead-photo-prep';
 
 interface Props {
   locale: string;
@@ -50,6 +51,13 @@ export default function EvalForm({ locale, submitted }: Props) {
     setSending(true);
     setErr('');
     try {
+      // Camera originals would blow Netlify's 6 MB request cap after two
+      // photos (see lead-photo-prep.ts) — shrink them to fit one request.
+      const photos = await shrinkFormPhotos(fd);
+      if (!photos.fits) {
+        setErr(leadPhotosTooLargeMessage(isEs));
+        return;
+      }
       fd.append('source', 'free-evaluation');
       const res = await fetch('/api/inquire', { method: 'POST', body: fd });
       if (!res.ok) throw new Error(await res.text());

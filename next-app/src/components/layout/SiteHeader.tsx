@@ -8,6 +8,7 @@ import { useTranslations, useLocale } from 'next-intl';
 import { useWishlist } from '@/context/WishlistContext';
 import { useCart } from '@/context/CartContext';
 import { AppIcon } from '@/components/AppIcon';
+import { CONTACT_PHONE_DISPLAY, TEL_HREF, smsHref } from '@/lib/contact-links';
 
 const GOLD = '#735c00';
 const SECONDARY = '#5e5e5d';
@@ -761,6 +762,33 @@ export default function SiteHeader() {
             <MobileLink href={altHref} onClick={closeAll} style={{ color: GOLD }}>
               {locale === 'en' ? 'Español' : 'English'}
             </MobileLink>
+
+            {/* Call + Text rows (owner-approved mockup, 2026-09-20). In the
+                PANEL on purpose: the header row above is width-budgeted to the
+                pixel and takes no new icon. Plain anchors — `tel:` / `sms:` are
+                not navigations, so the panel closes itself. */}
+            <div className="mobile-row">
+              <a
+                href={TEL_HREF}
+                onClick={closeAll}
+                className="mobile-nav-link text-xs font-bold uppercase tracking-[0.08em]"
+                style={{ color: GOLD, justifyContent: 'flex-start', gap: '0.5rem' }}
+              >
+                <AppIcon name="call" className="text-[1rem]" />
+                {locale === 'en' ? 'Call' : 'Llamar'} {CONTACT_PHONE_DISPLAY}
+              </a>
+            </div>
+            <div className="mobile-row">
+              <a
+                href={smsHref()}
+                onClick={closeAll}
+                className="mobile-nav-link text-xs font-bold uppercase tracking-[0.08em]"
+                style={{ color: GOLD, justifyContent: 'flex-start', gap: '0.5rem' }}
+              >
+                <AppIcon name="sms" className="text-[1rem]" />
+                {locale === 'en' ? 'Text Us' : 'Enviar Texto'}
+              </a>
+            </div>
 
           </div>
         </div>

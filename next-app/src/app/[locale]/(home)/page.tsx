@@ -21,6 +21,7 @@ import TestimonialsSection from '@/components/home/TestimonialsSection';
 import { getHomeCarouselPayload } from '@/lib/home-carousel-server';
 import { getHomeBanner } from '@/lib/home-banner-server';
 import { resolveHomeBanner } from '@/lib/home-banner';
+import TextUsLink from '@/components/cta/TextUsLink';
 import type { CarouselItem } from '../../../../carousel/lib/carouselData';
 
 // 2026-09-06: a locale-less path with a file extension (`/money.jpg`, an old
@@ -414,6 +415,15 @@ export default async function HomePage({ params }: Props) {
                   >
                     {isEs ? 'Llame o envíe un mensaje →' : 'Call or text Chris →'}
                   </a>
+                  {/* The link above only dials; this one really texts (2026-09-20). */}
+                  <TextUsLink
+                    isEs={isEs}
+                    icon={false}
+                    className="hover-underline-grow text-xs font-bold uppercase tracking-[0.16em]"
+                    style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
+                  >
+                    {isEs ? 'Enviar un texto →' : 'Send a text →'}
+                  </TextUsLink>
                 </div>
               </div>
             </div>

@@ -5,6 +5,7 @@ import FormPrivacyNotice from '@/components/legal/FormPrivacyNotice';
 import { LocationField, PreferredContactField } from '@/components/contact/InquiryPreferenceFields';
 import { parsePreferredContact, preferredContactEmailErrorMessage, preferredContactNeedsEmail } from '@/lib/inquiry-fields';
 import { isValidPhoneNumber, phoneErrorMessage } from '@/lib/phone';
+import { leadPhotosTooLargeMessage, shrinkFormPhotos } from '@/lib/lead-photo-prep';
 import { phoneHoursLabel } from '@/lib/business-location';
 import { FormGrid, PageContainer, Section } from '@/components/layout/ResponsiveLayout';
 
@@ -42,10 +43,17 @@ export default function MessageUsForm({ locale }: Props) {
     setSending(true);
     setErr('');
     try {
+      // Camera originals would blow Netlify's 6 MB request cap after two
+      // photos (see lead-photo-prep.ts) — shrink them to fit one request.
+      const photos = await shrinkFormPhotos(fd);
+      if (!photos.fits) {
+        setErr(leadPhotosTooLargeMessage(isEs));
+        return;
+      }
       // Sent as multipart so optional photos ride along with the message.
       const res = await fetch('/api/contact-message', {
         method: 'POST',
-        body: new FormData(formEl),
+        body: fd,
       });
       if (!res.ok) throw new Error(await res.text());
       setDone(true);

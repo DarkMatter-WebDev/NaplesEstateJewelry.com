@@ -2,11 +2,78 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-09-18**.
+> in `DECISIONS.md`. Last reconciled: **2026-09-20**.
 
 ## Start Here (2026-09-15 — SUPERSEDES the blocks below)
 
 **Read this, then `TASKS.md`.**
+
+🟡 **09-20 (2) — BUILT + dev-tested + STAGED, awaiting push (no SQL, no env
+vars): the lead-form photo fix and the phone contact bar.**
+- Photos are shrunk in the browser to fit Netlify's 6 MB request cap and stored
+  as WebP (dev: 24.5 MB → 0.79 MB; 10 photos 61.5 MB → 0.56 MB; too-large path
+  shows a plain message). After the push: **owner submits the free-evaluation
+  form from the iPhone with 4+ camera-roll photos** — that is the production
+  proof (a dev server has no cap). It creates one real test lead.
+- Phone contact bar Call · Text · Directions on the seller pages only, mounted
+  from the layout — no ranking page file edited; built-HTML diff of 14 ranking
+  pages: title, description, canonical, H1, JSON-LD, hreflang and visible text
+  IDENTICAL.
+- 09-20 (3), same batch: the owner said yes → the `/bullion` hero button pair
+  and the five real Text links (`components/cta/TextUsLink.tsx`; existing
+  wording and call links untouched) are BUILT + STAGED too. Gold / silver /
+  estate-jewelry / sell pages byte-identical; nothing removed anywhere. Gate
+  tsc 0 · lint 0 · 1522/1522 · build 0. `CHANGELOG.md` 2026-09-20 (2) + (3).
+- 🟢 **Google Ads account CREATED 09-20: 321-137-8976, under
+  info@naplesestatejewelry.com**, made through Business Manager (the route that
+  avoids the Smart funnel and the 404). Business Profile + Merchant Center
+  linked automatically; call reporting on; auto-apply off; 0 campaigns; no
+  payment method → it cannot spend. Research done; proposal
+  https://claude.ai/artifact/J7KQwYDbLyiEu8X8opQM4t **APPROVED by the owner
+  09-20: $13/day, wording as written, Spanish included.** 🟢 **Campaign "NEJ
+  Sellers - Search" (ID 24265714239) is fully BUILT and now LIVE** — five ad
+  groups (Gold, Silver and Flatware, Estate and Inherited Jewelry, Spanish;
+  Coins and Bullion paused on its own until the site push), 55 negatives,
+  sitelinks, callouts, call asset 9–6, Business Profile location asset; Search
+  Network only, presence-only Collier + Bonita Springs + Estero, EN + ES,
+  7 AM–9 PM, Maximize clicks $6.00 cap, $13.00/day, every AI/auto option off.
+  The earlier save failures were a missing PASSKEY on the info@ login (Admin →
+  Access and security → Security tasks); the owner created it and saves worked
+  at once. 🟢 **LIVE since 09-20 ~4:19 PM ET** — owner added billing and said
+  "go"; campaign Enabled at $13.00/day, "Pending" while Google reviews the ads;
+  Coins and Bullion stays paused until the site push. Weekly reports 09-27 ·
+  10-04 · 10-11 · 10-18. `TASKS.md` top · `CHANGELOG.md` 2026-09-20 (4)–(6). The old
+  shell 238-352-7909 (info@surettesystems.com) is abandoned.
+
+🟡 **09-20 — Google Ads plan APPROVED in its lean form; four seller-contact
+helpers started.** (Superseded in part by the block above: two of the four are
+now built.)
+- Rules (`DECISIONS.md` top entry): NO tracking tag (owner does not want ad
+  tracking), ads land on the existing pages UNTOUCHED, goal = any seller
+  contact (walk-ins lead), organic visibility is the overriding rule, small
+  isolated deploys are fine now.
+- 🔴 **Finding, not yet confirmed on production:** the lead forms post photos
+  raw in one request (up to 10 × 15 MB) while Netlify caps a request at 6 MB
+  (~4.5 MB of photos). Every photo submission that ever succeeded totalled
+  under 1.5 MB. Two or three iPhone photos probably fail. Owner's call: allow
+  the harmless production probe, test from the iPhone, or go straight to the
+  fix. `CHANGELOG.md` 2026-09-20.
+- Built: `src/lib/contact-links.ts` + test (not yet used by any page).
+- ◻ Owner: pick from the mockups —
+  https://claude.ai/artifact/YTKAs3Se2wzvUiPZV928TG (phone bar A or B,
+  `/bullion` buttons, the five Text-link spots).
+- ◻ Owner: create the Google Ads account (Expert Mode, no campaign). Then the
+  keyword research and the proposal. Plan file:
+  `C:\Users\rcman\.claude\plans\wondrous-twirling-bunny.md`; steps in `TASKS.md` top.
+
+🟢 **09-19 — citation look-back (read-only, no code): Apple Maps and BBB are
+both live and match the citation standard.** Apple's review passed (hours
+Mon–Fri 11–3 · Sat 11–4 · Sun closed, buyer-first About, the untrue
+delivery/curbside/appointment items gone). The BBB profile is published
+(name, address, phone, website correct; "Not Rated — under 6 months", Gold
+Buyers only; optional owner claim). `CHANGELOG.md` 2026-09-19. Nothing is
+staged; next dated reads: GSC validations ~09-20, Instagram token row Mon
+09-21 after 12:15Z.
 
 🟢 **09-18 (2) — DEPLOYED + live-verified: Text Deals admin gets "Reopen — edit & resend" (clones a sold deal into a new draft with the photo + price and a "back available" message), a real "Choose photo" button, and "Delete deal" (never mid-send; shared photos kept). `CHANGELOG.md` 2026-09-18 (2).**
 
@@ -24,7 +91,7 @@ before the first text: the four text-alert tables (`text_deals`,
 first use. Owner runs `supabase/text-alerts-service-role-grant-2026-09.sql`
 once, then Resend YES on the personal cell (the 09-16 confirmations were
 stamped sent but the carrier refused the unverified number) and the test
-plan in `TASKS.md`. Live gates still 403/403/401.** → ✅ SQL run + re-probed; **first live text round-trip PASSED 22:45Z** (sign-up → confirmation `delivered` → YES → `confirmed`) and **the full deal loop PASSED 23:08Z** (deal MMS → reply forwarded `1ST` → Mark sold → late-reply auto-reply). 🟢 **Text alerts are LIVE end to end.** 🟢 DEPLOYED + live-verified 09-17 night (all five): **`/order-lookup`** — guests open their order with the order number + the email or phone on it (no account; noindex; rate-limited; public view only), the order emails now link there with the number prefilled and print **NaplesEstateJewelry.com**; the admin order page names the shipping SERVICE bought (Priority / Express / Registered, derived from the fee — `lib/shipping-service.ts`), the `logo2.webp` retired wordmark deleted + its redirect repointed. The iPhone two-thread quirk (SMS vs MMS from the same number) is FIXED + DEPLOYED 09-17: every customer text is now an MMS with the brand picture (one-thread result CONFIRMED 09-18 on the owner's phone). 🟡 **09-18 (3) v4 DEPLOYED + owner-approved ("looks good"); v5 BUILT + STAGED, ready to push: the picture is the gold wordmark on navy + "DEALS" as a third line (`text-brand-wordmark-v5.jpg`, 800×400 — a 2:1 canvas the bubble crops to 16:9, artwork on the central 600 px so it stays whole, 22 KB, NEW file name because `/assets/*` is immutable-cached) replacing the square octopus; v1 800×300 went live 03:0xZ and the iPhone bubble cropped its edges, v2 4:3 went live 03:3xZ and showed whole but too tall, v3 5:3 built then shortened again on request, v4 approved on the phone, then DEALS added (mockup C) = v5** — verify with YES from the personal cell after the deploy. `CHANGELOG.md` 2026-09-17 (evening). `CHANGELOG.md` 2026-09-17.
+plan in `TASKS.md`. Live gates still 403/403/401.** → ✅ SQL run + re-probed; **first live text round-trip PASSED 22:45Z** (sign-up → confirmation `delivered` → YES → `confirmed`) and **the full deal loop PASSED 23:08Z** (deal MMS → reply forwarded `1ST` → Mark sold → late-reply auto-reply). 🟢 **Text alerts are LIVE end to end.** 🟢 DEPLOYED + live-verified 09-17 night (all five): **`/order-lookup`** — guests open their order with the order number + the email or phone on it (no account; noindex; rate-limited; public view only), the order emails now link there with the number prefilled and print **NaplesEstateJewelry.com**; the admin order page names the shipping SERVICE bought (Priority / Express / Registered, derived from the fee — `lib/shipping-service.ts`), the `logo2.webp` retired wordmark deleted + its redirect repointed. The iPhone two-thread quirk (SMS vs MMS from the same number) is FIXED + DEPLOYED 09-17: every customer text is now an MMS with the brand picture (one-thread result CONFIRMED 09-18 on the owner's phone). 🟢 **09-18 (3) DEPLOYED + owner-approved on the phone ("looks good", 04:1xZ): the picture is the gold wordmark on navy + "DEALS" as a third line (`text-brand-wordmark-v5.jpg`, 800×400 — a 2:1 canvas the bubble crops to 16:9, artwork on the central 600 px so it stays whole, 22 KB, NEW file name because `/assets/*` is immutable-cached) replacing the square octopus; v1 800×300 went live 03:0xZ and the iPhone bubble cropped its edges, v2 4:3 went live 03:3xZ and showed whole but too tall, v3 5:3 built then shortened again on request, v4 approved on the phone, then DEALS added (mockup C) = v5, YES → whole picture in the short bubble.** Nothing pending on text alerts. `CHANGELOG.md` 2026-09-17 (evening). `CHANGELOG.md` 2026-09-17.
 
 🟡 **09-16 — Twilio toll-free verification still *In review*** (checked in
 the console; submitted 09-15 late evening = one business day; Twilio says

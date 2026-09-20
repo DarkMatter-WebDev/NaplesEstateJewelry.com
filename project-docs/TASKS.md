@@ -1,15 +1,349 @@
 # Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-09-18**.
+> in `CHANGELOG.md`. Last reconciled: **2026-09-20**.
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-09-18 (3) — DEPLOY: text-message picture = wordmark + "DEALS" (v5; no SQL, no env vars)
+### 🟡 2026-09-20 (2) — READY TO PUSH: lead-form photo fix + phone contact bar (no SQL, no env vars)
+
+Built per `CHANGELOG.md` 2026-09-20 (2). Owner: "go with c and also test to be
+sure it works, and version b on the bar."
 
 **Owner:**
 1. ◻ Push.
-2. ◻ Say "deployed" — Claude checks the new picture URL (200, 22 KB); then text YES from the personal cell → the "You're in" reply should show NAPLES / ESTATE JEWELRY / DEALS whole in the same short bubble as v4. (v1 banner 03:0xZ: edges cropped; v2 4:3 03:3xZ: whole but too tall; v3 skipped; v4 2:1 03:4xZ approved "looks good"; v5 = v4 + DEALS, mockup C approved.)
+2. ◻ **iPhone test (the production proof — a dev server has no 6 MB cap):** open
+   `naplesestatejewelry.com/free-evaluation` in Safari → add **4 or more**
+   camera-roll photos → fill the form honestly marked as a test → Send. Expect
+   "Submission received!" within a few seconds and the email with 4+ photo
+   links. Before this fix that submission should have failed. Then say so —
+   Claude reads the Storage objects (expect `.webp`, a few hundred KB each). The
+   test lead stays in Admin → Inquiries (only the owner can delete it).
+3. ◻ On the phone, open `/gold-services`: the Call · Text · Directions bar sits
+   at the bottom; Text opens Messages to (239) 404-8505 with "Hi, I have
+   something I'd like to sell. Sending photos:"; Directions opens Maps at the
+   showroom. It must NOT appear on the homepage, shop, checkout or `/card`.
+4. ✅ Owner said yes 09-20 → BUILT + STAGED in this same batch
+   (`CHANGELOG.md` 2026-09-20 (3)): the `/bullion` button pair and the five
+   Text-link spots. After the push, on the phone: `/bullion` shows FREE
+   APPRAISAL + CALL under the paragraph; MENU ends with "Call (239) 404-8505"
+   and "Text Us"; `/sell/naples` showroom block has a TEXT US pill.
+5. 🟡 **09-20 — owner APPROVED: $13/day, the ad wording as written, Spanish
+   INCLUDED. Campaign "NEJ Sellers - Search" is a saved DRAFT ("Drafts in
+   progress: 1", Campaigns (0), $0.00/day) — BLOCKED on Google's "Confirm it's
+   you" re-authentication, which only the owner can do.** Google will not save
+   a BUDGET until the signed-in person re-confirms their identity (the dialog
+   offered Skip once — until Oct 4 — then only Cancel / Confirm; with it
+   skipped the draft shows "Budget: Value is required" and "Changes failed to
+   save"). ◻ **Owner:** in Google Ads (info@ login) open Campaigns → Drafts →
+   "NEJ Sellers - Search" → Budget → when "Confirm it's you" appears click
+   **Confirm** and complete Google's sign-in check; then say so.
+   Saved in the draft (verified on the Review page): Search network ONLY
+   (Search Partners + Display unticked — both are ON by default), locations
+   Collier County + Bonita Springs + Estero with **Presence** only (default is
+   "Presence or interest"), English + Spanish, ad schedule all days 7:00 AM–9:00
+   PM, bidding Maximize clicks with a **$6.00** max CPC, AI Max OFF (the three
+   switches read `aria-checked=false`; the Review line "Text customization and
+   Final URL expansion turned on" is Google's wording, re-check after publish),
+   keyword/asset AI generation skipped, enhanced conversions UNTICKED (it is
+   pre-ticked and carries data-processing terms), ad group 1 = Gold: 10 phrase
+   keywords → `https://naplesestatejewelry.com/gold-services` (path
+   /sell-gold/naples), one responsive search ad with the 11 approved headlines
+   (23/27/28/23/17/21/16/28/26/23/22 chars) + 4 descriptions (87/82/87/83); the
+   preview already shows the Business Profile address as the location asset.
+   ⚠️ Google pre-selects **$76.89/day** as the "recommended" budget — always
+   choose "Set custom budget". Google's own estimate at $13/day: ~51 clicks a
+   week at ~$1.78 = ~$91 a week. ⚠️ The wizard forces a conversion GOAL: "Get
+   directions" was chosen with "set up manually using code after" = an empty
+   placeholder conversion action, NO code goes on the site (remove it from Goals
+   later if it gets in the way).
+   **09-20, later — the confirmation is NOT sticking.** The owner reopened the
+   draft; the **$13.00 budget then SAVED** ("All changes saved", Budget ticked)
+   and the settings (Search only, 3 locations + Presence, EN+ES, 7 AM–9 PM,
+   Clicks + $6.00 cap) survived. The **Gold keywords and the ad did NOT** — the
+   earlier "Changes failed to save" was real, the step reopened empty.
+   Re-entering them brought "Confirm it's you" straight back (now "Skip / Try
+   again"), and each failed save stacked a "Fix errors — Discard / Fix errors"
+   dialog on top (two copies; clicking Fix errors does not clear them). Claude
+   left the page without discarding; the draft still exists ("Drafts in
+   progress: 1", Campaigns (0)). Likely cause: the ad blocker / pop-up blocker
+   is stopping Google's verification window — the dialog itself offers "Blocked
+   during authentication?" and EVERY Google Ads page in this Chrome shows "Turn
+   off ad blockers — Google Ads can't work when you're using an ad blocker".
+   ◻ **Owner:** (1) pause the ad blocker (the "Pie" extension) on
+   ads.google.com and allow pop-ups for ads.google.com; (2) reload Google Ads,
+   open the draft → Keywords and ads, type anything in the keyword box → when
+   "Confirm it's you" appears click Confirm / Try again and finish Google's
+   check in the window it opens; (3) say so. Extension and pop-up settings are
+   the owner's to change — Claude does not touch them.
+   **09-20, third pass:** owner paused the ad blocker + confirmed; Claude
+   re-entered the Gold keywords and the full ad (11 headlines, 4 descriptions —
+   all counters registered, ad card shown). On Next → Budget, "Confirm it's
+   you" (Cancel / Confirm) fired AGAIN with "Changes failed to save": the
+   confirmation appears to cover ONE save, and Google re-challenges on the next
+   sensitive write (possibly because the clicks are automated). ⛔ Claude does
+   not click Confirm — it is the owner's identity check. The page was left
+   exactly there, dialog up, data still in the page. ◻ **Owner, at the
+   keyboard:** click **Confirm** on that dialog, finish the check, do NOT close
+   or reload the tab, then say "confirmed" — Claude continues on the same page
+   (set $13 if blank → Review → Publish → pause), and the owner may need to
+   click Confirm once or twice more along the way. Practical alternative if it
+   keeps looping: the owner clicks through Budget → Review → Publish themself
+   (three clicks; everything is already filled in) and Claude pauses the
+   campaign and builds the rest afterwards.
+   🔴 **09-20, ROOT CAUSE FOUND — Google Ads wants a PASSKEY on the info@
+   login.** Admin → Access and security → Summary → Security tasks: "**Create a
+   passkey** — Create a passkey to authorize sensitive actions … ⚠ 1 admin,
+   billing or standard user has not created a passkey … **New passkeys take 1
+   to 2 days to pair with Ads.**" (also open: "Review domains"; "Review users"
+   ✓). Budgets, keywords and ads are "sensitive actions": without the passkey
+   every such save raises "Confirm it's you" and is rejected even after the
+   owner confirms (4th pass: owner confirmed → Claude set $13, Review read
+   "ready to publish · 10 keywords · 1 ad · $13.00/day" but NO Publish button
+   rendered and the indicator stayed "Changes failed to save"; the
+   `BatchService/Batch[Draft, Budget, Campaign, AdGroup, AdGroupCriterion,
+   AdGroupAd .Mutate]` call answered HTTP 200 yet nothing persisted — reopening
+   the draft showed Keywords-and-ads and Budget empty again). What DOES persist
+   (non-sensitive): name, Search-only network, the 3 locations + Presence, EN+ES,
+   7 AM–9 PM schedule, Clicks + $6.00 cap, AI Max off.
+   ◻ **Owner (security setting — Claude does not touch it):** Google Ads →
+   Admin → Access and security → Security tasks → **Create a passkey → "Go to
+   setting"** and create it for info@naplesestatejewelry.com (Windows Hello /
+   phone). Then wait for it to pair (Google says 1–2 days) and say so. Optional:
+   "Review domains".
+   🟢 **09-20, UNBLOCKED + PUBLISHED + PAUSED.** The owner created the passkey
+   and clicked "Update allowed domains" (naplesestatejewelry.com kept as Allow);
+   saves went through at once (no 1–2 day wait): budget $13.00 "All changes
+   saved", Gold keywords + ad saved, Review "ready to publish" with a real
+   Publish button → **campaign "NEJ Sellers - Search" published (campaign ID
+   24265714239) and PAUSED within the minute** — row reads "$13.00/day ·
+   Paused", Total: Account $0.00/day. Banner: "Your account cannot show ads —
+   enter your billing information" (no payment method → it could not have
+   served). Google's post-publish "Set up with a Google Tag" page was skipped
+   (no tag, by the owner's decision).
+   🟢 **09-20, BUILD COMPLETE — campaign still PAUSED, cannot spend.** 55
+   campaign negatives · five ad groups with one ad each: Gold →
+   `/gold-services`, Silver and Flatware → `/silver-services`, Estate and
+   Inherited Jewelry → `/estate-jewelry`, Spanish - Vender Oro →
+   `/es/gold-services`, **Coins and Bullion → `/bullion` (ad group PAUSED on its
+   own until the site push)** · sitelinks (Free Appraisal, Sell Gold, Sell
+   Silver, Read Our Reviews) · callouts · call asset (239) 404-8505 daily 9–6 ·
+   account-level Business Profile location asset. Settings read back after the
+   build: Search Network only, Collier + Bonita Springs + Estero **Presence**,
+   EN + ES, 7 AM–9 PM daily, Maximize clicks $6.00 cap, $13.00/day, AI Max /
+   text customization / URL expansion / auto-created assets / broad match all
+   OFF. Record: `CHANGELOG.md` 2026-09-20 (5).
+   🟢 **09-20 ~4:19 PM ET — LIVE.** Owner: "billing added, go." Campaign set
+   to Enabled at $13.00/day (the only change); row reads "Pending" while Google
+   reviews the ads; Coins and Bullion ad group still Paused. `CHANGELOG.md`
+   2026-09-20 (6).
+   - ✅ Owner added the payment method · ✅ owner said "go".
+   - ◻ **Claude, 09-21 or 09-22:** confirm the ads left review (any
+     disapproval → fix wording, never the site), first impressions appear, the
+     location list shows the Shirley St showroom.
+   - ◻ **Weekly reports: 09-27 · 10-04 · 10-11 · 10-18** (spend, clicks, calls
+     from the ad, directions taps, search-terms sweep → new negatives; week 4 =
+     keep, adjust or stop).
+   - ◻ **Owner, optional:** auto-tagging off (no site tag, so `gclid` does
+     nothing) — say yes and Claude flips it.
+   - ◻ **After the site push:** enable the Coins and Bullion ad group.
+   (superseded) ◻ **Claude, once the passkey has paired:** re-enter the Gold keywords + ad
+   (scripted, ~1 minute), set $13, Publish → PAUSE at
+   once (there is no "create paused" option; no payment method = cannot serve
+   anyway) → add ad groups Silver & flatware → `/silver-services`, Estate &
+   inherited → `/estate-jewelry`, Coins & bullion → `/bullion` (keep paused
+   until the site push), Spanish → `/es/gold-services` → campaign negatives →
+   sitelinks, callouts, call asset scheduled 9–6 → show the owner every setting.
+   Proposal: https://claude.ai/artifact/J7KQwYDbLyiEu8X8opQM4t
+   - ◻ Daily budget: $10 / **$13 (recommended)** / $16.
+   - ◻ Ad wording (section 4): yes or edits. Spanish ad group: yes / hold.
+   - ◻ Add the payment method (Billing → Settings) — owner only; check Billing
+     → Promotions for the "$500 after $500 spend" credit.
+   - ◻ Optional: auto-tagging off (no site tag, so `gclid` does nothing).
+   - Then Claude builds the campaign PAUSED and shows every setting; live only
+     on the owner's go. Coins & bullion ad group waits for the site push (the
+     `/bullion` hero buttons). Weekly report for the first month.
+   - Record: `CHANGELOG.md` 2026-09-20 (4). (History of how the account was
+     reached follows.)
+   (history) **a shell already existed: 238-352-7909, "Setup in
+   progress", login info@surettesystems.com**, stuck in the Smart-campaign
+   sign-up funnel with no Expert Mode exit on that step. Owner decides:
+   (a) which Google login should own the ads (info@surettesystems.com as now,
+   or the login that owns the Business Profile / info@naplesestatejewelry.com);
+   (b) how to get an account WITHOUT a Smart campaign — either "New Google Ads
+   Account" on `ads.google.com/nav/selectaccount` (the fresh flow shows "Switch
+   to Expert Mode" → "Create an account without a campaign"), or a free manager
+   account (ads.google.com/home/tools/manager-accounts) that creates the client
+   account with no campaign and no billing up front — sensible for Surette
+   Systems, which runs many client sites. Creating the account and billing are
+   the owner's clicks; Claude does everything after (link the Business Profile,
+   call reporting, auto-apply off, Keyword Planner, the proposal). Also turn
+   off the ad blocker for ads.google.com — Google Ads refuses to load fully
+   with it on.
+   ⭐ **09-20 owner decision: the ads account should use the SAME login as the
+   Business Profile, and that login should be info@naplesestatejewelry.com.**
+   Read in Chrome (nothing changed): Business Profile → People and access =
+   **Chris Surette, Primary owner, info@surettesystems.com** + **PENDING:
+   info@naplesestatejewelry.com, Owner** — the invitation was already sent and
+   never accepted. That login is account #4 in the owner's Chrome but signed
+   out ("Verify it's you"). Owner: sign in as info@naplesestatejewelry.com →
+   accept the Business Profile invitation (email from Google, or
+   business.google.com → the invitation banner) → then, still as info@, open
+   ads.google.com → Expert Mode → "Create an account without a campaign". That
+   login has no ads account yet, so the 404 block below may not apply — but it
+   is a Workspace login too, so it still might. Optional later: People and
+   access → transfer primary ownership to info@ (Google makes a new owner wait
+   7 days first).
+   **09-20, later still — invite RE-SENT, email NOT arriving.** Owner signed in
+   as info@naplesestatejewelry.com (authuser 4). That mailbox held NO
+   Business Profile invite (searched `in:anywhere`, incl. Spam/Trash) and
+   `business.google.com/u/4/locations` shows "0 businesses", no invitation.
+   The pending entry offers only "Cancel invitation" (no resend), so on the
+   owner's request to add info@ Claude cancelled it and re-added
+   info@naplesestatejewelry.com as **Owner** → Pending again. ~4 minutes later
+   still no email and nothing in the info@ Business Profile manager. Other
+   Google mail DOES reach that inbox (Search Console, 09-19). ◻ Owner: check
+   the inbox again in 15–30 min (search `from:businessprofile-noreply@google.com`,
+   and the Workspace admin quarantine if there is one). Found on the way: the
+   profile sits inside a Google **Business Manager** organization "Naples
+   Estate Jewelry" (om-6664439942685358256; tabs Apps and services · Stores ·
+   People and access · Payments profile) whose only super admin is
+   info@surettesystems.com. Adding info@ there was NOT done — it is a broader
+   grant (apps + payments profile) than a Business Profile owner, and the
+   owner has not asked for it. It may turn out to be the working route.
+   ✅ **09-20 10:13 — Business Manager route WORKED.** Owner: "go into the
+   organization and add it there.. i own both emails." Claude sent the super
+   admin invitation from info@surettesystems.com (Business Manager → People and
+   access → Add person); the email "Invite to manage apps for Naples Estate
+   Jewelry" (businessmanager-noreply@google.com) reached the info@ inbox within
+   a minute and the OWNER accepted it. Verified as info@ (authuser 4): People
+   and access lists BOTH logins as Super admin; Apps and services shows 2 linked
+   (Merchant Center 5836867944, Google Business Profile). The Business Profile
+   itself is still not listed under info@ ("0 businesses") — super admins no
+   longer get automatic app access and the separate Owner invite email still
+   has not arrived; not needed for ads.
+   ⭐ **The clean ads route:** Business Manager (as info@) → Apps and services →
+   **Add service → Google Ads → Next** = "Link to Google Ads · New account —
+   Create a new Google Ads account that will automatically be linked to Business
+   Manager": name prefilled "Naples Estate Jewelry Google Ads account" + Country
+   + Time zone + Currency. No campaign, no billing screen, no Smart funnel.
+   Claude stopped there with the dialog open (creating the account is the
+   owner's click). ◻ Owner: Country **United States** · Time zone **(GMT-05:00)
+   Eastern Time** · Currency **US Dollar** → Next → confirm. ⚠️ Time zone and
+   currency can never be changed afterwards. Then say so → Claude takes over
+   (link the Business Profile as a location asset, call reporting, auto-apply
+   off, Keyword Planner, proposal).
+   🔴 **09-20 later — "New Google Ads Account" → "Create a new account" 404s
+   on this login** (reproduced: `ads.google.com/signup?fna=true…` loads 200,
+   then redirects to `/404`; same with the bare `/signup?fna=true`). Per Google's
+   community experts this 404 is a deliberate block on creating a NEW account
+   for the signed-in person — typical triggers: the login already has an ads
+   account (here the unfinished shell), a Workspace login, VPN. It is not a
+   site or browser bug to debug. Ways forward, owner's choice: (1) on the
+   account picker use "Switch Google account" to a plain Gmail that has never
+   had Google Ads (e.g. the personal Gmail), create the campaign-free account
+   in Expert Mode there, then add info@ as a user and make that Gmail a manager
+   of the Business Profile so it can be linked; (2) if that 404s too, finish the
+   existing shell 238-352-7909 through the Smart funnel with the smallest
+   budget, and the moment it lands in the account PAUSE the campaign and switch
+   to Expert Mode (Tools → "Switch to Expert Mode") — a new campaign sits in
+   review before it can serve, so pausing at once means no spend; this path
+   also keeps the Business-Profile promo attached.
+
+**Claude, after the push (on your word):** curl `/gold-services` and `/` for the
+bar (present / absent), read the new Storage objects after the iPhone test.
+
+**Gate (whole batch, after (3)):** `npx tsc --noEmit` 0 · `npm run lint` 0 (3
+known `<img>` warnings) · `npx vitest run` **1522/1522 (151 files)** · `npm run
+build` exit 0 from a deleted `.next`, no Turbopack build cache. Built-HTML
+diffs: (2) 14 ranking pages identical apart from the bar's `<nav>`; (3) gold /
+silver / estate-jewelry / sell / sell/fort-myers identical, nothing removed
+anywhere, added text only on `/sell/naples`, `/bullion` and the homepage owner
+block.
+
+**Staging (Google Ads build record, docs only):** ✅ synced 2026-09-20 — dry
+run listed exactly 3 files (CHANGELOG, CURRENT_STATUS, TASKS), 0 Extras, 1152
+total; real run copied 3 / 0 FAILED (exit 1 = copied only); follow-up dry run
+0/0/0; leak check 0 `.env*` / `.log`; `.tsx` control present; SHA-256 MATCH 3
+of 3. No app code changed by the ads build. Docs-only re-sync after this line:
+dry run 1 (TASKS.md) → copied → follow-up 0.
+
+**Staging (Text links + `/bullion` buttons):** ✅ synced 2026-09-20 — dry run
+listed exactly the 12 touched files (2 NEW: `components/cta/TextUsLink.tsx`,
+`__tests__/text-us-links.test.ts`; 6 modified: `(home)/page.tsx`,
+`bullion/page.tsx`, `free-evaluation/page.tsx`, `sell/[city]/page.tsx`,
+`SiteHeader.tsx`, `ProductTrustSections.tsx`; 4 docs: CHANGELOG,
+CURRENT_STATUS, STRUCTURE, TASKS), 0 Extras, 1152 total (= 1150 + 2); real run
+copied 12 / 0 FAILED (exit 1 = copied only); follow-up dry run 0/0/0, exit 0;
+leak check 0 `.env*` / `.log`, 0 `.git`; positive control 219 = 219 `.tsx`;
+SHA-256 MATCH 11 of 11 (8 code files + CHANGELOG, STRUCTURE, CURRENT_STATUS).
+Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+**Staging (photo fix + contact bar):** ✅ synced 2026-09-20 — dry run listed
+exactly the 18 touched files (6 NEW: `components/cta/MobileContactBar.tsx`,
+`lib/contact-bar-paths.ts`, `lib/lead-photo-encode.ts`, `lib/lead-photo-prep.ts`,
+`__tests__/lead-photo.test.ts`, `__tests__/mobile-contact-bar.test.ts`; 6
+modified: `globals.css`, `[locale]/layout.tsx`, `api/inquire/route.ts`,
+`api/contact-message/route.ts`, `EvalForm.tsx`, `MessageUsForm.tsx`; 6 docs:
+CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS, features/lead-capture)
++ 1 new dir, 0 Extras, 1150 total (= 1144 + 6); real run copied 18 / 0 FAILED
+(exit 1 = copied only); follow-up dry run 0/0/0, exit 0; leak check 0 `.env*` /
+`.log`, 0 `.git`; positive control 218 = 218 `.tsx`; SHA-256 MATCH on the 10
+code files + CHANGELOG, DECISIONS (12 of 12). Docs-only re-sync after this
+line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### 🟡 2026-09-20 — Google Ads (lean: no tracking tag) + four seller-contact helpers — owner choices needed
+
+Rules: `DECISIONS.md` top entry. Record: `CHANGELOG.md` 2026-09-20. Plan:
+`C:\Users\rcman\.claude\plans\wondrous-twirling-bunny.md`.
+
+**Owner:**
+1. ◻ **Photo upload (S1).** Finding: the forms send photos raw in one request
+   (up to 10 × 15 MB); Netlify caps a request at 6 MB (~4.5 MB of photos); no
+   photo submission above 1.5 MB has ever succeeded. Not yet confirmed on
+   production — pick one: (a) allow the harmless probe (honeypot-filled dummy
+   uploads; nothing stored, no row, no email), (b) try the free-evaluation form
+   from the iPhone with 4 camera-roll photos, or (c) go straight to the fix
+   (browser downscale to 2048 px + server WebP — what the upload rule requires
+   anyway; verified on the iPhone before it ships).
+2. ◻ **Mockups** — https://claude.ai/artifact/YTKAs3Se2wzvUiPZV928TG : phone
+   bar version A (Call · Text) or B (Call · Text · Directions, recommended);
+   the `/bullion` button pair; the five Text-link spots. Say yes / change.
+3. ◻ **Create the Google Ads account** — ads.google.com → when it offers to
+   build a campaign, choose **"Switch to Expert Mode"** → **"Create an account
+   without a campaign"**. Billing is yours. The "$500 after $500 spend" credit
+   is your call (declined on purpose before); it must not raise the budget.
+   Then say so — Claude links the Business Profile, turns call reporting on and
+   auto-apply off (with your OK), runs Keyword Planner + the per-keyword organic
+   check, and brings a proposal with an exact daily number. Nothing goes live
+   without your yes.
+
+**Claude, after the yes on each:** S2 Text links → S3 `/bullion` → S4 bar, each
+its own gate (tsc · lint · vitest · build from a deleted `.next`) + built-HTML
+diff of gold / silver / estate-jewelry / free-evaluation / sell / sell/naples
+(EN + ES) + staging sync. Weekly ads report for the first month once live.
+
+**Built so far:** `src/lib/contact-links.ts`, `lib/__tests__/contact-links.test.ts`,
+an `sms:` case in `route-progress-bar.test.ts`. No page imports it yet → no
+visible change, nothing worth a deploy on its own.
+
+**Gate:** `npx tsc --noEmit` 0 · `npm run lint` 0 (3 known `<img>` warnings)
+· `npx vitest run` **1462/1462 (148 files)** · `npm run build` exit 0 from a
+deleted `.next`, no Turbopack build cache.
+
+**Staging (contact-links + Google Ads docs):** ✅ synced 2026-09-20 — dry run
+listed exactly the 8 touched files (NEW `lib/contact-links.ts`,
+`__tests__/contact-links.test.ts`; `route-progress-bar.test.ts`; CHANGELOG,
+CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS), 0 Extras, 1144 total (= 1142 +
+2); real run copied 8 / 0 FAILED (exit 1 = copied only); follow-up dry run
+0/0/0, exit 0; leak check 0 `.env*` / `.log`, 0 `.git`; positive control 217 =
+217 `.tsx`; SHA-256 MATCH on the 3 code files + CHANGELOG, DECISIONS,
+STRUCTURE, CURRENT_STATUS. Docs-only re-sync after this line: dry run 1
+(TASKS.md) → copied → follow-up 0. Nothing here needs a push on its own.
+
+### 🟢 2026-09-18 (3) — DONE: text-message picture = wordmark + "DEALS" (v5 deployed, owner: "looks good")
+
+1. ✅ Pushed + deployed; v5 URL 200/21827 bytes = local; YES → NAPLES / ESTATE JEWELRY / DEALS whole in the short bubble (04:1xZ). Rule in `DECISIONS.md` → *"Text alerts: every customer-facing text is a picture message"* (2:1 canvas, artwork inside the central 600 px, NEW file name per change). History: (v1 banner 03:0xZ: edges cropped; v2 4:3 03:3xZ: whole but too tall; v3 skipped; v4 2:1 03:4xZ approved "looks good"; v5 = v4 + DEALS, mockup C approved.)
 
 ### 🟢 2026-09-18 — DEPLOYED + live-verified: Mark sold → buyer confirmation (MMS delivered) · Reopen / Choose photo / Delete deal all exercised on production — late-reply auto-reply verified 02:58Z; nothing pending
 
@@ -685,7 +1019,8 @@ history.**
   - An `error` on 09-28 means re-pasting the token before 09-30.
 - ~09-28: brand SERP site-name line (first recheck after the 09-14 re-crawl
   request).
-- ~09-18: Apple place card, BBB.
+- ✅ 2026-09-19: Apple place card + BBB read — both PASS (`CHANGELOG.md`
+  2026-09-19; detail in the 09-11 citation block below).
 - ~09-20: GSC validations ("Page with redirect", "Blocked by robots.txt").
 - ~09-24: Yelp ad metrics.
 - ~10-09: free-appraisal calls look-back.
@@ -1053,7 +1388,7 @@ LLAMAR buttons, QR claim removed. No SQL, no env vars.
   anything that will get us calls"): the `/sell` EN/ES button wording
   mismatch and the admin banner link-option label. Do not reopen.
 
-### ◻ 2026-09-11 — Citation (NAP) campaign: Steps 1–5 DELIVERED; owner actions open (Apple hours, Bing publish, BBB add, trade directories)
+### ◻ 2026-09-11 — Citation (NAP) campaign: Steps 1–5 DELIVERED; ✅ Apple + BBB live and correct (checked 09-19); owner actions open (D&B Profile Manager, trade directories)
 
 Report (private artifact, owner's reference — master record, audit, checklists,
 two outreach emails, Moz Local vs Yext): https://claude.ai/code/artifact/441be9e1-19c3-4627-b4fe-fef5bc7a08ae
@@ -1128,7 +1463,15 @@ on the public records:
   offered (In-Store Pickup kept — checkout has Local Pickup). Address left as
   stored "Suite 104" (displays "Ste 104"; editing risks re-verification).
   Category stays "Gold Buyer". ◻ Owner's call: Apple suggests adding a
-  backup account to avoid lockout. ◻ Recheck the public place card ~09-18.
+  backup account to avoid lockout. ✅ **Public place card rechecked
+  2026-09-19 (maps.apple.com, owner's Chrome, read-only): the review PASSED
+  and everything is live** — hours Sun Closed · Mon–Fri 11:00AM–3:00PM · Sat
+  11:00AM–4:00PM; the buyer-first About ("…Calls answered daily, 9 AM–6 PM…");
+  Good to Know (expanded) has 0 hits for Delivery / Curbside / Appointment /
+  No-Contact / Same-Day and keeps In-Store Pickup + Walk-Ins Welcome; NAP =
+  6240 Shirley St · Ste 104 · Naples, FL 34109 · +1 (239) 404-8505 ·
+  naplesestatejewelry.com; category Gold Buyer. Nothing left on Apple except
+  the optional backup account.
 
 **09-11 (later) — follow-through in the owner's Chrome:**
 - ✅ **GIA Retailer Lookup SUBMITTED** by the owner (form pre-filled by us:
@@ -1137,8 +1480,20 @@ on the public records:
   store phone / info@). "Submitted for review" — ◻ watch info@ for GIA's
   approval, then search 34109 on the Retailer Lookup.
 - ✅ **BBB free profile SUBMITTED by the owner 09-11** (bbb.org "Thank you
-  for submitting" page seen). ◻ Owner confirms BBB's email to info@; recheck
-  bbb.org search for the profile ~09-18.
+  for submitting" page seen). ✅ **Rechecked 2026-09-19: the profile is
+  PUBLISHED** —
+  https://www.bbb.org/us/fl/naples/profile/gold-buyers/naples-estate-jewelry-0653-90465534
+  (first result for the name near Naples, FL). Naples Estate Jewelry · 6240
+  Shirley St Ste 104 · Naples, FL 34109-6254 · (239) 404-8505 · Visit Website
+  → https://naplesestatejewelry.com/ — all match the citation standard.
+  Alternate name Naples Antiques LLC; Christopher Surette, Owner; BBB of West
+  Florida; file opened 9/11/2026; NOT accredited (not sought). Two things to
+  know, neither an error: only **Gold Buyers** shows as a category (Estate
+  Jewelry + Silver Buyers were submitted), and the rating reads **"Not Rated
+  … in business less than 6 months"** — BBB dates the business from the file,
+  the same 2010-vs-2026 wording question already on the owner's list. ◻
+  Owner, optional: the profile's "Own this business?" link claims it (a BBB
+  account — the way to add hours, the two categories and a start date).
 - (was) ◻ **BBB free profile — form PRE-FILLED, owner clicks "Create Profile"**
   (bbb.org/get-listed → I own a business). Categories Gold Buyers, Estate
   Jewelry, Silver Buyers. Not clicked by us: it creates a BBB account and
@@ -1151,6 +1506,14 @@ on the public records:
   "Microsoft account" and reads the status.
 - Owner-only still: Apple Business Connect hours/About, JA (paid), JBT
   (needs principals/references), Chamber + partner emails.
+
+**Staging (Apple + BBB look-back, docs only):** ✅ synced 2026-09-19 — dry
+run listed exactly the 3 touched files (CHANGELOG, CURRENT_STATUS, TASKS), 0
+Extras, 1142 total; real run copied 3 / 0 FAILED (exit 1 = copied only);
+follow-up dry run 0/0/0, exit 0; leak check 0 `.env*` / `.log`, 0 `.git`;
+positive control 217 = 217 `.tsx`; SHA-256 MATCH on all 3. Docs-only re-sync
+after this line: dry run 1 (TASKS.md) → copied → follow-up 0. Nothing to
+push — no app code changed.
 
 (Step 1 baseline record, 09-10 night:)
 

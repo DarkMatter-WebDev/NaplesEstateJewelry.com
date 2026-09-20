@@ -71,9 +71,10 @@ describe('route progress bar — when it arms', () => {
     expect(shouldArmProgressBar(intent({ href: 'https://example.com/anything' }))).toBe(false);
   });
 
-  it('does not arm for mailto: or tel:', () => {
+  it('does not arm for mailto:, tel: or sms:', () => {
     expect(shouldArmProgressBar(intent({ href: 'mailto:info@naplesestatejewelry.com' }))).toBe(false);
     expect(shouldArmProgressBar(intent({ href: 'tel:+12394048505' }))).toBe(false);
+    expect(shouldArmProgressBar(intent({ href: 'sms:2394048505?&body=Hi' }))).toBe(false);
   });
 
   it('does not arm when the link opens a new tab', () => {

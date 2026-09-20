@@ -10,6 +10,7 @@ import TradingViewMini from '@/components/trading/TradingViewMini';
 import TradingViewTicker from '@/components/trading/TradingViewTicker';
 import { AppIcon } from '@/components/AppIcon';
 import ClayMark from '@/components/ClayMark';
+import { phoneHoursLabel } from '@/lib/business-location';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -101,6 +102,23 @@ export default async function BullionPage({ params }: Props) {
                 ? 'Servicios privados de metales preciosos para lingotes de oro y plata, monedas, plata esterlina, platino, paladio y metales de chatarra, con pruebas claras, matemáticas de mercado en vivo y pago el mismo día.'
                 : 'Private precious-metals estate services for gold and silver bullion, coins, sterling silver, platinum, palladium, and scrap metals, with clear testing, live-market math, and same-day payment. We explain the numbers before you decide.'}
             </p>
+            {/* The pair every other seller lander's hero carries (DECISIONS →
+                "Hero buttons on the buy-side landers include the phone"). This
+                hero had nothing to tap until 2026-09-20 (owner-approved mockup). */}
+            <div className="mt-8 flex flex-wrap justify-center gap-4">
+              <Link href={isEs ? '/es/free-evaluation' : '/free-evaluation'} className="gold-button">
+                {isEs ? 'TASACIÓN GRATUITA' : 'FREE APPRAISAL'}
+              </Link>
+              <a
+                href="tel:2394048505"
+                className="outline-button"
+                style={{ borderColor: 'rgba(255,255,255,0.48)', color: 'white', background: 'rgba(255,255,255,0.08)', gap: '0.5rem' }}
+              >
+                <AppIcon name="call" className="text-[1rem]" />
+                {isEs ? 'LLAMAR (239) 404-8505' : 'CALL (239) 404-8505'}
+              </a>
+            </div>
+            <p className="mt-4 text-sm text-[#d7d0c3]">{phoneHoursLabel(isEs)}</p>
           </div>
         </section>
 

@@ -12,6 +12,7 @@ import ShowroomAddress from '@/components/ShowroomAddress';
 import { hoursSegmentsCompact, mapsUrl, phoneHoursLabel } from '@/lib/business-location';
 import { getStoreHours } from '@/lib/store-hours';
 import { SERVICE_AREAS } from '@/lib/service-areas';
+import TextUsLink from '@/components/cta/TextUsLink';
 
 // 2026-09-11 (owner): this page leads with CALLING and VISITING, not with the
 // photo form. The free-evaluation calls were the valuable ones, people who
@@ -691,6 +692,10 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
                   <a href="tel:2394048505" className="gold-button">
                     {isEs ? 'Llame o Envíe un Texto a Chris' : 'Call or Text Chris'}
                   </a>
+                  {/* The button above only dials; this one really texts (2026-09-20). */}
+                  <TextUsLink isEs={isEs} opening="seller" className="outline-button" style={{ gap: '0.5rem' }}>
+                    {isEs ? 'Texto a Chris' : 'Text Chris'}
+                  </TextUsLink>
                 </div>
               </div>
             </div>

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { createAdminNotification } from '@/lib/admin-notify';
 import { PRODUCT_IMAGES_BUCKET } from '@/lib/product-image-storage';
+import { encodeLeadPhoto } from '@/lib/lead-photo-encode';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { normalizePhoneNumber, phoneErrorMessage } from '@/lib/phone';
 import {
@@ -158,11 +159,11 @@ export async function POST(req: Request) {
     const bucket = service.storage.from(PRODUCT_IMAGES_BUCKET);
     for (const file of accepted) {
       try {
-        const ext = (file.name.split('.').pop() ?? 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
-        const path = `messages/${crypto.randomUUID()}.${ext}`;
-        const buffer = Buffer.from(await file.arrayBuffer());
-        const { error: upErr } = await bucket.upload(path, buffer, {
-          contentType: file.type || 'image/jpeg',
+        // Re-encoded to WebP (original bytes kept if sharp cannot read them).
+        const photo = await encodeLeadPhoto(file);
+        const path = `messages/${crypto.randomUUID()}.${photo.extension}`;
+        const { error: upErr } = await bucket.upload(path, photo.buffer, {
+          contentType: photo.contentType,
           cacheControl: '31536000',
           upsert: false,
         });

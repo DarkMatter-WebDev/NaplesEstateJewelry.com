@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { AppIcon } from '@/components/AppIcon';
+import TextUsLink from '@/components/cta/TextUsLink';
 import { addressWithLandmark, streetLine } from '@/lib/business-location';
 
 // Product-page trust layer (owner request 2026-08-04, modeled on the
@@ -72,7 +73,8 @@ export function ProductPolicyAccordions({ isEs, prefix, pickupHoursLine }: Props
               El pago funciona con PayPal — pague de forma segura con cualquier tarjeta de crédito o débito
               o con su saldo de PayPal; no se requiere cuenta. En compras que califiquen, PayPal Pay Later
               puede dividir su pago en cuotas, directamente al pagar. ¿Compra en persona? La recogida local
-              es gratuita en {streetLine()} — llame o envíe un mensaje al{' '}
+              es gratuita en {streetLine()} — llame o{' '}
+              <TextUsLink isEs icon={false} className="product-trust-link">envíe un mensaje</TextUsLink> al{' '}
               <a href="tel:2394048505" className="product-trust-link">(239) 404-8505</a>.
             </>
           ) : (
@@ -80,7 +82,8 @@ export function ProductPolicyAccordions({ isEs, prefix, pickupHoursLine }: Props
               Checkout is powered by PayPal — pay securely with any major credit or debit card or your
               PayPal balance; no account required. On qualifying purchases, PayPal Pay Later can split your
               payment into installments, right in checkout. Buying in person? Local pickup is free at
-              {' '}{streetLine()} — call or text{' '}
+              {' '}{streetLine()} — call or{' '}
+              <TextUsLink isEs={false} icon={false} className="product-trust-link">text</TextUsLink>{' '}
               <a href="tel:2394048505" className="product-trust-link">(239) 404-8505</a>.
             </>
           )}

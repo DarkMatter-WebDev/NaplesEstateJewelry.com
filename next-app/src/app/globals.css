@@ -3098,6 +3098,69 @@ body:has(main[data-no-cookie-notice]) [data-cookie-notice] {
   display: none;
 }
 
+/* Phone contact bar — Call · Text · Directions on the seller pages
+   (components/cta/MobileContactBar.tsx; owner-approved mockup B, 2026-09-20).
+   Phones only (`md:hidden` on the element). Fixed, so it shifts no layout; the
+   two :has() rules below give the page room for it and lift the cookie notice
+   clear of it, both server-rendered and JS-free like the /card rule above. */
+.mobile-contact-bar {
+  --mobile-contact-bar-height: 3.5rem;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  gap: 0.375rem;
+  min-height: var(--mobile-contact-bar-height);
+  padding: 0.4375rem 0.5rem calc(0.4375rem + env(safe-area-inset-bottom, 0px));
+  background: rgba(20, 22, 22, 0.97);
+  border-top: 1px solid rgba(233, 195, 73, 0.55);
+}
+.mobile-contact-bar a {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 2.625rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  border-radius: 999px;
+  border: 1px solid rgba(242, 202, 80, 0.4);
+  color: #ecdcb0;
+  font-family: var(--font-label);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.mobile-contact-bar a:active {
+  transform: scale(0.97);
+}
+.mobile-contact-bar a:focus-visible {
+  outline: 2px solid #e9c349;
+  outline-offset: 2px;
+}
+/* Call leads: the gold of `.gold-button`, a touch wider than the other two. */
+.mobile-contact-bar a.mobile-contact-bar-call {
+  flex-grow: 1.25;
+  border-color: transparent;
+  background: linear-gradient(135deg, #dcb336, #b5890c);
+  color: var(--color-on-primary);
+}
+@media (max-width: 767.98px) {
+  /* Room for the bar, so the footer's last line is never underneath it. */
+  body:has([data-mobile-contact-bar]) {
+    padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+  }
+  /* First visit: the cookie notice sits ABOVE the bar, not on top of it. */
+  body:has([data-mobile-contact-bar]) [data-cookie-notice] {
+    bottom: calc(3.5rem + 0.75rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 /* Admin listing editor on phones — option B (owner, 2026-09-02; see
    features/admin-listing-editor-mobile.md). Two rules, both deliberately
    small after four failed deploys of the previous approach:

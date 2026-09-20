@@ -1,6 +1,25 @@
 # Feature: Lead Capture
 
-> Current lead and subscriber capture surfaces. Last updated: **2026-09-15**.
+> Current lead and subscriber capture surfaces. Last updated: **2026-09-20**.
+
+## Photos on the lead forms fit one request; phone contact bar (2026-09-20)
+
+- **Photos.** `EvalForm` (`/free-evaluation`, up to 10) and `MessageUsForm`
+  (`/contact`, up to 6) post all photos in ONE multipart request. Netlify caps
+  that request at 6 MB (~4.5 MB of photos), so `lib/lead-photo-prep.ts` shrinks
+  the set in the browser to 3.8 MB (2048 → 1024 px by count, JPEG intermediate)
+  and `lib/lead-photo-encode.ts` stores WebP on the server. Undecodable photos
+  are sent as they are; a set that still cannot fit posts nothing and tells the
+  seller to send fewer or text them to (239) 404-8505. Before this, camera
+  originals were posted and no photo submission above 1.5 MB had ever succeeded.
+  The picker stays `accept="image/*" multiple` with no `capture`.
+- **Phone contact bar.** Call · Text · Directions fixed to the bottom of the
+  seller pages on phones (`components/cta/MobileContactBar.tsx`, pages from
+  `lib/contact-bar-paths.ts`, links from `lib/contact-links.ts`). Text opens a
+  message to the owner's cell that starts "Hi, I have something I'd like to
+  sell. Sending photos:" — never the toll-free deals number.
+- No analytics or ad tracking was added for either; the owner judges by
+  business (`DECISIONS.md` → *"Google Ads runs with NO site tag"*).
 
 ## Homepage "Join the List" window — email, text alerts, or both (2026-09-15)
 

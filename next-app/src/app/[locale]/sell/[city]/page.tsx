@@ -13,6 +13,7 @@ import ShowroomAddress from '@/components/ShowroomAddress';
 import ShowroomHours from '@/components/ShowroomHours';
 import StorefrontPhoto from '@/components/StorefrontPhoto';
 import ClayMark from '@/components/ClayMark';
+import TextUsLink from '@/components/cta/TextUsLink';
 
 interface Props {
   params: Promise<{ locale: string; city: string }>;
@@ -320,6 +321,10 @@ export default async function SellCityPage({ params }: Props) {
                   <a href="tel:2394048505" className="outline-button">
                     {isEs ? 'LLAMAR O TEXTO (239) 404-8505' : 'CALL OR TEXT (239) 404-8505'}
                   </a>
+                  {/* The button above only dials; this one really texts (2026-09-20). */}
+                  <TextUsLink isEs={isEs} opening="seller" className="outline-button" style={{ gap: '0.5rem' }}>
+                    {isEs ? 'ENVIAR TEXTO' : 'TEXT US'}
+                  </TextUsLink>
                 </div>
                 <p className="mt-4 text-sm text-[#4d4635]">{phoneHoursLabel(isEs)}</p>
               </div>

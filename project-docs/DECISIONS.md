@@ -4,7 +4,116 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-09-16**.
+> compaction. Last reconciled: **2026-09-20**.
+
+## Google Ads runs with NO site tag; the pages that rank are never edited for ads; the goal is any seller contact (2026-09-20)
+
+Owner, 2026-09-19/20, while approving a $300–500/month Google Search
+campaign for sellers:
+
+- **Organic visibility is the overriding rule.** "We are now getting seen on
+  google organically, and we dont want to do anything to the code that changes
+  that… free evaluations brings us business, the gold buying side bring
+  business… we dont want to mess that up." Sellers also arrive after asking AI
+  assistants (Copilot, ChatGPT). ⛔ For ads, never change an existing page's
+  URL, title, meta description, H1, body copy, FAQ, JSON-LD, canonical, sitemap
+  entry or redirect, and do not bump `CONTENT_LAST_MODIFIED`. Ads land on the
+  existing landers exactly as they are. Any site step taken alongside the ads
+  is proven with a built-HTML diff of the ranking pages.
+- **No ad tracking.** "I truly dont care about tracking the ads… i would
+  naturally notice more business." → no Google tag / GTM / GA4, no conversion
+  pixel, no thank-you URL, no lead-source capture. Consequently the cookie
+  notice stays the one-button "Okay" (*"Cookie banner: one 'Okay' button"*
+  below), and the Privacy / Cookie Preferences statements that the site runs no
+  analytics or advertising pixel stay TRUE. Do not re-propose a tag unless the
+  budget grows enough for conversion-based bidding — and then that rule's
+  Accept / Essential-only requirement applies first.
+- **Why that is fine at this budget:** Google's conversion bidding would have
+  too little data to learn from, and Google still reports, with no site code,
+  calls from the ad (call asset with a free forwarding number — the site and
+  the Business Profile keep (239) 404-8505), Directions / click-to-call "local
+  actions" once the Business Profile is linked as a location asset, spend,
+  clicks and the search-terms report. Real *store visit* conversions and
+  Performance Max for store goals need volume a single shop will not reach.
+- **The goal is any seller contact, not calls alone** — walk-ins have been the
+  strongest channel, then the form and calls. Ad copy sells the visit as much
+  as the call; ads run about 7 AM–9 PM, only the call asset is limited to the
+  9–6 phone hours. This broadens the 09-11 "rank work by its effect on calls"
+  rule to "its effect on sellers reaching us".
+- **Bid where we do NOT already rank.** "sell gold naples fl" is #1 organic
+  with only Gold Silver Naples' paid slot above; defending it is a separate
+  owner decision with its own price.
+- **Spend gates:** the owner creates the account and owns billing (the "$500
+  after $500 spend" credit is theirs to take or leave; never a reason to raise
+  the budget). Campaigns are built PAUSED and go live only on the owner's
+  approval of the exact daily number and the ad text. Weekly report for the
+  first month.
+- **Deploys:** "dont worry about netlify deploys.. i dont mind" (09-19) — small
+  isolated deploys are fine, and preferred where isolation protects the
+  rankings. This relaxes the 09-02 "bundle deploys" habit.
+
+## Lead-form photos are shrunk in the browser to fit ONE request; the server makes them WebP; a photo is never silently lost (2026-09-20)
+
+Netlify cuts a synchronous function request at 6 MB, and binary bodies are
+base64-encoded on the way in, so ~4.5 MB of photos is the real ceiling. The
+admin uploader has respected that since 09-09; the public lead forms posted
+camera originals until 09-20, and no photo submission above 1.5 MB had ever
+succeeded.
+
+- The browser (`lib/lead-photo-prep.ts`) downsizes the whole set to
+  `LEAD_PHOTO_BUDGET_BYTES` (3.8 MB), stepping 2048 → 1600 → 1280 → 1024 px as
+  the count grows. ⛔ Do not raise the budget toward the cap, and do not remove
+  the smaller tiers — ten photos must still fit.
+- It asks the canvas for **JPEG**, not WebP: the server re-encodes anyway, and
+  on WebKit a WebP request silently produces a slow PNG. `blob.type` is still
+  the only truth.
+- The server (`lib/lead-photo-encode.ts`) stores WebP (2048 cap, truthful name
+  and contentType, owned buffer). Bytes sharp cannot read are stored as they
+  arrived.
+- ⛔ Never drop a photo silently. Undecodable → sent as it is; set still too big
+  → nothing is posted and the form tells the seller to send fewer or text them
+  to the cell.
+- The picker stays `accept="image/*" multiple` with NO `capture` (that would
+  force the camera and kill choosing several from the camera roll).
+- One request, not one-per-photo: a public per-photo upload endpoint would be an
+  anonymous write surface into Storage.
+- A dev server has no 6 MB cap — size behaviour is proven by measuring what the
+  browser sends; the cap itself only shows on production.
+
+## The phone contact bar is mounted from the layout by an allow-list of seller sections (2026-09-20)
+
+Call · Text · Directions, phones only (`components/cta/MobileContactBar.tsx`,
+owner-approved mockup version B). Directions is there because walk-ins lead.
+
+- Pages come from `lib/contact-bar-paths.ts` `CONTACT_BAR_SECTIONS`. ⛔ Never
+  mount it from a page file — the seller landers are the pages that rank and
+  must not be edited to carry it. ⛔ Never on the homepage (hero budget), shop,
+  checkout, account, `/card`, `/kittcard`, admin, `/contact`.
+- `usePathname`, never `useSearchParams` (that would deopt every static page).
+  The helper strips `/en` as well as `/es` so prerender and browser agree.
+- The bar is at the very bottom; on a first visit the cookie notice is lifted
+  ABOVE it (`body:has([data-mobile-contact-bar]) [data-cookie-notice]`), so the
+  bar never jumps when "Okay" is tapped. z-30: under the header, the drawers and
+  the notice.
+- Spanish is "Llamar · Texto · Llegar" — "Cómo llegar" does not fit three across
+  at 320 px. A label change means re-measuring 320 px in Spanish.
+
+## Customer Call / Text / Directions links come from `contact-links.ts`; a Text link always reaches the owner's cell (2026-09-20)
+
+`src/lib/contact-links.ts` is the one source for NEW contact CTAs: `TEL_HREF`,
+`smsHref(body?)`, `sellerTextBody(isEs)`, `directionsHref()`. The older 66
+hand-written `tel:2394048505` links stay as they are (several are pinned by
+count in `phone-hours.test.ts`); do not mass-rewrite them.
+
+- `sms:2394048505?&body=…` — iOS wants `&`, Android wants `?`; this form
+  satisfies both (in use on `/card` since 09-03).
+- ⛔ Never the toll-free text-deals number in a `tel:` or `sms:` href: it is an
+  outbound marketing sender whose replies run through the YES/STOP handler, so
+  a seller who texted it would never reach Chris. Guarded by
+  `lib/__tests__/contact-links.test.ts`.
+- Where copy already says "call or text", the wording and the existing call
+  link stay; the Text link is added beside it. The mobile header ROW takes no
+  new icon (it is width-budgeted to the pixel) — Text goes in the menu panel.
 
 ## A fallen-through sale is reopened as a NEW deal; deleting a deal never touches a photo another deal shares (2026-09-18)
 

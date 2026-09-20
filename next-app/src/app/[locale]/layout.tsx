@@ -7,6 +7,7 @@ import { caslon, hanken } from '@/lib/fonts';
 import { WishlistProvider } from '@/context/WishlistContext';
 import { CartProvider } from '@/context/CartContext';
 import CookieNotice from '@/components/legal/CookieNotice';
+import MobileContactBar from '@/components/cta/MobileContactBar';
 import CustomerReveal from '@/components/layout/CustomerReveal';
 import SocialBackgroundPublishProvider from '@/components/admin/SocialBackgroundPublishProvider';
 import RouteProgressBar from '@/components/layout/RouteProgressBar';
@@ -274,6 +275,11 @@ export default async function LocaleLayout({ children, params }: Props) {
                   <CustomerReveal />
                 </div>
               </SocialBackgroundPublishProvider>
+              {/* Phones, seller pages only — it renders null everywhere else
+                  (`lib/contact-bar-paths.ts`). Mounted here so the pages that
+                  rank are never edited to carry it. `usePathname` does not
+                  deopt static rendering the way `useSearchParams` does. */}
+              <MobileContactBar locale={locale} />
               <CookieNotice locale={locale} />
             </WishlistProvider>
           </CartProvider>
