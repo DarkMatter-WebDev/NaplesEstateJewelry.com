@@ -5,7 +5,21 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-09-20 (9) + (10) — READY TO PUSH (one batch): photo cap 10 on BOTH lead forms + iOS never auto-zooms on a field, sitewide (no SQL, no env vars)
+### 🟡 2026-09-20 (15) — READY TO PUSH: form confirmation lands in view + "Success!" + "Send another" + call/text line, all three lead forms (no SQL, no env vars)
+
+Owner-approved mockup (option B + the "Need us sooner?" line). Shared
+`components/contact/FormSuccessPanel.tsx` on free appraisal, contact message and
+product inquiry; instant centre-scroll + one re-check after the keyboard closes;
+rate-limit (429) now gets its own message (`lib/lead-form-errors.ts`). Dev-tested
+at 375 px and 1280 px, EN + ES; gate tsc 0 · lint 0 · 1544/1544 · build 0.
+`CHANGELOG.md` 2026-09-20 (15).
+
+1. ◻ **Owner: push.**
+2. ◻ **Owner, iPhone:** send the free appraisal form and the contact form →
+   "Success!" is on screen without scrolling; tap "Send another" → an empty form
+   at the top of the screen. (A test send creates a real lead — mark it TEST.)
+
+### ✅ 2026-09-20 (9) + (10) — PUSHED + deployed 09-20 night; **owner CONFIRMED both iPhone checks** (no zoom on any field; 10-photo cap + red warning on both forms): photo cap 10 on BOTH lead forms + iOS never auto-zooms on a field, sitewide (no SQL, no env vars)
 
 **(10) iOS zoom:** one rule in `globals.css` makes every text field 16px on touch
 screens (`@media (hover: none)`, unlayered, `!important`); desktop keeps 14px.
@@ -185,7 +199,11 @@ sure it works, and version b on the bar."
    - ✅ 09-20 ~7 PM: ads APPROVED — campaign "Eligible (Learning)". PMax /
      Display Expansion / Search Partners recommendations dismissed (never
      "Apply"). `CHANGELOG.md` 2026-09-20 (11).
-   - ◻ **Owner decision:** add four keyword headlines to the Gold ad (the whole
+   - ✅ 09-20 night: DONE — Gold ad 11 → 15 headlines (last one became "Sell
+     Gold Jewelry in Naples" to match a keyword exactly); editor strength Good.
+     `CHANGELOG.md` 2026-09-20 (12). ✅ 09-20 night: owner said yes → the other four ads
+     done too; all five = 15 headlines, Eligible, strength Good (Spanish
+     recalculating). `CHANGELOG.md` 2026-09-20 (13). Original item: add four keyword headlines to the Gold ad (the whole
      missing 3.3% of the optimization score): We Buy Gold in Naples · Gold
      Buyers in Naples, FL · Where to Sell Gold in Naples · Sell Your Gold
      Jewelry Today — yes / edits.
@@ -193,6 +211,13 @@ sure it works, and version b on the bar."
      lead-source label (~1–2 h, no Google script, no cookie) / full Google tag
      (~1 day, cookie accept-decline, CSP + privacy edits). Recommended: decide
      after 2–4 weeks of data; if any, the label.
+   - ✅ 09-20 ~10:25 PM: ads now run **24/7** (owner: "we pay per click? why
+     not just run 24/7?" — first extended to midnight, then all day; call asset
+     stays 9–6; $13/day cap unchanged). `CHANGELOG.md` 2026-09-20 (14). ⚠️ In
+     every weekly report: Segment → Hour of day + overnight search terms; trim
+     back to 7 AM–midnight if spend drifts into the small hours.
+   - ◻ **Claude, 09-21 or 09-22:** also confirm the 6 sitelinks / 4 callouts /
+     call asset left "Pending — under review" (still pending 09-20 10 PM).
    - ◻ **Claude, 09-21 or 09-22:** confirm the ads left review (any
      disapproval → fix wording, never the site), first impressions appear, the
      location list shows the Shirley St showroom.

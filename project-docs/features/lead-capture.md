@@ -15,6 +15,12 @@
   seller to send fewer or text them to (239) 404-8505. Before this, camera
   originals were posted and no photo submission above 1.5 MB had ever succeeded.
   The picker stays `accept="image/*" multiple` with no `capture`.
+- **After a send (2026-09-20).** All three lead forms show the shared
+  `FormSuccessPanel`: it jumps itself to the middle of the screen (instant, plus
+  one re-check after the phone keyboard closes — never `smooth`), says
+  "Success!", offers "Send another" (clean form, top of the form back on
+  screen) and "Need us sooner? Call or text". At the routes' rate limit (429) the
+  form says so and offers the phone (`lib/lead-form-errors.ts`).
 - **Phone contact bar.** Call · Text · Directions fixed to the bottom of the
   seller pages on phones (`components/cta/MobileContactBar.tsx`, pages from
   `lib/contact-bar-paths.ts`, links from `lib/contact-links.ts`). Text opens a

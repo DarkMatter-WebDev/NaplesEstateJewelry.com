@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import FormPrivacyNotice from '@/components/legal/FormPrivacyNotice';
 import { LocationField, PreferredContactField } from '@/components/contact/InquiryPreferenceFields';
 import { parsePreferredContact, preferredContactEmailErrorMessage, preferredContactNeedsEmail } from '@/lib/inquiry-fields';
 import { isValidPhoneNumber, phoneErrorMessage } from '@/lib/phone';
+import FormSuccessPanel, { scrollToFormStart } from '@/components/contact/FormSuccessPanel';
 import LeadPhotoCount from '@/components/contact/LeadPhotoCount';
+import { LeadSendError, leadSendErrorMessage } from '@/lib/lead-form-errors';
 import { leadPhotoCapHint } from '@/lib/lead-photo-limits';
 import { leadPhotosTooLargeMessage, shrinkFormPhotos } from '@/lib/lead-photo-prep';
 
@@ -22,6 +24,18 @@ export default function EvalForm({ locale, submitted }: Props) {
   const [err, setErr] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [emailError, setEmailError] = useState('');
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // "Send another": the fields are unmounted while the success panel shows, so
+  // they come back empty — only our own state needs clearing.
+  function sendAnother() {
+    setDone(false);
+    setPhotoCount(0);
+    setErr('');
+    setPhoneError('');
+    setEmailError('');
+    scrollToFormStart(formRef.current);
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -62,12 +76,12 @@ export default function EvalForm({ locale, submitted }: Props) {
       }
       fd.append('source', 'free-evaluation');
       const res = await fetch('/api/inquire', { method: 'POST', body: fd });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) throw new LeadSendError(res.status);
       setDone(true);
-    } catch {
-      setErr(isEs
+    } catch (error) {
+      setErr(leadSendErrorMessage(error, isEs, isEs
         ? 'Error al enviar. Por favor inténtelo de nuevo.'
-        : 'Failed to send. Please try again.');
+        : 'Failed to send. Please try again.'));
     } finally {
       setSending(false);
     }
@@ -75,6 +89,7 @@ export default function EvalForm({ locale, submitted }: Props) {
 
   return (
     <form
+      ref={formRef}
       id="fe-eval-form"
       name="free-evaluation-request"
       onSubmit={handleSubmit}
@@ -82,7 +97,7 @@ export default function EvalForm({ locale, submitted }: Props) {
       // mx-auto: the form is capped at 540px and now sits in a centred section,
       // so without auto margins it hugs the left edge of its container. It was
       // only ever flush-left because it used to live in the left-aligned hero.
-      className="grid gap-4 rounded-2xl border p-5 shadow-[0_22px_70px_rgba(38,28,6,0.18)] md:p-6 mx-auto w-full"
+      className="grid gap-4 rounded-2xl border p-5 shadow-[0_22px_70px_rgba(38,28,6,0.18)] md:p-6 mx-auto w-full scroll-mt-28"
       style={{
         background: 'rgba(255,255,255,0.9)',
         borderColor: 'rgba(115, 92, 0, 0.16)',
@@ -95,24 +110,15 @@ export default function EvalForm({ locale, submitted }: Props) {
       </p>
 
       {done ? (
-        <div className="text-center py-8 px-4">
-          <div
-            className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full text-xs font-bold uppercase tracking-[0.12em]"
-            style={{ background: '#f7efd7', color: '#735c00', fontFamily: 'var(--font-label)' }}
-          >
-            OK
-          </div>
-          <p
-            className="text-lg font-bold mb-2"
-            style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
-          >
-            {isEs ? '¡Enviado!' : 'Submission received!'}
-          </p>
-          <p className="text-sm" style={{ color: '#5e5e5d' }}>
-            {isEs
+        <div className="py-8 px-4">
+          <FormSuccessPanel
+            isEs={isEs}
+            kind="submission"
+            body={isEs
               ? 'Revisaremos su información y nos comunicaremos con usted pronto.'
               : "We'll review your submission and be in touch soon."}
-          </p>
+            onSendAnother={sendAnother}
+          />
         </div>
       ) : (
         <>

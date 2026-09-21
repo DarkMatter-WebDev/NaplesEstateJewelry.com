@@ -1,6 +1,71 @@
 
 # Changelog
 
+## 2026-09-20 (15) — Lead forms: the confirmation now lands IN VIEW, says "Success!" with a check mark, and offers "Send another" + a call/text line; friendlier message at the rate limit — BUILT + dev-tested + STAGED, awaiting push (no SQL, no env vars)
+
+Owner (after confirming the two iPhone checks — no-zoom and the 10-photo cap — both pass): "once it's successfully sent, they are brought down the page… the 'submission received' text is out of view… instead of 'Ok'… write something like thank you, or success!… give the users a button to make another submission… apply these fixes to all forms.. mock up changes first." Mockup (two options, real fonts + gold) shown in chat; owner chose **option B "Success!" + option A's "Need us sooner?" line**.
+
+**Cause of the scroll problem.** A sent form is swapped for a panel a fraction of its height; the page collapses and the browser keeps its scroll offset, so the viewport ends up BELOW the panel. Reproduced on dev at 375 px: panel at −378…−89 px (above the screen), `scrollY` unchanged.
+
+**Fix — one shared panel, three forms.** NEW `src/components/contact/FormSuccessPanel.tsx`, used by `EvalForm` (`/free-evaluation`), `MessageUsForm` (`/contact`) and `InquiryForm` (`/contact?item=…`). The Join the List window is untouched (own popup, own "You're on the list", no scroll problem).
+- **Lands in view:** on mount `scrollIntoView({ block: 'center', behavior: 'auto' })` (centre also clears the sticky header), takes focus (`role="status"`, `tabIndex=-1`) so screen readers announce it, and re-checks ONCE after 450 ms — only moving if the panel is cut off — because a closing phone keyboard changes the visible area. ⛔ Deliberately NOT `smooth` and no `requestAnimationFrame`: the first version used a smooth scroll and did not move at all in a hidden preview pane (frames frozen) — the same class of failure a closing iOS keyboard causes by cancelling an animated scroll.
+- **Looks:** gold check mark (`AppIcon check`) instead of the "OK" badge; heading **Success!** / ¡Listo!; small line "Submission received" / "Message sent" (Envío recibido / Mensaje enviado); each form keeps its own one-sentence body.
+- **"Send another" / "Enviar otro"** (`outline-button`, `sync` icon): each form's `sendAnother()` clears its state and `scrollToFormStart` puts the top of the fresh form on screen (`scroll-mt-28` = 112 px, clear of the header). Eval + contact forms unmount their fields while the panel shows, so they return empty (photos too); the inquiry form's fields are controlled, so each is reset and the message goes back to "I'm interested in: <item>." Rate limits unchanged.
+- **"Need us sooner? Call or text (239) 404-8505"** — Call → `TEL_HREF`, text → `smsHref()`, number → `TEL_HREF`, all from `contact-links.ts` (never the text-deals number). ES: "¿Nos necesita antes? Llame o envíe un texto al …".
+- **Rate-limit message.** Testing hit the routes' limit (five 200s then HTTP 429) — proof "Send another" cannot be used to flood, and a gap: the forms answered 429 with "Failed to send. Please try again." NEW `src/lib/lead-form-errors.ts` (`LeadSendError`, `leadSendErrorMessage`): at 429 the form says "You've sent several in a short time. Please wait a few minutes, or call or text (239) 404-8505." (EN/ES); every other failure keeps its old wording.
+
+**Dev check (preview pane; honeypot filled, so no lead was created):**
+
+| Form | Width | Panel after send | "Send another" |
+|---|---|---|---|
+| `/free-evaluation` | 375×812 | 261–550 px, fully in view, focused (scrollY 10287 → 9648) | form top at 112 px; name, description, photos empty |
+| `/es/contact` message | 375×812 | 262–550 px, fully in view; Spanish copy correct; no horizontal scroll | form top 112 px; fields + photos empty |
+| `/contact?item=Test Gold Ring` | 375×812 | 282–531 px, fully in view, "MESSAGE SENT" | section top 112 px; name/phone empty, radio cleared, message back to "I'm interested in: Test Gold Ring. " |
+| `/contact` message | 1280×800 | 276–525 px, fully in view | form top 112 px |
+
+Screenshot of the real panel at 375 px matches the approved mockup. ⚠️ A desktop run WITHOUT an explicit size measured a 0×0 window (hidden pane) — discarded; always emulate a size.
+
+**Tests:** NEW `lib/__tests__/form-success-panel.test.ts` (9): instant scroll + re-check and no `smooth`/rAF, status role + focus, Success + check and no "OK" badge in any form, Send another + call/text links from `contact-links`, each form's reset list, `scroll-mt-28`, and the 429 wording + wiring.
+
+**Gate:** `npx tsc --noEmit` 0 · `npm run lint` 0 (3 known `<img>` warnings) · `npx vitest run` **1544/1544 (154 files)** · `npm run build` exit 0 from a deleted `.next`, no `.next/cache/turbopack/`.
+
+**Also recorded:** owner confirmed on the iPhone — no auto-zoom on any field, and the 10-photo cap + red warning work on both forms (batch (9)+(10), live).
+
+**After the push (owner, iPhone — the keyboard-closing case only a phone shows):** send each form → "Success!" is on screen without scrolling; "Send another" → empty form at the top of the screen.
+
+## 2026-09-20 (14) — Google Ads: ad schedule 7 AM–9 PM → 7 AM–midnight → **24/7** (two owner questions, minutes apart); status check; stale "improve your responsive search ads" card explained (no code change)
+
+- **Status 10:07 PM ET:** campaign Enabled · "Eligible (Learning)"; all five ads **Eligible** (the evening's headline edits re-approved); 0 impressions / 0 clicks / $0.00 — expected: the ads cleared review ~7 PM, the schedule ended at 9 PM, it was a Sunday evening, and these keywords see 10–100 local searches a month. No billing or policy banner. Sitelinks (6), callouts (4) and the call asset still "Pending — under review" (assets are reviewed separately from ads; up to a business day) — until then ads can serve without them.
+- **Owner's screenshot of the "Improve your responsive search ads … and by adding sitelinks" card:** stale. Opening it names only the Gold ad and shows that ad as **Good** with "Add more sitelinks" ticked; six sitelinks already exist (Google's form asks for six). Recommendation cards refresh about daily. Nothing to add.
+- **Schedule change.** Owner: "i feel like a lot of people may be searching in the evening, up till about midnight?.. do you agree or disagree?" Agreed, and changed: Ad schedule → pencil → "All days 7:00 AM to **12:00 AM**" → Save; read back: Mondays … Sundays each "7:00 AM - 12:00 AM". Why: couch-time phone searches (many estate sellers are working-age children of residents); the 9 PM cutoff was designed around phone calls, but the goal is any contact and the form + Text link work at any hour; the **call asset keeps its own 9 AM–6 PM schedule**, so no late calls to voicemail; the $13.00/day cap is unchanged — with keywords this small the campaign is limited by search volume, not budget, so more hours = more chances, not more spend. Caveat: without site tracking only clicks-by-hour are visible, not which hours produce sellers; reversible in one click if late-night search terms look poor. (Google's note on the editor: saving replaces the schedule rows and resets their per-row stats — all zero anyway.)
+- **Then 24/7, ~10:25 PM.** Owner: "we pay per click? why not just run 24/7?" Correct — cost is per click only, and the $13.00/day cap holds whatever the hours. The usual reasons to cut overnight do not bite here: the call asset has its own 9–6 schedule; "overnight steals daytime budget" only matters when the budget runs out, and this campaign is limited by search volume; the ads only reach people physically in Collier / Bonita Springs / Estero typing seller phrases, so a 1 AM searcher is still a local with something to sell, and the form + Text link work at any hour. Changed: Ad schedule → pencil → "All days **12:00 AM to 12:00 AM**" → Save; read back: **"Your ads are eligible to show all the time"**, grid filled for every hour, no schedule rows (= no restriction). ⚠️ To watch in the weekly reports: Maximize clicks prefers cheap clicks and overnight clicks are cheap — if spend drifts into the small hours (Segment → Hour of day) or late search terms look poor, trim back to 7 AM–midnight.
+
+## 2026-09-20 (13) — Google Ads: the other four ads get four keyword headlines each — all five ads now 15 headlines, ad strength Average → Good (no code change)
+
+Owner: "should we update the average ones? do what you recommend to strengthen all more."
+
+Same treatment as the Gold ad in (12): each ad's editor lists its ad group's keywords; four headlines containing those phrases were added to the four free slots (11 → 15). Every one is a plain statement of what the business does, in Naples; nothing else in any ad was changed, and Google's own "Apply all" suggestions were not used. Editor read **Ad strength: Good** on each before saving; each save passed the policy check and returned to the Ads table.
+
+| Ad group | Its keywords (from the editor) | Headlines added |
+|---|---|---|
+| Estate and Inherited Jewelry | sell jewelry · where to sell jewelry · sell estate jewelry · sell antique jewelry · jewelry buyers near me · estate jewelry buyers · sell inherited jewelry | Sell Estate Jewelry in Naples · Estate Jewelry Buyers Naples · Where to Sell Jewelry Locally · Sell Antique Jewelry in Naples |
+| Coins and Bullion | sell gold coins · sell silver coins · sell bullion · coin buyers near me | Sell Gold Coins in Naples · Sell Silver Coins in Naples · Coin Buyers in Naples, FL · Sell Bullion in Naples |
+| Silver and Flatware | sell silver · sell sterling silver · sell silver flatware · silver buyers near me · sterling silver buyers | Sell Silver Flatware in Naples · Sterling Silver Buyers Naples · Silver Buyers in Naples, FL · We Buy Sterling Silver |
+| Spanish - Vender Oro | vender oro · compro oro · donde vender oro · vender joyas · compra de oro cerca de mi | Dónde Vender Oro en Naples · Vender Joyas en Naples · Compra de Oro en Naples · Compro Oro en Naples |
+
+**Read back from the Ads table afterwards:** campaign Enabled · "Eligible (Learning)"; all five rows "+12 more" (15 headlines) and **Eligible**; strength **Good** on Estate, Coins, Gold and Silver, "Pending" (recalculating; Good in the editor) on Spanish. "Excellent" would need Google's own suggested wording and pinning changes — not worth chasing; ad strength is Google's diagnostic, not what decides whether an ad shows.
+
+Method (repeatable): Ads → hover the row → `find` the "Edit this Ad … finalUrls: <page>" pencil → click its ref. The editor already shows some empty headline slots; click "+ Headline" only until four empty inputs whose NEAREST counter reads "/ 30" exist; fill exactly those with the native value setter + `input`/`change`; wait ~5 s and read the strength label; confirm no value landed in a counter-less input; `find` "Save ad" → click → ~16 s for the policy check and the return to the table. Row positions from `getBoundingClientRect` must be multiplied by 0.6125 on this 2560 px screen to get click coordinates.
+
+## 2026-09-20 (12) — Owner PUSHED + deployed batch (9)+(10) (photo cap 10 + sitewide no-zoom); Gold ad gains four keyword headlines → ad strength Average → Good (no code change)
+
+Owner: "pushed and deployed latest batch... did you update the gold ad?" — it had NOT been updated (the four headlines were only proposed in entry (11), waiting for a yes); the question was taken as the yes and the edit made at once.
+
+- **Gold ad (ad group Gold, account 321-137-8976):** headlines 11 → **15**. Added: **We Buy Gold in Naples · Gold Buyers in Naples, FL · Where to Sell Gold in Naples · Sell Gold Jewelry in Naples.** The last one differs from the proposal ("Sell Your Gold Jewelry Today") on purpose: the editor lists the group's keywords — "gold buyer", "sell gold", "we buy gold", "sell gold jewelry", "cash for gold", "where to sell gold", "sell scrap gold" + 3 — and the new wording contains "sell gold jewelry" exactly. Editor read **Ad strength: Good** ("include popular keywords" ticked) before saving; after "Save ad" → policy check → Ads table: Gold row "+12 more", status **Eligible**, strength "Pending" (recalculating). Google's own "Apply all" suggestions (remove "Sell Gold in Naples, FL", add "We Buy Gold Near You" etc.) were NOT used. Nothing else in the ad changed (4 descriptions, paths, final URL).
+- **Seen on the Ads table:** all five ads are **Eligible** (approved), and all five were rated "Average" — the recommendation card had only named Gold. Offered to the owner: the same four-keyword-headline treatment for Silver and Flatware, Estate and Inherited Jewelry, Coins and Bullion and the Spanish ad (each has 11 of 15 headlines).
+- Method: Ads → hover the row → pencil; "+ Headline" ×4; the new slots are the EMPTY inputs whose nearest counter reads "/ 30" (inputs 15–18 here) — five more empty inputs below them have no counter (URL options) and must not be filled; native value setter + `input`/`change`; read `Headlines n/15`-style counters and the strength label before saving.
+- **Site:** owner reports batch (9)+(10) pushed and deployed. Not production-checked by Claude (not asked). Open: the owner's iPhone checks in `TASKS.md`.
+
 ## 2026-09-20 (11) — Google Ads: ads APPROVED (campaign "Eligible (Learning)"); optimization score 96.7% explained; three spend-expanding recommendations dismissed; tracking options priced for the owner (no code change)
 
 Owner: "it says we have an optimization score of 96.7%.. anything to improve that? also how hard / disruptive would it be to add tracking?"

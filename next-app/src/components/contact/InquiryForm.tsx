@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import FormSuccessPanel, { scrollToFormStart } from '@/components/contact/FormSuccessPanel';
 import FormPrivacyNotice from '@/components/legal/FormPrivacyNotice';
 import { PreferredContactField } from '@/components/contact/InquiryPreferenceFields';
 import { preferredContactEmailErrorMessage, preferredContactNeedsEmail, type PreferredContact } from '@/lib/inquiry-fields';
+import { LeadSendError, leadSendErrorMessage } from '@/lib/lead-form-errors';
 import { isValidPhoneNumber, phoneErrorMessage } from '@/lib/phone';
 
 interface Props {
@@ -21,9 +23,8 @@ export default function InquiryForm({ locale, itemName, submitted: initialSubmit
   // location does not change the answer (owner decision 2026-09-08).
   const [preferredContact, setPreferredContact] = useState<PreferredContact | ''>('');
   const [emailError, setEmailError] = useState('');
-  const [message, setMessage] = useState(
-    isEs ? `Estoy interesado/a en: ${itemName}. ` : `I'm interested in: ${itemName}. `
-  );
+  const defaultMessage = isEs ? `Estoy interesado/a en: ${itemName}. ` : `I'm interested in: ${itemName}. `;
+  const [message, setMessage] = useState(defaultMessage);
   // Honeypot. Invisible to humans, so any value means a bot — the server drops
   // the submission silently. This form shipped WITHOUT one while the other two
   // inquiry forms had it, and it is the only one that got spammed (2026-08-22).
@@ -32,6 +33,23 @@ export default function InquiryForm({ locale, itemName, submitted: initialSubmit
   const [done, setDone] = useState(initialSubmitted);
   const [err, setErr] = useState('');
   const [phoneError, setPhoneError] = useState('');
+  const sectionRef = useRef<HTMLElement>(null);
+
+  // "Send another": this form's fields are controlled, so each one is cleared
+  // here (the message goes back to its "I'm interested in…" opening).
+  function sendAnother() {
+    setDone(false);
+    setName('');
+    setPhone('');
+    setEmail('');
+    setPreferredContact('');
+    setMessage(defaultMessage);
+    setBotField('');
+    setErr('');
+    setPhoneError('');
+    setEmailError('');
+    scrollToFormStart(sectionRef.current);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -55,12 +73,12 @@ export default function InquiryForm({ locale, itemName, submitted: initialSubmit
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ item: itemName, name, phone, email, message, preferred_contact: preferredContact, 'bot-field': botField }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) throw new LeadSendError(res.status);
       setDone(true);
-    } catch {
-      setErr(isEs
+    } catch (error) {
+      setErr(leadSendErrorMessage(error, isEs, isEs
         ? 'Error al enviar. Por favor inténtelo de nuevo.'
-        : 'Failed to send. Please try again.');
+        : 'Failed to send. Please try again.'));
     } finally {
       setSending(false);
     }
@@ -68,32 +86,23 @@ export default function InquiryForm({ locale, itemName, submitted: initialSubmit
 
   if (done) {
     return (
-      <section className="py-16 md:py-24" style={{ background: 'var(--color-background)' }}>
-        <div className="container mx-auto px-6 md:px-8 max-w-2xl text-center">
-          <div
-            className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full text-xs font-bold uppercase tracking-[0.12em]"
-            style={{ background: '#f7efd7', color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
-          >
-            OK
-          </div>
-          <p
-            className="text-2xl font-bold mb-3"
-            style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
-          >
-            {isEs ? '¡Mensaje enviado!' : 'Message sent!'}
-          </p>
-          <p style={{ color: 'var(--color-on-surface-variant)' }}>
-            {isEs
+      <section ref={sectionRef} className="py-16 md:py-24 scroll-mt-28" style={{ background: 'var(--color-background)' }}>
+        <div className="container mx-auto px-6 md:px-8 max-w-2xl">
+          <FormSuccessPanel
+            isEs={isEs}
+            kind="message"
+            body={isEs
               ? 'Revisaremos su consulta y nos comunicaremos pronto.'
               : "We'll review your inquiry and be in touch soon."}
-          </p>
+            onSendAnother={sendAnother}
+          />
         </div>
       </section>
     );
   }
 
   return (
-    <section className="py-16 md:py-24" style={{ background: 'var(--color-background)' }}>
+    <section ref={sectionRef} className="py-16 md:py-24 scroll-mt-28" style={{ background: 'var(--color-background)' }}>
       <div className="container mx-auto px-6 md:px-8 max-w-3xl">
 
         <div

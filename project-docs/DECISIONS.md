@@ -88,6 +88,22 @@ succeeded.
 - A dev server has no 6 MB cap — size behaviour is proven by measuring what the
   browser sends; the cap itself only shows on production.
 
+## A sent lead form shows ONE shared success panel that puts itself on screen (2026-09-20)
+
+`components/contact/FormSuccessPanel.tsx` — free appraisal, contact message,
+product inquiry. Owner-approved mockup: "Success!" + check mark, "Send another",
+"Need us sooner? Call or text".
+
+- Swapping a tall form for a short panel collapses the page and strands the
+  viewport below it, so the panel scrolls ITSELF to the centre on mount.
+- ⛔ Instant (`behavior: 'auto'`), never `smooth`, never `requestAnimationFrame`:
+  an animated scroll is cancelled by a closing phone keyboard and does nothing
+  at all when frames are frozen. One re-check at 450 ms, moving only if cut off.
+- "Send another" must return a CLEAN form (no re-send of old photos/fields) and
+  put its top back on screen; the server's rate limits are the flood guard, and
+  a 429 has its own wording (`lib/lead-form-errors.ts`).
+- A new lead form uses this panel; ⛔ no hand-written success block.
+
 ## The phone contact bar is mounted from the layout by an allow-list of seller sections (2026-09-20)
 
 Call · Text · Directions, phones only (`components/cta/MobileContactBar.tsx`,

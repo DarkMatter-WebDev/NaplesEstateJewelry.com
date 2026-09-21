@@ -8,12 +8,17 @@
 
 **Read this, then `TASKS.md`.**
 
-🟡 **09-20 (10) — READY TO PUSH with (9): iOS no longer auto-zooms on ANY field**
+🟡 **09-20 (15) — READY TO PUSH: lead-form confirmation lands in view, says
+"Success!", offers "Send another" + a call/text line** — one shared
+`FormSuccessPanel` on all three lead forms (owner-approved mockup B); 429 gets its
+own message. Dev-tested 375 + 1280 px, gate 1544/1544. `CHANGELOG.md` (15).
+
+🟢 **09-20 (10) — LIVE + owner-confirmed on the iPhone (with (9)): iOS no longer auto-zooms on ANY field**
 — one sitewide 16px rule for touch screens in `globals.css` (desktop keeps
 14px); measured on dev, gate 1536/1536. iPhone check after the push is the
 proof. `CHANGELOG.md` 2026-09-20 (10).
 
-🟡 **09-20 (9) — READY TO PUSH: photo cap is 10 on BOTH lead forms** (was 6 on
+🟢 **09-20 (9) — LIVE + owner-confirmed: photo cap is 10 on BOTH lead forms** (was 6 on
 `/contact`, 10 on `/free-evaluation`, both silent — owner's phone test). Shared
 `LEAD_PHOTO_MAX`, "up to 10 photos" on the pickers, red warning past 10.
 Dev-tested, gate green, STAGED. `CHANGELOG.md` 2026-09-20 (9).
@@ -55,7 +60,8 @@ vars): the lead-form photo fix and the phone contact bar.**
   Coins and Bullion paused on its own until the site push), 55 negatives,
   sitelinks, callouts, call asset 9–6, Business Profile location asset; Search
   Network only, presence-only Collier + Bonita Springs + Estero, EN + ES,
-  7 AM–9 PM, Maximize clicks $6.00 cap, $13.00/day, every AI/auto option off.
+  ads run 24/7 since 09-20 night (was 7 AM–9 PM; call asset stays 9–6),
+  Maximize clicks $6.00 cap, $13.00/day, every AI/auto option off.
   The earlier save failures were a missing PASSKEY on the info@ login (Admin →
   Access and security → Security tasks); the owner created it and saves worked
   at once. 🟢 **LIVE since 09-20 ~4:19 PM ET** — owner added billing and said

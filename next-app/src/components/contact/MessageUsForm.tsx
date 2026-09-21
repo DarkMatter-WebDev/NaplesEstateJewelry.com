@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import FormPrivacyNotice from '@/components/legal/FormPrivacyNotice';
 import { LocationField, PreferredContactField } from '@/components/contact/InquiryPreferenceFields';
 import { parsePreferredContact, preferredContactEmailErrorMessage, preferredContactNeedsEmail } from '@/lib/inquiry-fields';
 import { isValidPhoneNumber, phoneErrorMessage } from '@/lib/phone';
+import FormSuccessPanel, { scrollToFormStart } from '@/components/contact/FormSuccessPanel';
 import LeadPhotoCount from '@/components/contact/LeadPhotoCount';
+import { LeadSendError, leadSendErrorMessage } from '@/lib/lead-form-errors';
 import { leadPhotoCapHint } from '@/lib/lead-photo-limits';
 import { leadPhotosTooLargeMessage, shrinkFormPhotos } from '@/lib/lead-photo-prep';
 import { phoneHoursLabel } from '@/lib/business-location';
@@ -23,6 +25,18 @@ export default function MessageUsForm({ locale }: Props) {
   const [phoneError, setPhoneError] = useState('');
   const [emailError, setEmailError] = useState('');
   const [photoCount, setPhotoCount] = useState(0);
+  const formAnchorRef = useRef<HTMLDivElement>(null);
+
+  // "Send another": the form is unmounted while the success panel shows, so it
+  // comes back empty — only our own state needs clearing.
+  function sendAnother() {
+    setDone(false);
+    setPhotoCount(0);
+    setErr('');
+    setPhoneError('');
+    setEmailError('');
+    scrollToFormStart(formAnchorRef.current);
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -57,12 +71,12 @@ export default function MessageUsForm({ locale }: Props) {
         method: 'POST',
         body: fd,
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) throw new LeadSendError(res.status);
       setDone(true);
-    } catch {
-      setErr(isEs
+    } catch (error) {
+      setErr(leadSendErrorMessage(error, isEs, isEs
         ? 'Error al enviar. Por favor inténtelo de nuevo o llámenos.'
-        : 'Failed to send. Please try again or call us.');
+        : 'Failed to send. Please try again or call us.'));
     } finally {
       setSending(false);
     }
@@ -103,28 +117,21 @@ export default function MessageUsForm({ locale }: Props) {
           </div>
         </div>
 
+        {/* Anchor for "Send another": present in both states, clear of the header. */}
+        <div ref={formAnchorRef} className="scroll-mt-28" />
         {done ? (
           <div
-            className="rounded-2xl border px-8 py-16 text-center shadow-[0_18px_54px_rgba(38,28,6,0.07)]"
+            className="rounded-2xl border px-6 py-12 shadow-[0_18px_54px_rgba(38,28,6,0.07)] md:px-8 md:py-16"
             style={{ background: 'rgba(255,255,255,0.86)', borderColor: 'rgba(115, 92, 0, 0.14)' }}
           >
-            <div
-              className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full text-xs font-bold uppercase tracking-[0.12em]"
-              style={{ background: '#f7efd7', color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
-            >
-              OK
-            </div>
-            <p
-              className="text-xl font-bold mb-2"
-              style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
-            >
-              {isEs ? '¡Mensaje enviado!' : 'Message sent!'}
-            </p>
-            <p style={{ color: 'var(--color-on-surface-variant)' }}>
-              {isEs
+            <FormSuccessPanel
+              isEs={isEs}
+              kind="message"
+              body={isEs
                 ? 'Gracias por escribirnos. Nos comunicaremos con usted pronto.'
                 : 'Thanks for reaching out. We\'ll be in touch soon.'}
-            </p>
+              onSendAnother={sendAnother}
+            />
           </div>
         ) : (
           <form
