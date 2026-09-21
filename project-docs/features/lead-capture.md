@@ -4,8 +4,10 @@
 
 ## Photos on the lead forms fit one request; phone contact bar (2026-09-20)
 
-- **Photos.** `EvalForm` (`/free-evaluation`, up to 10) and `MessageUsForm`
-  (`/contact`, up to 6) post all photos in ONE multipart request. Netlify caps
+- **Photos.** `EvalForm` (`/free-evaluation`) and `MessageUsForm` (`/contact`)
+  both take **up to 10** (`lib/lead-photo-limits.ts` — the picker says so, and
+  `LeadPhotoCount` warns in red that only the first 10 are sent; until 09-20 (9)
+  `/contact` silently kept 6) and post all photos in ONE multipart request. Netlify caps
   that request at 6 MB (~4.5 MB of photos), so `lib/lead-photo-prep.ts` shrinks
   the set in the browser to 3.8 MB (2048 → 1024 px by count, JPEG intermediate)
   and `lib/lead-photo-encode.ts` stores WebP on the server. Undecodable photos

@@ -8,10 +8,21 @@
 
 **Read this, then `TASKS.md`.**
 
-🔴 **09-20 (7) — READY TO PUSH: the phone contact bar is showing on DESKTOP on
-the live seller pages** (an unlayered `display: flex` beat `md:hidden`). One-rule
-fix in `globals.css` + component + test, dev-verified at 1024 / 768 / 375 px,
-gate green, STAGED. 🟢 Same session: **the lead-form photo fix is PROVEN on
+🟡 **09-20 (10) — READY TO PUSH with (9): iOS no longer auto-zooms on ANY field**
+— one sitewide 16px rule for touch screens in `globals.css` (desktop keeps
+14px); measured on dev, gate 1536/1536. iPhone check after the push is the
+proof. `CHANGELOG.md` 2026-09-20 (10).
+
+🟡 **09-20 (9) — READY TO PUSH: photo cap is 10 on BOTH lead forms** (was 6 on
+`/contact`, 10 on `/free-evaluation`, both silent — owner's phone test). Shared
+`LEAD_PHOTO_MAX`, "up to 10 photos" on the pickers, red warning past 10.
+Dev-tested, gate green, STAGED. `CHANGELOG.md` 2026-09-20 (9).
+
+🟢 **09-20 (7) — DEPLOYED + production-verified 09-20 evening: the phone contact
+bar no longer shows on desktop** (an unlayered `display: flex` had beaten
+`md:hidden`; fix in `globals.css` + component + test). All 46 bar pages + 11
+no-bar pages as expected, live stylesheet correct, 15 rendered loads `display:
+none` at 2560 px. 🟢 Same session: **the lead-form photo fix is PROVEN on
 production** — 5 photos, 9.58 MB shrunk to 0.80 MB in the browser, HTTP 200,
 five `.webp` objects in Storage. `CHANGELOG.md` 2026-09-20 (7).
 
@@ -49,7 +60,9 @@ vars): the lead-form photo fix and the phone contact bar.**
   Access and security → Security tasks); the owner created it and saves worked
   at once. 🟢 **LIVE since 09-20 ~4:19 PM ET** — owner added billing and said
   "go"; campaign Enabled at $13.00/day, "Pending" while Google reviews the ads;
-  Coins and Bullion enabled the same evening after the owner's site push. Weekly reports 09-27 ·
+  Coins and Bullion enabled the same evening after the owner's site push;
+  auto-tagging off, six sitelinks; owner accepted the Click-to-Call terms 09-20
+  (the orange "new terms soon" banner is an announcement — nothing left to do). Weekly reports 09-27 ·
   10-04 · 10-11 · 10-18. `TASKS.md` top · `CHANGELOG.md` 2026-09-20 (4)–(6). The old
   shell 238-352-7909 (info@surettesystems.com) is abandoned.
 

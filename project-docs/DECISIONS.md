@@ -75,6 +75,14 @@ succeeded.
   to the cell.
 - The picker stays `accept="image/*" multiple` with NO `capture` (that would
   force the camera and kill choosing several from the camera roll).
+- **One cap, said out loud (2026-09-20 (9)):** `LEAD_PHOTO_MAX = 10` in
+  `lib/lead-photo-limits.ts` is the only place the number lives — both forms,
+  both routes and the browser shrink import it. The picker says "up to 10
+  photos" before anything is chosen, and `LeadPhotoCount` turns red ("Only the
+  first 10 will be sent") when more are picked. ⛔ A route must never carry its
+  own `MAX_FILES` number again: `/contact` kept 6 and `/free-evaluation` 10,
+  silently, until the owner counted the photos in the emails. A new form that
+  takes photos uses the same three pieces.
 - One request, not one-per-photo: a public per-photo upload endpoint would be an
   anonymous write surface into Storage.
 - A dev server has no 6 MB cap — size behaviour is proven by measuring what the
@@ -1415,7 +1423,14 @@ and `.form-field` is 14px. `user-scalable=no` does NOT stop it (iOS ignores
 it). The fix that works is the input size: `.product-editor-modal :is(input,
 select, textarea) { font-size: 1rem }` under `@media (hover: none)`, kept
 UNLAYERED so a Tailwind `text-xs` on the same element cannot win. ⛔ Do not
-"tidy" that rule into `@layer` — it stops working silently. Pinch and
+"tidy" that rule into `@layer` — it stops working silently.
+**Since 2026-09-20 (10) this is SITEWIDE:** one rule directly above the two
+scoped ones — `@media (hover: none) { :is(input, select, textarea):not(checkbox,
+radio, range, file, hidden) { font-size: 1rem !important } }`. `!important`
+because a bare element rule loses to `.form-field` and to inline `fontSize`
+(checkout discount code, 13px). A new form needs nothing; ⛔ do not give a
+field an inline or `!important` size under 16px on touch screens. Desktop keeps
+14px. Guard `ios-input-zoom.test.ts`. Only an iPhone proves it. Pinch and
 double-tap are handled separately (`touch-action: manipulation` + the
 non-passive two-finger `touchmove` guard in `AdminShell`, because React's
 touch props are passive and `preventDefault` there is a no-op).

@@ -20,6 +20,7 @@
 // offers the phone instead of failing.
 
 import { encodeCanvasForUpload } from './image-encode';
+import { capLeadPhotos } from './lead-photo-limits';
 
 /**
  * Bytes of photos one submission may carry. 6 MB platform cap → ~4.5 MB of
@@ -160,11 +161,14 @@ export type PreparedLeadPhotos = {
 
 /**
  * Shrink a seller's photos so the whole set fits one request. Non-image files
- * are dropped (the server ignores them anyway). Steps down a tier at a time
- * and stops at the first set that fits.
+ * are dropped (the server ignores them anyway), and only the first
+ * `LEAD_PHOTO_MAX` images are kept — the form has already told the customer so
+ * in red (`LeadPhotoCount`), and the server keeps the same number, so nothing is
+ * encoded and uploaded only to be thrown away. Steps down a tier at a time and
+ * stops at the first set that fits.
  */
 export async function prepareLeadPhotos(input: readonly File[]): Promise<PreparedLeadPhotos> {
-  const images = input.filter((file) => file.size > 0 && file.type.startsWith('image/'));
+  const images = capLeadPhotos(input.filter((file) => file.size > 0 && file.type.startsWith('image/')));
   let index = startTierIndex(images.length);
   let files = await shrinkAll(images, LEAD_PHOTO_TIERS[index]);
   while (!fitsLeadPhotoBudget(files) && index < LEAD_PHOTO_TIERS.length - 1) {

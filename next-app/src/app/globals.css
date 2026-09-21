@@ -3186,6 +3186,34 @@ body:has(main[data-no-cookie-notice]) [data-cookie-notice] {
   }
 }
 
+/* EVERY text field on touch screens is 16px (owner, 2026-09-20: "apply that
+   fix on mobile everywhere there's an input field, so the mobile view never
+   auto-zooms"). iOS Safari zooms the page when a focused field is under 16px
+   and never zooms back out; the site's `.form-field` is 14px and several
+   fields set smaller sizes inline (checkout discount code: 13px).
+   - `@media (hover: none)` = phones and tablets. Desktop keeps the 14px look.
+   - Unlayered, so a Tailwind `text-xs`/`text-sm` on the field cannot win.
+   - `!important`, because a plain rule loses to `.form-field` (higher
+     specificity) and to inline `style={{ fontSize }}`. It is the one property
+     here and the only way a single rule can cover fields written later.
+   - Checkboxes, radios, range, file and hidden inputs draw no text and never
+     trigger the zoom — left alone.
+   ⛔ Never "fix" the zoom with `maximum-scale` / `user-scalable=no`: iOS
+   ignores it for this and it breaks pinch-zoom accessibility (DECISIONS,
+   "Accidental zoom"). The two scoped rules below predate this one and are
+   kept: they are harmless and documented where they were needed. */
+@media (hover: none) {
+  :is(input, select, textarea):not(
+      [type='checkbox'],
+      [type='radio'],
+      [type='range'],
+      [type='file'],
+      [type='hidden']
+    ) {
+    font-size: 1rem !important;
+  }
+}
+
 /* The homepage "Join the List" window on phones (owner, 2026-09-15): the
    same accidental zoom — iOS Safari zooms the page when a focused field is
    under 16px, and the window's fields are 14px `.form-field`s. 16px on touch

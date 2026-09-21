@@ -1,6 +1,67 @@
 
 # Changelog
 
+## 2026-09-20 (11) — Google Ads: ads APPROVED (campaign "Eligible (Learning)"); optimization score 96.7% explained; three spend-expanding recommendations dismissed; tracking options priced for the owner (no code change)
+
+Owner: "it says we have an optimization score of 96.7%.. anything to improve that? also how hard / disruptive would it be to add tracking?"
+
+- **Status ~7 PM ET:** campaign row reads **"Eligible (Learning) — Bid strategy learning"** — the ads left review about 2.5 hours after go-live. 0 impressions yet.
+- **Recommendations page had four cards.** Three were DISMISSED as "not relevant for my business" because each undoes a deliberate setting: *Create a Performance Max campaign*, *Use Display Expansion*, *Opt in to Google Search Partner Network*. ⛔ Their cards carry a one-click **Apply** — never click it. Verified afterwards: Networks = "Google Search Network" only; change history's newest entry is still the 6:41 PM sitelinks. The score stayed 96.7%, so those three were worth nothing to it.
+- **The whole 3.3% is one item:** the **Gold** ad's strength is "Average" (the other four are not flagged) — Google's only unticked box is "include popular keywords in your headlines": of its 11 headlines only "Sell Gold in Naples, FL" contains a searched phrase. Proposed to the owner (4 of the 4 free headline slots, each a keyword the ad group already targets, each true of the business): **We Buy Gold in Naples · Gold Buyers in Naples, FL · Where to Sell Gold in Naples · Sell Your Gold Jewelry Today**. Not applied — ad wording is the owner's approval. The score is Google's own to-do list, not a quality grade; 100% is not a goal.
+- **Tracking, as answered:** (A) today, no site code: clicks, cost, search terms, calls from the ad's call button, directions taps. (B) **Lead-source label, first-party** — a `src` tag on the ads' landing URLs, remembered for the visit in `sessionStorage` and sent with the form, so the lead email / Admin → Inquiries says "came from a Google ad": no Google script, no cookie, no banner change, no CSP/privacy edits, ranking pages untouched (canonical already handles a query string); ~1–2 hours + one push; tells the OWNER which form leads came from ads, tells Google nothing. (C) **Full Google tag** with conversions (form sent, call / text / directions taps): third-party script (PageSpeed mobile is already ~79), the one-button cookie notice must become a real accept / decline, CSP + privacy + cookie-page edits, auto-tagging back on; about a day + careful testing; SEO-neutral but the most visible change, and at $13/day Google's bidding has too little data to use it. Walk-ins — the strongest channel — are untrackable by any of them except asking "how did you find us?". Recommendation: nothing now; read two to four weeks of data first; if any, (B).
+
+## 2026-09-20 (10) — iOS no longer auto-zooms when a field is tapped — ANYWHERE on the site: one sitewide 16px rule for touch screens — BUILT + dev-tested + STAGED with (9), awaiting push (no SQL, no env vars)
+
+Owner: "we applied a fix to the 'join the list' modal… that stopped iOS from auto-zooming… let's apply that fix on mobile everywhere there's an input field."
+
+**What the earlier fix was.** iOS Safari zooms the page when a focused field's text is under 16px and never zooms back. `.form-field` is 14px. The 09-02 (admin listing editor) and 09-15 (Join the List) fixes were each a scoped `@media (hover: none) { … font-size: 1rem }` rule in `globals.css`.
+
+**Now one sitewide rule** (`globals.css`, directly above those two, which are kept — harmless and documented where they were needed):
+`@media (hover: none) { :is(input, select, textarea):not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='hidden']) { font-size: 1rem !important; } }`
+- `hover: none` = phones and tablets; **desktop keeps the 14px look** (measured: 14px at 1024 px).
+- Unlayered so Tailwind `text-xs`/`text-sm` cannot win; `!important` because a plain element rule loses to `.form-field` (specificity) and to inline `style={{ fontSize }}` — the checkout discount-code box is 13px inline. One property, and the only way a single rule also covers fields written later (public AND admin).
+- ⛔ Not done with `maximum-scale` / `user-scalable=no` — iOS ignores it for this and it breaks pinch-zoom accessibility (`DECISIONS.md`, "Accidental zoom").
+
+**Measured on dev, phone emulation 375 px (`(hover: none)` matched), every field before → after, by deleting the rule through the CSSOM and re-measuring:** `/contact` name / email / phone / location / message 14 → 16 · `/free-evaluation` description / name / phone / email / location 14 → 16 · `/shop` search 14.4 → 16, sort 12.48 → 16, per-page 13.12 → 16, the seven filter-drawer selects 13 → 16, the two price boxes 13.12 → 16 · `/order-lookup` both 14 → 16 · `/unsubscribe` 14 → 16 · homepage Join the List text + tel 16 (already). **No field anywhere was above 16px, so nothing was shrunk; no page gained horizontal scroll; the shop toolbar and filter drawer still fit** (selects 309 px wide, right edge 342 of 375). The blank band in the filter-drawer screenshot is the year/era strip not yet painted in the preview pane — 186 px with AND without the rule, not caused by it. Account sign-in / sign-up were not opened in the pane (real Turnstile crashes it) and checkout needs a cart — both are covered by the rule being global, and the rule was confirmed in the production CSS build: `:is(input,select,textarea):not([type=checkbox],…){font-size:1rem!important}`.
+- Cosmetic note: on a phone the shop's "Inventory order" sort label and the field text now read a little larger than before. That is the fix itself (16px is the threshold).
+
+**Tests:** NEW `lib/__tests__/ios-input-zoom.test.ts` (5): one sitewide rule under `(hover: none)`, `!important`, the five no-text input types excluded, brace depth 0 (not inside `@layer`), and no `userScalable`/`maximumScale` in either layout.
+
+**Gate (covers (9) + (10)):** `npx tsc --noEmit` 0 · `npm run lint` 0 (3 known `<img>` warnings) · `npx vitest run` **1536/1536 (153 files)** · `npm run build` exit 0 from a deleted `.next`, no `.next/cache/turbopack/`.
+
+**After the push (owner, iPhone — the only real proof; desktop Chrome cannot reproduce iOS's zoom):** tap into a field on `/contact`, `/free-evaluation`, the shop search and a filter, checkout's discount code, and an admin form — the page must not zoom.
+
+## 2026-09-20 (9) — Lead forms: ONE photo cap (10) on both forms, stated up front, red warning when more are picked — BUILT + dev-tested + STAGED, awaiting push (no SQL, no env vars)
+
+Owner's phone test of the pushed photo fix: "when i tried to send 11 photos from the contact page only 6 came through, and from the free appraisal page only 10 of the 12 came through… allow 10 from both but notify the customer of that cap, and alert them in red that only the first 10 will send." Then: "check all forms if we have more."
+
+**Cause (exactly matches the numbers).** The two routes each carried their own cap and applied it silently: `api/contact-message/route.ts` `MAX_FILES = 6`, `api/inquire/route.ts` `MAX_FILES = 10`, both `.slice(0, MAX_FILES)`; neither form mentioned a limit. The 09-20 shrink fix made large sets arrive at all, which is what exposed the silent trim. (The photo fix itself worked on the phone: 10 camera photos went through in one request.)
+
+**All public forms checked:** only two take files — `EvalForm` (`/free-evaluation` → `/api/inquire`) and `MessageUsForm` (`/contact` → `/api/contact-message`). `InquiryForm` (product inquiry) posts text only; the only API routes that read uploads outside admin are those two.
+
+**Fix.**
+- NEW `src/lib/lead-photo-limits.ts` — `LEAD_PHOTO_MAX = 10`, `capLeadPhotos`, `isOverLeadPhotoCap`, `leadPhotoCapHint`, `leadPhotoCountLabel`, `leadPhotoOverCapMessage` (EN/ES). No browser or server APIs, so forms AND routes import the same number; both routes now read `const MAX_FILES = LEAD_PHOTO_MAX`.
+- NEW `src/components/contact/LeadPhotoCount.tsx` — the line under the picker, shared by both forms: "3 photos selected", or in red with `role="alert"`: **"You selected 12 photos. Only the first 10 will be sent."** / "Seleccionó 12 fotos. Solo se enviarán las primeras 10." Replaces the two hand-written count lines.
+- Both forms state the cap before anything is picked: the helper line gains "— up to 10 photos" / "— hasta 10 fotos". (That is the only visible-text change on `/free-evaluation`; title, H1, copy, JSON-LD untouched.)
+- `lib/lead-photo-prep.ts` — `prepareLeadPhotos` keeps only the first 10 images before shrinking, so a phone does not encode and upload photos the server would discard, and the size tiers work on the real count.
+
+**Dev check (preview pane, 375 px):** `/free-evaluation` — hint shown; 3 picked → "3 photos selected"; 12 picked → red warning (`rgb(186, 26, 26)`, `role=alert`), no horizontal scroll; submit (honeypot filled, so no lead) posted **10 files, pick-1 … pick-10, 1.61 MB, HTTP 200**. `/contact` — hint shown; 11 picked → red warning; posted **10 files, last = pick-10, HTTP 200**. The server-side cap is not exercised by a honeypot submit — it is pinned by the unit test.
+
+**Tests:** NEW `lib/__tests__/lead-photo-limits.test.ts` (9): the number, first-ten-in-order, both languages, both routes import the constant and hold no number of their own, both forms state the cap and use the shared line, red + `role=alert`, prep caps before shrinking.
+
+**Gate:** `npx tsc --noEmit` 0 · `npm run lint` 0 (3 known `<img>` warnings) · `npx vitest run` **1531/1531 (152 files)** · `npm run build` exit 0 from a deleted `.next`, no `.next/cache/turbopack/`.
+
+**After the push (owner, phone):** pick 11+ photos on `/contact` → red line, 10 arrive; same on `/free-evaluation`.
+
+## 2026-09-20 (8) — Google Ads: auto-tagging OFF (owner's yes), two more sitelinks (six total); Google's "sitelinks are missing" tip explained; 🔴 owner must accept Google's new Call and Messaging Ads Terms (no code change)
+
+Owner: "yes turn auto-tagging off, if you recommend it… also google is saying sitelinks are missing from this campaign.. should we add them?"
+
+- **Auto-tagging → No** (Admin → Account settings; read back "No"). Recommended because the site carries no Google tag, so the `gclid` parameter did nothing except make every ad click a unique URL — which misses the CDN's cached copy of the page (slower first load for exactly the visitors being paid for) and puts a tracking parameter on a site whose owner does not want ad tracking. Google Ads' own reporting (clicks, cost, calls from the ad, directions, search terms) is unaffected. Reversible in one click if conversion tracking is ever wanted.
+- **"Sitelinks are missing from this campaign"** — the four sitelinks from entry (5) ARE attached at campaign level; they read "Pending — under review", and Google's recommendation only counts approved ones, so the tip is stale and clears on approval. Google's form does say "to maximize performance, add 6 or more", so two were added, both to existing pages used as they are: **Sell Estate Jewelry** → `/estate-jewelry` ("One piece or a whole estate" / "Free evaluation, no pressure") and **Coins and Bullion** → `/bullion` ("Gold and silver coins and bars" / "Free evaluation while you wait"). Six sitelinks, all pending review. Watches and diamonds stay held back, as in the approved proposal.
+- 🔴 **Owner action:** a new account-wide banner — "New Call and Messaging Ads Terms … You will need to review and accept these terms in order to create and edit call ads and call assets" (Account settings also shows "Click-to-Call terms: Not accepted yet"). The call asset (239) 404-8505 already exists, but it cannot be edited — and may stop being eligible — until the terms are accepted. Accepting legal terms is the owner's click: the orange **Fix it** button on the banner. Claude did not click it.
+- **Later 09-20 — owner accepted; nothing left to do.** Account settings now read "Click-to-Call terms: **Accepted**" (row opened: "Terms of Service have been accepted"), "Lead form ads terms: Accepted", and "Data protection contacts: christopher surette". The orange banner is STILL shown, but it is an announcement ("the new terms will go into effect soon"): its "Fix it" only opens Account settings, where everything acceptable is accepted, and the bell holds nothing but a Performance Max upsell. If Google publishes the new terms later it will ask again — owner's click then. Owner also approved the two new sitelinks' wording. Assets page: 6 sitelinks · 4 callouts · call asset all "Pending — under review"; the "sitelinks are missing" tip is gone.
+
 ## 2026-09-20 (7) — Lead-form photo fix PROVEN on production (5 photos, 9.58 MB → 0.80 MB → five `.webp` objects); 🔴 phone contact bar was showing on DESKTOP — fixed + dev-verified + STAGED, needs a push (no SQL, no env vars)
 
 Owner: "do the test form 5 photos for me, there are random pics to use in /pictures on the computer."
@@ -11,6 +72,13 @@ Owner: "do the test form 5 photos for me, there are random pics to use in /pictu
 - Fix: `globals.css` — the base rule is now `display: none`, and `display: flex` moved inside the existing `@media (max-width: 767.98px)` block. `MobileContactBar.tsx` — the useless `md:hidden` class removed, header comment says why. `mobile-contact-bar.test.ts` — no longer trusts the utility: asserts the base rule is `display: none`, that no base `display: flex` exists, and that the phone query turns it on.
 - Dev check (preview pane, `/gold-services`): 1024 px → `display: none`, body padding 0 · 375 px → `flex`, 57 px, flush to the bottom, body padding 56 px, CALL · TEXT · DIRECTIONS · 768 px → `none`.
 - **Gate:** `npx tsc --noEmit` 0 · `npm run lint` 0 (3 known `<img>` warnings) · `npx vitest run` **1522/1522 (151 files)** · `npm run build` exit 0 from a deleted `.next`, no `.next/cache/turbopack/`.
+
+**🟢 DEPLOYED + production-verified the same evening (owner: "pushed and confirmed it's fixed, but double check all affected production pages").** Owner's Chrome, 2560 px, `naplesestatejewelry.com`:
+- **Every page that carries the bar — all 46 sitemap URLs in the ten seller sections (EN + ES, incl. the guides and the `/sell/[city]` pages):** HTTP 200, bar present in the HTML, class is exactly `mobile-contact-bar` (the new build — no `md:hidden`). **11 pages that must NOT carry it** (`/`, `/es`, `/shop`, `/es/shop`, `/card`, `/kittcard`, `/contact`, `/es/contact`, `/reviews`, `/about`, `/spot-prices`): bar absent. 57 of 57 as expected.
+- **The one live stylesheet that mentions the bar** (`1_p3a3-i6xamt.css`): base rule `display:none`; the only `display:flex` for it sits inside `@media (max-width:767.98px)`.
+- **Rendered result on 15 real page loads at 2560 px** (ten section roots + `/es/gold-services`, `/es/bullion`, `/sell/naples`, `/gold-services/gold-marks`, `/es/estate-services/selling-inherited-jewelry`): computed `display: none` on every one; ES labels Llamar · Texto · Llegar. (Two first read "absent" — the check ran before the DOM was parsed; re-read after load: present, `none`.) Homepage: no bar, body padding 0.
+- Phone width could not be emulated in the owner's maximized Chrome (site iframes are refused by its own frame headers; the window would not shrink) — phone side rests on the stylesheet rule above, the dev check at 375 px, and the owner's own phone confirmation.
+- Rest of the batch, same pass: `/bullion` + `/es/bullion` hero shows FREE APPRAISAL / TASACIÓN GRATUITA + CALL / LLAMAR (239) 404-8505, no horizontal scroll; one `sms:2394048505` link outside the bar on `/sell/naples`, `/es/sell/naples`, `/free-evaluation`, `/es/free-evaluation`, `/`, `/es`; no toll-free number in any `tel:`/`sms:` href; titles unchanged and no robots meta on the eleven pages read.
 
 ## 2026-09-20 (6) — Google Ads campaign "NEJ Sellers - Search" is LIVE at $13.00/day on the owner's word (no code change)
 

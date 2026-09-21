@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { createAdminNotification } from '@/lib/admin-notify';
 import { PRODUCT_IMAGES_BUCKET } from '@/lib/product-image-storage';
 import { encodeLeadPhoto } from '@/lib/lead-photo-encode';
+import { LEAD_PHOTO_MAX } from '@/lib/lead-photo-limits';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { checkSubmissionForSpam } from '@/lib/spam-heuristics';
 import { normalizePhoneNumber, phoneErrorMessage } from '@/lib/phone';
@@ -97,7 +98,7 @@ async function notifyAdminOfInquiry(input: {
   });
 }
 
-const MAX_FILES = 10;
+const MAX_FILES = LEAD_PHOTO_MAX; // same number the form states (lead-photo-limits.ts)
 const MAX_BYTES = 15 * 1024 * 1024; // 15 MB per photo
 
 function esc(value: string): string {

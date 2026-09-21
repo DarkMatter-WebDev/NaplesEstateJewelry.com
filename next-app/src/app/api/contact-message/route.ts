@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { createAdminNotification } from '@/lib/admin-notify';
 import { PRODUCT_IMAGES_BUCKET } from '@/lib/product-image-storage';
 import { encodeLeadPhoto } from '@/lib/lead-photo-encode';
+import { LEAD_PHOTO_MAX } from '@/lib/lead-photo-limits';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { normalizePhoneNumber, phoneErrorMessage } from '@/lib/phone';
 import {
@@ -29,7 +30,7 @@ const MAX_NAME = 200;
 const MAX_EMAIL = 320;
 const MAX_PHONE = 60;
 const MAX_MESSAGE = 5000;
-const MAX_FILES = 6;
+const MAX_FILES = LEAD_PHOTO_MAX; // was 6 — silently dropped photos 7+ (2026-09-20)
 const MAX_BYTES = 15 * 1024 * 1024; // 15 MB per photo
 
 function esc(value: string): string {

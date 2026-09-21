@@ -5,7 +5,33 @@
 
 ## ◻ OPEN — needs a human
 
-### 🔴 2026-09-20 (7) — READY TO PUSH: phone contact bar shows on DESKTOP (live now) — one-rule CSS fix staged (no SQL, no env vars)
+### 🟡 2026-09-20 (9) + (10) — READY TO PUSH (one batch): photo cap 10 on BOTH lead forms + iOS never auto-zooms on a field, sitewide (no SQL, no env vars)
+
+**(10) iOS zoom:** one rule in `globals.css` makes every text field 16px on touch
+screens (`@media (hover: none)`, unlayered, `!important`); desktop keeps 14px.
+Measured on dev at 375 px: every field on `/contact`, `/free-evaluation`, `/shop`
+(+ filter drawer), `/order-lookup`, `/unsubscribe` went 12.5–14 → 16, nothing
+shrunk, no sideways scroll. Gate 1536/1536 · build 0. `CHANGELOG.md` 2026-09-20
+(10). ◻ **Owner after the push, iPhone:** tap into fields on `/contact`,
+`/free-evaluation`, shop search + a filter, checkout discount code, an admin
+form — no zoom. (Only an iPhone can prove it.)
+
+**(9) photo cap:**
+
+Owner's phone test: 11 photos from `/contact` arrived as 6, 12 from
+`/free-evaluation` as 10 — the routes capped at 6 and 10 and said nothing. Now one
+shared `LEAD_PHOTO_MAX = 10` (`lib/lead-photo-limits.ts`), "— up to 10 photos" on
+both pickers, red "You selected 12 photos. Only the first 10 will be sent."
+(`components/contact/LeadPhotoCount.tsx`). Only these two public forms take
+files. Dev-tested at 375 px (12 → 10 posted, 11 → 10 posted); gate tsc 0 · lint 0
+· 1531/1531 · build 0. `CHANGELOG.md` 2026-09-20 (9).
+
+1. ◻ **Owner: push.**
+2. ◻ **Owner, phone:** pick 11+ photos on `/contact` and on `/free-evaluation` —
+   the red line appears and exactly 10 arrive in the email.
+
+
+### ✅ 2026-09-20 (7) — DEPLOYED + production-verified 09-20 evening: phone contact bar no longer shows on desktop (57 of 57 pages as expected)
 
 Found 09-20 during the photo test: `.mobile-contact-bar { display: flex }` beat
 Tailwind's `md:hidden`, so the Call · Text · Directions strip shows at the
@@ -14,9 +40,9 @@ bottom of the seller pages on desktop. Fixed in `globals.css` (base rule
 dev-verified at 1024 / 768 / 375 px; gate tsc 0 · lint 0 · 1522/1522 · build 0.
 `CHANGELOG.md` 2026-09-20 (7).
 
-1. ◻ **Owner: push.**
-2. ◻ After the push, on a desktop browser open `/gold-services` — no strip at
-   the bottom; on the phone it is still there.
+1. ✅ Owner pushed + confirmed. 2. ✅ Claude checked all 46 bar pages + 11
+   no-bar pages, the live stylesheet, and 15 rendered page loads at 2560 px —
+   `CHANGELOG.md` 2026-09-20 (7).
 
 
 ### 🟡 2026-09-20 (2) — PUSHED by the owner 09-20 (not production-checked by Claude): lead-form photo fix + phone contact bar — owner phone tests still open (no SQL, no env vars)
@@ -156,14 +182,31 @@ sure it works, and version b on the bar."
    reviews the ads; Coins and Bullion ad group still Paused. `CHANGELOG.md`
    2026-09-20 (6).
    - ✅ Owner added the payment method · ✅ owner said "go".
+   - ✅ 09-20 ~7 PM: ads APPROVED — campaign "Eligible (Learning)". PMax /
+     Display Expansion / Search Partners recommendations dismissed (never
+     "Apply"). `CHANGELOG.md` 2026-09-20 (11).
+   - ◻ **Owner decision:** add four keyword headlines to the Gold ad (the whole
+     missing 3.3% of the optimization score): We Buy Gold in Naples · Gold
+     Buyers in Naples, FL · Where to Sell Gold in Naples · Sell Your Gold
+     Jewelry Today — yes / edits.
+   - ◻ **Owner decision, no hurry:** tracking — nothing (today) / first-party
+     lead-source label (~1–2 h, no Google script, no cookie) / full Google tag
+     (~1 day, cookie accept-decline, CSP + privacy edits). Recommended: decide
+     after 2–4 weeks of data; if any, the label.
    - ◻ **Claude, 09-21 or 09-22:** confirm the ads left review (any
      disapproval → fix wording, never the site), first impressions appear, the
      location list shows the Shirley St showroom.
    - ◻ **Weekly reports: 09-27 · 10-04 · 10-11 · 10-18** (spend, clicks, calls
      from the ad, directions taps, search-terms sweep → new negatives; week 4 =
      keep, adjust or stop).
-   - ◻ **Owner, optional:** auto-tagging off (no site tag, so `gclid` does
-     nothing) — say yes and Claude flips it.
+   - ✅ 09-20: auto-tagging OFF (owner's yes) · six sitelinks (two added:
+     Sell Estate Jewelry, Coins and Bullion) — `CHANGELOG.md` 2026-09-20 (8).
+   - ✅ 09-20 owner ACCEPTED (Account settings: Click-to-Call terms
+     "Accepted"); the orange banner lingers as an announcement only — nothing
+     left to accept today. Original note: in Google Ads click the orange **Fix it** on the banner
+     "New Call and Messaging Ads Terms" and accept — needed to keep / edit the
+     call button on the ads (Account settings shows "Click-to-Call terms: Not
+     accepted yet"). Claude does not accept terms.
    - ✅ 09-20: site batch pushed → Coins and Bullion ad group ENABLED (reads
      "Pending"); all five ad groups on, one shared $13.00/day.
    (superseded) ◻ **Claude, once the passkey has paired:** re-enter the Gold keywords + ad

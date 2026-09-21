@@ -5,6 +5,8 @@ import FormPrivacyNotice from '@/components/legal/FormPrivacyNotice';
 import { LocationField, PreferredContactField } from '@/components/contact/InquiryPreferenceFields';
 import { parsePreferredContact, preferredContactEmailErrorMessage, preferredContactNeedsEmail } from '@/lib/inquiry-fields';
 import { isValidPhoneNumber, phoneErrorMessage } from '@/lib/phone';
+import LeadPhotoCount from '@/components/contact/LeadPhotoCount';
+import { leadPhotoCapHint } from '@/lib/lead-photo-limits';
 import { leadPhotosTooLargeMessage, shrinkFormPhotos } from '@/lib/lead-photo-prep';
 
 interface Props {
@@ -162,12 +164,9 @@ export default function EvalForm({ locale, submitted }: Props) {
                 {isEs
                   ? 'Selecciona varias a la vez desde tu rollo de cámara o archivos'
                   : 'Select multiple at once from your camera roll or files'}
+                {' — '}{leadPhotoCapHint(isEs)}
               </span>
-              {photoCount > 0 && (
-                <span className="text-sm font-semibold block mt-2" style={{ color: '#735c00' }}>
-                  {photoCount} {isEs ? (photoCount === 1 ? 'foto seleccionada' : 'fotos seleccionadas') : (photoCount === 1 ? 'photo selected' : 'photos selected')}
-                </span>
-              )}
+              <LeadPhotoCount isEs={isEs} selected={photoCount} color="#735c00" />
             </label>
           </div>
 

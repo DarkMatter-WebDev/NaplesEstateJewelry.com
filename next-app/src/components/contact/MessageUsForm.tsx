@@ -5,6 +5,8 @@ import FormPrivacyNotice from '@/components/legal/FormPrivacyNotice';
 import { LocationField, PreferredContactField } from '@/components/contact/InquiryPreferenceFields';
 import { parsePreferredContact, preferredContactEmailErrorMessage, preferredContactNeedsEmail } from '@/lib/inquiry-fields';
 import { isValidPhoneNumber, phoneErrorMessage } from '@/lib/phone';
+import LeadPhotoCount from '@/components/contact/LeadPhotoCount';
+import { leadPhotoCapHint } from '@/lib/lead-photo-limits';
 import { leadPhotosTooLargeMessage, shrinkFormPhotos } from '@/lib/lead-photo-prep';
 import { phoneHoursLabel } from '@/lib/business-location';
 import { FormGrid, PageContainer, Section } from '@/components/layout/ResponsiveLayout';
@@ -244,14 +246,9 @@ export default function MessageUsForm({ locale }: Props) {
                 </span>
                 <span className="text-xs mt-1" style={{ color: 'var(--color-on-surface-variant)' }}>
                   {isEs ? 'Opcional — adjunte imágenes de su artículo' : 'Optional — attach images of your item'}
+                  {' — '}{leadPhotoCapHint(isEs)}
                 </span>
-                {photoCount > 0 && (
-                  <span className="text-sm font-semibold mt-2" style={{ color: 'var(--color-primary)' }}>
-                    {photoCount} {isEs
-                      ? (photoCount === 1 ? 'foto seleccionada' : 'fotos seleccionadas')
-                      : (photoCount === 1 ? 'photo selected' : 'photos selected')}
-                  </span>
-                )}
+                <LeadPhotoCount isEs={isEs} selected={photoCount} color="var(--color-primary)" />
               </label>
             </div>
 
