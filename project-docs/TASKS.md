@@ -5,7 +5,19 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-09-20 (15) — READY TO PUSH: form confirmation lands in view + "Success!" + "Send another" + call/text line, all three lead forms (no SQL, no env vars)
+### 🟡 2026-09-21 — Sister-site (naplesantiquesllc.com) audit DONE, read-only — owner decisions open
+
+Findings + baseline: `SEO_LEAD_AUDIT.md` (2026-09-21 section); `CHANGELOG.md` 2026-09-21 (2).
+1. ◻ **Owner → antiques-site agent:** 301 the 58 NEJ-legacy paths + `/shop/*` + `/es/*` to the same path on naplesestatejewelry.com; re-angle `/sell/sterling-silver/`; JSON-LD relationship; deep links instead of homepage-only (exact list in the chat report of 09-21).
+2. ✅ **Owner decision 09-21:** no GBP for the antiques line for now (conditions to revisit: own answered number, own permanent sign, primary category "Antique store", DBA). **Antiques site switches to the owner's cell (239) 304-6229** and stops printing NEJ's number (links to NEJ instead); street address stays VISIBLE but is removed from its JSON-LD (no NEJ wording in its directions) — final handoff prompt given in chat 09-21; the antiques agent implements it.
+3. ◻ **Owner decision:** add `naplesantiquesllc.com` to GSC + Change of Address from anodyneantiques.com — fine AFTER item 1's redirects are live.
+1b. ✅ 09-21: antiques agent DONE + deployed; Claude verified the live site against the handoff (all pass — `CHANGELOG.md` 2026-09-21 (3)). Antiques agent is now on GSC (property + Change of Address). ◻ Still wanted from it ~3–4 weeks after the property exists: the Links report list for naplesantiquesllc.com.
+4. 🟡 **BUILT + STAGED 09-21 (3), awaiting push:** `/estate-services` sister-shop sentence (EN+ES) + dead naplesantiquesllc code removed from `netlify.toml` / `proxy.ts`. ◻ **Owner: push.** ◻ Claude after the push: curl `/estate-services` + `/es/estate-services` for the sentence, `.co`/`www` one-hop 301, naplesantiquesllc.com still the antiques site. **Staging:** ✅ synced 09-21 — dry run listed exactly the 9 touched files (netlify.toml, proxy.ts, estate-services/page.tsx, ARCHITECTURE, CHANGELOG, CLIENTS, CURRENT_STATUS, DECISIONS, TASKS), 0 Extras, 1159 total; copied 9 / 0 failed; follow-up 0; leak check 0; `.tsx` control 221 = 221; SHA-256 match 6 of 6.
+5. ◻ **Owner decision:** review `naplesjewelrybuyers.com` separately — it competes with NEJ for gold queries on the same phone.
+6. ◻ GBP pending Google update (WhatsApp chat link) — owner accepts or declines.
+7. ◻ **Claude, 2026-10-19:** re-check the baseline (GSC totals/top pages, GBP split + search terms, the five searches).
+
+### 🟡 2026-09-20 (15) — PUSHED 09-20 late night (not production-checked by Claude); owner's iPhone check open: form confirmation lands in view + "Success!" + "Send another" + call/text line, all three lead forms
 
 Owner-approved mockup (option B + the "Need us sooner?" line). Shared
 `components/contact/FormSuccessPanel.tsx` on free appraisal, contact message and
@@ -14,7 +26,7 @@ rate-limit (429) now gets its own message (`lib/lead-form-errors.ts`). Dev-teste
 at 375 px and 1280 px, EN + ES; gate tsc 0 · lint 0 · 1544/1544 · build 0.
 `CHANGELOG.md` 2026-09-20 (15).
 
-1. ◻ **Owner: push.**
+1. ✅ Owner pushed 09-20 late night ("pushed successfully").
 2. ◻ **Owner, iPhone:** send the free appraisal form and the contact form →
    "Success!" is on screen without scrolling; tap "Send another" → an empty form
    at the top of the screen. (A test send creates a real lead — mark it TEST.)
@@ -216,11 +228,11 @@ sure it works, and version b on the bar."
      stays 9–6; $13/day cap unchanged). `CHANGELOG.md` 2026-09-20 (14). ⚠️ In
      every weekly report: Segment → Hour of day + overnight search terms; trim
      back to 7 AM–midnight if spend drifts into the small hours.
-   - ◻ **Claude, 09-21 or 09-22:** also confirm the 6 sitelinks / 4 callouts /
-     call asset left "Pending — under review" (still pending 09-20 10 PM).
-   - ◻ **Claude, 09-21 or 09-22:** confirm the ads left review (any
-     disapproval → fix wording, never the site), first impressions appear, the
-     location list shows the Shirley St showroom.
+   - ✅ **09-21 morning, read in Chrome:** all 5 ads, 6 sitelinks, 4 callouts
+     and the call asset Eligible; showroom location asset serving; 17 impr · 5
+     clicks · $9.08 · "Eligible (Learning)". `CHANGELOG.md` 2026-09-21.
+     ◻ Owner's call, no hurry: add "the gold center naples" (competitor name,
+     1 impression, no click) as a negative.
    - ◻ **Weekly reports: 09-27 · 10-04 · 10-11 · 10-18** (spend, clicks, calls
      from the ad, directions taps, search-terms sweep → new negatives; week 4 =
      keep, adjust or stop).

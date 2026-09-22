@@ -213,6 +213,16 @@ export default async function EstateServicesPage({ params }: Props) {
                 <>Not sure where to start? Our guide <Link href="/estate-services/selling-inherited-jewelry" className="font-semibold text-[#735c00] underline underline-offset-2">Selling inherited jewelry: what to do first</Link> covers what not to touch, how to sort what you have, and what an executor needs.</>
               )}
             </p>
+            {/* Sister-shop link (2026-09-21, owner-approved): whole-house contents go
+                to the antiques site. Body link only — never in schema, sameAs, the
+                footer, or the silver pages (SEO_LEAD_AUDIT.md 2026-09-21). */}
+            <p className="mt-3 text-center text-sm leading-relaxed text-[#4d4635]">
+              {isEs ? (
+                <>¿Necesita vaciar toda la casa — muebles, arte, porcelana, plata antigua? Nuestra tienda hermana, <a href="https://naplesantiquesllc.com/estate-services/" target="_blank" rel="noopener noreferrer" className="font-semibold text-[#735c00] underline underline-offset-2">Naples Antiques and Estate Services</a>, se encarga del contenido completo del patrimonio (sitio en inglés).</>
+              ) : (
+                <>Clearing the whole house — furniture, art, porcelain, antique silver? Our sister shop, <a href="https://naplesantiquesllc.com/estate-services/" target="_blank" rel="noopener noreferrer" className="font-semibold text-[#735c00] underline underline-offset-2">Naples Antiques and Estate Services</a>, handles full estate contents.</>
+              )}
+            </p>
           </div>
         </section>
 

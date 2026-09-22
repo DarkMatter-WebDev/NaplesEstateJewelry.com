@@ -24,44 +24,18 @@
 
 # ---------------------------------------------------------------------------
 # ✅ DEPLOY GATE SATISFIED (2026-08-01 domain switch to naplesestatejewelry.com):
-# the .com is LIVE on this Netlify site — GoDaddy DNS A @ → 75.2.60.5 +
-# CNAME www → naplesantiques.netlify.app, apex + www added as domains,
-# .com set as PRIMARY, Let's Encrypt cert reissued covering all hosts, and
-# https://naplesestatejewelry.com verified serving in a browser. The host
-# redirects below are safe to deploy.
+# the .com is LIVE on this Netlify site — GoDaddy DNS A @ and www → 75.2.60.5
+# (re-verified 2026-09-21; www no longer CNAMEs to a *.netlify.app name, so the
+# 2026-09-20 project rename naplesantiques → naplesestatejewelry changed
+# nothing), apex + www added as domains, .com set as PRIMARY, Let's Encrypt
+# cert covering all four NEJ hosts, and https://naplesestatejewelry.com
+# verified serving in a browser. The host redirects below are safe to deploy.
+#
+# naplesantiquesllc.com is NOT on this project any more (2026-09-20): it is
+# the primary domain of the separate Naples Antiques and Estate Services site,
+# which 301s NEJ's old paths back here itself. Its host redirects that lived
+# here were removed 2026-09-21 — never re-add them (SEO_LEAD_AUDIT.md).
 # ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
-# Legacy brand domain (2026-07-30): naplesantiquesllc.com is a Netlify domain
-# alias on this project purely so these path-preserving 301s can transfer its
-# stranded Google index equity to the current domain (GoDaddy's forwarding
-# product was removed — it broke HTTPS and dropped paths). Retargeted straight
-# to the .com primary on 2026-08-01 so old links hop once, never twice. Both
-# scheme variants per host; keep these ABOVE the other redirect rules.
-# ---------------------------------------------------------------------------
-[[redirects]]
-  from = "https://naplesantiquesllc.com/*"
-  to = "https://naplesestatejewelry.com/:splat"
-  status = 301
-  force = true
-
-[[redirects]]
-  from = "http://naplesantiquesllc.com/*"
-  to = "https://naplesestatejewelry.com/:splat"
-  status = 301
-  force = true
-
-[[redirects]]
-  from = "https://www.naplesantiquesllc.com/*"
-  to = "https://naplesestatejewelry.com/:splat"
-  status = 301
-  force = true
-
-[[redirects]]
-  from = "http://www.naplesantiquesllc.com/*"
-  to = "https://naplesestatejewelry.com/:splat"
-  status = 301
-  force = true
 
 # ---------------------------------------------------------------------------
 # Domain switch (2026-08-01): naplesestatejewelry.co → naplesestatejewelry.com.

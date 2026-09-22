@@ -8,7 +8,30 @@
 
 **Read this, then `TASKS.md`.**
 
-🟡 **09-20 (15) — READY TO PUSH: lead-form confirmation lands in view, says
+🟡 **09-21 (3) — BUILT + STAGED, awaiting push (no SQL, no env vars):
+`/estate-services` links to the sister antiques site (one sentence, EN+ES) +
+dead naplesantiquesllc redirect code removed.** Antiques site verified live
+against the handoff first. Gate green; built-HTML diff = only the two
+estate-services pages. `CHANGELOG.md` 2026-09-21 (3).
+
+🟡 **09-21 — Sister-site audit (naplesantiquesllc.com) done, read-only: "safe with
+changes".** Redirects back to NEJ + silver-page re-angle belong on the antiques
+site; no second GBP; owner decisions in `TASKS.md` top; baseline re-check
+2026-10-19. `SEO_LEAD_AUDIT.md` 2026-09-21.
+
+🟢 **09-21 morning — Google Ads first read (Chrome, read-only):** everything
+passed review (5 ads, 6 sitelinks, 4 callouts, call asset, showroom location);
+17 impressions · 5 clicks · $9.08 · Eligible (Learning); search terms all
+genuine sellers. Next: weekly report 09-27. `CHANGELOG.md` 2026-09-21.
+
+🟢 **Session closed 2026-09-20 late night — nothing is staged-but-unpushed.**
+Open items are owner phone checks and dated ads follow-ups (`TASKS.md` top):
+the iPhone look at the new form confirmation; Google Ads check 09-21/22 (first
+impressions, assets out of review, showroom under the location asset); first
+weekly ads report 09-27.
+
+🟡 **09-20 (15) — PUSHED 09-20 late night (owner's iPhone check open; not
+production-checked by Claude): lead-form confirmation lands in view, says
 "Success!", offers "Send another" + a call/text line** — one shared
 `FormSuccessPanel` on all three lead forms (owner-approved mockup B); 429 gets its
 own message. Dev-tested 375 + 1280 px, gate 1544/1544. `CHANGELOG.md` (15).

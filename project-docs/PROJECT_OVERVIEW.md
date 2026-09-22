@@ -116,7 +116,8 @@ discretion and a personal relationship over a storefront transaction.
 - **Related domains** (listed as `sameAs`): `naplesjewelrybuyers.com` — a
   separate, live, actively-run buy-side landing site with its own
   LocalBusiness/FAQPage schema (confirmed 2026-07-11).
-- **Source**: `https://github.com/DarkMatter-WebDev/NaplesAntiquesLLC.com`.
+- **Source**: `https://github.com/DarkMatter-WebDev/NaplesEstateJewelry.com`
+  (renamed from `NaplesAntiquesLLC.com` on 2026-09-21; the old URL redirects).
 - **Deploy flow**: root `netlify.toml` sets `base = "next-app"`, runs
   `npm run build`, and publishes `.next`.
 - See `CLIENTS.md` for hosting/repo/credential reference locations.

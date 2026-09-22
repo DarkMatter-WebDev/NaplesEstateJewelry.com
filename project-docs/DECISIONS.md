@@ -6,6 +6,25 @@
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
 > compaction. Last reconciled: **2026-09-20**.
 
+## Sister site Naples Antiques and Estate Services is kept clearly separate from NEJ (2026-09-21)
+
+`naplesantiquesllc.com` (formerly NEJ's own legacy domain) became the separate
+antiques/estate-contents site on 2026-09-20: same suite, same owner, own Netlify
+project. Owner's rule: "#1 goal is to not threaten NEJ at all." Audit +
+evidence: `SEO_LEAD_AUDIT.md` 2026-09-21.
+
+- ⛔ No Google Business Profile or directory listings for it while it shares the
+  suite. Revisit only with its own answered number, own permanent sign, primary
+  category "Antique store" and a DBA.
+- It uses the owner's cell (239) 304-6229 and never prints NEJ's (239) 404-8505;
+  its JSON-LD is an `Organization` with NO address/hours and no reference to NEJ.
+- It owns whole-house contents, antiques and antique silver as objects; NEJ owns
+  jewelry, gold, coins, watches, diamonds and silver by weight. It 301s NEJ's old
+  paths back to `.com` itself.
+- NEJ links to it from ONE place: a body sentence on `/estate-services` (EN + ES).
+  ⛔ Never from `/silver-services` or its guides (NEJ's best non-brand page), and
+  never in schema/`sameAs`, the footer or the sitemap.
+
 ## Google Ads runs with NO site tag; the pages that rank are never edited for ads; the goal is any seller contact (2026-09-20)
 
 Owner, 2026-09-19/20, while approving a $300–500/month Google Search
@@ -2880,8 +2899,9 @@ store-hours formatters are a separate, pure system and are not affected
 Owner decision 2026-08-01, after buying the `.com`: the canonical web domain
 is `https://naplesestatejewelry.com`. The legacy `.co` remains owned as a
 Netlify alias that 301s path-preservingly to `.com` (rules in root
-`netlify.toml`), and `naplesantiquesllc.com` redirects straight to `.com` so
-old links never hop twice. New site-URL code must build from
+`netlify.toml`). (Until 2026-09-20 `naplesantiquesllc.com` also 301'd here; it is
+now the separate Naples Antiques and Estate Services site, which redirects NEJ's
+old paths back itself — `SEO_LEAD_AUDIT.md` 2026-09-21.) New site-URL code must build from
 `NEXT_PUBLIC_SITE_URL`/`SITE_URL` (falling back to the `.com`), never hardcode
 either domain.
 

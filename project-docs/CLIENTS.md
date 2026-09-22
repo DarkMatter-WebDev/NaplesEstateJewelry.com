@@ -12,12 +12,12 @@
 | **Business** | Naples Estate Jewelry; legal entity Naples Antiques LLC |
 | **Primary contact** | Chris — (239) 404-8505 |
 | **Primary domain** | `naplesestatejewelry.com` — live Netlify primary since 2026-08-01 |
-| **Related domains** | `naplesestatejewelry.co` — former primary and current business-email domain; website 301s to `.com`. `naplesantiquesllc.com` — Netlify alias redirecting to `.com`. `naplesjewelrybuyers.com` — separate live buy-side site. |
+| **Related domains** | `naplesestatejewelry.co` — former primary and current business-email domain; website 301s to `.com`. `naplesantiquesllc.com` — since 2026-09-20 NOT ours on this project: primary domain of the separate sister site Naples Antiques and Estate Services (own Netlify project, owner's cell (239) 304-6229, no GBP); it 301s NEJ's old paths back to `.com` itself (`SEO_LEAD_AUDIT.md` 2026-09-21). `naplesjewelrybuyers.com` — separate live buy-side site. |
 | **Business email** | **The monitored mailbox is `info@naplesestatejewelry.com`** on Google Workspace — owner-confirmed receiving 2026-08-09, and the single point of failure for every inbound path the site has (inquiries, order notifications, marketing Reply-To, bounce handling). `info@` / `chris@naplesestatejewelry.co` still exist but the app no longer points anyone at them; **never alter `.co` MX records during site work**. **Senders:** as of 2026-08-05 all outbound From addresses are `@naplesestatejewelry.com` — Resend's verified sending domain. Do not "fix" a sender back to `.co`; it will not send |
-| **Hosting** | Netlify site slug `naplesantiques`, team slug `rcman12589`; root `netlify.toml` builds `next-app/` and publishes `.next` |
+| **Hosting** | Netlify site slug `naplesestatejewelry` (renamed from `naplesantiques` 2026-09-20; `naplesantiques.netlify.app` now 404s, nothing depends on it), team slug `rcman12589`; root `netlify.toml` builds `next-app/` and publishes `.next` |
 | **DNS / registrar** | GoDaddy; primary apex points to Netlify (`75.2.60.5`) and Netlify owns the active certificate |
 | **Supabase** | Project ref `evzluixourmsefwdsieu` |
-| **Repository reference** | `https://github.com/DarkMatter-WebDev/NaplesAntiquesLLC.com` — historical/manual-copy destination; this source-of-truth folder itself has no git workflow |
+| **Repository reference** | `https://github.com/DarkMatter-WebDev/NaplesEstateJewelry.com` (renamed from `NaplesAntiquesLLC.com` 2026-09-21; GitHub 301s the old name — ⛔ never create a new repo called `NaplesAntiquesLLC.com` in the org, it would kill that redirect) — manual-copy destination; this source-of-truth folder itself has no git workflow |
 | **Maintenance plan** | TBD — define scope, cadence, and response time |
 | **Billing status** | TBD |
 
@@ -26,7 +26,8 @@
 - `.com` DNS, Netlify primary/certificate, application environments, Supabase
   Auth URLs, PayPal/eBay/Etsy registrations, Search Console, sitemap, and Google
   Change of Address are complete.
-- `.co` and `naplesantiquesllc.com` redirect path-preservingly to `.com`.
+- `.co` redirects path-preservingly to `.com`. (`naplesantiquesllc.com` left this
+  project 2026-09-20 — see Related domains.)
   `.co/api/*` remains available for backward-compatible external callbacks.
 - Site credit and current public branding name Surette Systems. Dark Matter
   remains only in historical account/repository identifiers.

@@ -22,8 +22,9 @@ redirects as a fallback.
 **Request ordering (established by measurement 2026-08-05): `next-app/src/proxy.ts`
 runs BEFORE `netlify.toml` redirect rules.** The proxy rewrites `/shop` to
 `/en/shop`, and the netlify rule then splats that already-rewritten path — which
-is why host-level redirects for the legacy domains (`naplesestatejewelry.co`,
-`naplesantiquesllc.com`, and their `www.` variants) live in the proxy, above the
+is why host-level redirects for the legacy domain (`naplesestatejewelry.co` and
+its `www.` variant; `naplesantiquesllc.com` was removed 2026-09-21 when it became
+a separate sister site) live in the proxy, above the
 locale rewrite. Placing them only in `netlify.toml` produced two hops per legacy
 link (`.co/shop` → `.com/en/shop` → `/shop`).
 

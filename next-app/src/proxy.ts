@@ -22,11 +22,12 @@ const CANONICAL_ORIGIN = 'https://naplesestatejewelry.com';
 // here and keep using the netlify.toml rules, which already resolve in one hop.
 // That is deliberate: the .co/api/* carve-out must stay a 200 rewrite because
 // external webhook POSTs (Resend, PayPal, eBay) do not follow 301s.
+//
+// naplesantiquesllc.com was removed 2026-09-21: since 2026-09-20 it is a
+// separate sister site on its own Netlify project and never reaches this app.
 const LEGACY_HOSTS = new Set([
   'naplesestatejewelry.co',
   'www.naplesestatejewelry.co',
-  'naplesantiquesllc.com',
-  'www.naplesantiquesllc.com',
 ]);
 
 function canonicalHostRedirect(request: NextRequest): NextResponse | null {
