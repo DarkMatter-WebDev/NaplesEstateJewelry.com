@@ -4,7 +4,54 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-09-20**.
+> compaction. Last reconciled: **2026-09-24**.
+
+## Etsy and eBay: high-value items stay off Etsy, and a manual delist on either marketplace is sticky (2026-09-24)
+
+- **Owner ruling (both marketplaces):** *"If I manually delist something on eBay or on the site from eBay, I don't want it automatically relisted during one of those sweeps."* The sweeps and status hooks may undo only a delist/hide that automation itself performed because the product sold, was archived, or went out of stock. Ended/withdrawn listings, never-synced products, and anything deactivated (Etsy) or hidden (eBay) by hand — from the site or on the marketplace directly — are left alone. Sold and archived products always come down. eBay implementation: `isEbayManualHold` over the newest `hide_oos` log message (`EBAY_HIDE_MESSAGE`), `CHANGELOG.md` 2026-09-24 (2); eBay's Withdraw/End path never auto-restored and still does not.
+
+- **Policy (owner):** Etsy is *"too risky for selling high dollar items"* — Etsy carries only items with a **melt value ≤ $300** (the owner's own criterion, corrected from "price over $300"). 33 listings above the line were deactivated 2026-09-24 (`CHANGELOG.md` 2026-09-24 (1)); the site and eBay are untouched. Nothing in code enforces the line at listing time — the owner applies it when clicking "Sync to Etsy".
+- **Deactivate, never delete.** Listings go `inactive` on Etsy via the site's delist route (reactivatable, keeps the listing id/history); `deleteListing` remains a separate explicit action.
+- **A manual "Deactivate on Etsy" is a hold the automation must respect.** `detectEtsyStatusDrift` only returns `restore` when the newest successful `delist` log row for the product was written by automation (`auto:` prefix, `ETSY_DELIST_MESSAGE.auto`). No row, or a `manual:` row, holds the listing off Etsy however available the product is. The `delist` branch is unchanged: sold/archived products always come down. **Why:** the 2026-08-21 sweep was written to catch a *missed* delist; its `restore` branch silently assumed every delisted-but-available listing was a mistake, which undid the owner's deliberate deactivations (and would have undone every drawer-button deactivation since August). **How to apply:** any new caller of `runDelist` must say who it is (`'auto'` only for status-driven automation); a new automatic-relist path must go through `detectEtsyStatusDrift` with the hold loaded, never call `runReactivate` directly. eBay's twin got the same rule the same morning (first bullet); the two must not drift apart.
+- **Order of operations when the sweep is paused for a fix:** deploy first, re-enable *Auto-delist when sold/archived* second. The toggle is the only gate on the sweep and the hook.
+
+## Google Ads: read placement and matched-vs-targeted locations before reading CTR or geography (2026-09-23 night)
+
+From reconciling an independent audit against the live account (`CHANGELOG.md` 2026-09-23 (12)):
+
+- **Blended CTR is a placement-mix number here.** All time, Top placements were 99 impressions → 26 clicks (26%) and Other (bottom of page) 249 → 3 (1.2%). Bottom-of-page impressions cost nothing and almost never click, so a CTR fall must be split into "more Other impressions" (harmless) and "Top CTR fell" (the real signal). Judge campaigns on **Top-placement CTR** (Segment → Top vs. Other), clicks and seller contacts — never on blended CTR alone. Wednesday 09-23's Top CTR fell 41% → 31% → 13% while Top impressions rose: the new keywords reached the top of the page and still did not click, which is relevance, not position.
+- **Matched-location counties ≠ targets.** Bonita Springs and Estero are inside Lee County, so a "Lee County" row in the matched-locations report contains them; subtract the targeted rows before calling anything a leak.
+- **Palm Beach County appearing under presence-only targeting is not a leak.** Presence = "in or regularly in"; the Collier target row (254/28) exceeded the Collier matched-county row (233/24) by exactly the Palm Beach row (21/4): Collier regulars physically in Palm Beach when they searched. It is the best-CTR slice in the account. ⛔ Do not exclude it.
+- **Exact-match duplicates of queries that already match a phrase keyword add nothing on Maximize Clicks** (no per-keyword bids to raise) and only split the data. Fix routing with ad-group-level phrase negatives instead.
+- **Every negative is checked for match type before it is judged.** Single-word broad negatives (`kilates`, `gramo`, `price`, `spot`…) block any query containing the word; that trade is accepted for English price terms and should be narrowed to phrase negatives where a seller shape is plausible (proposal A, awaiting the owner).
+
+## Google Ads: a CTR collapse after a reach change is diagnosed by decomposing impressions by source, never by reaching for a bidding lever (2026-09-23)
+
+The afternoon reach expansion (+43 keywords, +Lee County) doubled impressions and cut CTR from 11–12% to 1.8%. The first instinct — "bid harder" via Target Impression Share — was proposed, re-audited at the owner's request and **withdrawn**: decomposition showed the genuine seller queries were still clicking at ~8–9%; they had simply become a quarter of the total. Rules that came out of it:
+
+- **Maximize Clicks stays.** It produced the good days. It ignores per-keyword bids, so "raise bids on high-intent terms" is not a lever on it; the lever is relevance — remove what dilutes and Max Clicks reallocates to what clicks. Do not switch bid strategy to chase exposure; Target IS buys top-of-page for price-checkers too and resets learning.
+- **The budget is a ceiling, not a target.** $19/day (owner's explicit choice, above the 09-20 range) is headroom. The campaign could not spend $13 with 31 keywords; more money does nothing until there are good auctions to buy.
+- **Keep keywords in the ad group whose ad matches them.** `"sell silver bars"` in Coins pulled general silver searches into the Coins ad instead of the 33%-CTR Silver ad. Cross-group leaks are fixed with ad-group-level negatives on the wrong group and exact match on the specific term, not by deleting the query.
+- **Spanish needs its own negatives.** `price` / `spot` / `per gram` do not cover `precio` / `gramo` / `kilates`; a "cuánto vale mi oro"-type keyword is a price-checker magnet, not a seller term.
+- **Lee County only with a Lee County ad group.** An ad that says "Naples" three times does not click in Fort Myers (Lee + Bonita + Estero: 63 impressions / 0 clicks in one day). Re-add it when there is copy for it.
+- **Judge changes two days after they land**, not the next morning — new keywords sit under review and an edited RSA restarts learning.
+
+## Owner rulings on Google Ads search intent (2026-09-23)
+
+- ⛔ **Never negative `naples jewelry buyers`.** It is town + item + verb, the same shape as "naples gold buyers"; a competitor chose that name *because* it is generic. Zero clicks on it mean the competitor's 49-review Knowledge Panel beside our ad wins the click — so the query is one to WIN (exact headline `Jewelry Buyers in Naples, FL` is in the Estate ad for it), never to surrender.
+- **Consignment searchers are wanted.** The owner converts them to selling. `consignment` / `consign` were removed from the negatives the same day they were added.
+- **No dedicated appraisals ad group** — Keyword Planner (Collier) shows `jewelry appraisal near me` 20/mo and the rest of the cluster is diamond/engagement-ring appraisal = insurance intent we do not serve. But the owner is right that `"estate jewelry appraisal"` phrase never fires on plain "jewelry appraisal", so `"jewelry appraisal"` / `"gold appraisal"` / `"silver appraisal"` / `"coin appraisal"` exist in their groups, guarded by the `"insurance appraisal"` / `"written appraisal"` negatives. Landing pages stay as they are (`/free-evaluation` as a keyword-level final URL is a later option).
+- ⛔ **Never negative a competitor's name** (2026-09-23 night, owner: "i want to show up next to gold center searches"). `"gold silver naples"` from 09-20 is the one historical exception and is not re-opened; no new competitor names (`gold center`, `gulf coast`, `national gold`…) are added. Zero clicks beside a competitor's Knowledge Panel is accepted; the ad exists to be the alternative in that moment.
+- ⛔ **No hand-kept logs or tallies for the owner** (2026-09-23 night: "i dont have time for that"). Measurement must be zero-effort: the Phone calls / Phone impr. / PTR columns (call-asset forwarding number), Admin → Inquiries / Messages dates, Yelp lead counts, GBP calls and directions. The first-party source label stays parked as the only build-side option.
+- **Ad copy pattern that earns clicks here: identity + place** ("Naples Estate Jewelry Buyer" 30 impr / 5 clicks) and walk-in facts ("No appointment needed… inside Sharon Lynch Collections" carried 67 / 5). Bare category labels ("Sell Inherited Jewelry" 20 / 0) and a street address in a headline (10 / 0) do not. A hook Google never serves ("One Piece or a Whole Estate", 0 impressions) is not improved by better wording.
+
+## The `naplesjewelrybuyers.com` satellite leads with the Naples Estate Jewelry name; the "Naples Jewelry Buyers" crest is retired from the hero (2026-09-23)
+
+A different company owns the exact-match "Naples Jewelry Buyers" Google Business Profile (5.0★ / 49 reviews, 11542 Tamiami Trl E, (239) 420-1918, `naplesjewelrybuyersllc.com`); Google Maps resolves that name straight to them. A visitor who remembers the satellite's *name* and looks it up later lands on the competitor. So every brand cue on the satellite now says **Naples Estate Jewelry** first — nav lockup (octopus mark + name, "Jewelry Buyers" as the descriptor), hero (typeset **Cinzel** wordmark with a metallic-gold gradient; the crest image is unreferenced but kept in the repo), trust pill ("★ 5.0 — Naples Estate Jewelry on Google"), footer, and all ten sub-page footers. ⛔ Do not flip these back, and do not put the crest back in the hero. ⛔ Unchanged, because they hold the #1 organic ranking for "naples jewelry buyers": the domain, every `<title>`, the H1, body copy, URLs, canonicals and the schema (`name` Naples Estate Jewelry, `alternateName` Naples Jewelry Buyers, one `@id` shared with the main site). All six Google/Maps links on the satellite point at NEJ's real GBP (`cid=17050430560749692864`). ⛔ A GBP named "Naples Jewelry Buyers" is not an option (name taken; second GBP at the shared suite ruled out 09-21). `naplesgoldbuyers.com` has no equivalent exposure — no exact-name competitor GBP. The satellite is its own project folder with its own drag-and-push deploy; nothing in the NEJ app changed.
+
+## Yelp is not downgraded while the bonus credit is unused (2026-09-23)
+
+Yelp's own terms: *"You lose any unfulfilled bonus ad budget if you downgrade or cancel early."* $104.56 of the $135.39 bonus remains through 2027-02-17, and a budget reduction is a downgrade. Yelp also still holds the only measured phone calls (3–4 in 30 days vs Google's 0). So the owner's "fund Google by cutting Yelp" is held until the 09-27 report; the Google raise is funded on its own.
 
 ## Sister site Naples Antiques and Estate Services is kept clearly separate from NEJ (2026-09-21)
 
@@ -1277,6 +1324,17 @@ editable. Rules that follow from that:
   like to ask about ") — the site has no scan analytics, and the phrase is
   how the owner knows a lead came from a card. Keep the `sms:…?&body=`
   form: `?&` is the one shape both iOS and Android honour.
+- **The email address is a readable `mailto:` line under the phone hours,
+  not a button** (owner, 2026-09-24, mockup Option B over a "Text | Email"
+  half-pill row): it is the one contact a person can read and type later.
+  Same muted size as the hours lines, gold `mail` glyph, prefilled subject
+  "Your card — Naples Estate Jewelry" (ES "Su tarjeta — …") for the same
+  attribution reason as the text. The address is a per-holder value in
+  `card-holders.ts`. ⛔ **Nothing added to this page may make it taller:**
+  the line's ~23px came out of the storefront thumbnail (16:9 → 2:1, margin
+  12 → 8px), measured on dev at 375px to −1.7px net. Pay for the next
+  addition the same way — from the photo, the tiles or a margin — never by
+  growing the page.
 - **A static QR only.** Never a paid "dynamic QR" service — the page is
   the dynamic part, and such services expire and take the cards with them.
 - **The EN/ES toggle is a Next `<Link prefetch>`, never a plain anchor**
@@ -2401,6 +2459,15 @@ here. The user copies it into a separate GitHub working folder manually.
 Keep runtime code in `next-app/`, SQL in `supabase/`, and durable project memory
 in `project-docs/`. Do not leave temporary reports, archives, logs, or generated
 caches in the root.
+
+Folder-rename rule (confirmed 2026-09-23): the source folder is
+`C:\Users\rcman\OneDrive\Documents\NaplesEstateJewelry.com`. Distinguish local
+folder paths from intentional legacy `.co` domain redirects and historical
+records; never replace those domain references as part of a folder rename.
+Relative NEJ launch paths remain valid. Regenerate ignored build artifacts that
+embed absolute paths at the next required build. The 2026-09-21 changelog records
+the separate Claude path-keyed memory migration; an in-project review alone does
+not independently verify that external store or require another migration.
 
 ### Startup memory is a snapshot, not a second changelog
 

@@ -288,6 +288,32 @@ export async function insertSyncLog(service: SupabaseClient, input: EtsySyncLogI
   if (error) console.error('etsy_sync_log insert error:', error);
 }
 
+/**
+ * Newest successful `delist` log message per product, for the manual-hold
+ * rule in `detectEtsyStatusDrift` (2026-09-24). Rows are read newest-first and
+ * the first one seen per product wins. A product with no delist row is absent
+ * from the map — callers treat "absent" as a manual hold, never as automation.
+ */
+export async function getLatestDelistMessages(
+  service: SupabaseClient,
+  productIds: string[],
+): Promise<Map<string, string | null>> {
+  const latest = new Map<string, string | null>();
+  if (!productIds.length) return latest;
+  const { data, error } = await service
+    .from('etsy_sync_log')
+    .select('product_id, message, created_at')
+    .eq('action', 'delist')
+    .eq('outcome', 'ok')
+    .in('product_id', productIds)
+    .order('created_at', { ascending: false });
+  if (error || !data) return latest;
+  for (const row of data as Array<{ product_id: string | null; message: string | null }>) {
+    if (row.product_id && !latest.has(row.product_id)) latest.set(row.product_id, row.message);
+  }
+  return latest;
+}
+
 export async function getRecentSyncLog(service: SupabaseClient, limit = 50): Promise<EtsySyncLogRow[]> {
   const { data, error } = await service
     .from('etsy_sync_log')

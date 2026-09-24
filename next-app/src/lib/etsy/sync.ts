@@ -46,6 +46,7 @@ import {
   deleteListingImageRow,
   deleteListingImagesByListingId,
   getConnection,
+  getLatestDelistMessages,
   getListing,
   getListingImages,
   insertListingImage,
@@ -1011,7 +1012,20 @@ export async function checkAllListingStatuses(productIds?: string[]): Promise<Ch
   };
 }
 
-export async function runDelist(productId: string): Promise<SyncStepResult> {
+/**
+ * Who asked for a deactivation. Recorded in the delist log row's message and
+ * read back by the manual-hold rule (`isEtsyManualHold`): only `auto` delists
+ * are ever auto-restored. Default is `manual` so a new caller that forgets to
+ * say gets the safe (sticky) behaviour.
+ */
+export type EtsyDelistSource = 'manual' | 'auto';
+
+export const ETSY_DELIST_MESSAGE: Record<EtsyDelistSource, string> = {
+  manual: 'manual: deactivated from the admin — stays off Etsy until reactivated by hand',
+  auto: 'auto: product sold or archived on the site',
+};
+
+export async function runDelist(productId: string, source: EtsyDelistSource = 'manual'): Promise<SyncStepResult> {
   const service = createServiceClient();
   const listing = await getListing(service, productId);
   if (!listing?.etsy_listing_id) {
@@ -1024,7 +1038,13 @@ export async function runDelist(productId: string): Promise<SyncStepResult> {
     listing_state: 'inactive',
     last_synced_at: new Date().toISOString(),
   });
-  await insertSyncLog(service, { product_id: productId, listing_id: listing.etsy_listing_id, action: 'delist', outcome: 'ok' });
+  await insertSyncLog(service, {
+    product_id: productId,
+    listing_id: listing.etsy_listing_id,
+    action: 'delist',
+    outcome: 'ok',
+    message: ETSY_DELIST_MESSAGE[source],
+  });
   return { done: true, syncState: updated.sync_state, listingId: listing.etsy_listing_id, listingUrl: listingUrlFor(listing.etsy_listing_id) };
 }
 
@@ -1433,17 +1453,43 @@ export type EtsyStatusDrift = 'delist' | 'restore' | null;
  *
  * ⚠️ Etsy keys on STATUS ONLY — unlike eBay it does not consider quantity.
  * That asymmetry is in the hook it mirrors; do not "fix" it here in isolation.
+ *
+ * `manualHold` (2026-09-24): a listing the OWNER deactivated — the admin's
+ * "Deactivate on Etsy" button, or a deactivation done on Etsy itself and picked
+ * up by the read-only status check — is never auto-restored, however available
+ * the product is on the site. Before this rule the sweep put 33 deliberately
+ * deactivated high-value listings straight back on Etsy. Only a delist that
+ * automation performed (product sold/archived) is undone when the product comes
+ * back; see `isEtsyManualHold`. The `delist` branch is unaffected: a sold
+ * product's listing always comes down.
  */
 export function detectEtsyStatusDrift(
   row: EtsyListingRow,
   product: { status?: string | null } | null,
+  manualHold = false,
 ): EtsyStatusDrift {
   if (!row.etsy_listing_id) return null;
   if (!product) return null;
   const status = normalizeProductStatus(product.status);
   if (status !== 'available' && LIVE_LISTING_STATES.includes(row.sync_state)) return 'delist';
-  if (status === 'available' && row.sync_state === 'delisted') return 'restore';
+  if (status === 'available' && row.sync_state === 'delisted') return manualHold ? null : 'restore';
   return null;
+}
+
+/**
+ * The manual-hold rule, from the newest successful `delist` log message for the
+ * product. Only a message automation wrote (`auto: …`) releases the hold. No
+ * row at all (the listing went inactive on Etsy's side, or was delisted before
+ * this rule existed) and every `manual: …` row hold the listing off Etsy.
+ */
+export function isEtsyManualHold(latestDelistMessage: string | null | undefined): boolean {
+  return !(typeof latestDelistMessage === 'string' && latestDelistMessage.startsWith('auto:'));
+}
+
+/** Manual-hold lookup for one product — the hook's and the repair's per-item path. */
+async function loadEtsyManualHold(service: SupabaseClient, productId: string): Promise<boolean> {
+  const latest = await getLatestDelistMessages(service, [productId]);
+  return isEtsyManualHold(latest.get(productId));
 }
 
 export interface EtsyReconcileResult {
@@ -1502,9 +1548,16 @@ export async function reconcileEtsyStatusDrift(): Promise<EtsyReconcileResult> {
       ((productRows ?? []) as Array<{ id: string; status: string | null }>).map((p) => [p.id, p]),
     );
 
-    const drifted = rows.filter(
-      (row) => detectEtsyStatusDrift(row, products.get(row.product_id) ?? null) !== null,
-    );
+    // Manual-hold rule: only a delisted listing on an AVAILABLE product can be
+    // a restore candidate, so only those need their newest delist log read.
+    const restoreCandidates = rows
+      .filter((row) => row.sync_state === 'delisted' && normalizeProductStatus(products.get(row.product_id)?.status) === 'available')
+      .map((row) => row.product_id);
+    const latestDelists = await getLatestDelistMessages(service, restoreCandidates);
+    const driftOf = (row: EtsyListingRow) =>
+      detectEtsyStatusDrift(row, products.get(row.product_id) ?? null, isEtsyManualHold(latestDelists.get(row.product_id)));
+
+    const drifted = rows.filter((row) => driftOf(row) !== null);
 
     // One outcome per attempted listing. A repair is counted from the state
     // that FOLLOWED the attempt, never from the attempt itself — see
@@ -1512,9 +1565,7 @@ export async function reconcileEtsyStatusDrift(): Promise<EtsyReconcileResult> {
     const outcomes: DriftRepairOutcome[] = [];
     for (const row of drifted) {
       if (outcomes.length > 0 && Date.now() > deadlineAt) break;
-      outcomes.push(
-        await repairEtsyStatusDrift(service, row.product_id, detectEtsyStatusDrift(row, products.get(row.product_id) ?? null)),
-      );
+      outcomes.push(await repairEtsyStatusDrift(service, row.product_id, driftOf(row)));
     }
 
     const counts = countDriftRepairs(outcomes);
@@ -1579,9 +1630,9 @@ async function applyEtsyProductStatus(service: SupabaseClient, productId: string
   const { data: product } = await service.from('products').select('status').eq('id', productId).maybeSingle();
   if (!product) return 'noop';
 
-  const drift = detectEtsyStatusDrift(listing, product);
+  const drift = detectEtsyStatusDrift(listing, product, await loadEtsyManualHold(service, productId));
   if (drift === 'delist') {
-    await runDelist(productId);
+    await runDelist(productId, 'auto');
     return 'repaired';
   }
   if (drift === 'restore') {
@@ -1638,7 +1689,9 @@ async function repairEtsyStatusDrift(
 
   const listingAfter = await getListing(service, productId);
   const { data: productAfter } = await service.from('products').select('status').eq('id', productId).maybeSingle();
-  const driftAfter = listingAfter ? detectEtsyStatusDrift(listingAfter, productAfter ?? null) : null;
+  const driftAfter = listingAfter
+    ? detectEtsyStatusDrift(listingAfter, productAfter ?? null, await loadEtsyManualHold(service, productId))
+    : null;
   const outcome = classifyDriftRepair({ driftBefore, directError, driftAfter });
 
   if (outcome === 'reconciled') {

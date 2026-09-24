@@ -60,6 +60,12 @@ import { getStoreHours } from '@/lib/store-hours';
  * - **The bottom button says where it goes** ("View Full Website & Shop",
  *   owner, 2026-09-08). Spanish drops "Completo" in place: the full phrase
  *   measured 252 of the 256px available at 375px.
+ * - **The email address is a readable line under the phone hours** (owner,
+ *   2026-09-24, mockup Option B over a "Text | Email" half-pill row): it is the
+ *   one contact a person can copy or type later, not only tap. The page did
+ *   not grow — the storefront thumbnail went 16:9 → 2:1 (and 4px closer to the
+ *   address) to pay for the line, to the pixel at 375px. The address lives in
+ *   `card-holders.ts` like the name and number.
  * - **Text is prefilled** ("Hi <name>, I have your card …"): lowers the hurdle
  *   for someone unsure how to start, and tells the owner the lead came from a
  *   card — the site has no scan analytics. `sms:` + `?&body=` is the one
@@ -130,6 +136,10 @@ export default async function CardLanding({ locale, holder }: CardLandingProps) 
   // `?&body=`: iOS wants `&`, Android wants `?`; this form satisfies both.
   const smsHref = `sms:${holder.phoneDigits}?&body=${encodeURIComponent(smsBody)}`;
   const phoneTel = `tel:${holder.phoneDigits}`;
+  // Prefilled subject for the same reason the text is prefilled: the site has
+  // no scan analytics, so the message itself says the lead came from a card.
+  const mailSubject = isEs ? 'Su tarjeta — Naples Estate Jewelry' : 'Your card — Naples Estate Jewelry';
+  const mailHref = `mailto:${holder.email}?subject=${encodeURIComponent(mailSubject)}`;
 
   const prefix = isEs ? '/es' : '';
   const tileClass =
@@ -265,6 +275,30 @@ export default async function CardLanding({ locale, holder }: CardLandingProps) 
               </p>
             );
           })()}
+          {/* Email — the one contact on the page a person can READ, not only
+              tap: someone who wants to write from a computer later needs the
+              address itself (owner, 2026-09-24, mockup Option B; the half-pill
+              "Text | Email" row was Option A and lost). Same muted size as the
+              two lines above it, the mail glyph in gold marks it as a link.
+              ⛔ The page did not get taller: this line (~23px at 375px) is
+              paid for by the storefront photo below, cropped 16:9 → 2:1 and
+              pulled up 4px — measured in CHANGELOG.md 2026-09-24. */}
+          <a
+            href={mailHref}
+            className="mt-1 flex items-center justify-center gap-1.5 text-[0.78rem] font-semibold no-underline"
+            style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
+          >
+            <AppIcon name="mail" className="text-[0.85rem]" />
+            <span
+              style={{
+                textDecoration: 'underline',
+                textUnderlineOffset: '2px',
+                textDecorationColor: 'color-mix(in srgb, var(--color-primary) 45%, transparent)',
+              }}
+            >
+              {holder.email}
+            </span>
+          </a>
         </div>
 
         {/* The primary taps */}
@@ -328,8 +362,12 @@ export default async function CardLanding({ locale, holder }: CardLandingProps) 
           </div>
           {/* The door, for someone standing in the parking lot (owner,
               2026-09-08; no caption). Lazy — the buttons above must not wait
-              for it — and 16:9 so it stays a thumbnail, not a hero. */}
-          <StorefrontPhoto locale={locale} aspect="16:9" className="mt-3" sizes="(min-width: 448px) 28rem, 100vw" />
+              for it — and a thumbnail, not a hero. 16:9 until 2026-09-24, now
+              2:1 with a 4px smaller top margin: those ~25px are what paid for
+              the email line above the buttons (owner: the line must not add
+              height to the page). The crop keeps the bottom of the frame, so
+              the door and the curb number stay in the picture. */}
+          <StorefrontPhoto locale={locale} aspect="2:1" className="mt-2" sizes="(min-width: 448px) 28rem, 100vw" />
           {/* Directions live with the address they point at (owner, 2026-09-03). */}
           <a
             href={mapsUrl()}

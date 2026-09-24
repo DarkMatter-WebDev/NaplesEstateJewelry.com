@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { detectEbayStatusDrift, EBAY_WRITE_BLOCKED_PRODUCT_IDS, RELISTED_LISTING_WARNING } from '@/lib/ebay/sync';
-import { detectEtsyStatusDrift } from '@/lib/etsy/sync';
+import { detectEbayStatusDrift, EBAY_HIDE_MESSAGE, EBAY_WRITE_BLOCKED_PRODUCT_IDS, isEbayManualHold, RELISTED_LISTING_WARNING } from '@/lib/ebay/sync';
+import { detectEtsyStatusDrift, ETSY_DELIST_MESSAGE, isEtsyManualHold } from '@/lib/etsy/sync';
 import type { EbayListingRow } from '@/lib/ebay/store';
 import type { EtsyListingRow } from '@/lib/etsy/store';
 
@@ -66,6 +66,26 @@ describe('eBay status-drift detection', () => {
     expect(detectEbayStatusDrift(ebayRow({ sync_state: 'hidden_oos' }), { status: 'available', quantity: 1 })).toBe('restore');
   });
 
+  it('never restores a listing the owner hid (manual hold)', () => {
+    // Owner ruling 2026-09-24: a delist done by hand — on eBay itself or from
+    // the site — must not be undone by a sweep. Twin of the Etsy rule.
+    expect(detectEbayStatusDrift(ebayRow({ sync_state: 'hidden_oos' }), { status: 'available', quantity: 1 }, true)).toBeNull();
+    // The hold only ever suppresses a restore — a sold product still comes down.
+    expect(detectEbayStatusDrift(ebayRow({ sync_state: 'published' }), { status: 'sold', quantity: 1 }, true)).toBe('delist');
+    expect(detectEbayStatusDrift(ebayRow({ sync_state: 'published' }), { status: 'archived', quantity: 1 }, true)).toBe('delist');
+  });
+
+  it('releases the eBay hold only for a hide automation wrote', () => {
+    expect(isEbayManualHold(EBAY_HIDE_MESSAGE.auto)).toBe(false);
+    expect(isEbayManualHold(EBAY_HIDE_MESSAGE.manual)).toBe(true);
+    // No hide_oos row: quantity zeroed on eBay's side, or before the rule. Hold.
+    expect(isEbayManualHold(null)).toBe(true);
+    expect(isEbayManualHold(undefined)).toBe(true);
+    expect(isEbayManualHold('')).toBe(true);
+    expect(EBAY_HIDE_MESSAGE.auto.startsWith('auto:')).toBe(true);
+    expect(EBAY_HIDE_MESSAGE.manual.startsWith('auto:')).toBe(false);
+  });
+
   it('leaves agreeing state alone — the sweep must be a no-op on a healthy catalog', () => {
     expect(detectEbayStatusDrift(ebayRow({ sync_state: 'published' }), { status: 'available', quantity: 1 })).toBeNull();
     expect(detectEbayStatusDrift(ebayRow({ sync_state: 'hidden_oos' }), { status: 'sold', quantity: 1 })).toBeNull();
@@ -98,6 +118,27 @@ describe('Etsy status-drift detection', () => {
 
   it('flags a restocked product still delisted', () => {
     expect(detectEtsyStatusDrift(etsyRow({ sync_state: 'delisted' } as Partial<EtsyListingRow>), { status: 'available' })).toBe('restore');
+  });
+
+  it('never restores a listing the owner deactivated (manual hold)', () => {
+    // 2026-09-24: 33 high-value listings were deactivated from the admin on
+    // purpose; without this rule the next sweep put every one back on Etsy.
+    const held = etsyRow({ sync_state: 'delisted' } as Partial<EtsyListingRow>);
+    expect(detectEtsyStatusDrift(held, { status: 'available' }, true)).toBeNull();
+    // The hold only ever suppresses a restore — a sold product's listing still comes down.
+    expect(detectEtsyStatusDrift(etsyRow({ sync_state: 'active' } as Partial<EtsyListingRow>), { status: 'sold' }, true)).toBe('delist');
+  });
+
+  it('releases the hold only for a delist automation wrote', () => {
+    expect(isEtsyManualHold(ETSY_DELIST_MESSAGE.auto)).toBe(false);
+    expect(isEtsyManualHold(ETSY_DELIST_MESSAGE.manual)).toBe(true);
+    // No delist row at all: deactivated on Etsy's side, or before the rule existed. Hold.
+    expect(isEtsyManualHold(null)).toBe(true);
+    expect(isEtsyManualHold(undefined)).toBe(true);
+    // Pre-rule rows carry no message; those 33 listings must stay off Etsy.
+    expect(isEtsyManualHold('')).toBe(true);
+    expect(ETSY_DELIST_MESSAGE.auto.startsWith('auto:')).toBe(true);
+    expect(ETSY_DELIST_MESSAGE.manual.startsWith('auto:')).toBe(false);
   });
 
   it('leaves agreeing state alone', () => {

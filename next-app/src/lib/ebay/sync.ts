@@ -32,6 +32,7 @@ import {
   countReviewListings,
   getConnection,
   bulkPatchListings,
+  getLatestHideMessages,
   getListing,
   insertSyncLog,
   insertSyncLogs,
@@ -719,15 +720,35 @@ async function withdrawListing(
   await insertSyncLog(service, { product_id: productId, listing_id: listing.ebay_listing_id, action: 'withdraw', outcome: 'ok' });
 }
 
+/**
+ * Who zeroed the quantity. Recorded in the `hide_oos` log row's message and
+ * read back by the manual-hold rule (`isEbayManualHold`): only an `auto` hide
+ * is ever auto-restored by the sweep or the hook. Default `manual` so a caller
+ * that forgets to say gets the safe (sticky) behaviour.
+ */
+export type EbayHideSource = 'manual' | 'auto';
+
+export const EBAY_HIDE_MESSAGE: Record<EbayHideSource, string> = {
+  manual: 'manual: quantity zeroed from the admin — stays hidden until restored by hand',
+  auto: 'auto: product sold or out of stock on the site',
+};
+
 async function hideListingQuantityZero(
   service: SupabaseClient,
   listing: EbayListingRow,
   productId: string,
+  source: EbayHideSource = 'manual',
 ): Promise<void> {
   const { accessToken } = await ensureFreshAccessToken(service);
   await bulkUpdatePriceQuantity(accessToken, [{ sku: listing.ebay_sku, quantity: 0, offerId: listing.ebay_offer_id ?? undefined }]);
   await upsertListing(service, productId, { sync_state: 'hidden_oos', last_pushed_qty: 0 });
-  await insertSyncLog(service, { product_id: productId, listing_id: listing.ebay_listing_id, action: 'hide_oos', outcome: 'ok' });
+  await insertSyncLog(service, {
+    product_id: productId,
+    listing_id: listing.ebay_listing_id,
+    action: 'hide_oos',
+    outcome: 'ok',
+    message: EBAY_HIDE_MESSAGE[source],
+  });
 }
 
 async function restoreListingQuantity(
@@ -1914,6 +1935,7 @@ export type EbayStatusDrift = 'delist' | 'restore' | null;
 export function detectEbayStatusDrift(
   listing: EbayListingRow,
   product: { status?: string | null; quantity?: number | null } | null,
+  manualHold = false,
 ): EbayStatusDrift {
   // A write-blocked listing is quarantined on purpose; the sweep must not
   // "repair" it into a write the owner deliberately suspended.
@@ -1931,10 +1953,32 @@ export function detectEbayStatusDrift(
   if (isSoldOut) {
     return listing.sync_state === 'published' || listing.sync_state === 'out_of_date' ? 'delist' : null;
   }
+  // `manualHold` (2026-09-24, owner ruling): a listing the OWNER hid — the
+  // drawer's Hide button, or quantity zeroed on eBay itself and picked up by
+  // the status check — is never auto-restored. Only a hide automation wrote
+  // (`auto:` in the newest hide_oos log row) is undone when the product comes
+  // back; see `isEbayManualHold`. Twin of the Etsy rule. `ended` listings were
+  // never auto-restored and still are not.
   if (status === 'available' && quantity > 0 && listing.sync_state === 'hidden_oos') {
-    return 'restore';
+    return manualHold ? null : 'restore';
   }
   return null;
+}
+
+/**
+ * The manual-hold rule, from the newest successful `hide_oos` log message for
+ * the product. Only a message automation wrote (`auto: …`) releases the hold.
+ * No row at all (quantity zeroed on eBay's side, or hidden before this rule)
+ * and every `manual: …` row keep the listing hidden.
+ */
+export function isEbayManualHold(latestHideMessage: string | null | undefined): boolean {
+  return !(typeof latestHideMessage === 'string' && latestHideMessage.startsWith('auto:'));
+}
+
+/** Manual-hold lookup for one product — the hook's and the repair's per-item path. */
+async function loadEbayManualHold(service: SupabaseClient, productId: string): Promise<boolean> {
+  const latest = await getLatestHideMessages(service, [productId]);
+  return isEbayManualHold(latest.get(productId));
 }
 
 export interface EbayReconcileResult {
@@ -1993,9 +2037,21 @@ export async function reconcileEbayStatusDrift(): Promise<EbayReconcileResult> {
         .map((product) => [product.id, product]),
     );
 
-    const drifted = listings.filter(
-      (listing) => detectEbayStatusDrift(listing, products.get(listing.product_id) ?? null) !== null,
-    );
+    // Manual-hold rule: only a hidden listing on an available, in-stock product
+    // can be a restore candidate, so only those need their newest hide log read.
+    const restoreCandidates = listings
+      .filter((listing) => {
+        const product = products.get(listing.product_id);
+        return listing.sync_state === 'hidden_oos'
+          && normalizeProductStatus(product?.status) === 'available'
+          && normalizeProductQuantity(product?.quantity) > 0;
+      })
+      .map((listing) => listing.product_id);
+    const latestHides = await getLatestHideMessages(service, restoreCandidates);
+    const driftOf = (listing: EbayListingRow) =>
+      detectEbayStatusDrift(listing, products.get(listing.product_id) ?? null, isEbayManualHold(latestHides.get(listing.product_id)));
+
+    const drifted = listings.filter((listing) => driftOf(listing) !== null);
 
     // One outcome per attempted listing. A repair is counted from the state
     // that FOLLOWED the attempt, never from the attempt itself — see
@@ -2011,7 +2067,7 @@ export async function reconcileEbayStatusDrift(): Promise<EbayReconcileResult> {
           service,
           connectionRow,
           listing.product_id,
-          detectEbayStatusDrift(listing, products.get(listing.product_id) ?? null),
+          driftOf(listing),
         ),
       );
     }
@@ -2098,11 +2154,13 @@ async function applyEbayProductStatus(
     if (connectionRow.sold_handling === 'withdraw') {
       await withdrawListing(service, listing, productId);
     } else {
-      await hideListingQuantityZero(service, listing, productId);
+      await hideListingQuantityZero(service, listing, productId, 'auto');
     }
     return 'repaired';
   }
   if (status === 'available' && quantity > 0 && listing.sync_state === 'hidden_oos') {
+    // Manual hold (2026-09-24): only automation's own hide is undone here.
+    if (await loadEbayManualHold(service, productId)) return 'noop';
     await restoreListingQuantity(service, listing, productId, productRow.quantity);
     return 'repaired';
   }
@@ -2157,7 +2215,9 @@ async function repairEbayStatusDrift(
 
   const listingAfter = await getListing(service, productId);
   const { data: productAfter } = await service.from('products').select('status, quantity').eq('id', productId).maybeSingle();
-  const driftAfter = listingAfter ? detectEbayStatusDrift(listingAfter, productAfter ?? null) : null;
+  const driftAfter = listingAfter
+    ? detectEbayStatusDrift(listingAfter, productAfter ?? null, await loadEbayManualHold(service, productId))
+    : null;
   const outcome = classifyDriftRepair({ driftBefore, directError, driftAfter });
 
   if (outcome === 'reconciled') {

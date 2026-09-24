@@ -66,6 +66,20 @@ describe('/card page — search and chrome rules', () => {
     expect(CARD_HOLDERS.kittcard.phoneDigits).toBe(CARD_HOLDERS.card.phoneDigits);
     expect(CARD_HOLDERS.kittcard.firstName).toBe(CARD_HOLDERS.card.firstName);
     expect(CARD_HOLDERS.card.phoneDigits).toBe('2394048505');
+    expect(CARD_HOLDERS.kittcard.email).toBe(CARD_HOLDERS.card.email);
+  });
+
+  it('shows the email address as a readable mailto line, paid for by the shorter storefront photo (owner, 2026-09-24, Option B)', () => {
+    // The address comes from the holder like the name and number — never typed into the page.
+    expect(CARD_HOLDERS.card.email).toBe('info@naplesestatejewelry.com');
+    expect(PAGE).toContain('mailto:${holder.email}');
+    expect(PAGE).toContain('{holder.email}');
+    expect(PAGE).not.toContain('info@naplesestatejewelry.com');
+    // The subject marks the lead as a card lead, like the prefilled text.
+    expect(PAGE).toContain("'Su tarjeta — Naples Estate Jewelry' : 'Your card — Naples Estate Jewelry'");
+    // The line's height came out of the photo, not the page: 16:9 → 2:1, mt-3 → mt-2.
+    expect(PAGE).toMatch(/<StorefrontPhoto [^>]*aspect="2:1"[^>]*className="mt-2"/);
+    expect(PAGE).not.toContain('aspect="16:9"');
   });
 
   it('renders no site header, footer or breadcrumb (the page is the buttons)', () => {

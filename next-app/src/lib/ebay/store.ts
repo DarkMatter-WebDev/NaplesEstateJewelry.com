@@ -267,6 +267,32 @@ export async function insertSyncLog(service: SupabaseClient, input: EbaySyncLogI
  * Same swallow-but-surface contract as the singular version: logging must
  * never break the caller.
  */
+/**
+ * Newest successful `hide_oos` log message per product, for the manual-hold
+ * rule in `detectEbayStatusDrift` (2026-09-24). Newest-first, first row seen
+ * per product wins. A product with no row is absent — callers treat "absent"
+ * as a manual hold (quantity zeroed on eBay's side, or before this rule).
+ */
+export async function getLatestHideMessages(
+  service: SupabaseClient,
+  productIds: string[],
+): Promise<Map<string, string | null>> {
+  const latest = new Map<string, string | null>();
+  if (!productIds.length) return latest;
+  const { data, error } = await service
+    .from('ebay_sync_log')
+    .select('product_id, message, created_at')
+    .eq('action', 'hide_oos')
+    .eq('outcome', 'ok')
+    .in('product_id', productIds)
+    .order('created_at', { ascending: false });
+  if (error || !data) return latest;
+  for (const row of data as Array<{ product_id: string | null; message: string | null }>) {
+    if (row.product_id && !latest.has(row.product_id)) latest.set(row.product_id, row.message);
+  }
+  return latest;
+}
+
 export async function insertSyncLogs(service: SupabaseClient, inputs: EbaySyncLogInput[]): Promise<void> {
   if (!inputs.length) return;
   const { error } = await service.from('ebay_sync_log').insert(

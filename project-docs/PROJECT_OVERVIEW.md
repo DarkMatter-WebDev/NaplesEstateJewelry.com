@@ -92,8 +92,11 @@ discretion and a personal relationship over a storefront transaction.
   (GoDaddy DNS → Netlify, `.com` is the Netlify PRIMARY with cert, env vars
   and Supabase Auth updated) — `https://naplesestatejewelry.com` serves the
   live site. PayPal/eBay/Etsy registrations, Search Console, sitemap, and
-  Google Change of Address are complete. A newer locally verified application
-  batch still awaits deployment and production smoke testing — see `TASKS.md`.
+   Google Change of Address are complete. The latest recorded NEJ application
+   deployment was verified on 2026-09-21; the 2026-09-23 handoff records no new
+   app-code batch awaiting deployment. The pending satellite-site publish belongs
+   to its separate project. See `CURRENT_STATUS.md` and `TASKS.md` for remaining
+   manual checks; these are recorded handoff facts, not a fresh production probe.
 - **Legacy domain**: `naplesestatejewelry.co` stays a Netlify alias with
   path-preserving 301s to `.com` (host redirects live in `proxy.ts` so legacy
   links resolve in ONE hop; `netlify.toml` keeps the host rules for paths outside

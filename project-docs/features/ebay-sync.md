@@ -37,6 +37,21 @@
 
 ## What this is
 
+**2026-09-24 manual hold (STAGED, deploy owed):** the reconcile sweep's and the
+status hook's `restore` branch (available, in-stock product + `hidden_oos`
+listing → `restoreListingQuantity`) no longer fires for a listing the owner
+hid. `hideListingQuantityZero(…, source)` records `manual:`/`auto:` in the
+`hide_oos` log message (`EBAY_HIDE_MESSAGE`); the drawer's Hide is `manual`,
+the sold-handling `quantity_zero` path is `auto`. `detectEbayStatusDrift`
+takes a third `manualHold` argument; `isEbayManualHold(latestHideMessage)`
+releases the hold only for an `auto:` row — no row (quantity zeroed on eBay
+itself and mapped from `OUT_OF_STOCK`, or hidden before this rule) and every
+`manual:` row keep the listing hidden. `getLatestHideMessages` (store) feeds
+the sweep in one query for restore candidates only. Withdraw/End (`ended`)
+was never auto-restored and still is not; the `delist` branches and the
+write-blocked quarantine are unchanged. Owner ruling + Etsy twin:
+`CHANGELOG.md` 2026-09-24 (1)–(2), `DECISIONS.md` "Etsy and eBay".
+
 **2026-09-07 reconcile-on-refusal:** a refused withdraw / quantity-zero /
 restore (eBay answers HTTP 400 on a listing it has already ended — a
 `Completed` item) no longer loops. The hook's `status_change_hook` error row

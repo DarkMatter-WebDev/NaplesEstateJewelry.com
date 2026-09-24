@@ -1,7 +1,7 @@
 # Structure And Build Integrity
 
 > Canonical project map and single sources of truth. Last reconciled:
-> **2026-09-15**.
+> **2026-09-21** (folder renamed `NaplesEstateJewelry.co` → `.com`).
 
 ## Runtime Shape
 
@@ -22,7 +22,7 @@ plans. App source and runtime assets belong under `next-app/`.
 ## Directory Map
 
 ```text
-NaplesEstateJewelry.co/
+NaplesEstateJewelry.com/
 |-- AGENTS.md
 |-- ACCOUNT_SETUP.md
 |-- CLAUDE.md

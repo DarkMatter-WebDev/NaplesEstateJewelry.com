@@ -22,9 +22,20 @@ export type CardHolder = {
   phoneDisplay: string;
   /** Digits only, for `tel:` and `sms:`. */
   phoneDigits: string;
+  /**
+   * Shown as a readable, tappable line on the card (owner, 2026-09-24, mockup
+   * Option B) and used for the `mailto:`. The one monitored mailbox; a card
+   * holder with their own inbox changes it here and nowhere else.
+   */
+  email: string;
 };
 
-const CHRIS = { firstName: 'Chris', phoneDisplay: '(239) 404-8505', phoneDigits: '2394048505' } as const;
+const CHRIS = {
+  firstName: 'Chris',
+  phoneDisplay: '(239) 404-8505',
+  phoneDigits: '2394048505',
+  email: 'info@naplesestatejewelry.com',
+} as const;
 
 export const CARD_HOLDERS: Record<CardHolderKey, CardHolder> = {
   card: { key: 'card', path: '/card', ...CHRIS },

@@ -1,9 +1,156 @@
 # Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-09-20**.
+> in `CHANGELOG.md`. Last reconciled: **2026-09-24**.
 
 ## ◻ OPEN — needs a human
+
+### 🟢 2026-09-24 — Google Ads image assets: 8 images (16 files) UPLOADED ~8:38 AM ET as manual campaign-level assets — all "Pending / Under review"
+
+Record: `CHANGELOG.md` 2026-09-24 (4) selection, (5) upload. Source files (16 = 8 images × 1:1 + 1.91:1): `C:\Users\rcman\OneDrive\Pictures\nej-google-ads-images\`. Assets table now 27 rows (11 + 16).
+Set: 01 Chris, arms crossed at the counter (the Yelp portrait, 1302², owner's swap) · 02 showroom door · 03 Waterford sterling flatware · 04 tray of gold chains · 05 hand of gold rings · 06 coral cameo brooch · 07 assorted sterling serving pieces on the counter (owner's photo 08:20) · 08 Patek Philippe watch in hand (owner's photo 08:18). Landscapes of 01, 06 and 08 carry the photo with blurred, darkened sides (06 and 08 from a 3:4 window); every square is a straight crop. ⛔ No collages — Google's image guidelines list them with overlaid text; one real photo with many pieces (07) does that job. Owner will swap 02 once the new sign is up; image assets are independently add/remove-able with no learning reset.
+1. ✅ Uploaded 09-24 (owner: "looks good, continue"); read back Image · Campaign · Pending · Under review × 16. ⛔ Never the "Dynamic Image Assets" / auto-created assets cards.
+2. ◻ **Claude, 09-25:** read the 16 statuses (expect Eligible). A disapproval = swap that file (re-crop / different photo), never an ad edit.
+3. ◻ Claude, 09-27 report: image-asset performance (Assets → Images: impressions, clicks, Google's Best/Good/Low rating once it has data).
+4. ◻ **Owner, when the new sign is up:** send the new storefront photo → Claude swaps asset 02 only.
+
+### 🟡 2026-09-24 — `/card` + `/kittcard` email line (Option B) BUILT + STAGED, awaiting the owner's push (rides with the Etsy/eBay batch below; no SQL, no env vars)
+
+Record: `CHANGELOG.md` 2026-09-24 (3). Tappable `info@naplesestatejewelry.com` line under the phone hours on both cards (EN + ES, prefilled subject); storefront thumbnail 16:9 → 2:1 so the page is 1.7px SHORTER at 375px, not taller. Gate tsc 0 · lint 0 · 1549/1549 · build 0.
+1. ◻ **Owner: push** (the same push as the Etsy/eBay manual-hold batch — one deploy).
+2. ◻ **Owner, on the phone after the deploy:** open `/card` → the gold envelope line sits under "Calls answered…"; tap it → the mail app opens to info@ with the subject "Your card — Naples Estate Jewelry"; the storefront photo still shows the door and the 104 on the curb.
+3. ◻ Claude, only on "verify it live": curl `/card`, `/es/card`, `/kittcard` for the `mailto:` and `aspect-ratio: 2 / 1`.
+
+### 🔴 2026-09-24 — Etsy high-value listings OFF (33 deactivated); manual-hold fix STAGED; auto-delist toggle PAUSED — two owner steps, in this order
+
+Record: `CHANGELOG.md` 2026-09-24 (1). State now: **35 active Etsy listings** (all ≤ $300 melt), 33 deactivated (`delisted` / `inactive`), Admin → Settings → Etsy Sync → *Auto-delist when sold/archived on the site* = **OFF**.
+
+1. ◻ **Owner: push the staged batch** (`lib/etsy/sync.ts`, `lib/etsy/store.ts`, `lib/ebay/sync.ts`, `lib/ebay/store.ts`, `lib/__tests__/marketplace-status-reconcile.test.ts` + docs) and let Netlify deploy. The batch carries BOTH manual-hold rules — Etsy (`CHANGELOG.md` 2026-09-24 (1)) and eBay ((2), owner ruling: a manual delist on eBay or from the site is never auto-relisted). Verified before staging: tsc 0 · 1548/1548 · lint 0 · build (see staging line).
+2. ◻ **Owner, only AFTER the deploy is live: switch *Auto-delist when sold/archived on the site* back ON.** ⛔ Flipping it on before the deploy re-activates all 33 on Etsy within 30 minutes (old `restore` branch). After the deploy the sweep holds them because their delist rows carry no `auto:` message.
+3. ◻ **Claude, first sweep after re-enable:** read `/api/admin/etsy/status` → `statusChecks` / recent activity: expect the `reconcile_status` summary with **0 repaired** and the listing map still at 35 active. If anything restored, flip the toggle off again and read `etsy_sync_log` for that product.
+**Staging (Etsy manual hold):** ✅ synced 2026-09-24 ~7:10 AM ET — dry run listed exactly the 8 touched files (`lib/etsy/sync.ts`, `lib/etsy/store.ts`, `marketplace-status-reconcile.test.ts`, CHANGELOG, TASKS, CURRENT_STATUS, DECISIONS, `features/etsy-sync.md`), 0 Extras, 1159 total; real run copied 8 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0/0/0, exit 0; leak check 0 `.env*` / `.log` / `.git`, no node_modules / .next / worktrees, launch.json present; positive control 222 = 222 `.tsx`; SHA-256 MATCH on all 8; staged `sync.ts` carries `isEtsyManualHold` (5 hits). Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+**Staging (eBay manual hold, same batch):** ✅ synced 2026-09-24 ~7:15 AM ET — dry run listed exactly the 8 touched files (`lib/ebay/sync.ts`, `lib/ebay/store.ts`, the reconcile test file, CHANGELOG, TASKS, CURRENT_STATUS, DECISIONS, `features/ebay-sync.md`), 0 Extras, 1159 total; real run copied 8 / 0 FAILED (exit 1); follow-up 0/0/0, exit 0; leak check 0 `.env*` / `.log` / `.git`, no node_modules / .next / worktrees, launch.json present; 222 = 222 `.tsx`; SHA-256 MATCH on all 8 plus the two Etsy files from the earlier sync; staged `ebay/sync.ts` carries `isEbayManualHold` (5 hits). Build for this state: `npm run build` exit 0, no `.next/cache/turbopack/`. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+4. ℹ️ Standing rule from today (`DECISIONS.md`): Etsy carries only items with melt ≤ $300. New listings: the admin's "Sync to Etsy" is manual per product, so the rule is applied by the owner at listing time — nothing enforces it in code (candidate for a pre-flight warning if it is ever forgotten). The four just under the line (#71 $284, #135 $276, #94 $233, #106 $231) stay live; #29 ($301) and #43 ($304) were taken down.
+
+### Documentation follow-up identified during Codex orientation (2026-09-23)
+
+- Reconcile superseded startup/runbook passages against the latest dated evidence
+  before working in their areas: old GitHub/Netlify scheduler descriptions versus
+  sole `pg_cron` scheduling; applied discount migrations still labelled pending;
+  live Text Alerts and marketplace-sale reconciliation still labelled staged;
+  the Deep Field read-only reconciliation route omitted from the structure map;
+  older build/test counts; and completed deployment/phone checks still shown as
+  unchecked beneath completed headings. The overview's pending NEJ deployment
+  statement was corrected in this review. Do not rerun SQL or reopen completed
+  work just because an older block says pending.
+- ✅ 2026-09-24: the `npm run build` for the Etsy manual-hold fix regenerated
+  `.next/required-server-files.json` — 0 `NaplesEstateJewelry.co\` paths, 4
+  `.com` paths (grep). The pre-rename artifact is gone. The existing optional worktree-cleanup item
+  remains separate; nothing was deleted.
+- This orientation changed only project docs and did not sync the external
+  staging folder. Prior staging-equality claims below are historical; include
+  the updated docs with the owner's next normal handoff.
+
+### 🟢 2026-09-23 night — Independent ads audit reconciled; A, C and D-columns APPLIED on the owner's yes; B and the log DROPPED on the owner's rulings
+
+Page: `https://claude.ai/artifact/HnMfKo2BUqjW738nfgzFci` · records `CHANGELOG.md` 2026-09-23 (12) audit, (13) applied.
+Key facts: all time 354 impr / 30 clicks / $65.29 at the last read; **Top placements 99 impr → 26 clicks, Other 255 → 4**
+(blended CTR is a placement-mix number — judge Top CTR); Palm Beach 21/4 = Collier "regularly in" users (⛔ never
+exclude); Lee 95 = Bonita 32/0 + Estero 28/1 + ~35 from the Lee window; every audit figure matched the account.
+
+1. ✅ **Applied 09-23 ~11 PM ET:** **A** broad `kilates` `gramo` removed; phrase `"gramo de oro"` `"el gramo"` `"como esta
+   el oro"` `"cómo está el oro"` `"cuanto esta el oro"` `"cuánto está el oro"` added · **C** Coins ad group + `"silver to
+   sell"` `"take silver"`; Silver ad group + `"silver coins"` `"silver bars"` · **D** Phone calls / Phone impr. / PTR
+   columns on the Campaigns table (first read: 14 call-button impressions, 0 calls). **Negatives now 90** (82 campaign +
+   8 ad-group). Budget, bids, strategy, locations, keywords, ads untouched.
+2. ⛔ **Dropped by owner ruling (do not re-propose):** B — `empeño` and `"gold center"` ("i want to show up next to gold
+   center searches"); the daily seller-contact log ("i dont have time for that"). Measurement stays zero-effort: the call
+   columns, Admin → Inquiries / Messages, Yelp leads, GBP calls/directions.
+3. ◻ **Claude, Sat 09-26 morning:** read Thu 09-24 + Fri 09-25 as the two clean days (Top CTR ≥ 20%, 8–12 clicks/day,
+   ≥ 9/10 clicked terms seller-intent, Phone calls column). 09-27 weekly report stands and adds Admin inquiries by day
+   beside clicks by day / ad group. 10-04 watch list: Spanish still 0 clicks → reconsider the group; Bonita still 0 →
+   reconsider the location; appraisal keywords' first CTR; Estate ad strength.
+4. ⛔ Not to be re-raised from this sample: budget/cap/strategy, Lee, Palm Beach exclusion, exact-match duplicates,
+   keyword expansion, ad rewrites, any site tag, competitor-name negatives.
+
+### 🟡 2026-09-23 — Google Ads reach expansion: Step 1 DONE; three owner decisions open
+
+Proposal doc: `https://claude.ai/code/artifact/0f869c91-cb79-475a-bf74-de8e24009869`.
+Implemented 09-23 (`CHANGELOG.md` 2026-09-23 (2)): keywords 31 → 74 (all phrase),
+campaign negatives 55 → 74. Budget, geography and ads untouched.
+
+1. ✅ **Lee County ADDED 09-23** on the owner's decision (4 locations; reach
+   727k Collier + **2,930k Lee** + 248k Estero + 216k Bonita ≈ 4× the pool).
+   Presence-only verified intact after the save. ⛔ Marco Island is NOT a
+   candidate — it is inside Collier County, already targeted; zero extra reach.
+2. ✅ **Budget RAISED $13 → $19.00/day 09-23** on the owner's explicit decision
+   (= **$577.60/mo, ABOVE the approved $300–500 range**; Claude recommended $16
+   and flagged the overage — owner chose $19). Verified $19.00/day on the
+   campaign row and Total: Account. ⚠️ Watch actual spend against this: the
+   campaign was projecting only 67% utilisation at $13/day before the reach
+   changes, so the first week tells us whether $19 is real or notional.
+2b. 🔴 **Owner decision — Yelp, HELD to 09-27.** Yelp's bonus terms (read
+   09-23): *"You lose any unfulfilled bonus ad budget if you downgrade or cancel
+   early."* **$104.56 of the $135.39 is still unused** (through Feb 17 2027), and
+   a budget reduction counts as a downgrade. Yelp does not publish the minimum
+   dollar figure. So cutting Yelp now forfeits $104.56 of free budget AND drops
+   the only channel with measured calls (3–4 in 30 days vs Google's 0).
+   Revisit with a full week of Google data on 09-27.
+3. 🔴 **RE-AUDIT 09-23 evening (`CHANGELOG.md` 2026-09-23 (8)): the expansion
+   doubled impressions and quartered clicks.** Per day: 21 = 72 impr / 9 clicks /
+   12.5% · 22 = 97 / 11 / 11.3% · **23 = ~170 / 3 / 1.8%.** Today: Coins 47 impr
+   / 0 clicks, Spanish 34 / 0 (≈20 of those are Spanish gold-PRICE checkers —
+   `precio del oro…` — the English price negatives don't cover Spanish, and the
+   new keyword `"cuanto vale mi oro"` invites them); Lee + Bonita + Estero 63 / 0
+   ("Naples" in every headline); the good English seller terms served with 0
+   clicks = lower position. 84% of impressions are mobile phones.
+   **Owner rulings 09-23:** ⛔ do NOT negative `naples jewelry buyers` (generic
+   phrase — win it, don't surrender it); consignment searchers are WANTED → the
+   `consignment` / `consign` negatives added 09-23 must come OUT.
+   🔴 **PLAN RE-AUDITED 09-23 late (owner asked; `CHANGELOG.md` (9)): the
+   Target-Impression-Share idea was WRONG for the goal.** Decomposing today's
+   ~170 impressions: Lee+Bonita+Estero 63 / 0 · Spanish price ~20 / 0 · silver
+   queries mis-routed to the COINS ad ~15 / 0 · diamonds/watches 9 / 0 · `naples
+   jewelry buyers` 7 / 0 · buyer-intent ~3 / 0 · **genuine Collier seller queries
+   ~35–40 / 3 ≈ 8–9% CTR — Monday's rate.** The good impressions still click; they
+   are now a quarter of the total instead of nearly all. Dilution, not lost
+   position ("0 clicks on 10 impressions" in a 6.8%-CTR group is noise). Target
+   IS would buy top-of-page for the diluting queries, reset learning, and abandon
+   the strategy that produced the hot days. ⛔ Do not switch bid strategy.
+   ✅ **CORRECTED PLAN APPLIED 09-23 night** (owner: "do what we need to…";
+   `CHANGELOG.md` 2026-09-23 (10)), every step read back after saving:
+   - Bid strategy / cap / budget **unchanged** (Max Clicks, $6, $19/day) — by
+     design; owner offered both levers, declined with reasons in (10).
+   - Campaign negatives 74 → **78**: + `precio` `precios` `gramo` `kilates`
+     `cotización` `"where can i buy"`; − `consignment` `consign`.
+   - Keywords 74 → **77**: − `"cuanto vale mi oro"` (21/0), − `"sell silver
+     bars"` phrase; + `"jewelry appraisal"` (Estate), `"gold appraisal"` (Gold),
+     `"silver appraisal"` (Silver), `"coin appraisal"` + **`[sell silver bars]`
+     exact** (Coins). ("sell silver dollars" was never touched.)
+   - Coins **ad-group** negatives (new level) → **82** total: `"sell silver near
+     me"` `"silver buyers"` `"where to sell silver"` `"selling silver"`.
+   - **Lee County REMOVED** → Locations 3 of 3 (Collier, Estero, Bonita).
+   - Estate ad re-headlined in place, 15/15: → `Jewelry Buyers in Naples, FL`,
+     `We Buy Jewelry in Naples, FL`, `Local Naples Jewelry Buyer`; status
+     Eligible, strength Pending (recalculating).
+   ◻ **Claude, 09-25 → 09-26 (not 09-24 — review/learning clocks restarted):**
+   per-day table; expect impressions ~90–110/day, CTR climbing toward 8–12%,
+   Coins and Spanish no longer at 0 clicks, Silver back to double digits.
+   ◻ **Claude, 09-27 report:** Estate ad strength (should return to Good), the
+   four appraisal keywords' first impressions + CTR, whether `"jewelry
+   appraisal"` pulls insurance-intent terms past the `"insurance appraisal"` /
+   `"written appraisal"` negatives, and — still unmeasured — the Top-vs-Other
+   segment for any hidden position loss.
+   ◻ **Later, owner's call:** a Lee County ad group with Fort Myers copy before
+   Lee is re-added; Step 2 broad match stays parked until a clean week exists.
+   - ⛔ **Dropped:** the appraisals ad group idea (Keyword Planner, Collier:
+     `jewelry appraisal near me` 20/mo, `inherited jewelry` 10/mo −100% YoY, the
+     rest is diamond/engagement-ring = insurance intent we don't serve).
+4. ◻ **Claude, 09-27:** first weekly ads report — per-day table, "Limited by
+   budget" status, impression share + lost-to-rank, eligible-% insight, clicks
+   by hour of day, and — if (B) is applied — the Target IS learning status.
 
 ### 🟡 2026-09-21 — Sister-site (naplesantiquesllc.com) audit DONE, read-only — owner decisions open
 
@@ -12,10 +159,23 @@ Findings + baseline: `SEO_LEAD_AUDIT.md` (2026-09-21 section); `CHANGELOG.md` 20
 2. ✅ **Owner decision 09-21:** no GBP for the antiques line for now (conditions to revisit: own answered number, own permanent sign, primary category "Antique store", DBA). **Antiques site switches to the owner's cell (239) 304-6229** and stops printing NEJ's number (links to NEJ instead); street address stays VISIBLE but is removed from its JSON-LD (no NEJ wording in its directions) — final handoff prompt given in chat 09-21; the antiques agent implements it.
 3. ◻ **Owner decision:** add `naplesantiquesllc.com` to GSC + Change of Address from anodyneantiques.com — fine AFTER item 1's redirects are live.
 1b. ✅ 09-21: antiques agent DONE + deployed; Claude verified the live site against the handoff (all pass — `CHANGELOG.md` 2026-09-21 (3)). Antiques agent is now on GSC (property + Change of Address). ◻ Still wanted from it ~3–4 weeks after the property exists: the Links report list for naplesantiquesllc.com.
-4. 🟡 **BUILT + STAGED 09-21 (3), awaiting push:** `/estate-services` sister-shop sentence (EN+ES) + dead naplesantiquesllc code removed from `netlify.toml` / `proxy.ts`. ◻ **Owner: push.** ◻ Claude after the push: curl `/estate-services` + `/es/estate-services` for the sentence, `.co`/`www` one-hop 301, naplesantiquesllc.com still the antiques site. **Staging:** ✅ synced 09-21 — dry run listed exactly the 9 touched files (netlify.toml, proxy.ts, estate-services/page.tsx, ARCHITECTURE, CHANGELOG, CLIENTS, CURRENT_STATUS, DECISIONS, TASKS), 0 Extras, 1159 total; copied 9 / 0 failed; follow-up 0; leak check 0; `.tsx` control 221 = 221; SHA-256 match 6 of 6.
-5. ◻ **Owner decision:** review `naplesjewelrybuyers.com` separately — it competes with NEJ for gold queries on the same phone.
+4. ✅ **DEPLOYED + live-verified 09-21 ~8:42 PM ET (`main@585ab40`; `CHANGELOG.md` 2026-09-21 (4)); GitHub repo renamed to `NaplesEstateJewelry.com` + Netlify relinked the same night.** Was: `/estate-services` sister-shop sentence (EN+ES) + dead naplesantiquesllc code removed from `netlify.toml` / `proxy.ts`. ◻ **Owner: push.** ◻ Claude after the push: curl `/estate-services` + `/es/estate-services` for the sentence, `.co`/`www` one-hop 301, naplesantiquesllc.com still the antiques site. **Staging:** ✅ synced 09-21 — dry run listed exactly the 9 touched files (netlify.toml, proxy.ts, estate-services/page.tsx, ARCHITECTURE, CHANGELOG, CLIENTS, CURRENT_STATUS, DECISIONS, TASKS), 0 Extras, 1159 total; copied 9 / 0 failed; follow-up 0; leak check 0; `.tsx` control 221 = 221; SHA-256 match 6 of 6.
+5. 🔴 **Owner decision — `naplesjewelrybuyers.com` brand-name leak (audited 2026-09-23, findings in `SEO_LEAD_AUDIT.md`).** A different company owns **"Naples Jewelry Buyers"** on Google Maps (5.0 ★ / 49 reviews, 11542 Tamiami Trl E, (239) 420-1918, `naplesjewelrybuyersllc.com`). Maps resolves that name **straight to them**; our satellite is #1 organic on web but their Knowledge Panel owns the right rail. Satellite traffic is small (19 clicks / 465 impr / 90 days). Already safe: every Google link on the satellite points at NEJ's real GBP (`cid=17050430560749692864`), and the page says "a service of Naples Estate Jewelry". Options, in rising order of cost/risk:
+   - ✅ **(a) + (b) DONE 09-23 — BUILT + STAGED in `Documents\NaplesJewelryBuyers\`, awaiting the owner's drag-and-push.** Owner approved the mockup (`https://claude.ai/artifact/VhYk8xe9SGQoCoWGPe74AG`, Option A). Nav/hero/pill/footer now lead with Naples Estate Jewelry; all 10 sub-page footers flipped; dead schema logo (404) fixed. Details `CHANGELOG.md` 2026-09-23 (6); full reasoning + deploy steps in that project's `staging/README-DEPLOY.md`.
+     - ◻ **Owner:** drag `staging/` contents onto the GitHub repo root (⚠️ **11** files now — `nej-mark.webp` is NEW; if it doesn't travel the nav shows a broken image), commit, push.
+     - ✅ **Option B ALSO DONE 09-23** (`CHANGELOG.md` 2026-09-23 (7)): hero crest replaced by a **typeset** wordmark in Cinzel (already loaded, previously unused → no extra payload), not a generated image. Rendered and measured at 1243 / 375 / 320 px — no overflow, 0 console errors, gradient live. Two dead CSS rules and two wrong image aspect-ratio hints fixed in passing.
+     - ◻ **Claude after the push:** curl `/nej-mark.webp` = 200, and eyeball the live hero once (the local check used a scratch copy, not production).
+     - ◻ **Claude, ~2 weeks:** confirm the `/` position for "naples jewelry buyers" is still ~1 (titles and copy were untouched, so it should be).
+     - ◻ **Owner, optional:** `logo.webp` (the old gold crest, 162 KB) is now referenced by nothing. Kept deliberately — no page loads it and it is the only copy of that artwork. Say the word to delete it.
+   - **(c) Still open — strategic:** decide whether the satellite earns its keep at all (19 clicks/90 days).
+   - ⛔ NOT an option: a GBP named "Naples Jewelry Buyers" — name taken at another address, and a second GBP at the shared suite was ruled out 09-21.
+   - ℹ️ `naplesgoldbuyers.com` (also ours) has no equivalent exposure — no exact-name competitor GBP.
 6. ◻ GBP pending Google update (WhatsApp chat link) — owner accepts or declines.
 7. ◻ **Claude, 2026-10-19:** re-check the baseline (GSC totals/top pages, GBP split + search terms, the five searches).
+8. ⏭️ **DROPPED on the owner's decision 2026-09-23: do not chase the Instagram `token_refresh` row.** The 09-21 row was never read and will not be. What this accepts: the automatic refresh runs again **09-28** (pg_cron) and the current token expires **09-30**. If the 09-28 run succeeds, nothing happens and this was noise. If it fails, Instagram auto-posting simply stops after 09-30 and the fix is a manual **Reconnect Instagram** in Admin — no data is lost and nothing else in the site depends on it. ⛔ Do not re-open this as a task; the signal to act is "Instagram posts stopped going out", not a log row.
+9. ◻ **Owner decision (optional cleanup):** delete `.claude/worktrees/priceless-margulis-2de730/` — a 22 MB throwaway agent worktree whose `.git` pointer targets the old `…NaplesEstateJewelry.co\.git\…` path (gone since the folder rename 09-21). Gitignored and excluded from staging by `/XD`, so harmless either way. `CHANGELOG.md` 2026-09-21 (5).
+
+**Staging (09-23 session close, docs only):** ✅ synced 2026-09-23 (night) — dry run listed exactly the 3 touched files (CLIENTS.md, CURRENT_STATUS.md, DECISIONS.md), 0 Extras, 1159 total; real run copied 3 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0/0/0, exit 0; leak check 0 `.env*` / `.log` / `.git`, no node_modules / .next / worktrees, launch.json present; positive control 222 = 222 `.tsx`; SHA-256 MATCH on all 3. (Earlier this session the CHANGELOG/TASKS/SEO_LEAD_AUDIT edits were synced the same way — see the 09-23 CHANGELOG entries.) ℹ️ The NEJ site itself has NO app-code changes this session — nothing to push from this repo; the only push owed is the **separate** `NaplesJewelryBuyers\staging\` folder (item 5). Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 
 ### 🟡 2026-09-20 (15) — PUSHED 09-20 late night (not production-checked by Claude); owner's iPhone check open: form confirmation lands in view + "Success!" + "Send another" + call/text line, all three lead forms
 
@@ -6522,7 +6682,7 @@ Do not chase this gap as a missing-file bug.
 ⚠️ **It is a point-in-time snapshot.** Rebuild it after any further edits:
 
 ```powershell
-$src="C:\Users\rcman\OneDrive\Documents\NaplesEstateJewelry.co"; $dst="C:\Users\rcman\NEJ-repo-staging"
+$src="C:\Users\rcman\OneDrive\Documents\NaplesEstateJewelry.com"; $dst="C:\Users\rcman\NEJ-repo-staging"
 robocopy $src $dst /MIR /XD .git node_modules .next .turbo .cache .vercel coverage out build "$src\.claude\worktrees" /XF *.log *.tmp *.bak *.orig *.tsbuildinfo next-env.d.ts .env .env.*
 ```
 
@@ -6571,7 +6731,7 @@ that directory name at every level, so it protects the destination's own `.git`
 from `/MIR` as well:
 
 ```
-robocopy "C:\Users\rcman\OneDrive\Documents\NaplesEstateJewelry.co" "<repo folder>" /MIR /XD .git node_modules .next /L
+robocopy "C:\Users\rcman\OneDrive\Documents\NaplesEstateJewelry.com" "<repo folder>" /MIR /XD .git node_modules .next /L
 ```
 
 Then re-run without `/L`. **After the copy, confirm `.github/workflows/` landed** —

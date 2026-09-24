@@ -23,8 +23,14 @@ import Image from 'next/image';
  */
 type Props = {
   locale?: string;
-  /** Frame shape. `4:3` is the photo's natural shape; `16:9` and `1:1` crop it. */
-  aspect?: '4:3' | '16:9' | '1:1';
+  /**
+   * Frame shape. `4:3` is the photo's natural shape; the others crop it.
+   * `2:1` is the `/card` thumbnail since 2026-09-24: the height it gave up
+   * (about 21px at 375px) paid for the email line above the buttons, so the
+   * page stayed exactly as tall as before (owner: "crop or shorten the store
+   * photo … so that the line does not add height to the entire page").
+   */
+  aspect?: '4:3' | '16:9' | '2:1' | '1:1';
   /** Accurate `sizes` for the slot — every fill image on this site carries one. */
   sizes: string;
   className?: string;
@@ -35,6 +41,7 @@ type Props = {
 const ASPECT: Record<NonNullable<Props['aspect']>, string> = {
   '4:3': '4 / 3',
   '16:9': '16 / 9',
+  '2:1': '2 / 1',
   '1:1': '1 / 1',
 };
 

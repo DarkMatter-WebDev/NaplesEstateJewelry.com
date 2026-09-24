@@ -99,7 +99,7 @@ returning and verifies that every statically named icon has a mapping.
 ## Folder Structure
 
 ```text
-NaplesEstateJewelry.co/
+NaplesEstateJewelry.com/
 â”œâ”€â”€ AGENTS.md
 â”œâ”€â”€ ACCOUNT_SETUP.md
 â”œâ”€â”€ netlify.toml                 # Netlify parent config: base = next-app

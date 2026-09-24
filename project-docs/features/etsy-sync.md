@@ -74,6 +74,20 @@ retains a unique accumulated warning set across all bounded image requests and
 does not use display text alone as a React key, preventing identical source-size
 advisories from triggering the Next.js duplicate-key overlay.
 
+**2026-09-24 manual hold (STAGED, deploy owed):** the reconcile sweep's
+`restore` branch (available product + `delisted` listing → `runReactivate`) no
+longer fires for a listing the owner deactivated. `runDelist(productId, source)`
+records `manual:`/`auto:` in the delist log message; `detectEtsyStatusDrift`
+takes a third `manualHold` argument and `isEtsyManualHold(latestDelistMessage)`
+releases the hold only for an `auto:` row — no row (deactivated on Etsy's side,
+or before this rule) and every `manual:` row keep the listing off Etsy.
+`getLatestDelistMessages` (store) feeds the sweep in one query for restore
+candidates only; the hook and the repair after-check read per product. The
+`delist` branch is unchanged. Trigger: 33 listings with melt > $300 were
+deactivated from the admin on the owner's instruction and the next sweep would
+have restored all of them; *Auto-delist when sold/archived* is OFF until the
+deploy is live (`CHANGELOG.md` 2026-09-24 (1), `DECISIONS.md` Etsy).
+
 **2026-09-07 reconcile-on-refusal:** a refused delist/relist (Etsy will not
 change the state of a listing it already closed — a sold single-quantity
 listing sits in `edit`, quantity 0, and `updateListing` answers "/quantity :
