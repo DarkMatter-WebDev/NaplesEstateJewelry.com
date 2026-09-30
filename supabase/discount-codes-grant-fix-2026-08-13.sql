@@ -1,0 +1,34 @@
+-- HOTFIX 2026-08-13 — run this in Supabase now. No redeploy needed.
+--
+-- Symptom: Admin -> Discount Codes loads and lists codes, but creating,
+-- editing, or deleting one fails with:
+--     permission denied for table discount_codes
+--
+-- Cause: discount-codes-2026-08.sql granted only SELECT to `authenticated`.
+-- Postgres checks table-level GRANTS *before* RLS, and the admin API routes run
+-- on requireAdmin()'s REQUEST-SCOPED client — the `authenticated` role — not the
+-- service role. So reads passed the grant check and every write was refused
+-- before the admin-only RLS policy was ever consulted.
+--
+-- Safety: this does NOT widen access. The "Admins manage discount codes" policy
+-- (`for all using (public.is_admin_user(auth.uid()))`) still restricts every one
+-- of these operations to admins; a non-admin authenticated user sees no rows and
+-- cannot write. This mirrors `buyers-2026-07.sql`, which carries the same grant
+-- and the same explanation.
+--
+-- `anon` remains with no access at all, so a shopper still cannot enumerate
+-- codes. Checkout validation runs server-side on the service client.
+--
+-- The canonical migration (discount-codes-2026-08.sql) has been corrected too,
+-- so a fresh environment gets this right without needing this file.
+--
+-- Safe to run more than once.
+
+grant select, insert, update, delete on public.discount_codes to authenticated;
+
+-- Verify: should return one row per privilege for `authenticated`.
+--   select privilege_type
+--     from information_schema.role_table_grants
+--    where table_name = 'discount_codes' and grantee = 'authenticated'
+--    order by privilege_type;
+-- Expect: DELETE, INSERT, SELECT, UPDATE

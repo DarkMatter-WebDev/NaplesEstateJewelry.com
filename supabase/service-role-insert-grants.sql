@@ -1,0 +1,23 @@
+-- Table INSERT grants for server routes that write via the service-role client.
+--
+-- The service role bypasses RLS, but in Postgres it still needs table-level
+-- privileges. Tables whose grants were scoped to anon/authenticated (with inserts
+-- normally going through a SECURITY DEFINER function) do not give service_role
+-- INSERT by default, which surfaces as: 42501 "permission denied for table ...".
+--
+-- admin_notifications: the public "Message Us Directly" form
+-- (/api/contact-message) and every lead form (/api/inquire, unified inbox) insert a
+-- notification via the service-role client so they appear in /admin/messages.
+--
+-- STATUS: live testing (2026-06-25) showed these inserts already SUCCEED, so this
+-- project's service_role already holds the grant — this file is a harmless,
+-- idempotent safety/documentation net and likely does NOT need to be run. Keep it
+-- in case the grant is ever missing in another environment.
+--
+-- Note: the inquiries lead form INSERT INTO inquiries (not admin_notifications) was
+-- a separate bug, fixed in code to insert as the anon role (which holds the
+-- public-insert grant); that did not need a service_role grant.
+--
+-- Safe to re-run.
+
+grant insert on public.admin_notifications to service_role;
