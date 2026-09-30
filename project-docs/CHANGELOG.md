@@ -1,6 +1,32 @@
 
 # Changelog
 
+## 2026-09-30 (9) — Buy Receipts: a SHOP copy and a SELLER'S copy (the owner's signature printed in cursive), "sign and date" lines — BUILT, needs ONE SQL line + the push (rides with (8))
+
+Owner: *"instead of printing two copies of the exact same receipt, we should print two copies, one with the signature fields for me to keep, and then one that has my signature already filled in at the bottom… find a cursive font and use that for my signature instead.. Christopher Surette"* → font pick **Alex Brush** (of Great Vibes / Alex Brush / Mr Dafoe, rendered with the name), no seller line on the seller's copy → *"move the date up onto the line after the signature, as you'd usually see on a 'sign and date' field"*.
+
+- **Two printed variants** of the paper (`BuyReceiptSheet.tsx`, `variant: 'shop' | 'seller'`, a small "Shop copy" / "Seller's copy" tag under the date):
+  - **Shop copy** — blank lines, signed by hand: *Seller signature | Date* and *Received by — Naples Estate Jewelry | Date* (the Received-by line now has its own date line beside it). May carry the ID photo; no thank-you line (it stays in the shop).
+  - **Seller's copy** — *Received by — Christopher Surette, Naples Estate Jewelry* with the name printed in **Alex Brush** on the line and the receipt date on the line beside it; no seller line; never the ID photo; the thank-you line.
+- **Signature font**: `src/lib/signature-font.ts` (`next/font/google` Alex Brush, `preload: false`, imported only by the paper). Name in `BUY_RECEIPT_SIGNER_NAME` (`lib/buy-receipts.ts`).
+- **Print sets** (`BUY_RECEIPT_PRINT_SETS`): *Shop copy + seller's copy* (default) · *Shop copy with ID photo + seller's copy* · *Shop copy only* · *Shop copy with ID photo only* · *Seller's copy only*. Copies are `{ plain, withId, seller }`; without a photo a with-ID shop copy becomes a plain one instead of vanishing. One print job, pages in that order.
+- **SQL** — `supabase/buy-receipts-seller-copy-2026-09.sql`: `alter table … add column print_copies_seller integer not null default 1`. ⛔ Run it BEFORE the push: every receipt read and the station's poll select this column.
+- Routes: `print-request` stores `print_copies_seller`. Station: prints the seller copies after the shop copies; Test print / Print again = one shop copy.
+- **Verification**: real print-to-PDF, both margin modes, every page looked at: *shop + seller* of a six-item receipt → 2 pages (page 2 = the seller's copy with the cursive signature and "Sep 30, 2026" on the date line beside it); *seller only* → 1 page. ⚠️ *Shop copy with ID + seller* of the SIX-item receipt → 3 pages in the zero-margin print: the signature-and-ID block no longer fits under six items with the 0.85 in top margin and moves whole to a second sheet. Up to about four items it is one page. Accepted (the bigger margins were the owner's call); noted in the feature doc. `tsc` 0 · lint 0 errors · **1592/1592** (one test added) · build 0. Temporary preview page deleted (0 references).
+- ⚠️ Not verified: the cursive font on the owner's printer, and the SQL line (owner runs it).
+
+## 2026-09-30 (8) — Buy Receipts: more top margin · "Print here" on every Log row · the station now says when a print opened a dialog and shows the shortcut setup — BUILT, awaiting the push
+
+Owner (after pushing (5)–(7) and verifying live): *"add some more space in the upper margin... add a button to 'print here' next to the 'send to printer' button on the main buy receipts log page.. see if there's any way to make the print happen automatically.. we still get the browser modal pop up and user has to manually click print from the desktop"*.
+
+- **Top margin.** Printed sheet padding is now **0.85 in top, 0.45 in bottom, 1 in sides** (was 0.65 / 0.65 / 1). 0.9 + 0.5 was tried first and a six-item file copy with the ID photo spilled to a second page again; 0.85 + 0.45 keeps the same total as before. With browser margins applied the sheet keeps 0.45 / 0.05 / 0.6 in. `buy-receipt-sheet-css.ts`.
+- **Log rows** now have **Print here** beside **Send to printer** (`BuyReceiptLog.tsx`, its own `useReceiptPrinter`; default set = 2 plain copies; records the pages through `[id]/printed`).
+- **Silent printing on the desktop.** A web page cannot skip the print dialog by itself; that is Chrome's `--kiosk-printing` start-up switch, which the desktop is evidently not running with (the everyday Chrome, or the shortcut not yet made). Two things were built so the owner can see and fix that from the station page:
+  - `useReceiptPrinter` now measures how long `window.print()` blocked. A dialog blocks until it is dismissed; kiosk printing returns at once. Over 1.5 s → `dialogSuspected`, and the station shows an amber notice: *"That print opened the print dialog, so this window is not printing on its own…"*.
+  - `StationSetupHelp.tsx`: a "Set up printing with no dialog" box on the station page (both the un-chosen view and the armed view; opened automatically after a dialog was detected) with the exact shortcut target and a Copy button, plus the three traps: a real printer must be the Windows default (Print to PDF or none → a dialog), the shortcut starts a separate Chrome, and the station must always be opened from that shortcut.
+- **Verification.** Real print-to-PDF in both margin modes: "2 plain + 1 with ID" of the six-item receipt → 3 pages, "2 plain" short → 2 pages, one print call each; the rendered page shows the larger top margin. Owner's Chrome on `localhost:3007`: the Log row shows Print here · Send to printer · Open; clicking Print here (with `window.print` stood in by a stub) made **one print call with 2 sheets in the job**, tore the host down and updated the row's count; the station page shows the setup box with the full shortcut and Copy. `tsc` 0 · lint 0 errors · **1591/1591** · build 0 (dev server stopped first; temporary page deleted, 0 references).
+- ⚠️ Not verified: the dialog detection on the real desktop. If it says "opened the print dialog" after the shortcut is in use, the Windows default printer is the next thing to check. `TASKS.md` top.
+
 ## 2026-09-30 (7) — Buy Receipts: printed margins wider again — 1 in at the sides, 0.65 in top and bottom (owner: "make the margins even bigger") — rides with (5)–(6), awaiting the push
 
 - Sheet padding in print: **0.65 in top/bottom, 1 in sides** (was 0.6 / 0.7 in); when the print dialog adds its own ~0.4 in, the sheet keeps **0.25 / 0.6 in** so the total is about the same. `buy-receipt-sheet-css.ts`.

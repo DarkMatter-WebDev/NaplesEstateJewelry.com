@@ -39,8 +39,12 @@ edit it, duplicate it, void it, add or replace the ID photo.
 - Notes: one line tall, grows only if more is typed.
 - The ownership statement (`BUY_RECEIPT_ATTESTATION` in `lib/buy-receipts.ts`).
   ⚠️ Owner: confirm this wording with your attorney.
-- Blank lines: seller signature, date, received by. Always blank — signed on
-  paper.
+- **Shop copy**: blank "sign and date" lines — *Seller signature | Date* and
+  *Received by | Date* — signed by hand by both and kept on file.
+- **Seller's copy**: *Received by — Christopher Surette, Naples Estate Jewelry*
+  with the name printed in cursive (Alex Brush, `src/lib/signature-font.ts`;
+  name in `BUY_RECEIPT_SIGNER_NAME`) and the receipt date on the line beside
+  it. No seller line, never the ID photo. Nobody signs twice.
 
 Only the seller's **first and last name**, **one item** and **how it was paid**
 are required. Everything else may be left blank so the form never holds up a
@@ -81,17 +85,19 @@ sale.
 
 The **print set** dropdown (form, after-save panel, receipt page):
 
-| Choice | Copies |
+| Choice | Pages |
 |---|---|
-| 2 copies, no ID photo **(default)** | 2 plain |
-| 1 seller copy + 1 file copy with ID photo | 1 plain + 1 with the ID |
-| 1 copy, no ID photo | 1 plain |
-| 1 file copy with ID photo | 1 with the ID |
+| Shop copy + seller's copy **(default)** | shop (blank lines) + seller's (signed) |
+| Shop copy with ID photo + seller's copy | shop with the ID + seller's |
+| Shop copy only | 1 |
+| Shop copy with ID photo only | 1 |
+| Seller's copy only | 1 |
 
 The two "with ID photo" choices are greyed out until a photo is attached. On
-the file copy the ID sits **beside the signature lines**, at card size
-(3.375 × 2.125 in). Under the signature lines it pushed the copy onto a second
-sheet, so it was moved beside them (measured 2026-09-30).
+the shop copy with the ID, the photo sits **beside the signature lines**, at
+card size (3.375 × 2.125 in). ⚠️ With the current margins that copy needs a
+second sheet once a receipt has about five or more items (the signature-and-ID
+block moves whole to the next page); up to four items it is one page.
 
 - **Save and send to desktop printer** saves, uploads the photo, then asks the
   print station to print. The laptop then shows *Sent. Waiting for the
@@ -100,14 +106,17 @@ sheet, so it was moved beside them (measured 2026-09-30).
   printer PC?*
 - **Print here** prints on the computer you are using (the normal print
   dialog, unless that browser was started with the shortcut below).
-- The Log's **Send to printer** sends the default set (2 copies, no ID photo).
+- The Log's **Send to printer** and **Print here** both use the default set (2
+  copies, no ID photo).
 
 Printing never opens a pop-up window. The receipt is placed in a hidden holder
 directly under the page body, and the print stylesheet hides everything else.
-All copies of one request go out as **one print job**, one page per copy.
-The printed sheet keeps 1 in at the sides and 0.65 in top and bottom (the
-owner's printer cut the edges at half an inch). Not more top and bottom: a
-six-item file copy with the ID photo must still fit one page.
+All copies of one request go out as **one print job**, one page per copy —
+shop copies first, then the seller's copy.
+The printed sheet keeps 1 in at the sides, 0.85 in at the top and 0.45 in at
+the bottom (the owner's printer cut the edges at half an inch; then more room
+was wanted at the top). Not more in total: a six-item file copy with the ID
+photo must still fit one page.
 
 ## The print station (the desktop PC)
 
@@ -140,6 +149,17 @@ six-item file copy with the ID photo must still fit one page.
   it still works, but it shows the print dialog.
 - To change printers, change the Windows default printer. There is no printer
   choice in the page.
+
+### If the desktop still shows the print dialog
+
+A web page cannot skip the dialog; only Chrome started with `--kiosk-printing`
+prints silently. The station measures how long `window.print()` blocked: a
+dialog blocks until dismissed, kiosk printing returns at once. After a print
+that took longer than 1.5 s it shows an amber notice and opens the
+"Set up printing with no dialog" box (the shortcut target with a Copy button).
+The three usual causes: the station was opened in the everyday Chrome; the
+shortcut's Chrome was already running without the switch; or the Windows
+default printer is "Microsoft Print to PDF" or none.
 
 ### How it behaves
 
@@ -179,7 +199,9 @@ six-item file copy with the ID photo must still fit one page.
 ## Database
 
 `supabase/buy-receipts-2026-09.sql` — run once in the Supabase SQL editor
-**before** the deploy. Safe to re-run. It creates:
+**before** the deploy. Safe to re-run. Then
+`supabase/buy-receipts-seller-copy-2026-09.sql` (2026-09-30) adds the
+`print_copies_seller` column. The first file creates:
 
 - `public.buy_receipts` with admin-only RLS (`is_admin_user`) **and** the table
   grant to `authenticated`. Both are required: the admin routes run on

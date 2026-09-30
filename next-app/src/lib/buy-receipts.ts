@@ -23,6 +23,9 @@ import { formatCurrency } from '@/types/sales';
 export const BUY_RECEIPT_TIME_ZONE = 'America/New_York';
 /** PRIVATE Storage bucket for seller ID photos (supabase/buy-receipts-2026-09.sql). */
 export const BUY_RECEIPT_ID_BUCKET = 'buy-receipt-ids';
+/** Printed on the seller's copy as the shop's signature (owner, 2026-09-30, in the cursive face of `signature-font.ts`). */
+export const BUY_RECEIPT_SIGNER_NAME = 'Christopher Surette';
+
 /** localStorage flag: this browser is the print station. An un-armed browser never polls or claims. */
 export const BUY_RECEIPT_STATION_KEY = 'nej-buy-receipt-station';
 
@@ -68,18 +71,25 @@ export const BUY_RECEIPT_STATION_BACKOFF_MAX_MS = 30_000;
 export const BUY_RECEIPT_CLAIM_STALE_MS = 90_000;
 export const BUY_RECEIPT_PRINT_WATCHDOG_MS = 20_000;
 
-/** What one "send to printer" produces. `withId` copies carry the seller's ID photo. */
+/**
+ * What one "send to printer" produces (owner, 2026-09-30):
+ * - the SHOP copy: blank signature lines, signed by hand by both, kept on file
+ *   (`plain`, or `withId` when it carries the seller's ID photo);
+ * - the SELLER'S copy: the owner's signature printed, no seller line, handed over.
+ */
 export const BUY_RECEIPT_PRINT_SETS = {
-  two_plain: { label: '2 copies, no ID photo', plain: 2, withId: 0 },
-  seller_and_file: { label: '1 seller copy + 1 file copy with ID photo', plain: 1, withId: 1 },
-  one_plain: { label: '1 copy, no ID photo', plain: 1, withId: 0 },
-  file_only: { label: '1 file copy with ID photo', plain: 0, withId: 1 },
+  shop_and_seller: { label: "Shop copy + seller's copy", plain: 1, withId: 0, seller: 1 },
+  shop_id_and_seller: { label: "Shop copy with ID photo + seller's copy", plain: 0, withId: 1, seller: 1 },
+  shop_only: { label: 'Shop copy only', plain: 1, withId: 0, seller: 0 },
+  shop_id_only: { label: 'Shop copy with ID photo only', plain: 0, withId: 1, seller: 0 },
+  seller_only: { label: "Seller's copy only", plain: 0, withId: 0, seller: 1 },
 } as const;
 export type BuyReceiptPrintSetKey = keyof typeof BUY_RECEIPT_PRINT_SETS;
 export const BUY_RECEIPT_PRINT_SET_KEYS = Object.keys(BUY_RECEIPT_PRINT_SETS) as BuyReceiptPrintSetKey[];
-export const BUY_RECEIPT_DEFAULT_PRINT_SET: BuyReceiptPrintSetKey = 'two_plain';
+export const BUY_RECEIPT_DEFAULT_PRINT_SET: BuyReceiptPrintSetKey = 'shop_and_seller';
 
-export type BuyReceiptCopies = { plain: number; withId: number };
+/** Shop copies without / with the ID photo, and seller's copies. */
+export type BuyReceiptCopies = { plain: number; withId: number; seller: number };
 
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {
   const n = Number(value);
@@ -88,18 +98,22 @@ function clampInt(value: unknown, min: number, max: number, fallback: number): n
 }
 
 /**
- * The copies a print request may ask for. A with-ID copy is impossible without
- * a photo, so it is dropped — and a request that would then print nothing
- * becomes one plain copy rather than silently doing nothing.
+ * The copies a print request may ask for. A shop copy with the ID photo is
+ * impossible without a photo, so it becomes a plain shop copy — and a request
+ * that would print nothing becomes one shop copy rather than silently doing nothing.
  */
 export function resolvePrintCopies(input: unknown, hasIdPhoto: boolean): BuyReceiptCopies {
   const source = (input ?? {}) as Record<string, unknown>;
   const fallback = BUY_RECEIPT_PRINT_SETS[BUY_RECEIPT_DEFAULT_PRINT_SET];
   let plain = clampInt(source.plain, 0, 3, fallback.plain);
   let withId = clampInt(source.withId, 0, 2, fallback.withId);
-  if (!hasIdPhoto) withId = 0;
-  if (plain + withId === 0) plain = 1;
-  return { plain, withId };
+  const seller = clampInt(source.seller, 0, 3, fallback.seller);
+  if (!hasIdPhoto) {
+    plain = Math.min(3, plain + withId);
+    withId = 0;
+  }
+  if (plain + withId + seller === 0) plain = 1;
+  return { plain, withId, seller };
 }
 
 export type BuyReceiptItem = { qty: number; description: string; amount: number };
@@ -169,6 +183,7 @@ export type BuyReceiptRow = {
   print_requested_by: string | null;
   print_copies_plain: number;
   print_copies_with_id: number;
+  print_copies_seller: number;
   print_claimed_at: string | null;
   print_claimed_by: string | null;
   printed_at: string | null;
@@ -188,7 +203,7 @@ export type BuyReceiptRow = {
 export const BUY_RECEIPT_COLUMNS =
   'id, seq, receipt_number, status, seller_name, seller_phone, seller_email, seller_street, seller_city, seller_state, '
   + 'seller_zip, seller_id_type, seller_id_last4, seller_dob, seller_id_photo_path, items, total, payments, notes, '
-  + 'print_requested_at, print_requested_by, print_copies_plain, print_copies_with_id, print_claimed_at, '
+  + 'print_requested_at, print_requested_by, print_copies_plain, print_copies_with_id, print_copies_seller, print_claimed_at, '
   + 'print_claimed_by, printed_at, print_count, void_reason, voided_at, voided_by, duplicated_from, created_by, '
   + 'created_by_email, updated_by_email, created_at, updated_at';
 
@@ -575,6 +590,7 @@ export function sampleBuyReceipt(nowIso: string): BuyReceiptRow {
     print_requested_by: null,
     print_copies_plain: 1,
     print_copies_with_id: 0,
+    print_copies_seller: 0,
     print_claimed_at: null,
     print_claimed_by: null,
     printed_at: null,

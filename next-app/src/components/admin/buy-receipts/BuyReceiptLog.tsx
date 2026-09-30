@@ -13,13 +13,14 @@ import {
   type BuyReceiptRow,
 } from '@/lib/buy-receipts';
 import { formatCurrency } from '@/types/sales';
-import { requestPrint } from './buy-receipt-client';
+import { useReceiptPrinter } from './BuyReceiptPrintHost';
+import { markPrinted, requestPrint } from './buy-receipt-client';
 
 /**
  * Admin → Buy Receipts → Log: every saved receipt, newest first. Search by
  * number, seller or phone. A row opens the receipt (print options, edit, void,
- * duplicate); "Send to printer" is the one action quick enough to keep here,
- * and it sends the default set — two copies, no ID photo.
+ * duplicate). "Send to printer" and "Print here" (owner, 2026-09-30) are quick
+ * enough to keep on the row; both use the default set — a shop copy and a seller's copy.
  */
 
 const SEARCH_DELAY_MS = 300;
@@ -45,6 +46,8 @@ export default function BuyReceiptLog({ adminBasePath, initialRows }: { adminBas
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const [printingId, setPrintingId] = useState<string | null>(null);
+  const printer = useReceiptPrinter();
   const firstRun = useRef(true);
 
   useEffect(() => {
@@ -79,7 +82,7 @@ export default function BuyReceiptLog({ adminBasePath, initialRows }: { adminBas
     setSendingId(row.id);
     setError(null);
     const set = BUY_RECEIPT_PRINT_SETS[BUY_RECEIPT_DEFAULT_PRINT_SET];
-    const result = await requestPrint(row.id, { plain: set.plain, withId: set.withId });
+    const result = await requestPrint(row.id, { plain: set.plain, withId: set.withId, seller: set.seller });
     setSendingId(null);
     if ('error' in result) {
       setError(result.error);
@@ -88,8 +91,30 @@ export default function BuyReceiptLog({ adminBasePath, initialRows }: { adminBas
     setRows((current) => current.map((item) => (item.id === row.id ? result.receipt : item)));
   }
 
+  async function printHere(row: BuyReceiptRow) {
+    if (sendingId || printingId) return;
+    setPrintingId(row.id);
+    setError(null);
+    try {
+      const set = BUY_RECEIPT_PRINT_SETS[BUY_RECEIPT_DEFAULT_PRINT_SET];
+      const pages = await printer.print(row, { plain: set.plain, withId: 0, seller: set.seller }, null);
+      if (pages <= 0) return;
+      const result = await markPrinted(row.id, pages);
+      if ('error' in result) {
+        setError(result.error);
+        return;
+      }
+      setRows((current) => current.map((item) => (item.id === row.id ? result.receipt : item)));
+    } finally {
+      setPrintingId(null);
+    }
+  }
+
+  const busy = sendingId !== null || printingId !== null;
+
   return (
     <div>
+      {printer.host}
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <input
           className="form-field"
@@ -171,7 +196,10 @@ export default function BuyReceiptLog({ adminBasePath, initialRows }: { adminBas
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
-                      <button type="button" className="outline-button text-xs" disabled={sendingId !== null} onClick={() => void send(row)}>
+                      <button type="button" className="outline-button text-xs" disabled={busy} onClick={() => void printHere(row)}>
+                        {printingId === row.id ? 'Printing…' : 'Print here'}
+                      </button>
+                      <button type="button" className="outline-button ml-2 text-xs" disabled={busy} onClick={() => void send(row)}>
                         {sendingId === row.id ? 'Sending…' : 'Send to printer'}
                       </button>
                       <Link href={`${adminBasePath}/buy-receipts/${row.id}`} className="outline-button ml-2 text-xs">

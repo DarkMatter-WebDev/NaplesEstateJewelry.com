@@ -25,6 +25,7 @@ import {
 import { formatCurrency } from '@/types/sales';
 import { useReceiptPrinter } from './BuyReceiptPrintHost';
 import { printableIdPhoto, type PrintableIdPhoto } from './buy-receipt-client';
+import StationSetupHelp from './StationSetupHelp';
 
 /**
  * Admin → Buy Receipts → Print station (owner mockup 2026-09-29).
@@ -171,7 +172,7 @@ export default function PrintStation({ adminBasePath, adminEmail }: { adminBaseP
 
   /** Print one receipt this station has already claimed (or a local reprint), then record it. */
   const runPrint = useCallback(
-    async (row: BuyReceiptRow, wanted: { plain: number; withId: number }, claimed: boolean) => {
+    async (row: BuyReceiptRow, wanted: { plain: number; withId: number; seller: number }, claimed: boolean) => {
       printingRef.current = true;
       setCurrent(row);
       setStatus('printing');
@@ -264,7 +265,7 @@ export default function PrintStation({ adminBasePath, adminEmail }: { adminBaseP
           .or(`print_claimed_at.is.null,print_claimed_at.lt.${staleBefore}`)
           .select('id');
         if (won && won.length > 0) {
-          await runPrint(next, { plain: next.print_copies_plain, withId: next.print_copies_with_id }, true);
+          await runPrint(next, { plain: next.print_copies_plain, withId: next.print_copies_with_id, seller: next.print_copies_seller ?? 0 }, true);
           delay = 250;
         }
       }
@@ -315,13 +316,13 @@ export default function PrintStation({ adminBasePath, adminEmail }: { adminBaseP
   function testPrint() {
     if (printingRef.current) return;
     setNotice(null);
-    void runPrint(sampleBuyReceipt(new Date().toISOString()), { plain: 1, withId: 0 }, false);
+    void runPrint(sampleBuyReceipt(new Date().toISOString()), { plain: 1, withId: 0, seller: 0 }, false);
   }
 
   function printAgain(row: BuyReceiptRow) {
     if (printingRef.current) return;
     setNotice(null);
-    void runPrint(row, { plain: 1, withId: 0 }, false);
+    void runPrint(row, { plain: 1, withId: 0, seller: 0 }, false);
   }
 
   const pageStyle = { minHeight: '100vh', background: 'var(--color-background, #fafaf8)', color: 'var(--color-on-surface)' } as const;
@@ -354,6 +355,7 @@ export default function PrintStation({ adminBasePath, adminEmail }: { adminBaseP
               </button>
             )}
           </div>
+          <StationSetupHelp />
           <Link href={`${adminBasePath}/buy-receipts`} className="text-sm underline" style={{ color: 'var(--color-primary)' }}>
             Back to Buy Receipts
           </Link>
@@ -428,6 +430,16 @@ export default function PrintStation({ adminBasePath, adminEmail }: { adminBaseP
           </p>
         )}
 
+        {printer.dialogSuspected && (
+          <div role="alert" className="border px-4 py-3 text-sm" style={{ borderColor: '#ef9f27', background: '#faeeda', color: '#633806' }}>
+            <p className="font-semibold">That print opened the print dialog, so this window is not printing on its own.</p>
+            <p className="mt-1">
+              Silent printing needs Chrome started from the print-station shortcut (the setup below) and a real printer set as the
+              Windows default. Open the station from that shortcut, then press Test print again.
+            </p>
+          </div>
+        )}
+
         <div>
           <p className="mb-2 text-sm" style={hintStyle}>Today</p>
           {today.length === 0 ? (
@@ -461,6 +473,8 @@ export default function PrintStation({ adminBasePath, adminEmail }: { adminBaseP
             </div>
           )}
         </div>
+
+        <StationSetupHelp open={printer.dialogSuspected} />
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs" style={hintStyle}>
           <Link href={`${adminBasePath}/buy-receipts/log`} className="underline">Log</Link>

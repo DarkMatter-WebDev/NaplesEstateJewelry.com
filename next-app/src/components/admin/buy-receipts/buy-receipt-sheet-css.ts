@@ -53,6 +53,7 @@ export const BUY_RECEIPT_SHEET_CSS = `
   margin-bottom: 4px;
 }
 .buy-receipt-sheet .brs-muted { color: #746b5b; }
+.buy-receipt-sheet .brs-copy-tag { margin-top: 3px; font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: #746b5b; }
 
 .buy-receipt-sheet .sheet-section-title {
   margin: 12px 0 8px;
@@ -199,6 +200,9 @@ export const BUY_RECEIPT_SHEET_CSS = `
 }
 .buy-receipt-sheet .brs-sign-line { height: 30px; border-bottom: 1px solid #1a1c1c; }
 .buy-receipt-sheet .brs-sign-label { margin-top: 4px; }
+.buy-receipt-sheet .brs-sign-line.brs-signature-ink { display: flex; align-items: flex-end; height: 40px; padding: 0 6px 2px; }
+.buy-receipt-sheet .brs-signature { font-size: 34px; line-height: 1; color: #1f2540; }
+.buy-receipt-sheet .brs-signature-date { font-size: 13px; line-height: 1.2; }
 
 .buy-receipt-sheet .brs-sign-with-id {
   display: grid;
@@ -209,6 +213,7 @@ export const BUY_RECEIPT_SHEET_CSS = `
   break-inside: avoid;
 }
 .buy-receipt-sheet .brs-sign-stack { display: grid; gap: 12px; }
+.buy-receipt-sheet .brs-sign-pair { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; }
 .buy-receipt-sheet .brs-id img {
   display: block;
   width: 3.375in;
@@ -276,8 +281,9 @@ export const BUY_RECEIPT_PRINT_HOST_CSS = `
     margin: 0;
     /* The paper's own margin (there is no @page margin, see above). The owner's printer cut the
        edges at half an inch; they asked for bigger again after 0.7 in (2026-09-30). */
-    /* 0.65in top/bottom, not more: a six-item file copy with the ID must still fit one page. */
-    padding: 0.65in 1in;
+    /* Top 0.85in (owner: more room at the top), bottom 0.45in, sides 1in. Not more in total: a six-item
+       file copy with the ID must still fit one page (0.9 + 0.5 spilled it). */
+    padding: 0.85in 1in 0.45in;
     border: 0;
     box-shadow: none;
     -webkit-print-color-adjust: exact;
@@ -290,6 +296,6 @@ export const BUY_RECEIPT_PRINT_HOST_CSS = `
 /* A print dialog whose margin setting overrides ours makes the page box narrower than Letter's 816px. The
    browser's margin (about 0.4in) is then most of the margin; the paper adds only what is missing. */
 @media print and (max-width: 800px) {
-  .buy-receipt-print-host .buy-receipt-sheet { padding: 0.25in 0.6in; }
+  .buy-receipt-print-host .buy-receipt-sheet { padding: 0.45in 0.6in 0.05in; }
 }
 `;

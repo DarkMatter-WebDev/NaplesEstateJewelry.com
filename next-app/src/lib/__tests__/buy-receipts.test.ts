@@ -222,18 +222,26 @@ describe('payments on the paper and in the form', () => {
 });
 
 describe('print sets', () => {
-  it('defaults to two copies without the ID photo', () => {
-    expect(BUY_RECEIPT_PRINT_SETS[BUY_RECEIPT_DEFAULT_PRINT_SET]).toMatchObject({ plain: 2, withId: 0 });
-    expect(resolvePrintCopies(null, true)).toEqual({ plain: 2, withId: 0 });
+  it('defaults to a shop copy plus a seller copy, no ID photo', () => {
+    expect(BUY_RECEIPT_PRINT_SETS[BUY_RECEIPT_DEFAULT_PRINT_SET]).toMatchObject({ plain: 1, withId: 0, seller: 1 });
+    expect(resolvePrintCopies(null, true)).toEqual({ plain: 1, withId: 0, seller: 1 });
   });
-  it('never prints a with-ID copy without a photo, and never prints nothing', () => {
-    expect(resolvePrintCopies({ plain: 1, withId: 1 }, true)).toEqual({ plain: 1, withId: 1 });
-    expect(resolvePrintCopies({ plain: 1, withId: 1 }, false)).toEqual({ plain: 1, withId: 0 });
-    expect(resolvePrintCopies({ plain: 0, withId: 1 }, false)).toEqual({ plain: 1, withId: 0 });
-    expect(resolvePrintCopies({ plain: 0, withId: 0 }, true)).toEqual({ plain: 1, withId: 0 });
+  it('turns a with-ID shop copy into a plain one when there is no photo, and never prints nothing', () => {
+    expect(resolvePrintCopies({ plain: 0, withId: 1, seller: 1 }, true)).toEqual({ plain: 0, withId: 1, seller: 1 });
+    expect(resolvePrintCopies({ plain: 0, withId: 1, seller: 1 }, false)).toEqual({ plain: 1, withId: 0, seller: 1 });
+    expect(resolvePrintCopies({ plain: 0, withId: 0, seller: 0 }, true)).toEqual({ plain: 1, withId: 0, seller: 0 });
   });
   it('clamps silly numbers', () => {
-    expect(resolvePrintCopies({ plain: 50, withId: 9 }, true)).toEqual({ plain: 3, withId: 2 });
+    expect(resolvePrintCopies({ plain: 50, withId: 9, seller: 7 }, true)).toEqual({ plain: 3, withId: 2, seller: 3 });
+  });
+  it('signs the seller copy from the one constant, in the cursive face', () => {
+    const sheet = readFileSync(join(process.cwd(), 'src', 'components', 'admin', 'buy-receipts', 'BuyReceiptSheet.tsx'), 'utf8');
+    expect(sheet).toContain('{BUY_RECEIPT_SIGNER_NAME}');
+    expect(sheet).toContain('signatureFont.className');
+    // The seller copy never carries the ID photo, and only the seller copy says thank you.
+    expect(sheet).toContain("const withId = !sellerCopy && Boolean(showIdPhoto && idPhotoUrl);");
+    expect(sheet).toContain('{sellerCopy && <p className="brs-thanks">');
+    expect(readFileSync(join(process.cwd(), 'src', 'lib', 'signature-font.ts'), 'utf8')).toContain('Alex_Brush');
   });
 });
 
@@ -391,7 +399,7 @@ describe('buy receipts: the paper, printing and the station', () => {
     expect(sheet).not.toContain('LLC');
     expect(BUY_RECEIPT_ATTESTATION).toMatch(/lawful owner/);
     // The ID photo appears only when a copy asks for it.
-    expect(sheet).toContain('{showIdPhoto && idPhotoUrl && (');
+    expect(sheet).toContain('{withId && (');
   });
 
   it('prints with no page margin so Chrome adds no header or footer', () => {

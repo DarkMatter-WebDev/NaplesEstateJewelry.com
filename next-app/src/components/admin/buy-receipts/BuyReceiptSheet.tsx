@@ -4,6 +4,7 @@ import { useLayoutEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { BUSINESS_NAME, cityLine, streetLine } from '@/lib/business-location';
 import { BUSINESS_EMAIL, BUSINESS_PHONE } from '@/lib/order-email-branding';
+import { signatureFont } from '@/lib/signature-font';
 import {
   BUY_RECEIPT_ATTESTATION,
   BUY_RECEIPT_ID_TYPES,
@@ -12,8 +13,10 @@ import {
   BUY_RECEIPT_NOTES_MAX,
   BUY_RECEIPT_PAYMENT_LABELS,
   BUY_RECEIPT_PAYMENT_METHODS,
+  BUY_RECEIPT_SIGNER_NAME,
   draftTotal,
   formatDob,
+  formatReceiptDate,
   formatReceiptDateTime,
   paymentsBalance,
   paymentsLine,
@@ -32,9 +35,11 @@ import { BUY_RECEIPT_SHEET_CSS } from './buy-receipt-sheet-css';
  * - `edit`: the same paper with underlined fields (the laptop form);
  * - `print`: the same paper as text (the log, "Print here", the Print Station).
  *
- * The signature lines are always blank — they are signed by hand on the paper.
- * The seller's ID photo appears only when `showIdPhoto` is set, i.e. on a file
- * copy the owner asked for; the seller's own copy never carries it.
+ * Two printed variants (owner, 2026-09-30):
+ * - `shop` — the copy kept on file: blank signature lines, signed by hand by
+ *   both; may carry the seller's ID photo (`showIdPhoto`);
+ * - `seller` — the copy handed over: the owner's signature printed in cursive
+ *   on the "Received by" line, no seller line, never the ID photo.
  */
 
 type EditProps = {
@@ -51,6 +56,8 @@ type EditProps = {
 type PrintProps = {
   mode: 'print';
   receipt: BuyReceiptRow;
+  /** `shop` (default) keeps the blank lines; `seller` prints the owner's signature. */
+  variant?: 'shop' | 'seller';
   idPhotoUrl?: string | null;
   showIdPhoto?: boolean;
 };
@@ -90,7 +97,7 @@ function AutoGrowTextarea({
   );
 }
 
-function Header({ receiptNumber, dateIso }: { receiptNumber: string | null; dateIso: string }) {
+function Header({ receiptNumber, dateIso, copyTag }: { receiptNumber: string | null; dateIso: string; copyTag?: string }) {
   return (
     <div className="brs-head">
       <div className="brs-brand">
@@ -110,6 +117,27 @@ function Header({ receiptNumber, dateIso }: { receiptNumber: string | null; date
         <div className="brs-doc">Purchase receipt</div>
         <div>No. {receiptNumber ?? <span className="brs-muted">assigned on save</span>}</div>
         <div>Date: {formatReceiptDateTime(dateIso)}</div>
+        {copyTag && <div className="brs-copy-tag">{copyTag}</div>}
+      </div>
+    </div>
+  );
+}
+
+/** The seller's copy: the shop has already signed and dated. */
+function SignedBlock({ dateIso }: { dateIso: string }) {
+  return (
+    <div className="brs-signatures">
+      <div>
+        <div className="brs-sign-line brs-signature-ink">
+          <span className={`${signatureFont.className} brs-signature`}>{BUY_RECEIPT_SIGNER_NAME}</span>
+        </div>
+        <span className="brs-label brs-sign-label">Received by — {BUY_RECEIPT_SIGNER_NAME}, {BUSINESS_NAME}</span>
+      </div>
+      <div>
+        <div className="brs-sign-line brs-signature-ink">
+          <span className="brs-signature-date">{formatReceiptDate(dateIso)}</span>
+        </div>
+        <span className="brs-label brs-sign-label">Date</span>
       </div>
     </div>
   );
@@ -130,7 +158,10 @@ function SignatureBlock() {
         <div className="brs-sign-line" />
         <span className="brs-label brs-sign-label">Received by — {BUSINESS_NAME}</span>
       </div>
-      <div />
+      <div>
+        <div className="brs-sign-line" />
+        <span className="brs-label brs-sign-label">Date</span>
+      </div>
     </div>
   );
 }
@@ -334,8 +365,10 @@ function EditSheet({ draft, onChange, receiptNumber, dateIso, idPhotoSlot }: Edi
   );
 }
 
-function PrintSheet({ receipt, idPhotoUrl, showIdPhoto }: PrintProps) {
+function PrintSheet({ receipt, idPhotoUrl, showIdPhoto, variant = 'shop' }: PrintProps) {
   const items = receipt.items ?? [];
+  const sellerCopy = variant === 'seller';
+  const withId = !sellerCopy && Boolean(showIdPhoto && idPhotoUrl);
   const cityStateZip = [[receipt.seller_city, receipt.seller_state].filter(Boolean).join(', '), receipt.seller_zip]
     .filter(Boolean)
     .join(' ');
@@ -344,7 +377,7 @@ function PrintSheet({ receipt, idPhotoUrl, showIdPhoto }: PrintProps) {
   return (
     <div className="buy-receipt-sheet">
       {isVoid && <div className="brs-void-mark" aria-hidden="true">VOID</div>}
-      <Header receiptNumber={receipt.receipt_number} dateIso={receipt.created_at} />
+      <Header receiptNumber={receipt.receipt_number} dateIso={receipt.created_at} copyTag={sellerCopy ? "Seller's copy" : 'Shop copy'} />
       {isVoid && <p className="brs-void-line">VOID{receipt.void_reason ? ` — ${receipt.void_reason}` : ''}</p>}
 
       <h2 className="sheet-section-title">Seller</h2>
@@ -397,36 +430,44 @@ function PrintSheet({ receipt, idPhotoUrl, showIdPhoto }: PrintProps) {
       </div>
 
       <p className="brs-attest">{BUY_RECEIPT_ATTESTATION}</p>
-      {showIdPhoto && idPhotoUrl && (
+      {sellerCopy && <SignedBlock dateIso={receipt.created_at} />}
+      {withId && (
         // File copy: the ID sits BESIDE the signature lines, at card size, so the
         // copy still fits one page (under them it ran onto a second sheet).
         <div className="brs-sign-with-id">
           <div className="brs-sign-stack">
-            <div>
-              <div className="brs-sign-line" />
-              <span className="brs-label brs-sign-label">Seller signature</span>
+            <div className="brs-sign-pair">
+              <div>
+                <div className="brs-sign-line" />
+                <span className="brs-label brs-sign-label">Seller signature</span>
+              </div>
+              <div>
+                <div className="brs-sign-line" />
+                <span className="brs-label brs-sign-label">Date</span>
+              </div>
             </div>
-            <div>
-              <div className="brs-sign-line" />
-              <span className="brs-label brs-sign-label">Date</span>
-            </div>
-            <div>
-              <div className="brs-sign-line" />
-              <span className="brs-label brs-sign-label">Received by — {BUSINESS_NAME}</span>
+            <div className="brs-sign-pair">
+              <div>
+                <div className="brs-sign-line" />
+                <span className="brs-label brs-sign-label">Received by — {BUSINESS_NAME}</span>
+              </div>
+              <div>
+                <div className="brs-sign-line" />
+                <span className="brs-label brs-sign-label">Date</span>
+              </div>
             </div>
           </div>
           <div className="brs-id">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={idPhotoUrl} alt="Seller ID" loading="eager" />
+            <img src={idPhotoUrl ?? undefined} alt="Seller ID" loading="eager" />
             <span className="brs-label brs-sign-label">Seller ID · file copy only</span>
           </div>
         </div>
       )}
-      {!(showIdPhoto && idPhotoUrl) && <SignatureBlock />}
+      {!sellerCopy && !withId && <SignatureBlock />}
 
-      {/* The thank-you line is for the seller; the file copy (with the ID) stays in the shop and needs the room. */}
-
-      {!(showIdPhoto && idPhotoUrl) && <p className="brs-thanks">Thank you for choosing {BUSINESS_NAME}.</p>}
+      {/* The thank-you line is for the seller; the shop copy stays in the shop and needs the room. */}
+      {sellerCopy && <p className="brs-thanks">Thank you for choosing {BUSINESS_NAME}.</p>}
     </div>
   );
 }

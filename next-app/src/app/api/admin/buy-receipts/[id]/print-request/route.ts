@@ -5,7 +5,8 @@ import { BUY_RECEIPT_COLUMNS, isReceiptId, resolvePrintCopies, type BuyReceiptRo
 /**
  * "Send to the desktop printer": stamps a print request the Print Station picks
  * up on its next poll. Body `{ plain, withId }` = how many copies without and
- * with the seller's ID photo; a with-ID copy is dropped when there is no photo.
+ * with the seller's ID photo, plus `seller` = seller's copies (the owner's signature
+ * printed); a with-ID copy becomes a plain shop copy when there is no photo.
  * Re-sending clears any earlier claim, so a second click prints again.
  * Allowed on a void receipt — it prints with the VOID mark.
  */
@@ -35,6 +36,7 @@ export async function POST(req: Request, context: Context) {
       print_requested_by: admin.user.email ?? null,
       print_copies_plain: copies.plain,
       print_copies_with_id: copies.withId,
+      print_copies_seller: copies.seller,
       print_claimed_at: null,
       print_claimed_by: null,
     })

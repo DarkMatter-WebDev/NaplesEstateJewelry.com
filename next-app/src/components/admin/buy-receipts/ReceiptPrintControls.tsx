@@ -99,7 +99,7 @@ export default function ReceiptPrintControls({
   const send = useCallback(async () => {
     setBusy('send');
     setError(null);
-    const result = await requestPrint(receipt.id, { plain: copies.plain, withId: copies.withId });
+    const result = await requestPrint(receipt.id, { plain: copies.plain, withId: copies.withId, seller: copies.seller });
     setBusy(null);
     if ('error' in result) {
       setError(result.error);
@@ -108,7 +108,7 @@ export default function ReceiptPrintControls({
     onChangedRef.current(result.receipt);
     setPhase('waiting');
     setWatch({ startedAt: Date.now(), baseCount: receipt.print_count });
-  }, [receipt.id, receipt.print_count, copies.plain, copies.withId]);
+  }, [receipt.id, receipt.print_count, copies.plain, copies.withId, copies.seller]);
 
   const printHere = useCallback(async () => {
     setBusy('print');
@@ -120,7 +120,7 @@ export default function ReceiptPrintControls({
         setError('The ID photo could not be loaded, so nothing was printed.');
         return;
       }
-      const pages = await printReceipt(receipt, { plain: copies.plain, withId: copies.withId }, idPhoto?.url ?? null);
+      const pages = await printReceipt(receipt, { plain: copies.plain, withId: copies.withId, seller: copies.seller }, idPhoto?.url ?? null);
       if (pages > 0) {
         const result = await markPrinted(receipt.id, pages);
         if ('error' in result) setError(result.error);
@@ -130,7 +130,7 @@ export default function ReceiptPrintControls({
       idPhoto?.release();
       setBusy(null);
     }
-  }, [receipt, copies.plain, copies.withId, printReceipt]);
+  }, [receipt, copies.plain, copies.withId, copies.seller, printReceipt]);
 
   // The form's "Save and send" / "Print here": run once when the panel appears.
   const autoRan = useRef(false);

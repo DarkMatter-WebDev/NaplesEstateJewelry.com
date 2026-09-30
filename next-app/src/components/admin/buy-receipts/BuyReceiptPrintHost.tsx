@@ -42,33 +42,40 @@ function pause(ms: number): Promise<void> {
  * covers a driver that never fires the event, so the station cannot get stuck
  * on "Printing…".
  */
-function printOnce(): Promise<void> {
+/** How long `print()` kept the page waiting. A dialog blocks until it is dismissed; kiosk printing returns at once. */
+const DIALOG_SUSPECTED_MS = 1_500;
+
+function printOnce(): Promise<{ blockedMs: number }> {
   return new Promise((resolve) => {
     let settled = false;
+    let blockedMs = 0;
     const finish = () => {
       if (settled) return;
       settled = true;
       window.removeEventListener('afterprint', finish);
       window.clearTimeout(watchdog);
-      resolve();
+      resolve({ blockedMs });
     };
     const watchdog = window.setTimeout(finish, BUY_RECEIPT_PRINT_WATCHDOG_MS);
     window.addEventListener('afterprint', finish);
     try {
+      const started = performance.now();
       window.print();
+      blockedMs = performance.now() - started;
     } catch {
       finish();
     }
   });
 }
 
-/** One sheet per entry: false = a plain copy, true = a copy carrying the seller's ID photo. */
-type PrintView = { receipt: BuyReceiptRow; idPhotoUrl: string | null; sheets: boolean[] };
+/** One sheet per entry, in print order. */
+type PrintSheet = { variant: 'shop' | 'seller'; showIdPhoto: boolean };
+type PrintView = { receipt: BuyReceiptRow; idPhotoUrl: string | null; sheets: PrintSheet[] };
 
 /**
  * `print(receipt, copies, idPhotoUrl)` sends ONE print job with one page per
- * copy — the plain copies first, then the copies that carry the seller's ID
- * photo — and resolves with how many pages were sent. (One job per copy, the
+ * copy — shop copies first (plain, then with the ID photo), then the seller's
+ * copies with the printed signature — and resolves with how many pages were sent. (One job per copy, the
  * first version, meant the printer paused between copies; owner, 2026-09-30.)
  * Render `host` somewhere in the component — it is the printout.
  *
@@ -77,6 +84,8 @@ type PrintView = { receipt: BuyReceiptRow; idPhotoUrl: string | null; sheets: bo
  */
 export function useReceiptPrinter() {
   const [view, setView] = useState<PrintView | null>(null);
+  /** True after a print that showed a dialog — this browser is not printing silently. */
+  const [dialogSuspected, setDialogSuspected] = useState(false);
   const busyRef = useRef(false);
   const aliveRef = useRef(true);
 
@@ -93,9 +102,12 @@ export function useReceiptPrinter() {
       busyRef.current = true;
       let printed = 0;
       try {
-        const sheets = [
-          ...Array.from({ length: Math.max(0, copies.plain) }, () => false),
-          ...Array.from({ length: idPhotoUrl ? Math.max(0, copies.withId) : 0 }, () => true),
+        // No photo to print: a with-ID shop copy still comes out, as a plain shop copy.
+        const plainShop = Math.max(0, copies.plain) + (idPhotoUrl ? 0 : Math.max(0, copies.withId));
+        const sheets: PrintSheet[] = [
+          ...Array.from({ length: plainShop }, () => ({ variant: 'shop' as const, showIdPhoto: false })),
+          ...Array.from({ length: idPhotoUrl ? Math.max(0, copies.withId) : 0 }, () => ({ variant: 'shop' as const, showIdPhoto: true })),
+          ...Array.from({ length: Math.max(0, copies.seller) }, () => ({ variant: 'seller' as const, showIdPhoto: false })),
         ];
         if (sheets.length > 0 && aliveRef.current) {
           // Commit every page to the DOM before looking for their images.
@@ -103,7 +115,8 @@ export function useReceiptPrinter() {
           const host = document.querySelector('.buy-receipt-print-host');
           await waitForImages(host ? Array.from(host.querySelectorAll('img')) : []);
           await waitForPrintLayout(window);
-          await printOnce();
+          const { blockedMs } = await printOnce();
+          if (aliveRef.current) setDialogSuspected(blockedMs > DIALOG_SUSPECTED_MS);
           printed = sheets.length;
           // Let the spooler take the job before the pages are torn down.
           await pause(400);
@@ -119,11 +132,11 @@ export function useReceiptPrinter() {
 
   const host = view ? (
     <BuyReceiptPrintHost>
-      {view.sheets.map((showIdPhoto, index) => (
-        <BuyReceiptSheet key={index} mode="print" receipt={view.receipt} idPhotoUrl={view.idPhotoUrl} showIdPhoto={showIdPhoto} />
+      {view.sheets.map((sheet, index) => (
+        <BuyReceiptSheet key={index} mode="print" variant={sheet.variant} receipt={view.receipt} idPhotoUrl={view.idPhotoUrl} showIdPhoto={sheet.showIdPhoto} />
       ))}
     </BuyReceiptPrintHost>
   ) : null;
 
-  return { print, host, printing: view !== null };
+  return { print, host, printing: view !== null, dialogSuspected };
 }
