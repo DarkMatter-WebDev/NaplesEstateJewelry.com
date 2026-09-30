@@ -8,6 +8,8 @@ const DEFAULT_SITE_URL = 'https://naplesestatejewelry.com';
 export const SITE_DOMAIN_LABEL = 'NaplesEstateJewelry.com';
 
 export const BUSINESS_PHONE = '(239) 404-8505';
+/** The one monitored mailbox (PROJECT_OVERVIEW.md → email is fully .com). */
+export const BUSINESS_EMAIL = 'info@naplesestatejewelry.com';
 
 /**
  * Pin every phone number in an already-escaped HTML string to a single line.

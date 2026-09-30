@@ -7,13 +7,14 @@ import { AppIcon } from '@/components/AppIcon';
 
 const GOLD = '#735c00';
 
-export type AdminSection = 'products' | 'social-queues' | 'orders' | 'in-store-sale' | 'buyers' | 'messages' | 'subscribers' | 'text-deals' | 'marketing' | 'discount-codes' | 'users' | 'settings';
+export type AdminSection = 'products' | 'social-queues' | 'orders' | 'in-store-sale' | 'buy-receipts' | 'buyers' | 'messages' | 'subscribers' | 'text-deals' | 'marketing' | 'discount-codes' | 'users' | 'settings';
 
 const SECTION_LABELS: Record<AdminSection, string> = {
   products: 'Products',
   'social-queues': 'Social Queues',
   orders: 'Orders',
   'in-store-sale': 'In-Store Sale',
+  'buy-receipts': 'Buy Receipts',
   buyers: 'Buyers',
   messages: 'Messages',
   subscribers: 'Subscribers',
@@ -247,6 +248,9 @@ export default function AdminHeader({
       />
       <AdminNavItem href={`${adminBasePath}/in-store-sale`} active={active === 'in-store-sale'}>
         In-Store Sale
+      </AdminNavItem>
+      <AdminNavItem href={`${adminBasePath}/buy-receipts`} active={active === 'buy-receipts'}>
+        Buy Receipts
       </AdminNavItem>
       <AdminNavItem href={`${adminBasePath}/buyers`} active={active === 'buyers'}>
         Buyers

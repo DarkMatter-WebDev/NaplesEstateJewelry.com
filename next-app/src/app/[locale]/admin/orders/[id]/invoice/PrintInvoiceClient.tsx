@@ -2,39 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { waitForPrintImages, waitForPrintLayout } from '@/lib/print-images';
 
 const INVOICE_PRINT_SCALE = 0.98;
-const PRINT_ASSET_TIMEOUT_MS = 8_000;
-
-async function waitForPrintImages(printWindow: Window) {
-  const images = Array.from(printWindow.document.images);
-  if (images.length === 0) return;
-
-  const imageReady = (image: HTMLImageElement) =>
-    new Promise<void>((resolve) => {
-      if (image.complete) {
-        resolve();
-        return;
-      }
-
-      const finish = () => resolve();
-      image.addEventListener('load', finish, { once: true });
-      image.addEventListener('error', finish, { once: true });
-    }).then(async () => {
-      if (image.naturalWidth > 0 && typeof image.decode === 'function') {
-        await image.decode().catch(() => undefined);
-      }
-    });
-
-  await Promise.race([
-    Promise.all(images.map(imageReady)),
-    new Promise<void>((resolve) => printWindow.setTimeout(resolve, PRINT_ASSET_TIMEOUT_MS)),
-  ]);
-}
-
-function waitForPrintLayout(printWindow: Window) {
-  return new Promise<void>((resolve) => printWindow.setTimeout(resolve, 50));
-}
 
 export default function PrintInvoiceClient({
   invoiceHtml,

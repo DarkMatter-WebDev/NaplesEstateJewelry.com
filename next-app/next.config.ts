@@ -27,7 +27,10 @@ const SECURITY_HEADERS = [
   // `microphone=()` (the previous value) forbids the mic in EVERY document, so
   // Chrome denied it with no prompt (owner, 2026-09-02). Same value must live in
   // root netlify.toml — the two-file header rule.
-  { key: 'Permissions-Policy', value: 'camera=(), microphone=(self), geolocation=(), browsing-topics=()' },
+  // camera=(self): Admin → Buy Receipts photographs the seller's ID with the
+  // webcam (2026-09-30). `camera=()` forbade it in every document, prompt or no
+  // prompt. (self) only lets OUR pages ask; the browser still asks the person.
+  { key: 'Permissions-Policy', value: 'camera=(self), microphone=(self), geolocation=(), browsing-topics=()' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains; preload' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
