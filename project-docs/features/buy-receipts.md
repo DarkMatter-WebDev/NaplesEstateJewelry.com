@@ -1,7 +1,7 @@
 # Feature: Buy Receipts (Admin)
 
-> Status: **BUILT 2026-09-30, not yet deployed.** Needs one SQL file run in
-> Supabase and a push. Everything behind the admin login (saving, the webcam,
+> Status: **DEPLOYED 2026-09-30** (SQL run and pushed by the owner; signed-out
+> checks pass on production). Everything behind the admin login (saving, the webcam,
 > the photo upload, the print station's live loop, the real printer) is
 > **unverified until the owner's first use** — see *Verification* at the end.
 
@@ -29,7 +29,8 @@ edit it, duplicate it, void it, add or replace the ID photo.
 - Receipt number (`BUY-00042`, assigned on save) and the date/time in Eastern.
 - **Seller**: name, phone, email (optional), street, city, state, ZIP, ID type,
   ID last 4, date of birth.
-- **Items purchased**: quantity, description, amount. ⛔ The amount is the
+- **Items purchased**: quantity, description, amount. The form starts with one
+  row ("+ Add item" for more) and the paper prints only the rows entered. ⛔ The amount is the
   **line total** as typed; there is no unit price. The total is the sum.
 - **Paid by**: Cash, Check (asks for the check number), Zelle, Venmo, Bank
   transfer, Store credit / trade. The **+** button adds another method for a
@@ -103,6 +104,10 @@ sheet, so it was moved beside them (measured 2026-09-30).
 
 Printing never opens a pop-up window. The receipt is placed in a hidden holder
 directly under the page body, and the print stylesheet hides everything else.
+All copies of one request go out as **one print job**, one page per copy.
+The printed sheet keeps 1 in at the sides and 0.65 in top and bottom (the
+owner's printer cut the edges at half an inch). Not more top and bottom: a
+six-item file copy with the ID photo must still fit one page.
 
 ## The print station (the desktop PC)
 
@@ -207,6 +212,13 @@ The file ends with verify queries and says what each should return.
 
 ## Rules worth keeping
 
+- ⛔ Responsive CSS on the paper is `@media screen and (…)` only. A print dialog
+  that applies its own margins makes the page about 740 px wide; an unqualified
+  `max-width` rule then restyles the PRINTOUT (stacked header, a second page —
+  the owner's first print, 2026-09-30). The printed sheet is `width: 100%` and
+  drops its own padding when the page box is narrower than Letter.
+- Check print output by rendering the real PDF, with margins 0 AND with 0.4 in
+  browser margins. An emulated-print screenshot shows neither.
 - ⛔ `@page { margin: 0 }` on the print host is deliberate. With any page
   margin Chrome prints its own header and footer (date, title, web address),
   and the kiosk print has no dialog to switch them off. The paper's own

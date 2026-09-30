@@ -1,6 +1,78 @@
 
 # Changelog
 
+## 2026-09-30 (7) — Buy Receipts: printed margins wider again — 1 in at the sides, 0.65 in top and bottom (owner: "make the margins even bigger") — rides with (5)–(6), awaiting the push
+
+- Sheet padding in print: **0.65 in top/bottom, 1 in sides** (was 0.6 / 0.7 in); when the print dialog adds its own ~0.4 in, the sheet keeps **0.25 / 0.6 in** so the total is about the same. `buy-receipt-sheet-css.ts`.
+- 0.75 in top/bottom was tried first: a six-item file copy with the ID photo then spilled onto a second page (4 pages for "2 plain + 1 with ID"). 0.65 in keeps it on one page with a little room.
+- Verified as in (6): real print-to-PDF, every page rendered, both margin modes — "2 plain + 1 with ID" of the six-item receipt → 3 pages, "2 plain" short → 2 pages, one print call each; the one-inch side margin is visible in the render. `tsc` 0 · lint 0 errors · **1591/1591** · build 0 (dev server stopped first; temporary page deleted, 0 references).
+
+## 2026-09-30 (6) — Buy Receipts: wider printed margins (the printer cut the edges) and ONE print job with a page per copy — BUILT, rides with (5), awaiting the push
+
+Owner: *"the form printed out goes too far to the edge of the page … the printer cuts off the edges.. we need to make the margins larger.. also: the 'print' function prints two independent prints jobs, one after the other.. can we simply make 2 pages print out in one print job? each form on a separate page"*.
+
+- **Margins.** The printed sheet's own padding is now **0.6 in top/bottom, 0.7 in sides** (was 0.4 / 0.5 in). When the print dialog applies its own ~0.4 in margins as well, the sheet adds **0.2 / 0.3 in** instead (was 0.04 / 0.02 in), so the content sits about 0.6–0.7 in from the paper edge either way. `buy-receipt-sheet-css.ts`, the `@media print` block and its `max-width: 800px` twin. There is still no `@page` margin: a real page margin would bring back Chrome's header and footer lines under kiosk printing.
+- **One job.** `useReceiptPrinter` (`BuyReceiptPrintHost.tsx`) now renders every copy at once — the plain copies, then the copies with the ID photo — and calls `window.print()` **once**; each sheet after the first starts on a new page (`.buy-receipt-sheet ~ .buy-receipt-sheet { break-before: page }` — `~`, not `+`, because every sheet brings its own `<style>` tag, which made the first `+` version print the copies as one continuous flow). The printer no longer pauses between copies. The station and the laptop share this code, so both changed.
+- **Verification** — real print output (headless `Page.printToPDF`, every page rendered and looked at), in both modes (margins 0, and 0.4 in browser margins): "2 plain + 1 with ID" of a 6-item receipt → **one print call, 3 pages**, each page a whole receipt, the third with the ID beside the signatures; "2 plain" of a short receipt → one call, 2 pages, the second page starting with the header. Content inset from the paper edge: 0.7 in sides / 0.6 in top in the zero-margin print. `tsc` 0 · lint 0 errors · **1591/1591** · build 0 (dev server stopped first; temporary preview page deleted, 0 references).
+- ⚠️ Not verified on the owner's printer: whether 0.7 in clears its cut-off, and the single job. `TASKS.md` top.
+
+## 2026-09-30 (5) — Buy Receipts: the form starts with ONE item row; the printed receipt is one page again (the small-screen layout was reaching paper) — BUILT, awaiting the push
+
+Owner: *"lets change the form so that by default it only shows one item field row, not 3"*, then (with a print-preview screenshot of BUY-00001) *"move the 'Purchase receipt / No. / Date' text to the top right, in line with the logo and company information, so we can save vertical space and make the sheet print as 1 page… currently it prints that last line on a second page"*.
+
+**What the screenshot showed.** On the owner's print the header was stacked (receipt number under the logo) and the seller fields ran two per row. That is the paper's small-screen layout (`@media (max-width: 760px)`). Reproduced here: when the print dialog applies its own margins (0.4 in each side) the page box is about 740 px wide, the rule matches, the sheet grows taller and "Thank you…" lands on a second page — `Page.printToPDF` with 0.4 in margins gave **2 pages** for all three test receipts and a render identical to the owner's screenshot. With the page's own `@page { margin: 0 }` honoured the layout was already correct, which is why the 09-30 (1) check did not catch it. ⚠️ That check verified only the zero-margin path and an *emulated* print screenshot.
+
+**Changes**
+- `buy-receipt-sheet-css.ts`: the small-screen block is now `@media screen and (max-width: 760px)`, so it can never reach paper. The header (logo + name on the left, "Purchase receipt / No. / Date" top right) therefore prints on one line in every case.
+- The printed sheet is `width: 100%` of the page box (was a fixed 8.5 in, which would be clipped if margins are applied), with `padding: 0.4in 0.5in`; and under `@media print and (max-width: 800px)` — i.e. the browser added margins — the paper's own padding is dropped instead of being added to them.
+- Tighter spacing on screen and paper: section titles 12 / 8 px, attestation 12 px, signature block 14 px above with 12 px between lines, thank-you line 12 px.
+- **The form starts with one item row** (`BUY_RECEIPT_FORM_ROWS = 1`, was 3); "+ Add item" adds more; opening a saved receipt for editing shows exactly its lines.
+- **The paper prints only the lines that were entered** — the two blank numbered rows it used to pad on are gone (they cost ~78 px, and empty numbered lines on a signed receipt invite additions).
+- File copy with the ID: label shortened to "Seller ID · file copy only" (one line) and the thank-you line omitted on that copy (it stays in the shop).
+
+**Verification**
+- Real print output, headless Chrome `Page.printToPDF`, each PDF rendered to PNG with Chrome's PDF viewer and looked at: the void test receipt, a 6-item receipt, and the 6-item file copy with an ID image → **1 page each, in BOTH modes** (margins 0, and 0.4 in browser margins); header on one line with the number top right; three seller fields per row. Before the fix the browser-margins mode was 2 / 2 / 2 pages.
+- Form, owner's Chrome on `localhost:3007` (signed in): a new form shows **1** item row; two "+ Add item" → 3; remove → 2; removing every row leaves 1.
+- From `next-app/`: `npx tsc --noEmit` 0 · `npm run lint` 0 errors (the same 3 older warnings) · `npm run test` **1591/1591** · `npm run build` 0 (dev server stopped first). The temporary preview page used for the print check is deleted (source and build manifest: 0 references).
+- ⚠️ Not verified: the owner's own print dialog after the deploy (one page, header on one line). `TASKS.md` top.
+
+**Tool notes.** A printed PDF can be looked at by opening the `.pdf` in a headless Chrome tab (`file:///…pdf#toolbar=0&view=Fit`) and taking a screenshot. `Emulation.setEmulatedMedia({ media: 'print' })` at a Letter-sized viewport is NOT a real print: it cannot show a print dialog's margins.
+
+## 2026-09-30 (4) — Buy Receipts: a live test receipt saved, edited and voided on production (BUY-00001, ~10:29 AM ET)
+
+Owner: *"save a test receipt"* (after Claude offered one and said it would be voided afterwards). Driven in the owner's Chrome on production; the tab was closed afterwards. Nothing was sent to the printer.
+
+- **Saved** through the form: seller "Test Receipt", two lines ("TEST ONLY - not a real purchase" $1.00, qty 2 "TEST ONLY - second line" $2.00), a split payment (Cash $1.00 + Check #0000 $2.00; the green "Payments add up to $3.00" line showed), a note. Result panel: **Receipt saved · BUY-00001 · Total paid $3.00 · Paid by Cash $1.00 · Check #0000 $2.00 · ID photo None**. → the generated `receipt_number` column, the `jsonb` items/payments and the insert under the admin session all work on production.
+- **Receipt page** `/admin/buy-receipts/390c47a1-d937-4302-8c79-c5a474b2c5c4`: the paper shows No. BUY-00001, "Date: Sep 30, 2026 · 10:29 AM", both lines, the total and the paid-by line; the row read back matches (`status recorded`, `total 3`, `created_by_email` set, no print request).
+- **Edited** (Edit → changed the note → Save changes): the note updated, the number and date did not change.
+- **Voided** (reason "Test receipt created to verify the feature. Not a real purchase."): VOID mark + the reason line on the paper; Edit and Void disappear, Print / Duplicate remain. A `PUT` afterwards → **409** "A void receipt cannot be edited. Duplicate it instead."; the row still reads `total 3`.
+- **Log:** "1 receipt" — BUY-00001 · Test Receipt · Cash $1.00 · Check #0000 $2.00 · $3.00 · tags Void / Not printed / No ID photo.
+- ℹ️ Small wart seen: with no address typed, the paper's "City, state, ZIP" line prints "FL" on its own, because the form starts with the state filled in. Cosmetic; not changed.
+- ⚠️ **Still unverified:** the webcam capture, the ID photo upload, and any real printing (the desktop shortcut, two copies, the file copy with the ID). BUY-00001 stays in the log as a void test record; the first real receipt will be BUY-00002.
+
+## 2026-09-30 (3) — Buy Receipts live-verified SIGNED IN (read-only, owner's Chrome, ~10:20 AM ET); the ID bucket confirmed private
+
+Owner: *"try the 2nd chrome instance i just opened up.. admin is logged in"*. One browser connected (`4845baac…`); one tab opened on production and closed afterwards. Nothing was saved, sent or printed.
+
+- **New receipt** `/admin/buy-receipts`: title "Admin - Buy Receipts | Naples Estate Jewelry"; the three tabs (New receipt current); "Buy Receipts" in the admin menu; the paper with "Seller" / "Items purchased", 3 item rows, "No. assigned on save", "Date: Sep 30, 2026 · 10:19 AM" (Eastern); the logo loaded (157 px); buttons Use webcam · Choose a photo · + Add item · Clear · Print here · Save · Save and send to desktop printer; `document.featurePolicy.allowsFeature('camera')` → **true**.
+- **Log** `/admin/buy-receipts/log`: "No receipts yet" (no red "could not be loaded" line); `GET /api/admin/buy-receipts` → **200, 0 receipts** (the route + the `authenticated` grant + the admin RLS policy work together); `GET …/<unknown uuid>` → 404 "Receipt not found."
+- **Print station** `/admin/buy-receipts/station`: opens as "This computer is not the print station". To watch one real poll, the station flag was set for 8 seconds (safe: zero receipts exist, so nothing could print) and then removed: status **"Connected · checked 10:20:09 AM"**, heading **Ready**, a fresh check every ~4 s, "No receipts yet today." → the browser-direct Supabase path (session hydration + RLS + grant) works on production. Flag restored to absent; the page again says it is not the station.
+- **ID bucket is private** (anon, read-only): `…/storage/v1/object/public/buy-receipt-ids/…` → `NoSuchBucket` "Bucket not found", while the same request against `product-images` → `NoSuchKey` "Object not found" (a public bucket); anon list of `buy-receipt-ids` → `[]`. This closes the `public = false` check left open in (2).
+- ⚠️ **Still unverified** (they write data or need hardware): saving a receipt, the webcam capture, the photo upload, a station actually printing, the kiosk shortcut on the real printer.
+
+## 2026-09-30 (2) — Buy Receipts: SQL run by the owner, pushed + DEPLOYED, live-verified signed out (~8:45 AM ET)
+
+Owner: *"ran sql, got this.. ok to push?"* (screenshot: the four `buy receipt ids` Storage policies), then *"pushed and deployed, verify it live"*.
+
+- **SQL:** the owner ran `supabase/buy-receipts-2026-09.sql`. Their screenshot showed the four bucket policies (delete / read / update / upload) — that query is near the end of the file, so everything before it ran. Checked from here with the public (anon) key, read-only: `GET /rest/v1/buy_receipts` → **401 `42501` permission denied** (the table exists and refuses signed-out visitors); control `GET /rest/v1/buy_receipts_does_not_exist` → **404 `PGRST205`**. ◻ Not seen: the `storage.buckets` row with `public = false` (the editor shows one result at a time) — one-line query handed to the owner.
+- **Staging before the push:** fresh dry run 0 to copy / 0 Extras / 1187 total.
+- **Live, signed out, `https://naplesestatejewelry.com`:**
+  - `/admin/buy-receipts`, `/log`, `/station`, `/<uuid>`, `/es/admin/buy-receipts` → **307**; the station's `Location: /account/sign-in`.
+  - All eight handlers (GET/POST list, PUT `[id]`, `print-request`, `printed`, `void`, `id-photo` POST + DELETE) → **401** `{"error":"Sign in required."}` — a 401 rather than a 404 is what proves the new build is the one serving.
+  - `Permissions-Policy: camera=(self), microphone=(self), geolocation=(), browsing-topics=()` on `/` and on the station URL.
+  - No regression: `/`, `/shop`, `/gold-services`, `/silver-services`, `/free-evaluation`, `/sell/naples`, `/es`, `/contact` → **200**; the CSP header is present; `/gold-services` title unchanged ("Sell Gold in Naples, FL — Gold Buyer | Naples Estate Jewelry").
+- ⚠️ **Signed-in checks NOT done:** no Chrome was connected to this session (`list_connected_browsers` → empty), and the in-app pane cannot pass the sign-in page. Still unverified: the form saving, the Log reading under the admin session, the webcam, the photo upload, the station and the printer. `TASKS.md` top.
+
 ## 2026-09-30 (1) — NEW: Admin → Buy Receipts (counter form on the laptop, print station on the desktop, seller ID photo, split payments) — BUILT, awaiting the SQL + the push
 
 Owner: *"add a new tab section in the admin area … a buy receipt with my business logo name information etc … several areas to insert an item with fields like item quantity description and purchase amount and fields at the bottom that will be left blank for signature … automatically dated … saves it to the log … another button allows me to print from my laptop on the desktop computer that is printer connected … maybe even to print directly without having to click anything on the desktop."* Planned in plan mode with mockups; the owner's answers and revisions (2026-09-29/30) are the rules in `DECISIONS.md` top entry. Runbook: `features/buy-receipts.md`.

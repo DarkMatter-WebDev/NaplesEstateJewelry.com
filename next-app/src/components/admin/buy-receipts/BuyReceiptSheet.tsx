@@ -6,7 +6,6 @@ import { BUSINESS_NAME, cityLine, streetLine } from '@/lib/business-location';
 import { BUSINESS_EMAIL, BUSINESS_PHONE } from '@/lib/order-email-branding';
 import {
   BUY_RECEIPT_ATTESTATION,
-  BUY_RECEIPT_BLANK_ROWS,
   BUY_RECEIPT_ID_TYPES,
   BUY_RECEIPT_MAX_ITEMS,
   BUY_RECEIPT_MAX_PAYMENTS,
@@ -337,8 +336,6 @@ function EditSheet({ draft, onChange, receiptNumber, dateIso, idPhotoSlot }: Edi
 
 function PrintSheet({ receipt, idPhotoUrl, showIdPhoto }: PrintProps) {
   const items = receipt.items ?? [];
-  // The paper always shows the form's three ruled rows, even for one item.
-  const blankRows = Math.max(0, BUY_RECEIPT_BLANK_ROWS - items.length);
   const cityStateZip = [[receipt.seller_city, receipt.seller_state].filter(Boolean).join(', '), receipt.seller_zip]
     .filter(Boolean)
     .join(' ');
@@ -381,14 +378,6 @@ function PrintSheet({ receipt, idPhotoUrl, showIdPhoto }: PrintProps) {
               <td className="brs-amount brs-text">{formatCurrency(item.amount)}</td>
             </tr>
           ))}
-          {Array.from({ length: blankRows }, (_, index) => (
-            <tr key={`blank-${index}`}>
-              <td className="brs-num brs-text">{items.length + index + 1}</td>
-              <td className="brs-qty brs-text" />
-              <td className="brs-text" />
-              <td className="brs-amount brs-text" />
-            </tr>
-          ))}
         </tbody>
       </table>
 
@@ -429,13 +418,15 @@ function PrintSheet({ receipt, idPhotoUrl, showIdPhoto }: PrintProps) {
           <div className="brs-id">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={idPhotoUrl} alt="Seller ID" loading="eager" />
-            <span className="brs-label brs-sign-label">Seller ID on file · file copy, not given to the seller</span>
+            <span className="brs-label brs-sign-label">Seller ID · file copy only</span>
           </div>
         </div>
       )}
       {!(showIdPhoto && idPhotoUrl) && <SignatureBlock />}
 
-      <p className="brs-thanks">Thank you for choosing {BUSINESS_NAME}.</p>
+      {/* The thank-you line is for the seller; the file copy (with the ID) stays in the shop and needs the room. */}
+
+      {!(showIdPhoto && idPhotoUrl) && <p className="brs-thanks">Thank you for choosing {BUSINESS_NAME}.</p>}
     </div>
   );
 }

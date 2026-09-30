@@ -5,15 +5,16 @@
 
 ## ◻ OPEN — needs a human
 
-### 🔴 2026-09-30 — Buy Receipts BUILT + STAGED — owner steps, in this order (SQL first, then the push)
+### 🟡 2026-09-30 — Buy Receipts DEPLOYED (SQL run + pushed 09-30, live-verified signed out) — owner's desktop setup + first live receipt open
 
 Record: `CHANGELOG.md` 2026-09-30 (1). Runbook and the desktop shortcut: `project-docs/features/buy-receipts.md`. Rules: `DECISIONS.md` top entry.
 
-1. ◻ **Run the SQL** — Supabase → SQL editor → paste all of `supabase/buy-receipts-2026-09.sql` → Run. It ends with six verify queries; the comments above each say what it should return (1 policy · 4 grants · 0 for anon · the bucket with `public = false` · 4 bucket policies · no receipts yet). Safe to re-run.
-2. ◻ **Copy to the repo folder and push.** No environment variables. The deploy also carries the camera header change (`camera=(self)`).
+0. ◻ **Push the 09-30 (5)–(7) batch** (no SQL, no env vars): one item row in the form, wider printed margins, one print job per request, the one-page print fix. Then open BUY-00001 → Print here (default set = 2 copies) → expect **one print job of two pages**, each a whole receipt with the number top right, nothing cut at the edges. Tell Claude if the edges are still cut (and what the dialog's Margins setting says) — the sheet now keeps 1 in at the sides and 0.65 in top and bottom.
+1. ✅ **Run the SQL** (owner, 09-30; table confirmed from here: anon → 401 `42501`; the ID bucket confirmed private 09-30 — public URL answers "Bucket not found") — Supabase → SQL editor → paste all of `supabase/buy-receipts-2026-09.sql` → Run. It ends with six verify queries; the comments above each say what it should return (1 policy · 4 grants · 0 for anon · the bucket with `public = false` · 4 bucket policies · no receipts yet). Safe to re-run.
+2. ✅ **Copy to the repo folder and push** (owner, 09-30 ~8:45 AM ET; live checks pass signed out and signed in, read-only — `CHANGELOG.md` 2026-09-30 (2)–(3)). No environment variables. The deploy also carries the camera header change (`camera=(self)`).
 3. ◻ **Desktop (the printer PC), once:** make the receipt printer the Windows default, paper Letter / portrait → create the Chrome shortcut from `features/buy-receipts.md` → open it → sign in → **Use this computer as the print station** → **Test print**. One page, no web address in the margins.
 4. ◻ **Laptop, first real receipt:** Admin → Buy Receipts → fill it in → **Use webcam** (the browser asks for the camera once — Allow) → **Save and send to desktop printer**. Expect "Printed on the desktop" on the laptop and two copies at the printer.
-5. ◻ **Tell Claude what happened** at steps 3–4. Nothing behind the admin login could be tested from here (saving, the webcam, the upload, the station's loop, the real printer), so these are the first real runs.
+5. ◻ **Tell Claude what happened** at steps 3–4. Saving, editing and voiding were proven live 09-30 with test receipt BUY-00001 (void; the first real one will be BUY-00002). Still never run: the webcam, the photo upload, and real printing.
 6. ◻ **Owner + attorney: the ownership statement** printed above the seller's signature (`BUY_RECEIPT_ATTESTATION` in `next-app/src/lib/buy-receipts.ts`) — confirm or reword.
 7. ◻ **Owner + attorney: the Privacy page.** It lists what the site collects and says nothing about ID records for purchases (`next-app/src/app/[locale]/privacy/page.tsx`, "Information We Collect"). The ID photo is an in-store record, not something the website collects from visitors — decide whether a sentence is wanted. The page was NOT edited.
 8. ◻ **Owner decision, later:** how long to keep ID photos. Nothing deletes them today; "Remove" on a receipt's page deletes one.

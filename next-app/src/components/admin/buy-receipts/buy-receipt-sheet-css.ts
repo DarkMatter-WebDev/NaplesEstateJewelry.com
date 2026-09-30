@@ -31,8 +31,9 @@ export const BUY_RECEIPT_SHEET_CSS = `
 .buy-receipt-sheet .brs-head {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
   gap: 16px;
-  padding-bottom: 12px;
+  padding-bottom: 10px;
   border-bottom: 2px solid #735c00;
 }
 .buy-receipt-sheet .brs-brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
@@ -54,7 +55,7 @@ export const BUY_RECEIPT_SHEET_CSS = `
 .buy-receipt-sheet .brs-muted { color: #746b5b; }
 
 .buy-receipt-sheet .sheet-section-title {
-  margin: 16px 0 10px;
+  margin: 12px 0 8px;
   padding-bottom: 4px;
   border-bottom: 1px solid #735c00;
   font-family: var(--font-headline, Georgia), Georgia, 'Times New Roman', serif;
@@ -188,12 +189,12 @@ export const BUY_RECEIPT_SHEET_CSS = `
 .buy-receipt-sheet .brs-hint.is-off { color: #a32d2d; }
 
 .buy-receipt-sheet .brs-notes { margin-top: 10px; }
-.buy-receipt-sheet .brs-attest { margin: 16px 0 0; font-size: 11.5px; line-height: 1.5; }
+.buy-receipt-sheet .brs-attest { margin: 12px 0 0; font-size: 11.5px; line-height: 1.45; }
 .buy-receipt-sheet .brs-signatures {
   display: grid;
   grid-template-columns: 2fr 1fr;
-  gap: 18px 24px;
-  margin-top: 22px;
+  gap: 12px 24px;
+  margin-top: 14px;
   break-inside: avoid;
 }
 .buy-receipt-sheet .brs-sign-line { height: 30px; border-bottom: 1px solid #1a1c1c; }
@@ -204,10 +205,10 @@ export const BUY_RECEIPT_SHEET_CSS = `
   grid-template-columns: minmax(0, 1fr) 3.375in;
   gap: 24px;
   align-items: start;
-  margin-top: 22px;
+  margin-top: 14px;
   break-inside: avoid;
 }
-.buy-receipt-sheet .brs-sign-stack { display: grid; gap: 18px; }
+.buy-receipt-sheet .brs-sign-stack { display: grid; gap: 12px; }
 .buy-receipt-sheet .brs-id img {
   display: block;
   width: 3.375in;
@@ -217,7 +218,7 @@ export const BUY_RECEIPT_SHEET_CSS = `
   background: #fbf9f2;
 }
 
-.buy-receipt-sheet .brs-thanks { margin: 18px 0 0; text-align: center; font-size: 11px; color: #746b5b; }
+.buy-receipt-sheet .brs-thanks { margin: 12px 0 0; text-align: center; font-size: 11px; color: #746b5b; }
 
 .buy-receipt-sheet .brs-void-mark {
   position: absolute;
@@ -234,7 +235,10 @@ export const BUY_RECEIPT_SHEET_CSS = `
 }
 .buy-receipt-sheet .brs-void-line { margin: 8px 0 0; font-size: 12px; font-weight: 600; color: #a32d2d; }
 
-@media (max-width: 760px) {
+/* screen ONLY. When a print dialog applies its own margins the page is about 740px wide; without the
+   word screen this rule stacked the header and halved the field rows ON PAPER and pushed the last line to a second sheet
+   (owner's print, 2026-09-30). */
+@media screen and (max-width: 760px) {
   .buy-receipt-sheet { padding: 18px 14px; min-height: 0; }
   .buy-receipt-sheet .brs-head { flex-direction: column; }
   .buy-receipt-sheet .brs-meta { text-align: left; white-space: normal; }
@@ -266,14 +270,26 @@ export const BUY_RECEIPT_PRINT_HOST_CSS = `
   body > *:not(.buy-receipt-print-host) { display: none !important; }
   .buy-receipt-print-host { display: block !important; }
   .buy-receipt-print-host .buy-receipt-sheet {
-    width: 8.5in;
+    width: 100%;
+    max-width: none;
     min-height: 0;
     margin: 0;
+    /* The paper's own margin (there is no @page margin, see above). The owner's printer cut the
+       edges at half an inch; they asked for bigger again after 0.7 in (2026-09-30). */
+    /* 0.65in top/bottom, not more: a six-item file copy with the ID must still fit one page. */
+    padding: 0.65in 1in;
     border: 0;
     box-shadow: none;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
   .buy-receipt-print-host .no-print { display: none !important; }
+  /* Several copies in ONE print job: one sheet per page. (~ not +: each sheet brings its own <style> tag.) */
+  .buy-receipt-print-host .buy-receipt-sheet ~ .buy-receipt-sheet { break-before: page; }
+}
+/* A print dialog whose margin setting overrides ours makes the page box narrower than Letter's 816px. The
+   browser's margin (about 0.4in) is then most of the margin; the paper adds only what is missing. */
+@media print and (max-width: 800px) {
+  .buy-receipt-print-host .buy-receipt-sheet { padding: 0.25in 0.6in; }
 }
 `;

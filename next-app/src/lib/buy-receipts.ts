@@ -50,7 +50,8 @@ export const BUY_RECEIPT_ATTESTATION =
   + 'and that I have the right to sell them. I am 18 years of age or older.';
 
 export const BUY_RECEIPT_MAX_ITEMS = 20;
-export const BUY_RECEIPT_BLANK_ROWS = 3;
+/** Item rows a form starts with. Owner, 2026-09-30: one, not three — "+ Add item" adds more. */
+export const BUY_RECEIPT_FORM_ROWS = 1;
 export const BUY_RECEIPT_MAX_PAYMENTS = 4;
 export const BUY_AMOUNT_MAX = 250_000;
 export const BUY_QTY_MAX = 999;
@@ -225,7 +226,7 @@ export function blankBuyReceiptDraft(): BuyReceiptDraft {
     sellerIdType: '',
     sellerIdLast4: '',
     sellerDob: '',
-    items: Array.from({ length: BUY_RECEIPT_BLANK_ROWS }, () => ({ qty: '', description: '', amount: '' })),
+    items: Array.from({ length: BUY_RECEIPT_FORM_ROWS }, () => ({ qty: '', description: '', amount: '' })),
     payments: [{ method: '', reference: '', amount: '' }],
     notes: '',
   };
@@ -242,7 +243,7 @@ export function draftFromReceipt(row: BuyReceiptRow): BuyReceiptDraft {
     description: item.description ?? '',
     amount: moneyText(Number(item.amount ?? 0)),
   }));
-  while (items.length < BUY_RECEIPT_BLANK_ROWS) items.push({ qty: '', description: '', amount: '' });
+  while (items.length < BUY_RECEIPT_FORM_ROWS) items.push({ qty: '', description: '', amount: '' });
 
   const saved = row.payments ?? [];
   const payments: BuyReceiptDraftPayment[] = saved.map((payment) => ({
@@ -542,7 +543,7 @@ export function buyReceiptIdPhotoPath(receiptId: string, fileId: string): string
 /** Item rows plus wrapped note lines: past `BUY_RECEIPT_ONE_PAGE_LINES` the paper may need a second page. */
 export function draftPaperLines(draft: Pick<BuyReceiptDraft, 'items' | 'notes'>): number {
   const noteLines = draft.notes.trim() ? Math.ceil(draft.notes.length / 95) + (draft.notes.match(/\n/g)?.length ?? 0) : 1;
-  return Math.max(draft.items.length, BUY_RECEIPT_BLANK_ROWS) + noteLines;
+  return Math.max(draft.items.length, BUY_RECEIPT_FORM_ROWS) + noteLines;
 }
 
 /** The Print Station's "Test print": a full-looking receipt that is never stored. */

@@ -62,12 +62,15 @@ function printOnce(): Promise<void> {
   });
 }
 
-type PrintView = { receipt: BuyReceiptRow; idPhotoUrl: string | null; showIdPhoto: boolean };
+/** One sheet per entry: false = a plain copy, true = a copy carrying the seller's ID photo. */
+type PrintView = { receipt: BuyReceiptRow; idPhotoUrl: string | null; sheets: boolean[] };
 
 /**
- * `print(receipt, copies, idPhotoUrl)` prints the plain copies first, then the
- * copies that carry the seller's ID photo, and resolves with how many pages
- * were sent. Render `host` somewhere in the component — it is the printout.
+ * `print(receipt, copies, idPhotoUrl)` sends ONE print job with one page per
+ * copy — the plain copies first, then the copies that carry the seller's ID
+ * photo — and resolves with how many pages were sent. (One job per copy, the
+ * first version, meant the printer paused between copies; owner, 2026-09-30.)
+ * Render `host` somewhere in the component — it is the printout.
  *
  * No requestAnimationFrame anywhere: a covered or minimised window stops
  * painting, and the Print Station is usually behind other windows.
@@ -90,23 +93,20 @@ export function useReceiptPrinter() {
       busyRef.current = true;
       let printed = 0;
       try {
-        const passes = [
-          { showIdPhoto: false, copies: copies.plain },
-          { showIdPhoto: true, copies: idPhotoUrl ? copies.withId : 0 },
+        const sheets = [
+          ...Array.from({ length: Math.max(0, copies.plain) }, () => false),
+          ...Array.from({ length: idPhotoUrl ? Math.max(0, copies.withId) : 0 }, () => true),
         ];
-        for (const pass of passes) {
-          if (pass.copies <= 0 || !aliveRef.current) continue;
-          // Commit the paper to the DOM before looking for its images.
-          flushSync(() => setView({ receipt, idPhotoUrl, showIdPhoto: pass.showIdPhoto }));
+        if (sheets.length > 0 && aliveRef.current) {
+          // Commit every page to the DOM before looking for their images.
+          flushSync(() => setView({ receipt, idPhotoUrl, sheets }));
           const host = document.querySelector('.buy-receipt-print-host');
           await waitForImages(host ? Array.from(host.querySelectorAll('img')) : []);
           await waitForPrintLayout(window);
-          for (let copy = 0; copy < pass.copies; copy += 1) {
-            await printOnce();
-            printed += 1;
-            // Let the spooler take the page before the next one is sent.
-            await pause(400);
-          }
+          await printOnce();
+          printed = sheets.length;
+          // Let the spooler take the job before the pages are torn down.
+          await pause(400);
         }
       } finally {
         busyRef.current = false;
@@ -119,7 +119,9 @@ export function useReceiptPrinter() {
 
   const host = view ? (
     <BuyReceiptPrintHost>
-      <BuyReceiptSheet mode="print" receipt={view.receipt} idPhotoUrl={view.idPhotoUrl} showIdPhoto={view.showIdPhoto} />
+      {view.sheets.map((showIdPhoto, index) => (
+        <BuyReceiptSheet key={index} mode="print" receipt={view.receipt} idPhotoUrl={view.idPhotoUrl} showIdPhoto={showIdPhoto} />
+      ))}
     </BuyReceiptPrintHost>
   ) : null;
 

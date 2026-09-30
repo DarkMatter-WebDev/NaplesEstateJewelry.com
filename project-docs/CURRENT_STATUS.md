@@ -6,11 +6,12 @@
 
 ## Start Here (2026-09-30 — newest; the 09-28 and 09-25 blocks below still apply)
 
-- 🟡 **NEW: Admin → Buy Receipts — BUILT, not deployed.** The receipt for what the shop buys at the counter: filled in on the laptop, saved to a log, printed by the desktop "Print station" with no dialog. Split payments, an optional private seller ID photo (webcam or file), print sets with or without the ID. `CHANGELOG.md` 2026-09-30 (1); rules `DECISIONS.md` top entry; runbook `features/buy-receipts.md`.
-- 🔴 **Two owner steps before it works, in this order** (`TASKS.md` top): (1) run `supabase/buy-receipts-2026-09.sql` in the Supabase SQL editor; (2) copy + push. Then the one-time desktop shortcut and the first live test.
+- 🟢 **NEW: Admin → Buy Receipts — DEPLOYED 09-30 ~8:45 AM ET (owner ran the SQL and pushed); live-verified signed out AND signed in (read-only)** — form renders, Log reads 0 receipts, the station connects and polls, the ID bucket is private (`CHANGELOG.md` 2026-09-30 (2)–(3)). **Save / edit / void proven live with a test receipt (BUY-00001, void — `CHANGELOG.md` 2026-09-30 (4)). Not yet exercised: the webcam, the photo upload, real printing.** The receipt for what the shop buys at the counter: filled in on the laptop, saved to a log, printed by the desktop "Print station" with no dialog. Split payments, an optional private seller ID photo (webcam or file), print sets with or without the ID. `CHANGELOG.md` 2026-09-30 (1); rules `DECISIONS.md` top entry; runbook `features/buy-receipts.md`.
+- 🟡 **Open, owner** (`TASKS.md` top): the one-time desktop Chrome shortcut + "Use this computer as the print station" + Test print; the first real receipt from the laptop (webcam, Save and send); report back.
+- 🟡 **09-30 (5)+(6) — STAGED, awaiting the push (no SQL):** the form starts with one item row; wider printed margins (1 in sides, 0.65 in top/bottom — the printer cut the edges); every copy in ONE print job, one page per copy; and the printed receipt is one page again — the paper's small-screen layout was reaching the owner's printout (header stacked, last line on page two). `CHANGELOG.md` 2026-09-30 (5)–(7). After the push: print BUY-00001 again — one job, two pages, nothing cut at the edges, number top right.
 - ⚠️ **One sitewide header changed:** `Permissions-Policy` `camera=()` → `camera=(self)` (both `next.config.ts` and `netlify.toml`), so the admin webcam capture can work. No page content, title, schema or sitemap entry changed.
 - ⚠️ **Unverified until the owner's first use:** everything behind the admin login — saving, the webcam, the photo upload, the station's live loop, the real printer. Verified here: the gate, the signed-out responses, the paper's layout and behaviour, and real print output (one Letter page, plain and with ID).
-- Gate 09-30: `tsc` 0 · lint 0 errors · **1591/1591** · build 0.
+- Gate 09-30 (re-run after (7)): `tsc` 0 · lint 0 errors · **1591/1591** · build 0.
 - The 09-28 items below (Google Ads display name, D&B review, the overdue ads reads, the $500 credit follow-up by ~Oct 4) are unchanged and still open.
 
 ## Start Here (2026-09-28 — the 09-25 block below still applies)

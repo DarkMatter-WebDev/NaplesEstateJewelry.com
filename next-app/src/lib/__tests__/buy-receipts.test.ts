@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   BUY_RECEIPT_ATTESTATION,
-  BUY_RECEIPT_BLANK_ROWS,
+  BUY_RECEIPT_FORM_ROWS,
   BUY_RECEIPT_DEFAULT_PRINT_SET,
   BUY_RECEIPT_PRINT_SETS,
   blankBuyReceiptDraft,
@@ -271,9 +271,11 @@ describe('print-station helpers', () => {
 });
 
 describe('drafts and ids', () => {
-  it('starts a blank form with three rows, one payment row and Florida', () => {
+  it('starts a blank form with ONE item row, one payment row and Florida', () => {
     const blank = blankBuyReceiptDraft();
-    expect(blank.items).toHaveLength(BUY_RECEIPT_BLANK_ROWS);
+    // Owner, 2026-09-30: one row by default, and the paper prints only the lines entered.
+    expect(BUY_RECEIPT_FORM_ROWS).toBe(1);
+    expect(blank.items).toEqual([{ qty: '', description: '', amount: '' }]);
     expect(blank.payments).toHaveLength(1);
     expect(blank.sellerState).toBe('FL');
   });
@@ -281,7 +283,8 @@ describe('drafts and ids', () => {
     const row = sampleBuyReceipt('2026-09-30T18:00:00Z');
     const form = draftFromReceipt(row);
     expect(form.sellerName).toBe('Test Print');
-    expect(form.items).toHaveLength(BUY_RECEIPT_BLANK_ROWS);
+    // Exactly the saved lines: no blank rows are padded on when a receipt is opened for editing.
+    expect(form.items).toHaveLength(2);
     expect(form.items[0]).toEqual({ qty: '1', description: 'This is a test print. Nothing was saved.', amount: '100.00' });
     expect(form.payments).toEqual([{ method: 'cash', reference: '', amount: '' }]);
     // And it round-trips through the validator.
@@ -395,6 +398,11 @@ describe('buy receipts: the paper, printing and the station', () => {
     const css = components('buy-receipt-sheet-css.ts');
     expect(css).toContain('@page { size: letter; margin: 0; }');
     expect(css).toContain('body > *:not(.buy-receipt-print-host) { display: none !important; }');
+    // The small-screen layout must never reach paper: a print with browser margins is ~740px wide.
+    expect(css).toContain('@media screen and (max-width: 760px)');
+    expect(css).not.toMatch(/@media \(max-width/);
+    // The print sheet fills whatever page box it gets.
+    expect(css).toMatch(/\.buy-receipt-print-host \.buy-receipt-sheet \{\s*width: 100%;/);
     // Scoped: the paper lives inside the admin page and must not restyle it.
     expect(css).not.toMatch(/^\s*body\s*\{/m);
   });
