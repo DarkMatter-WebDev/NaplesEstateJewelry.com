@@ -56,8 +56,9 @@ Under the Email field: **Email a copy to the seller when saved** (greyed out
 until an email is typed). The seller's copy goes out through Resend as the
 receipt is saved — a light, compact receipt (small octopus logo, one details
 list, "Items purchased by Naples Estate Jewelry", the statement in the third
-person — "The seller certifies…" — and the owner's printed Received-by
-signature sharing one underline with the date), **never the ID photo**. The
+person — "The seller certifies…" — Paid by and Total on one bold line,
+"Received by:" above the owner's printed signature, which shares one underline
+with the date, and a three-line centred footer), **never the ID photo**. The
 logo is `public/assets/images/branding/email-logo.png` (PNG: Outlook cannot
 show WebP). The after-save panel says *Emailed
 to …* or shows the error with **Email now**; the receipt page has **Email to

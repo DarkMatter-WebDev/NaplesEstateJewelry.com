@@ -407,7 +407,7 @@ describe('buy receipts: the seller copy by email', () => {
     };
     const email = buildBuyReceiptEmail(row);
     expect(email.subject).toBe('Your receipt from Naples Estate Jewelry — BUY-00042');
-    for (const part of ['BUY-00042', 'Sep 30, 2026 · 2:14 PM', 'This is a test print. Nothing was saved.', '$150.00', 'Cash $100.00 · Check #2041 $50.00', 'Christopher Surette', BUY_RECEIPT_ATTESTATION_SELLER, 'Items purchased by Naples Estate Jewelry', 'Seller&rsquo;s copy', '/assets/images/branding/email-logo.png']) {
+    for (const part of ['BUY-00042', 'Sep 30, 2026 · 2:14 PM', 'This is a test print. Nothing was saved.', '$150.00', 'Paid by: Cash $100.00 · Check #2041 $50.00', 'Total paid to seller', 'Received by:', 'Christopher Surette', BUY_RECEIPT_ATTESTATION_SELLER, 'Items purchased by Naples Estate Jewelry', 'Seller&rsquo;s copy', '/assets/images/branding/email-logo.png']) {
       expect(email.html).toContain(part);
     }
     expect(email.text).toContain('Total paid to seller: $150.00');

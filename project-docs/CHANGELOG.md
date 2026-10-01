@@ -1,6 +1,22 @@
 
 # Changelog
 
+## 2026-10-01 (20) — Buy Receipts: seller email, round two (totals on one line, "Received by:" above the signature, three-line footer) — STAGED, awaiting the push (no SQL)
+
+Owner, on the deployed (18) email: *"move the dollar amount and the 'paid by' answer closer to the labels… move 'received by' up above the signature area, and add a ':'… make sure the 'date' label under the line is snug up against it, on the same line as 'Christopher Surette, Naples Estate Jewelry'… put 'thank you for choosing Naples Estate Jewelry' centered on its own line… the 'questions…' line centered on its own line too."* Then over mockups v6–v10: signature a tiny bit larger (14 → 17 px) and sitting on its rule; *"move 'total paid to seller' and its total to the right, so the dollar value lines up with the other dollar values… move 'paid by' up onto the same line and keep it anchored left… bold 'paid by: cash' similarly"*; and on the real render: the two captions under the line at the body size.
+
+- **`next-app/src/lib/buy-receipt-email.ts`**: the totals are ONE row under the items — **Paid by: Cash** (14 px bold, left) and **Total paid to seller   $150.00** (14 px bold, right; the amount flush under the item amounts). **Received by:** is a small caption above the signature rule; the 17 px cursive name sits on the rule (`line-height: 0.9`, no bottom padding) with the date right-aligned on the same rule; beneath, *Christopher Surette, Naples Estate Jewelry* (left) and *Date* (right) in the 12 px muted label style, 1 px under the rule. Footer = three centred 11 px lines: thank-you · questions/phone · site · address. The plain-text part mirrors the order (Paid by before Total; "Received by:").
+- **Test** (`buy-receipts.test.ts`): the email must contain `Paid by: Cash $100.00 · Check #2041 $50.00`, `Total paid to seller` and `Received by:`.
+- **Verification**: rendered from the sample receipt in headless Chrome at 700 px (562 px tall) and shown to the owner — the real render, not a mockup. `tsc` 0 · lint 0 errors · **1594/1594** · build 0.
+
+## 2026-09-30 (19) — (18) DEPLOYED (owner pushed); live-verified; BUY-00002 emailed again to the owner at 9:29 PM ET with the new layout
+
+Owner: *"pushed and deployed, verify it live and email BUY-00002 again"*.
+
+- **Signed out, production:** `/assets/images/branding/email-logo.png` → 200 `image/png` 15,262 B (the email's logo resolves); `/admin/buy-receipts`, `/log` → 307; the email route → 401; `/` → 200.
+- **Signed in (owner's Chrome):** BUY-00002's page shows the paper heading **Items purchased by Naples Estate Jewelry** and the paper's unchanged "I certify…" line. **Email again** → status card *Emailed to rcman12589@aol.com · Sep 30, 2026 · 9:29 PM*, no error. The log page's links did not respond to the extension's synthetic clicks once (the tab's renderer stalled on a screenshot); the button was pressed through the page's own click handler and the send went through.
+- ⚠️ Not seen from here: the email in the owner's inbox — the logo, the one-line signature + date, and "The seller certifies…" are what to look for.
+
 ## 2026-09-30 (18) — Buy Receipts: the seller's email restyled (light, compact, octopus logo, "The seller certifies…"); paper heading "Items purchased by Naples Estate Jewelry" — STAGED, awaiting the push (no SQL)
 
 Owner, after a Staples receipt email: *"shrink down some of the text on the customer receipt email.. change the colorway to a light theme… remove the outermost borders and allow the text to get closer to the edges… add a small version of our octopus logo"*, then over four mockups: drop the two-column block, shrink the signature (twice), *"re-word the 'i certify...'… right now it makes it seems like 'I certify' is referring to me, christopher surette"*, *"make sure the signature underline and date line are one"*, *"change items purchased to items purchased by Naples Estate Jewelry… rename the paper's heading too"*.

@@ -11,7 +11,11 @@
 // details list, the items table, total and paid-by, the ownership statement
 // in the third person ("The seller certifies…" — "I certify" read as if the
 // owner were certifying), and a small signature sharing ONE underline with the
-// date. Table-based HTML with inline styles so it renders in every mail app.
+// date. Round two (owner, 2026-10-01, mockup v10): "Paid by: Cash" bold on the
+// left and "Total paid to seller $x" bold on the right of ONE line, the total
+// flush under the item amounts; "Received by:" as a caption ABOVE the line; the
+// signature sitting on its rule; the footer as three centred lines.
+// Table-based HTML with inline styles so it renders in every mail app.
 import { BUSINESS_NAME, addressOneLine } from '@/lib/business-location';
 import { escapeHtml } from '@/lib/marketing-email-html';
 import { BUSINESS_PHONE, SITE_DOMAIN_LABEL, getSiteUrl } from '@/lib/order-email-branding';
@@ -69,6 +73,7 @@ export function buildBuyReceiptEmail(row: BuyReceiptRow): BuyReceiptEmail {
   const small = `font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.45;color:${INK};`;
   const label = `font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.45;color:${MUTED};`;
   const tiny = `font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:1.45;color:${MUTED};`;
+  const caption = `font-family:Arial,Helvetica,sans-serif;font-size:9.5px;line-height:1.4;letter-spacing:0.06em;text-transform:uppercase;color:${MUTED};`;
 
   const detailRows = detailLines(row)
     .map((line) => `<tr><td style="${label}padding:2px 10px 2px 0;white-space:nowrap;vertical-align:top;">${escapeHtml(line.label)}</td><td style="${small}padding:2px 0;">${escapeHtml(line.value)}</td></tr>`)
@@ -117,30 +122,29 @@ export function buildBuyReceiptEmail(row: BuyReceiptRow): BuyReceiptEmail {
                     </tr>
                     ${itemRows}
                     <tr>
-                      <td colspan="2" style="${small}padding:8px 8px 2px 0;font-size:14px;font-weight:700;">Total paid to seller</td>
-                      <td align="right" style="${small}padding:8px 0 2px 8px;font-size:14px;font-weight:700;white-space:nowrap;">${escapeHtml(total)}</td>
-                    </tr>
-                    <tr>
-                      <td colspan="2" style="${label}padding:0 8px 0 0;">Paid by</td>
-                      <td align="right" style="${small}padding:0 0 0 8px;">${escapeHtml(paid)}</td>
+                      <td style="${small}padding:8px 8px 0 0;vertical-align:bottom;font-size:14px;font-weight:700;">Paid by: ${escapeHtml(paid)}</td>
+                      <td colspan="2" align="right" style="${small}padding:8px 0 0 8px;font-size:14px;font-weight:700;white-space:nowrap;">Total paid to seller&nbsp;&nbsp;&nbsp;${escapeHtml(total)}</td>
                     </tr>
                   </table>
 
                   ${row.notes ? `<p style="${tiny}margin:10px 0 0;">Notes: ${escapeHtml(row.notes).replace(/\n/g, '<br />')}</p>` : ''}
                   <p style="${tiny}margin:10px 0 0;font-size:10.5px;line-height:1.4;">${escapeHtml(BUY_RECEIPT_ATTESTATION_SELLER)}</p>
 
-                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:12px;">
+                  <p style="${caption}margin:12px 4px 0;">Received by:</p>
+                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                     <tr>
-                      <td style="padding:0 4px 2px;border-bottom:1px solid ${INK};vertical-align:bottom;font-family:'Alex Brush','Brush Script MT','Segoe Script',cursive;font-size:14px;line-height:1.1;color:#1f2540;">${escapeHtml(BUY_RECEIPT_SIGNER_NAME)}</td>
+                      <td style="padding:0 4px 0;border-bottom:1px solid ${INK};vertical-align:bottom;font-family:'Alex Brush','Brush Script MT','Segoe Script',cursive;font-size:17px;line-height:0.9;color:#1f2540;">${escapeHtml(BUY_RECEIPT_SIGNER_NAME)}</td>
                       <td align="right" style="padding:0 4px 2px;border-bottom:1px solid ${INK};vertical-align:bottom;${tiny}color:${INK};white-space:nowrap;">${escapeHtml(signedDate)}</td>
                     </tr>
                     <tr>
-                      <td style="padding:3px 4px 0;font-family:Arial,Helvetica,sans-serif;font-size:9.5px;letter-spacing:0.06em;text-transform:uppercase;color:${MUTED};">Received by &mdash; ${escapeHtml(BUY_RECEIPT_SIGNER_NAME)}, ${escapeHtml(BUSINESS_NAME)}</td>
-                      <td align="right" style="padding:3px 4px 0;font-family:Arial,Helvetica,sans-serif;font-size:9.5px;letter-spacing:0.06em;text-transform:uppercase;color:${MUTED};">Date</td>
+                      <td style="${label}padding:1px 4px 0;">${escapeHtml(BUY_RECEIPT_SIGNER_NAME)}, ${escapeHtml(BUSINESS_NAME)}</td>
+                      <td align="right" style="${label}padding:1px 4px 0;">Date</td>
                     </tr>
                   </table>
 
-                  <p style="${tiny}margin:14px 0 0;text-align:center;">Thank you for choosing ${escapeHtml(BUSINESS_NAME)}. Questions? Reply to this email or call <span style="white-space:nowrap;">${escapeHtml(BUSINESS_PHONE)}</span>.<br /><a href="${escapeHtml(siteUrl)}" style="color:${GOLD};text-decoration:underline;">${escapeHtml(SITE_DOMAIN_LABEL)}</a> &middot; ${escapeHtml(addressOneLine())}</p>
+                  <p style="${tiny}margin:14px 0 0;text-align:center;">Thank you for choosing ${escapeHtml(BUSINESS_NAME)}.</p>
+                  <p style="${tiny}margin:2px 0 0;text-align:center;">Questions? Reply to this email or call <span style="white-space:nowrap;">${escapeHtml(BUSINESS_PHONE)}</span>.</p>
+                  <p style="${tiny}margin:2px 0 0;text-align:center;"><a href="${escapeHtml(siteUrl)}" style="color:${GOLD};text-decoration:underline;">${escapeHtml(SITE_DOMAIN_LABEL)}</a> &middot; ${escapeHtml(addressOneLine())}</p>
                 </td>
               </tr>
             </table>
@@ -161,15 +165,16 @@ export function buildBuyReceiptEmail(row: BuyReceiptRow): BuyReceiptEmail {
     `${itemsHeading}:`,
     ...items.map((item, index) => `  ${index + 1}. ${item.description} — qty ${item.qty} — ${formatCurrency(item.amount)}`),
     '',
-    `Total paid to seller: ${total}`,
     `Paid by: ${paid}`,
+    `Total paid to seller: ${total}`,
     ...(row.notes ? ['', `Notes: ${row.notes}`] : []),
     '',
     BUY_RECEIPT_ATTESTATION_SELLER,
     '',
-    `Received by — ${BUY_RECEIPT_SIGNER_NAME}, ${BUSINESS_NAME} · ${signedDate}`,
+    `Received by: ${BUY_RECEIPT_SIGNER_NAME}, ${BUSINESS_NAME} · ${signedDate}`,
     '',
-    `Thank you for choosing ${BUSINESS_NAME}. Questions? Reply to this email or call ${BUSINESS_PHONE}.`,
+    `Thank you for choosing ${BUSINESS_NAME}.`,
+    `Questions? Reply to this email or call ${BUSINESS_PHONE}.`,
     `${SITE_DOMAIN_LABEL} · ${addressOneLine()}`,
   ].join('\n');
 
