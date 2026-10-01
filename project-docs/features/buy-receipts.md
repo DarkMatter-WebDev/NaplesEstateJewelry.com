@@ -54,8 +54,12 @@ sale.
 
 Under the Email field: **Email a copy to the seller when saved** (greyed out
 until an email is typed). The seller's copy goes out through Resend as the
-receipt is saved — the same layout as the paper, the owner's printed
-Received-by line, **never the ID photo**. The after-save panel says *Emailed
+receipt is saved — a light, compact receipt (small octopus logo, one details
+list, "Items purchased by Naples Estate Jewelry", the statement in the third
+person — "The seller certifies…" — and the owner's printed Received-by
+signature sharing one underline with the date), **never the ID photo**. The
+logo is `public/assets/images/branding/email-logo.png` (PNG: Outlook cannot
+show WebP). The after-save panel says *Emailed
 to …* or shows the error with **Email now**; the receipt page has **Email to
 seller** / **Email again**; the Log shows an **Emailed** tag. A void receipt is
 not emailed. SQL: `supabase/buy-receipts-email-2026-09.sql` (`emailed_at`,

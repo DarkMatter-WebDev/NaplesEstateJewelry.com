@@ -1,6 +1,24 @@
 
 # Changelog
 
+## 2026-09-30 (18) — Buy Receipts: the seller's email restyled (light, compact, octopus logo, "The seller certifies…"); paper heading "Items purchased by Naples Estate Jewelry" — STAGED, awaiting the push (no SQL)
+
+Owner, after a Staples receipt email: *"shrink down some of the text on the customer receipt email.. change the colorway to a light theme… remove the outermost borders and allow the text to get closer to the edges… add a small version of our octopus logo"*, then over four mockups: drop the two-column block, shrink the signature (twice), *"re-word the 'i certify...'… right now it makes it seems like 'I certify' is referring to me, christopher surette"*, *"make sure the signature underline and date line are one"*, *"change items purchased to items purchased by Naples Estate Jewelry… rename the paper's heading too"*.
+
+- **The email** (`next-app/src/lib/buy-receipt-email.ts`, rewritten): white, no outer frame, 14 px side padding, 12 px Arial body (11 px muted, 15 px bold title). Header = 40 × 31 octopus + "Naples Estate Jewelry" in gold serif + address · phone. Then *Your receipt — BUY-000NN* / *Seller's copy · date*, ONE details list (Seller / Phone / Email / Address / ID — blanks left out) between two thin gold rules, **Items purchased by Naples Estate Jewelry** (Item / Qty / Amount), *Total paid to seller* (14 px bold), *Paid by*, notes, the statement in 10.5 px, then the signature (14 px cursive) and the date on ONE shared underline with *Received by — Christopher Surette, Naples Estate Jewelry* / *Date* beneath, and a two-line centred footer. The plain-text part mirrors it.
+- **Third-person statement** — new `BUY_RECEIPT_ATTESTATION_SELLER` in `buy-receipts.ts`: *"The seller certifies that they are the lawful owner of the items listed above, that the items are not stolen or subject to any lien, that they have the right to sell them, and that they are 18 years of age or older."* Used by the email only; **the paper keeps the first-person "I certify…" above the seller's own signature line** (there it IS the seller speaking). A test asserts the email never says "I certify".
+- **Logo for email** — new `next-app/public/assets/images/branding/email-logo.png` (80 × 61, 15 KB, made from `nav-logo.webp` with sharp; PNG because Outlook cannot show WebP), referenced as `https://naplesestatejewelry.com/assets/images/branding/email-logo.png` and shown at 40 × 31. It is the ONLY `<img>` in the email (the test now allows exactly one, still forbids the ID path).
+- **Paper** — `BuyReceiptSheet.tsx` section title is now *Items purchased by Naples Estate Jewelry* in edit and print modes (the owner's wording). Nothing else on the paper changed.
+- **Verification**: the email built from the sample receipt rendered in headless Chrome at 700 px (543 px tall, one short scroll; signature and date share one rule; logo loads). `tsc` 0 · lint 0 errors · **1594/1594** · build 0 · dev server restarted. ⚠️ Not sent from here: the owner's inbox is the real check — the Alex Brush face only shows where the mail app has a script font; elsewhere the name falls back to Brush Script MT / Segoe Script / cursive.
+
+## 2026-09-30 (17) — (11)–(16) DEPLOYED (owner ran the email SQL — two rows — and pushed); live-verified; test receipt BUY-00002 saved and EMAILED to the owner (~evening ET)
+
+Owner: *"ran the sql, got two rows.. ok to push?"* → staging dry run 0 → yes. Then *"pushed and deployed, verify it live, send test receipt with email to rcman12589@aol.com"*.
+
+- **Signed out, production:** `/admin/buy-receipts`, `/log` → 307; the new `[id]/email` route, the create route and the list route → 401; `/` → 200.
+- **Signed in (owner's Chrome):** the form opens with ONE item row and the printed signature already on its Received-by line. A test receipt was filled in with the owner's email, the **Email a copy to the seller when saved** box (greyed out until the email was typed) ticked, one $1 line, Cash, and saved: panel **Receipt saved · BUY-00002 · Email: Emailed to rcman12589@aol.com**. The row reads back with `emailed_to` / `emailed_at` set, and the Log lists it. BUY-00002 is left as a recorded $1 test receipt (the owner may void it from its page; it was not voided so the owner can also print it).
+- ⚠️ Not seen from here: the email in the owner's inbox (how the signature line renders in their mail app), and the shop copy on paper with the printed signature.
+
 ## 2026-09-30 (16) — Buy Receipts: "Email a copy to the seller when saved" — BUILT, needs ONE SQL file + the push (rides with (11)–(15))
 
 Owner: *"add a feature that allows admin to check a box on the buy receipt to 'send via email'.. where, if the customer has entered an email, the receipt is automatically emailed to them as well."*

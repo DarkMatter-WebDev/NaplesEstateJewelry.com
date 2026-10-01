@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   BUY_RECEIPT_ATTESTATION,
+  BUY_RECEIPT_ATTESTATION_SELLER,
   BUY_RECEIPT_FORM_ROWS,
   BUY_RECEIPT_DEFAULT_PRINT_SET,
   BUY_RECEIPT_PRINT_SETS,
@@ -406,13 +407,15 @@ describe('buy receipts: the seller copy by email', () => {
     };
     const email = buildBuyReceiptEmail(row);
     expect(email.subject).toBe('Your receipt from Naples Estate Jewelry — BUY-00042');
-    for (const part of ['BUY-00042', 'Sep 30, 2026 · 2:14 PM', 'This is a test print. Nothing was saved.', '$150.00', 'Cash $100.00 · Check #2041 $50.00', 'Christopher Surette', BUY_RECEIPT_ATTESTATION, 'Seller&rsquo;s copy']) {
+    for (const part of ['BUY-00042', 'Sep 30, 2026 · 2:14 PM', 'This is a test print. Nothing was saved.', '$150.00', 'Cash $100.00 · Check #2041 $50.00', 'Christopher Surette', BUY_RECEIPT_ATTESTATION_SELLER, 'Items purchased by Naples Estate Jewelry', 'Seller&rsquo;s copy', '/assets/images/branding/email-logo.png']) {
       expect(email.html).toContain(part);
     }
     expect(email.text).toContain('Total paid to seller: $150.00');
-    // The ID photo is never in the email, in any form.
+    // The ID photo is never in the email, in any form; the only image is the logo.
     expect(email.html).not.toContain('receipts/x/y.webp');
-    expect(email.html).not.toContain('<img');
+    expect(email.html.match(/<img /g)).toHaveLength(1);
+    // The email speaks of the seller in the third person; the paper keeps its first-person line.
+    expect(email.html).not.toContain('I certify');
     expect(email.text).not.toContain('y.webp');
     // A void receipt says so in the subject.
     expect(buildBuyReceiptEmail({ ...row, status: 'void', void_reason: 'Test' }).subject).toMatch(/^VOID — /);

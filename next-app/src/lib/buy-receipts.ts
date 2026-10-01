@@ -52,6 +52,14 @@ export const BUY_RECEIPT_ATTESTATION =
   'I certify that I am the lawful owner of the items listed above, that they are not stolen or subject to any lien, '
   + 'and that I have the right to sell them. I am 18 years of age or older.';
 
+/**
+ * The same statement in the third person, for the emailed copy — "I certify" under the
+ * owner's printed signature read as if the owner were certifying (owner, 2026-09-30).
+ */
+export const BUY_RECEIPT_ATTESTATION_SELLER =
+  'The seller certifies that they are the lawful owner of the items listed above, that the items are not stolen or '
+  + 'subject to any lien, that they have the right to sell them, and that they are 18 years of age or older.';
+
 export const BUY_RECEIPT_MAX_ITEMS = 20;
 /** Item rows a form starts with. Owner, 2026-09-30: one, not three — "+ Add item" adds more. */
 export const BUY_RECEIPT_FORM_ROWS = 1;

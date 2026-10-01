@@ -284,7 +284,7 @@ function EditSheet({ draft, onChange, receiptNumber, dateIso, idPhotoSlot, email
       </div>
       {idPhotoSlot}
 
-      <h2 className="sheet-section-title">Items purchased</h2>
+      <h2 className="sheet-section-title">Items purchased by {BUSINESS_NAME}</h2>
       <table className="brs-items">
         <thead>
           <tr>
@@ -426,7 +426,7 @@ function PrintSheet({ receipt, idPhotoUrl, showIdPhoto, variant = 'shop' }: Prin
         <div className="brs-c3"><span className="brs-label">Date of birth</span><Value>{formatDob(receipt.seller_dob)}</Value></div>
       </div>
 
-      <h2 className="sheet-section-title">Items purchased</h2>
+      <h2 className="sheet-section-title">Items purchased by {BUSINESS_NAME}</h2>
       <table className="brs-items">
         <thead>
           <tr>
