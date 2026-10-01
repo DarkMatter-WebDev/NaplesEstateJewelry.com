@@ -362,8 +362,8 @@ describe('buy receipts: database and storage rules', () => {
 describe('buy receipts: routes', () => {
   const files = routeFiles(join(root, 'src', 'app', 'api', 'admin', 'buy-receipts'));
 
-  it('has the six routes', () => {
-    expect(files).toHaveLength(6);
+  it('has the seven routes', () => {
+    expect(files).toHaveLength(7);
   });
 
   it('gates every handler on requireAdmin and never reaches for the service role', () => {
@@ -388,6 +388,44 @@ describe('buy receipts: routes', () => {
     expect(route).toContain("cacheControl: '0'");
     // A replace removes the previous object.
     expect(route).toContain('bucket.remove([previous])');
+  });
+});
+
+describe('buy receipts: the seller copy by email', () => {
+  it('builds the seller copy as an email: number, lines, total, paid-by, the signed line, never the ID', async () => {
+    const { buildBuyReceiptEmail } = await import('../buy-receipt-email');
+    const row = {
+      ...sampleBuyReceipt('2026-09-30T18:14:00Z'),
+      receipt_number: 'BUY-00042',
+      seller_email: 'maria@example.com',
+      seller_id_photo_path: 'receipts/x/y.webp',
+      payments: [
+        { method: 'cash' as const, reference: null, amount: 100 },
+        { method: 'check' as const, reference: '2041', amount: 50 },
+      ],
+    };
+    const email = buildBuyReceiptEmail(row);
+    expect(email.subject).toBe('Your receipt from Naples Estate Jewelry — BUY-00042');
+    for (const part of ['BUY-00042', 'Sep 30, 2026 · 2:14 PM', 'This is a test print. Nothing was saved.', '$150.00', 'Cash $100.00 · Check #2041 $50.00', 'Christopher Surette', BUY_RECEIPT_ATTESTATION, 'Seller&rsquo;s copy']) {
+      expect(email.html).toContain(part);
+    }
+    expect(email.text).toContain('Total paid to seller: $150.00');
+    // The ID photo is never in the email, in any form.
+    expect(email.html).not.toContain('receipts/x/y.webp');
+    expect(email.html).not.toContain('<img');
+    expect(email.text).not.toContain('y.webp');
+    // A void receipt says so in the subject.
+    expect(buildBuyReceiptEmail({ ...row, status: 'void', void_reason: 'Test' }).subject).toMatch(/^VOID — /);
+  });
+
+  it('is sent through the admin routes only, never attaching the photo', () => {
+    const route = read('src', 'app', 'api', 'admin', 'buy-receipts', '[id]', 'email', 'route.ts');
+    expect(route).toContain('requireAdmin()');
+    expect(route).not.toContain('createServiceClient');
+    const mailer = read('src', 'lib', 'buy-receipt-mailer.ts');
+    expect(mailer).toContain("replyTo: 'info@naplesestatejewelry.com'");
+    expect(mailer).not.toContain('attachments');
+    expect(mailer).not.toContain('seller_id_photo_path');
   });
 });
 

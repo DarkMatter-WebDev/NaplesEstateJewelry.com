@@ -108,6 +108,9 @@ export const BUY_RECEIPT_SHEET_CSS = `
 .buy-receipt-sheet .sheet-input:focus { border-bottom-color: #735c00; background: #fffdf3; box-shadow: 0 1px 0 #735c00; }
 .buy-receipt-sheet .sheet-input::placeholder { color: #a79e8b; }
 .buy-receipt-sheet .brs-right { text-align: right; }
+.buy-receipt-sheet .brs-email-copy { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 11.5px; color: #746b5b; cursor: pointer; }
+.buy-receipt-sheet .brs-email-copy input { width: 14px; height: 14px; margin: 0; accent-color: #735c00; }
+.buy-receipt-sheet .brs-email-copy:has(input:disabled) { opacity: 0.55; cursor: default; }
 
 .buy-receipt-sheet .brs-value {
   display: block;
@@ -243,12 +246,57 @@ export const BUY_RECEIPT_SHEET_CSS = `
 /* screen ONLY. When a print dialog applies its own margins the page is about 740px wide; without the
    word screen this rule stacked the header and halved the field rows ON PAPER and pushed the last line to a second sheet
    (owner's print, 2026-09-30). */
+/* Tablet: the paper fills the screen, the header stacks, fields go two per row. */
 @media screen and (max-width: 760px) {
   .buy-receipt-sheet { padding: 18px 14px; min-height: 0; }
   .buy-receipt-sheet .brs-head { flex-direction: column; }
   .buy-receipt-sheet .brs-meta { text-align: left; white-space: normal; }
   .buy-receipt-sheet .brs-grid > * { grid-column: span 6; }
   .buy-receipt-sheet .brs-grid > .brs-c5, .buy-receipt-sheet .brs-grid > .brs-c6 { grid-column: span 12; }
+}
+
+/* Phone (owner, 2026-09-30: usable on tablet and mobile too). One field per row;
+   each item row becomes a small block — description across, then qty, amount and
+   the remove button; each payment row the same. */
+@media screen and (max-width: 520px) {
+  .buy-receipt-sheet { padding: 14px 10px; font-size: 14px; }
+  .buy-receipt-sheet .brs-grid { gap: 8px; }
+  .buy-receipt-sheet .brs-grid > * { grid-column: span 12; }
+  .buy-receipt-sheet .brs-items thead { display: none; }
+  .buy-receipt-sheet .brs-items,
+  .buy-receipt-sheet .brs-items tbody { display: block; }
+  .buy-receipt-sheet .brs-items tr {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) minmax(0, 1fr) 30px;
+    grid-template-areas: 'num desc desc desc' 'num qty amount tools';
+    gap: 4px 6px;
+    padding: 6px 0;
+    border-bottom: 1px solid #eadfbd;
+  }
+  .buy-receipt-sheet .brs-items td { display: block; width: auto; padding: 0; border: 0; }
+  .buy-receipt-sheet .brs-items td.brs-num { grid-area: num; align-self: start; padding-top: 6px; }
+  .buy-receipt-sheet .brs-items td.brs-qty { grid-area: qty; }
+  .buy-receipt-sheet .brs-items td.brs-amount { grid-area: amount; }
+  .buy-receipt-sheet .brs-items td.brs-tools { grid-area: tools; align-self: center; text-align: right; }
+  .buy-receipt-sheet .brs-items td.brs-desc { grid-area: desc; }
+  .buy-receipt-sheet .brs-items .brs-qty input::placeholder { color: #a79e8b; }
+  .buy-receipt-sheet .brs-pay-row {
+    grid-template-columns: minmax(0, 1fr) 28px;
+    grid-template-areas: 'method tools' 'reference reference' 'amount amount';
+  }
+  .buy-receipt-sheet .brs-pay-row > select { grid-area: method; }
+  .buy-receipt-sheet .brs-pay-row > :nth-child(2) { grid-area: reference; }
+  .buy-receipt-sheet .brs-pay-row > :nth-child(3) { grid-area: amount; }
+  .buy-receipt-sheet .brs-pay-row > :nth-child(4) { grid-area: tools; }
+  .buy-receipt-sheet .brs-pay-row > span:empty { display: none; }
+  .buy-receipt-sheet .brs-total { gap: 12px; }
+  .buy-receipt-sheet .brs-signatures { grid-template-columns: 1fr; gap: 14px; }
+  .buy-receipt-sheet .brs-signature { font-size: 28px; }
+}
+
+/* Touch screens: 16px inputs, or iOS zooms the page on every tap into a field. */
+@media screen and (hover: none) and (pointer: coarse) {
+  .buy-receipt-sheet .sheet-input { font-size: 16px; }
 }
 `;
 

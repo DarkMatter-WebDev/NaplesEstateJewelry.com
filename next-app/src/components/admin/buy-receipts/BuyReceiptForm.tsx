@@ -17,7 +17,7 @@ import { formatCurrency } from '@/types/sales';
 import BuyReceiptSheet from './BuyReceiptSheet';
 import IdPhotoField from './IdPhotoField';
 import ReceiptPrintControls, { PrintSetSelect, printSetAllowed } from './ReceiptPrintControls';
-import { createReceipt, uploadIdPhoto } from './buy-receipt-client';
+import { createReceipt, emailReceipt, uploadIdPhoto } from './buy-receipt-client';
 
 /**
  * Admin → Buy Receipts → New receipt (owner mockups 2026-09-29/30).
@@ -31,6 +31,7 @@ import { createReceipt, uploadIdPhoto } from './buy-receipt-client';
 
 type Action = 'save' | 'send' | 'print';
 type Saved = { receipt: BuyReceiptRow; action: 'send' | 'print' | null; setKey: BuyReceiptPrintSetKey };
+type EmailState = { status: 'sent'; to: string } | { status: 'failed'; error: string } | null;
 
 const hintStyle = { color: 'var(--color-on-surface-variant)' } as const;
 const cardStyle = { borderColor: 'var(--color-outline-variant)' } as const;
@@ -55,6 +56,9 @@ export default function BuyReceiptForm({
   const [saved, setSaved] = useState<Saved | null>(null);
   const [photoFailed, setPhotoFailed] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
+  const [emailCopy, setEmailCopy] = useState(false);
+  const [emailState, setEmailState] = useState<EmailState>(null);
+  const [emailing, setEmailing] = useState(false);
 
   const hasPhoto = photo !== null;
   const setKey = printSetAllowed(chosenSet, hasPhoto) ? chosenSet : BUY_RECEIPT_DEFAULT_PRINT_SET;
@@ -77,6 +81,8 @@ export default function BuyReceiptForm({
     setError(null);
     setSaved(null);
     setPhotoFailed(null);
+    setEmailCopy(false);
+    setEmailState(null);
   }
 
   async function submit(action: Action) {
@@ -86,10 +92,11 @@ export default function BuyReceiptForm({
       setError(check.error);
       return;
     }
+    const wantsEmail = emailCopy && Boolean(draft.sellerEmail.trim());
     setBusy(action);
     setError(null);
 
-    const created = await createReceipt(draft, duplicatedFrom?.id ?? null);
+    const created = await createReceipt(draft, duplicatedFrom?.id ?? null, wantsEmail);
     if ('error' in created) {
       setError(`${created.error} Nothing was saved.`);
       setBusy(null);
@@ -97,6 +104,13 @@ export default function BuyReceiptForm({
     }
 
     let receipt = created.receipt;
+    if (wantsEmail) {
+      setEmailState(
+        created.emailed
+          ? { status: 'sent', to: receipt.emailed_to ?? draft.sellerEmail.trim() }
+          : { status: 'failed', error: created.emailError ?? 'The receipt could not be emailed.' },
+      );
+    }
     if (photo) {
       const uploaded = await uploadIdPhoto(receipt.id, photo.blob);
       if ('error' in uploaded) setPhotoFailed(uploaded.error);
@@ -121,6 +135,19 @@ export default function BuyReceiptForm({
     setSaved({ ...saved, receipt: uploaded.receipt });
   }
 
+  async function emailNow() {
+    if (!saved || emailing) return;
+    setEmailing(true);
+    const result = await emailReceipt(saved.receipt.id);
+    setEmailing(false);
+    if ('error' in result) {
+      setEmailState({ status: 'failed', error: result.error });
+      return;
+    }
+    setEmailState({ status: 'sent', to: result.receipt.emailed_to ?? saved.receipt.seller_email ?? '' });
+    setSaved({ ...saved, receipt: result.receipt });
+  }
+
   if (saved) {
     const { receipt } = saved;
     return (
@@ -138,6 +165,23 @@ export default function BuyReceiptForm({
           <div className="flex justify-between gap-3"><span style={hintStyle}>Items</span><span className="text-right">{receipt.items.length}</span></div>
           <div className="flex justify-between gap-3"><span style={hintStyle}>Paid by</span><span className="text-right">{paymentsLine(receipt.payments)}</span></div>
           <div className="flex justify-between gap-3"><span style={hintStyle}>ID photo</span><span className="text-right">{receipt.seller_id_photo_path ? 'Attached' : 'None'}</span></div>
+          <div className="flex items-center justify-between gap-3">
+            <span style={hintStyle}>Email</span>
+            <span className="flex items-center gap-2 text-right">
+              {emailState?.status === 'sent' ? (
+                <span style={{ color: 'var(--color-primary)' }}>Emailed to {emailState.to}</span>
+              ) : emailState?.status === 'failed' ? (
+                <span style={{ color: 'var(--color-error)' }}>{emailState.error}</span>
+              ) : (
+                <span>{receipt.seller_email ? 'Not emailed' : 'No email address'}</span>
+              )}
+              {receipt.seller_email && emailState?.status !== 'sent' && (
+                <button type="button" className="outline-button text-xs" disabled={emailing} onClick={() => void emailNow()}>
+                  {emailing ? 'Sending…' : 'Email now'}
+                </button>
+              )}
+            </span>
+          </div>
           <div className="flex justify-between gap-3 border-t pt-3 text-xl font-bold" style={{ ...cardStyle, fontFamily: 'var(--font-headline)' }}><span>Total paid</span><span>{formatCurrency(receipt.total)}</span></div>
         </div>
 
@@ -189,6 +233,8 @@ export default function BuyReceiptForm({
         idPhotoSlot={
           <IdPhotoField previewUrl={photo?.url ?? null} onPick={pickPhoto} onRemove={() => setPhoto(null)} />
         }
+        emailCopy={emailCopy}
+        onEmailCopyChange={setEmailCopy}
       />
 
       <div className="mx-auto mt-4 grid gap-2" style={{ width: 'min(8.5in, 100%)' }}>

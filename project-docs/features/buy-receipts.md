@@ -39,16 +39,37 @@ edit it, duplicate it, void it, add or replace the ID photo.
 - Notes: one line tall, grows only if more is typed.
 - The ownership statement (`BUY_RECEIPT_ATTESTATION` in `lib/buy-receipts.ts`).
   ⚠️ Owner: confirm this wording with your attorney.
-- **Shop copy**: blank "sign and date" lines — *Seller signature | Date* and
-  *Received by | Date* — signed by hand by both and kept on file.
-- **Seller's copy**: *Received by — Christopher Surette, Naples Estate Jewelry*
+- **Shop copy**: blank *Seller signature | Date* lines for the seller, kept on
+  file. Below them, *Received by — Christopher Surette, Naples Estate Jewelry*
   with the name printed in cursive (Alex Brush, `src/lib/signature-font.ts`;
-  name in `BUY_RECEIPT_SIGNER_NAME`) and the receipt date on the line beside
-  it. No seller line, never the ID photo. Nobody signs twice.
+  name in `BUY_RECEIPT_SIGNER_NAME`) and the receipt date beside it.
+- **Seller's copy**: the same printed Received-by line, no seller line, never
+  the ID photo. **The owner never signs anything**; the seller signs once.
 
 Only the seller's **first and last name**, **one item** and **how it was paid**
 are required. Everything else may be left blank so the form never holds up a
 sale.
+
+## Emailing the seller their copy
+
+Under the Email field: **Email a copy to the seller when saved** (greyed out
+until an email is typed). The seller's copy goes out through Resend as the
+receipt is saved — the same layout as the paper, the owner's printed
+Received-by line, **never the ID photo**. The after-save panel says *Emailed
+to …* or shows the error with **Email now**; the receipt page has **Email to
+seller** / **Email again**; the Log shows an **Emailed** tag. A void receipt is
+not emailed. SQL: `supabase/buy-receipts-email-2026-09.sql` (`emailed_at`,
+`emailed_to`). Code: `src/lib/buy-receipt-email.ts` (the email, pure),
+`src/lib/buy-receipt-mailer.ts` (Resend + the stamp),
+`app/api/admin/buy-receipts/[id]/email/route.ts`.
+
+## On a tablet or a phone
+
+The form reflows: on a tablet the header stacks and fields go two per row; on
+a phone (under 520 px) one field per row, each item row becomes a small block
+(description, then qty / amount / remove), payments stack, and inputs are 16 px
+so iOS does not zoom. The webcam starts with the rear camera there. The print
+output is unchanged — every reflow rule is `@media screen`.
 
 ## Seller ID photo
 
@@ -127,7 +148,7 @@ photo must still fit one page.
 2. Create a desktop shortcut with this target (one line):
 
    ```
-   "C:\Program Files\Google\Chrome\Application\chrome.exe" --user-data-dir="%LOCALAPPDATA%\NEJ Print Station" --kiosk-printing --disable-backgrounding-occluded-windows --disable-background-timer-throttling --disable-renderer-backgrounding --app=https://naplesestatejewelry.com/admin/buy-receipts/station
+   "C:\Program Files\Google\Chrome\Application\chrome.exe" --user-data-dir="%LOCALAPPDATA%\NEJStation" --kiosk-printing --disable-backgrounding-occluded-windows --disable-background-timer-throttling --app=https://naplesestatejewelry.com/admin/buy-receipts/station
    ```
 
 3. Open it. Sign in once (the sign-in stays in that separate Chrome profile).
@@ -142,8 +163,13 @@ photo must still fit one page.
 - `--user-data-dir=…` gives the station its **own Chrome**. Without it, if the
   everyday Chrome is already open, Windows just hands it the address and the
   kiosk switch is silently ignored — the dialog comes back.
-- The three `--disable-…` switches stop Chrome from putting the station to
-  sleep when another window covers it.
+- 253 characters: the Windows "Create Shortcut" wizard cuts a target off at
+  259 (the owner hit it, 2026-09-30).
+- The two `--disable-…` switches are the cure for a slow print: Chrome holds a
+  covered or background window's `print()` and slows its timers. A job sent from
+  the laptop sat for over a minute when the station ran as a background tab in
+  the everyday Chrome (2026-09-30). Keep the station in its own window from
+  this shortcut, and do not minimise it.
 - `--app=…` opens it as a plain window with no address bar.
 - ⛔ Always open the station from the shortcut. Opened from the everyday Chrome
   it still works, but it shows the print dialog.
@@ -220,7 +246,7 @@ The file ends with verify queries and says what each should return.
 |---|---|
 | Rules, types, validator, print sets, dates | `next-app/src/lib/buy-receipts.ts` |
 | Tests (42) incl. source guards | `next-app/src/lib/__tests__/buy-receipts.test.ts` |
-| Routes | `next-app/src/app/api/admin/buy-receipts/` — `route.ts` (POST, GET), `[id]/route.ts` (GET, PUT), `[id]/print-request`, `[id]/printed`, `[id]/void`, `[id]/id-photo` (POST, DELETE) |
+| Routes | `next-app/src/app/api/admin/buy-receipts/` — `route.ts` (POST, GET), `[id]/route.ts` (GET, PUT), `[id]/print-request`, `[id]/printed`, `[id]/void`, `[id]/id-photo` (POST, DELETE), `[id]/email` |
 | Pages | `next-app/src/app/[locale]/admin/buy-receipts/` — `page.tsx`, `log/`, `[id]/`, `station/` |
 | The paper (edit + print) | `components/admin/buy-receipts/BuyReceiptSheet.tsx` + `buy-receipt-sheet-css.ts` |
 | Printing in place | `components/admin/buy-receipts/BuyReceiptPrintHost.tsx` (`useReceiptPrinter`) |
@@ -234,6 +260,10 @@ The file ends with verify queries and says what each should return.
 
 ## Rules worth keeping
 
+- ⛔ Anything printed from the hidden holder that needs a web font must call
+  `ensureSignatureFont()` (or the same pattern) before `print()`: a hidden
+  element never fetches a font, and printing does not wait for one. The
+  owner's first signature printed in a plain face because of this (2026-09-30).
 - ⛔ Responsive CSS on the paper is `@media screen and (…)` only. A print dialog
   that applies its own margins makes the page about 740 px wide; an unqualified
   `max-width` rule then restyles the PRINTOUT (stacked header, a second page —

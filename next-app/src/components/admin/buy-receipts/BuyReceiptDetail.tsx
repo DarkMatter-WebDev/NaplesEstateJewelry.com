@@ -15,7 +15,7 @@ import {
 import BuyReceiptSheet from './BuyReceiptSheet';
 import IdPhotoField from './IdPhotoField';
 import ReceiptPrintControls from './ReceiptPrintControls';
-import { removeIdPhoto, updateReceipt, uploadIdPhoto, useIdPhotoUrl, voidReceipt } from './buy-receipt-client';
+import { emailReceipt, removeIdPhoto, updateReceipt, uploadIdPhoto, useIdPhotoUrl, voidReceipt } from './buy-receipt-client';
 
 /**
  * One saved receipt: the paper, its ID photo, and what can be done with it —
@@ -39,6 +39,8 @@ export default function BuyReceiptDetail({ adminBasePath, initialReceipt }: { ad
   const [voidReason, setVoidReason] = useState('');
   const [voidError, setVoidError] = useState<string | null>(null);
   const [voidBusy, setVoidBusy] = useState(false);
+  const [emailing, setEmailing] = useState(false);
+  const [emailNote, setEmailNote] = useState<{ text: string; ok: boolean } | null>(null);
 
   const idPhotoUrl = useIdPhotoUrl(receipt.seller_id_photo_path);
   const isVoid = receipt.status === 'void';
@@ -86,6 +88,20 @@ export default function BuyReceiptDetail({ adminBasePath, initialReceipt }: { ad
       return;
     }
     setReceipt(result.receipt);
+  }
+
+  async function emailSeller() {
+    if (emailing) return;
+    setEmailing(true);
+    setEmailNote(null);
+    const result = await emailReceipt(receipt.id);
+    setEmailing(false);
+    if ('error' in result) {
+      setEmailNote({ text: result.error, ok: false });
+      return;
+    }
+    setReceipt(result.receipt);
+    setEmailNote({ text: `Emailed to ${result.receipt.emailed_to ?? receipt.seller_email}`, ok: true });
   }
 
   async function confirmVoid() {
@@ -165,9 +181,19 @@ export default function BuyReceiptDetail({ adminBasePath, initialReceipt }: { ad
               <ReceiptPrintControls receipt={receipt} onChanged={setReceipt} />
             </div>
 
+            {emailNote && (
+              <p role={emailNote.ok ? 'status' : 'alert'} className="text-right text-sm" style={{ color: emailNote.ok ? 'var(--color-primary)' : 'var(--color-error)' }}>
+                {emailNote.text}
+              </p>
+            )}
             <div className="flex flex-wrap items-center gap-2">
               <Link href={`${adminBasePath}/buy-receipts/log`} className="outline-button text-xs">Back to the log</Link>
               <span className="flex-1" />
+              {!isVoid && receipt.seller_email && (
+                <button type="button" className="outline-button text-xs" disabled={emailing} onClick={() => void emailSeller()}>
+                  {emailing ? 'Sending…' : receipt.emailed_at ? 'Email again' : 'Email to seller'}
+                </button>
+              )}
               <Link href={`${adminBasePath}/buy-receipts?from=${receipt.id}`} className="outline-button text-xs">Duplicate</Link>
               {!isVoid && (
                 <>
@@ -188,6 +214,7 @@ export default function BuyReceiptDetail({ adminBasePath, initialReceipt }: { ad
           {receipt.updated_at !== receipt.created_at && (
             <div className="flex justify-between gap-3"><span style={hintStyle}>Last change</span><span className="text-right">{formatReceiptDateTime(receipt.updated_at)}{receipt.updated_by_email ? ` by ${receipt.updated_by_email}` : ''}</span></div>
           )}
+          <div className="flex justify-between gap-3"><span style={hintStyle}>Email</span><span className="text-right">{receipt.emailed_at ? `Emailed to ${receipt.emailed_to} · ${formatReceiptDateTime(receipt.emailed_at)}` : receipt.seller_email ? 'Not emailed' : 'No email address'}</span></div>
           <div className="flex justify-between gap-3"><span style={hintStyle}>Printing</span><span className="text-right">{receiptPrintLabel(receipt)}{receipt.printed_at ? ` · last ${formatReceiptDateTime(receipt.printed_at)}` : ''}</span></div>
           {isVoid && (
             <div className="flex justify-between gap-3" style={{ color: 'var(--color-error)' }}><span>Void</span><span className="text-right">{receipt.void_reason}{receipt.voided_at ? ` · ${formatReceiptDateTime(receipt.voided_at)}` : ''}</span></div>

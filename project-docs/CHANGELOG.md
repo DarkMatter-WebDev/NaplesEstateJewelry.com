@@ -1,6 +1,64 @@
 
 # Changelog
 
+## 2026-09-30 (16) — Buy Receipts: "Email a copy to the seller when saved" — BUILT, needs ONE SQL file + the push (rides with (11)–(15))
+
+Owner: *"add a feature that allows admin to check a box on the buy receipt to 'send via email'.. where, if the customer has entered an email, the receipt is automatically emailed to them as well."*
+
+- **The box** sits under the Email field on the paper (screen only, never printed), greyed out until an email is typed. When ticked, the save route emails the seller their copy right after the row is inserted; the after-save panel shows *Emailed to …*, or the error with an **Email now** retry. A failed email never costs the receipt.
+- **The email** (`src/lib/buy-receipt-email.ts`, pure): the SELLER'S copy — header, number + Eastern date + "Seller's copy", the seller lines that were filled in, items, total, paid-by, notes, the attestation, the Received-by line with the owner's name (cursive where the mail app has a script face; Alex Brush is not embedded in email) and the receipt date, thank-you + contact footer. **Never the ID photo, no attachments, no links to the photo.** Subject *Your receipt from Naples Estate Jewelry — BUY-000NN*; a void receipt is marked VOID (the manual route refuses to send one).
+- **Sending** (`src/lib/buy-receipt-mailer.ts`, server): Resend, from `noreply@naplesestatejewelry.com`, reply-to `info@`, same as the order receipts; stamps `emailed_at` / `emailed_to`. Routes: the create route takes `emailCopy: true`; new `POST /api/admin/buy-receipts/[id]/email` ("Email to seller" / "Email again" on the receipt page). The Log shows an **Emailed** tag; the receipt page's status card shows when and to whom.
+- **SQL** — `supabase/buy-receipts-email-2026-09.sql`: `emailed_at timestamptz`, `emailed_to text`. ⛔ Run BEFORE the push: every receipt read selects them.
+- **Verification**: unit test of the email builder (number, lines, total, paid-by line, signer, attestation, "Seller's copy", VOID subject; the ID path appears nowhere and there is no `<img>`); route guards (admin gate, no service role, no attachments); the box on a temporary preview page: present, disabled with no email, enabled and ticked once an email is typed; the email HTML rendered in the pane looks like the paper. `tsc` 0 · lint 0 errors · **1594/1594** · build 0. Temporary page deleted.
+- ⚠️ No real email was sent from here. The first real send is the owner's (tick the box on a receipt with their own address, or use **Email to seller** on BUY-00002+; the void test receipt is refused).
+
+## 2026-09-30 (15) — The buy-receipt form works on a tablet and a phone (owner: "usable on both tablet and mobile too, if admin chooses") — BUILT, rides with (11)–(14)
+
+- `buy-receipt-sheet-css.ts`: the tablet block (≤760 px, screen only) already stacked the header and put fields two per row. New phone block (≤520 px): one field per row; each item row becomes a small block — description across, then qty, amount and the remove button; each payment row the same (method + "+"/"×", then check number, then amount); signature cells one per row; slightly tighter padding. `.sheet-input` is 16 px on touch screens (`hover: none` + `pointer: coarse`) so iOS does not zoom on every tap — the sitewide rule is overridden by the paper's own 13 px, so the paper needs its own.
+- `IdPhotoCapture.tsx`: the webcam starts with the rear camera on a phone or tablet (`facingMode: { ideal: 'environment' }`); a laptop ignores it.
+- `BuyReceiptSheet.tsx`: the description cell has a class (`brs-desc`) so the phone grid can place it in both modes.
+- **Verified** on a temporary page in headless Chrome at 390 × 844 (phone), 768 × 1024 (tablet) and 1280 (laptop): no horizontal overflow at any width; phone: sheet 366 px wide, description field 310 px, amount below the description, the buttons inside the screen; tablet: three fields per row, items in a table, buttons in one row. Screenshots sent to the owner. The print output is untouched (all of this is `@media screen`). `tsc` 0 · lint 0 errors · 1592/1592 · build 0. Temporary page deleted.
+- ⚠️ Not tried on a real phone or tablet; the owner's iPhone check is the proof (saving, the camera prompt, Print here = the share sheet).
+
+## 2026-09-30 (14) — The shop copy's "Received by" line is pre-signed and pre-dated too: the owner never signs — BUILT, rides with (11)–(13)
+
+Owner: *"can we also pre-print my signature on the store copy, so i dont ever have to sign anything?"* and *"auto fill my date on the store copy too, if you recommend it as safe"* — recommended as safe: the date beside the printed signature is the receipt's own date, already printed at the top; the seller still writes their own date by hand.
+
+- `BuyReceiptSheet.tsx`: one `SignedReceivedBy` (cursive name + receipt date) is used on EVERY copy — the plain shop copy, the shop copy with the ID photo (in its stacked pair), the seller's copy, and the on-screen form. The seller's own *Seller signature | Date* lines stay blank on the shop copies. `SignatureBlock` now takes `dateIso`.
+- `tsc` 0 · lint 0 errors · 1592/1592 · build 0. Not printed on paper yet.
+
+## 2026-09-30 (13) — The printed signature came out in a plain face: the cursive font was never fetched for a hidden sheet; the printer now waits for it — BUILT, rides with (11)–(12)
+
+Owner: *"my printed signature came out as regular font.. not cursive... when it printed finally"*.
+
+- **Cause.** The seller's copy is rendered inside the print holder, which is `display: none` on screen. A hidden element never makes the browser download a font, and `window.print()` does not wait for fonts — so on a browser that had not shown the face yet (the station's own profile, or a Log page, which never shows the sheet), the signature printed in the fallback face. The (10) live check saw the *declared* family name, not a loaded font.
+- **Fix.** `ensureSignatureFont()` in `BuyReceiptPrintHost.tsx`: `document.fonts.load('32px ' + the face)` + `document.fonts.ready`, capped at 4 s. It runs when any page with a printer mounts (warm-up) and again inside `print()` alongside the image wait, before `window.print()`.
+- **Verified** with a FRESH headless Chrome profile (no font cache): a seller's-copy print → the PDF embeds `AlexBrush-Regular`, and the rendered page shows the cursive signature. `tsc` 0 · lint 0 errors · 1592/1592 · build 0. Temporary preview page deleted.
+- ⚠️ Not seen on paper yet — the owner prints again after the push.
+
+## 2026-09-30 (12) — A job took over a minute to print: the station was a background tab in the everyday Chrome; the two background switches go back into the (still wizard-sized) shortcut
+
+Owner: *"i did try and print from the laptop through the receipt log.. it took what seemed like over a minute for the job to print out from the desktop though"* (before pushing (11)).
+
+- **Cause.** The station is switched on in the desk's everyday Chrome (found in (10)), as a tab that was not in front. Chrome holds a background tab's `window.print()` until the tab is shown and slows the tab's timers to once a minute; the request was picked up (the station's Web Worker clock keeps polling) but the print itself waited. With the tab in front earlier that day the station checked every ~4 s.
+- **Fix.** The shortcut target in `StationSetupHelp.tsx` (and `features/buy-receipts.md`) is now **253 characters** — under the wizard's 259 — and keeps `--disable-backgrounding-occluded-windows` and `--disable-background-timer-throttling`; only `--disable-renderer-backgrounding` was dropped. The shortcut's own window prints silently and is never a background tab. The owner was given the target in chat; the on-page box updates with the push. `tsc` 0 · lint 0 errors · 1592/1592 · build 0.
+
+## 2026-09-30 (11) — Station shortcut shortened to fit the Windows "Create Shortcut" wizard — BUILT, awaiting the push
+
+Owner: *"i cant properly set up the desktop shortcut… the field cuts it short.. the field wont allow all the characters"* (screenshot of the wizard). The wizard's location box stops at 259 characters; the full target with the three anti-throttling switches was longer.
+
+- `StationSetupHelp.tsx` (`stationShortcutTarget`) now gives a 175-character target: `chrome.exe`, `--user-data-dir="%LOCALAPPDATA%\NEJStation"`, `--kiosk-printing`, `--app=…/station`. The `--disable-backgrounding-occluded-windows`, `--disable-background-timer-throttling` and `--disable-renderer-backgrounding` switches were dropped — the station keeps its own Web Worker clock, so they were belt and braces. `features/buy-receipts.md` carries the same short target.
+- The owner was given the short target in chat straight away; the on-page box catches up with the next push. `tsc` 0 · lint 0 errors · 1592/1592 · build 0.
+
+## 2026-09-30 (10) — (8)+(9) DEPLOYED (owner ran the seller-copy SQL, pushed) and live-verified, signed out and signed in
+
+Owner: *"ran the sql, got this result (screenshot) and i good to push and deploy?"* — the verify query showed `print_copies_seller · integer · 1`; staging re-checked (dry run 0) → yes. Then *"pushed and deployed, verify it live"*.
+
+- **Signed out, production:** `/admin/buy-receipts`, `/log`, `/station` → 307; list + print-request routes → 401; `/`, `/shop`, `/gold-services` → 200; camera header live.
+- **Signed in (owner's Chrome, production):** the Log loads (no error line — the new column is read fine); the row shows **Print here · Send to printer · Open**; the API returns `print_copies_seller: 1` on BUY-00001. **Print here** on BUY-00001 with `window.print` stood in by a stub → **one print call, two sheets in the job**: (1) *Shop copy* — four blank lines labelled Seller signature / Date / Received by — Naples Estate Jewelry / Date, no thank-you; (2) *Seller's copy* — "Christopher Surette" in the loaded **Alex Brush** face, "Sep 30, 2026" on the date line beside it, the thank-you line. The row's count went 9 → 11.
+- 🔎 **The station page in that Chrome (the desk Chrome, `4845baac…`) opened as "Ready"** — so the station is switched ON in the owner's everyday Chrome, which was never started with `--kiosk-printing`. That is exactly why the print dialog appears on the desktop. The "Set up printing with no dialog" box (with the shortcut and Copy) is on that page; the fix is to open the station from the shortcut's own Chrome and switch it on THERE (and off in the everyday one).
+- ⚠️ Still not seen on paper: the cursive signature on the owner's printer, and whether the dialog is gone on the desktop once the station runs from the shortcut.
+
 ## 2026-09-30 (9) — Buy Receipts: a SHOP copy and a SELLER'S copy (the owner's signature printed in cursive), "sign and date" lines — BUILT, needs ONE SQL line + the push (rides with (8))
 
 Owner: *"instead of printing two copies of the exact same receipt, we should print two copies, one with the signature fields for me to keep, and then one that has my signature already filled in at the bottom… find a cursive font and use that for my signature instead.. Christopher Surette"* → font pick **Alex Brush** (of Great Vibes / Alex Brush / Mr Dafoe, rendered with the name), no seller line on the seller's copy → *"move the date up onto the line after the signature, as you'd usually see on a 'sign and date' field"*.

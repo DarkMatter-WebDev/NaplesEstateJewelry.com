@@ -34,8 +34,26 @@ function json(method: string, body: unknown): RequestInit {
   return { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) };
 }
 
-export function createReceipt(draft: BuyReceiptDraft, duplicatedFrom: string | null): Promise<ReceiptResult> {
-  return call('/api/admin/buy-receipts', json('POST', { ...draft, duplicatedFrom }), 'Could not save the receipt.');
+export type CreateReceiptResult = { receipt: BuyReceiptRow; emailed: boolean; emailError: string | null } | { error: string };
+
+/** `emailCopy` asks the server to email the seller their copy as part of the save. */
+export async function createReceipt(
+  draft: BuyReceiptDraft,
+  duplicatedFrom: string | null,
+  emailCopy = false,
+): Promise<CreateReceiptResult> {
+  try {
+    const res = await fetch('/api/admin/buy-receipts', json('POST', { ...draft, duplicatedFrom, emailCopy }));
+    const data = (await res.json().catch(() => ({}))) as { receipt?: BuyReceiptRow; error?: string; emailed?: boolean; emailError?: string | null };
+    if (!res.ok || !data.receipt) return { error: data.error ?? 'Could not save the receipt.' };
+    return { receipt: data.receipt, emailed: data.emailed === true, emailError: data.emailError ?? null };
+  } catch {
+    return { error: OFFLINE };
+  }
+}
+
+export function emailReceipt(id: string): Promise<ReceiptResult> {
+  return call(`/api/admin/buy-receipts/${id}/email`, json('POST', {}), 'The receipt could not be emailed.');
 }
 
 export function updateReceipt(id: string, draft: BuyReceiptDraft): Promise<ReceiptResult> {

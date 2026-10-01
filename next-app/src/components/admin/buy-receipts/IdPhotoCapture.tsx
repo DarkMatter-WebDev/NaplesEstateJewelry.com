@@ -60,6 +60,8 @@ export default function IdPhotoCapture({ onCapture, onClose }: { onCapture: (pho
         audio: false,
         video: {
           ...(wanted ? { deviceId: { exact: wanted } } : {}),
+          // On a phone or tablet start with the rear camera; a laptop ignores this.
+          facingMode: wanted ? undefined : { ideal: 'environment' },
           width: { ideal: 1920 },
           height: { ideal: 1080 },
         },

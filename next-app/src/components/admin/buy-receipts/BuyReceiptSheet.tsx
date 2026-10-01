@@ -51,6 +51,9 @@ type EditProps = {
   dateIso: string;
   /** The "Seller ID photo" strip: a screen-only control, never printed. */
   idPhotoSlot?: ReactNode;
+  /** "Send via email" (owner, 2026-09-30): a screen-only box under the email field. */
+  emailCopy?: boolean;
+  onEmailCopyChange?: (checked: boolean) => void;
 };
 
 type PrintProps = {
@@ -124,9 +127,15 @@ function Header({ receiptNumber, dateIso, copyTag }: { receiptNumber: string | n
 }
 
 /** The seller's copy: the shop has already signed and dated. */
-function SignedBlock({ dateIso }: { dateIso: string }) {
+/**
+ * "Received by": the owner's signature and the receipt's date, printed — on
+ * EVERY copy (owner, 2026-09-30: "so i dont ever have to sign anything"). The
+ * date is the receipt's own date, the one already printed at the top.
+ * Two grid cells: the caller's grid gives them their widths.
+ */
+function SignedReceivedBy({ dateIso }: { dateIso: string }) {
   return (
-    <div className="brs-signatures">
+    <>
       <div>
         <div className="brs-sign-line brs-signature-ink">
           <span className={`${signatureFont.className} brs-signature`}>{BUY_RECEIPT_SIGNER_NAME}</span>
@@ -139,13 +148,14 @@ function SignedBlock({ dateIso }: { dateIso: string }) {
         </div>
         <span className="brs-label brs-sign-label">Date</span>
       </div>
-    </div>
+    </>
   );
 }
 
-function SignatureBlock() {
+/** The seller signs and dates by hand. Two grid cells. */
+function SellerSignAndDate() {
   return (
-    <div className="brs-signatures">
+    <>
       <div>
         <div className="brs-sign-line" />
         <span className="brs-label brs-sign-label">Seller signature</span>
@@ -154,14 +164,25 @@ function SignatureBlock() {
         <div className="brs-sign-line" />
         <span className="brs-label brs-sign-label">Date</span>
       </div>
-      <div>
-        <div className="brs-sign-line" />
-        <span className="brs-label brs-sign-label">Received by — {BUSINESS_NAME}</span>
-      </div>
-      <div>
-        <div className="brs-sign-line" />
-        <span className="brs-label brs-sign-label">Date</span>
-      </div>
+    </>
+  );
+}
+
+/** The seller's copy: only the shop's printed signature. */
+function SignedBlock({ dateIso }: { dateIso: string }) {
+  return (
+    <div className="brs-signatures">
+      <SignedReceivedBy dateIso={dateIso} />
+    </div>
+  );
+}
+
+/** The shop copy: the seller signs above the shop's printed signature. */
+function SignatureBlock({ dateIso }: { dateIso: string }) {
+  return (
+    <div className="brs-signatures">
+      <SellerSignAndDate />
+      <SignedReceivedBy dateIso={dateIso} />
     </div>
   );
 }
@@ -170,7 +191,7 @@ function Value({ children }: { children?: ReactNode }) {
   return <span className="brs-value">{children || ' '}</span>;
 }
 
-function EditSheet({ draft, onChange, receiptNumber, dateIso, idPhotoSlot }: EditProps) {
+function EditSheet({ draft, onChange, receiptNumber, dateIso, idPhotoSlot, emailCopy = false, onEmailCopyChange }: EditProps) {
   // Set when the owner picks "Check", so the check-number field takes focus as it appears.
   const focusCheckRow = useRef<number | null>(null);
 
@@ -210,10 +231,23 @@ function EditSheet({ draft, onChange, receiptNumber, dateIso, idPhotoSlot }: Edi
           <span className="brs-label">Phone</span>
           <input className="sheet-input" value={draft.sellerPhone} inputMode="tel" autoComplete="off" onChange={(e) => set({ sellerPhone: e.target.value })} />
         </label>
-        <label className="brs-c4">
-          <span className="brs-label">Email (optional)</span>
-          <input className="sheet-input" value={draft.sellerEmail} inputMode="email" autoComplete="off" placeholder="name@example.com" onChange={(e) => set({ sellerEmail: e.target.value })} />
-        </label>
+        <div className="brs-c4">
+          <label className="block">
+            <span className="brs-label">Email (optional)</span>
+            <input className="sheet-input" value={draft.sellerEmail} inputMode="email" autoComplete="off" placeholder="name@example.com" onChange={(e) => set({ sellerEmail: e.target.value })} />
+          </label>
+          {onEmailCopyChange && (
+            <label className="no-print brs-email-copy">
+              <input
+                type="checkbox"
+                checked={emailCopy}
+                disabled={!draft.sellerEmail.trim()}
+                onChange={(e) => onEmailCopyChange(e.target.checked)}
+              />
+              <span>Email a copy to the seller when saved</span>
+            </label>
+          )}
+        </div>
         <label className="brs-c6">
           <span className="brs-label">Street</span>
           <input className="sheet-input" value={draft.sellerStreet} autoComplete="off" onChange={(e) => set({ sellerStreet: e.target.value })} />
@@ -268,7 +302,7 @@ function EditSheet({ draft, onChange, receiptNumber, dateIso, idPhotoSlot }: Edi
               <td className="brs-qty">
                 <input className="sheet-input" value={item.qty} inputMode="numeric" placeholder="1" aria-label={`Row ${index + 1} quantity`} onChange={(e) => setItem(index, { qty: e.target.value })} />
               </td>
-              <td>
+              <td className="brs-desc">
                 <input className="sheet-input" value={item.description} placeholder="Description" aria-label={`Row ${index + 1} description`} onChange={(e) => setItem(index, { description: e.target.value })} />
               </td>
               <td className="brs-amount">
@@ -359,7 +393,7 @@ function EditSheet({ draft, onChange, receiptNumber, dateIso, idPhotoSlot }: Edi
       </div>
 
       <p className="brs-attest">{BUY_RECEIPT_ATTESTATION}</p>
-      <SignatureBlock />
+      <SignatureBlock dateIso={dateIso} />
       <p className="brs-thanks">Thank you for choosing {BUSINESS_NAME}.</p>
     </div>
   );
@@ -407,7 +441,7 @@ function PrintSheet({ receipt, idPhotoUrl, showIdPhoto, variant = 'shop' }: Prin
             <tr key={index}>
               <td className="brs-num brs-text">{index + 1}</td>
               <td className="brs-qty brs-text">{item.qty}</td>
-              <td className="brs-text">{item.description}</td>
+              <td className="brs-desc brs-text">{item.description}</td>
               <td className="brs-amount brs-text">{formatCurrency(item.amount)}</td>
             </tr>
           ))}
@@ -437,24 +471,10 @@ function PrintSheet({ receipt, idPhotoUrl, showIdPhoto, variant = 'shop' }: Prin
         <div className="brs-sign-with-id">
           <div className="brs-sign-stack">
             <div className="brs-sign-pair">
-              <div>
-                <div className="brs-sign-line" />
-                <span className="brs-label brs-sign-label">Seller signature</span>
-              </div>
-              <div>
-                <div className="brs-sign-line" />
-                <span className="brs-label brs-sign-label">Date</span>
-              </div>
+              <SellerSignAndDate />
             </div>
             <div className="brs-sign-pair">
-              <div>
-                <div className="brs-sign-line" />
-                <span className="brs-label brs-sign-label">Received by — {BUSINESS_NAME}</span>
-              </div>
-              <div>
-                <div className="brs-sign-line" />
-                <span className="brs-label brs-sign-label">Date</span>
-              </div>
+              <SignedReceivedBy dateIso={receipt.created_at} />
             </div>
           </div>
           <div className="brs-id">
@@ -464,7 +484,7 @@ function PrintSheet({ receipt, idPhotoUrl, showIdPhoto, variant = 'shop' }: Prin
           </div>
         </div>
       )}
-      {!sellerCopy && !withId && <SignatureBlock />}
+      {!sellerCopy && !withId && <SignatureBlock dateIso={receipt.created_at} />}
 
       {/* The thank-you line is for the seller; the shop copy stays in the shop and needs the room. */}
       {sellerCopy && <p className="brs-thanks">Thank you for choosing {BUSINESS_NAME}.</p>}

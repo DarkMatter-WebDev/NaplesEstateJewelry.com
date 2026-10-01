@@ -193,6 +193,7 @@ export default function BuyReceiptLog({ adminBasePath, initialRows }: { adminBas
                         {isVoid && <Tag tone="red">Void</Tag>}
                         {pending ? <Tag tone="gold">Waiting for the desktop</Tag> : <Tag tone={row.print_count > 0 ? 'green' : 'grey'}>{receiptPrintLabel(row)}</Tag>}
                         {!row.seller_id_photo_path && <Tag tone="grey">No ID photo</Tag>}
+                        {row.emailed_at && <Tag tone="green">Emailed</Tag>}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">

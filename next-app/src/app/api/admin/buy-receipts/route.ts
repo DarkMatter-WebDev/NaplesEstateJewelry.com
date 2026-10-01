@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
+import { sendBuyReceiptEmail } from '@/lib/buy-receipt-mailer';
 import {
   BUY_RECEIPT_COLUMNS,
   buyReceiptContentColumns,
@@ -9,7 +10,8 @@ import {
 } from '@/lib/buy-receipts';
 
 /**
- * Admin → Buy Receipts. POST saves a new receipt; GET lists / searches the log.
+ * Admin → Buy Receipts. POST saves a new receipt (and, with `emailCopy: true`
+ * and a seller email, emails the seller their copy); GET lists / searches the log.
  *
  * Runs on requireAdmin()'s request-scoped client (the `authenticated` role), so
  * the table's admin RLS policy AND its grant are what let this work — see
@@ -47,7 +49,26 @@ export async function POST(req: Request) {
     console.error('[buy-receipts] insert failed', error?.message);
     return NextResponse.json({ error: 'Could not save the receipt. Nothing was recorded.' }, { status: 500 });
   }
-  return NextResponse.json({ receipt: data as unknown as BuyReceiptRow }, { status: 201 });
+  let receipt = data as unknown as BuyReceiptRow;
+
+  // "Send via email" (owner, 2026-09-30): the seller's copy goes out as the
+  // receipt is saved. A failed email never costs the receipt — it is reported.
+  let emailed = false;
+  let emailError: string | null = null;
+  if (body?.emailCopy === true) {
+    if (!receipt.seller_email) {
+      emailError = 'No email address was entered for the seller.';
+    } else {
+      const sent = await sendBuyReceiptEmail({ supabase: admin.supabase, receipt });
+      if (sent.ok) {
+        receipt = sent.receipt;
+        emailed = true;
+      } else {
+        emailError = sent.error;
+      }
+    }
+  }
+  return NextResponse.json({ receipt, emailed, emailError }, { status: 201 });
 }
 
 export async function GET(req: Request) {

@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import { BUY_RECEIPT_PRINT_WATCHDOG_MS, type BuyReceiptCopies, type BuyReceiptRow } from '@/lib/buy-receipts';
 import { waitForImages, waitForPrintLayout } from '@/lib/print-images';
+import { signatureFont } from '@/lib/signature-font';
 import BuyReceiptSheet from './BuyReceiptSheet';
 import { BUY_RECEIPT_PRINT_HOST_CSS } from './buy-receipt-sheet-css';
 
@@ -27,6 +28,23 @@ export function BuyReceiptPrintHost({ children }: { children: ReactNode }) {
     </div>,
     document.body,
   );
+}
+
+/**
+ * The cursive signature face must be IN the browser before `print()` runs.
+ * The seller's copy lives in a hidden holder, and a hidden element does not
+ * make the browser fetch a font — so the first print of the evening went out in
+ * the fallback face (owner, 2026-09-30: "my printed signature came out as
+ * regular font"). Asking the font set to load it fetches the file regardless of
+ * visibility; four seconds is the most a print will wait for it.
+ */
+export async function ensureSignatureFont(): Promise<void> {
+  if (typeof document === 'undefined' || !document.fonts) return;
+  const spec = `32px ${signatureFont.style.fontFamily}`;
+  await Promise.race([
+    document.fonts.load(spec).then(() => document.fonts.ready).then(() => undefined),
+    new Promise<void>((resolve) => window.setTimeout(resolve, 4_000)),
+  ]).catch(() => undefined);
 }
 
 function pause(ms: number): Promise<void> {
@@ -91,6 +109,8 @@ export function useReceiptPrinter() {
 
   useEffect(() => {
     aliveRef.current = true;
+    // Warm the signature face now, so the first print does not have to wait for it.
+    void ensureSignatureFont();
     return () => {
       aliveRef.current = false;
     };
@@ -113,7 +133,7 @@ export function useReceiptPrinter() {
           // Commit every page to the DOM before looking for their images.
           flushSync(() => setView({ receipt, idPhotoUrl, sheets }));
           const host = document.querySelector('.buy-receipt-print-host');
-          await waitForImages(host ? Array.from(host.querySelectorAll('img')) : []);
+          await Promise.all([waitForImages(host ? Array.from(host.querySelectorAll('img')) : []), ensureSignatureFont()]);
           await waitForPrintLayout(window);
           const { blockedMs } = await printOnce();
           if (aliveRef.current) setDialogSuspected(blockedMs > DIALOG_SUSPECTED_MS);

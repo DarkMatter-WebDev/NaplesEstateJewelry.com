@@ -184,6 +184,8 @@ export type BuyReceiptRow = {
   print_copies_plain: number;
   print_copies_with_id: number;
   print_copies_seller: number;
+  emailed_at: string | null;
+  emailed_to: string | null;
   print_claimed_at: string | null;
   print_claimed_by: string | null;
   printed_at: string | null;
@@ -203,7 +205,7 @@ export type BuyReceiptRow = {
 export const BUY_RECEIPT_COLUMNS =
   'id, seq, receipt_number, status, seller_name, seller_phone, seller_email, seller_street, seller_city, seller_state, '
   + 'seller_zip, seller_id_type, seller_id_last4, seller_dob, seller_id_photo_path, items, total, payments, notes, '
-  + 'print_requested_at, print_requested_by, print_copies_plain, print_copies_with_id, print_copies_seller, print_claimed_at, '
+  + 'print_requested_at, print_requested_by, print_copies_plain, print_copies_with_id, print_copies_seller, emailed_at, emailed_to, print_claimed_at, '
   + 'print_claimed_by, printed_at, print_count, void_reason, voided_at, voided_by, duplicated_from, created_by, '
   + 'created_by_email, updated_by_email, created_at, updated_at';
 
@@ -591,6 +593,8 @@ export function sampleBuyReceipt(nowIso: string): BuyReceiptRow {
     print_copies_plain: 1,
     print_copies_with_id: 0,
     print_copies_seller: 0,
+    emailed_at: null,
+    emailed_to: null,
     print_claimed_at: null,
     print_claimed_by: null,
     printed_at: null,

@@ -14,11 +14,17 @@ import { getSiteUrl } from '@/lib/order-email-branding';
  * `--kiosk-printing` sends that straight to the Windows default printer.
  */
 export function stationShortcutTarget(): string {
+  // 253 characters: Windows' Create Shortcut wizard cuts a target at 259 (the
+  // owner hit it, 2026-09-30). The two background switches stay because they are
+  // the cure for "it took a minute to print": Chrome holds a covered or
+  // background window's print() and slows its timers; a job sat for over a
+  // minute in the everyday Chrome that evening. `--disable-renderer-backgrounding`
+  // was the one dropped to fit.
   return (
     '"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" '
-    + '--user-data-dir="%LOCALAPPDATA%\\NEJ Print Station" '
+    + '--user-data-dir="%LOCALAPPDATA%\\NEJStation" '
     + '--kiosk-printing '
-    + '--disable-backgrounding-occluded-windows --disable-background-timer-throttling --disable-renderer-backgrounding '
+    + '--disable-backgrounding-occluded-windows --disable-background-timer-throttling '
     + `--app=${getSiteUrl()}/admin/buy-receipts/station`
   );
 }
