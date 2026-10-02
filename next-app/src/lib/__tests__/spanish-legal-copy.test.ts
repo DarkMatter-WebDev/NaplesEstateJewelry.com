@@ -8,9 +8,11 @@ describe('Spanish legal policy copy', () => {
     // /terms).
     expect(Object.keys(SPANISH_LEGAL_COPY)).toHaveLength(6);
 
-    for (const page of Object.values(SPANISH_LEGAL_COPY)) {
+    for (const [key, page] of Object.entries(SPANISH_LEGAL_COPY)) {
       expect(page.title).toBeTruthy();
-      expect(page.updated).toBe('19 de junio de 2026');
+      // Privacy + Cookie Preferences were rewritten 2026-10-02 for the Google
+      // Ads measurement (lib/ads-tracking.ts); the other four are unchanged.
+      expect(page.updated).toBe(key === 'privacy' || key === 'cookie-preferences' ? '2 de octubre de 2026' : '19 de junio de 2026');
       expect(page.sections.length).toBeGreaterThan(0);
       for (const section of page.sections) {
         expect(section.title).toBeTruthy();

@@ -21,6 +21,13 @@ import {
   type LocationArea,
   type PreferredContact,
 } from '@/lib/inquiry-fields';
+import {
+  adClickLines,
+  adClickSubjectSuffix,
+  adClickSummary,
+  parseAdClickIds,
+  type AdClickIds,
+} from '@/lib/ads-tracking';
 
 export const runtime = 'nodejs';
 
@@ -75,6 +82,7 @@ async function notifyAdminOfInquiry(input: {
   message: string;
   imageUrls: string[];
   prefs: InquiryPreferences;
+  adClick: AdClickIds;
 }) {
   let service;
   try {
@@ -83,10 +91,12 @@ async function notifyAdminOfInquiry(input: {
     return;
   }
   // The message center is text-only, so the two preferences ride as lines
-  // under the phone, in the order the owner reads them.
+  // under the phone, in the order the owner reads them — then the ad click,
+  // when the sender arrived from a Google ad.
   const extraLines = [
     ...(input.phone ? [`Phone: ${input.phone}`] : []),
     ...inquiryPreferenceLines(input.prefs.locationArea, input.prefs.locationDetail, input.prefs.preferredContact),
+    ...adClickLines(input.adClick),
   ];
   await createAdminNotification(service, {
     type: 'inquiry',
@@ -117,9 +127,10 @@ interface EmailPayload {
   message: string;
   imageUrls: string[];
   prefs: InquiryPreferences;
+  adClick: AdClickIds;
 }
 
-async function sendEmails({ itemTitle, name, phone, email, message, imageUrls, prefs }: EmailPayload) {
+async function sendEmails({ itemTitle, name, phone, email, message, imageUrls, prefs, adClick }: EmailPayload) {
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) return;
 
@@ -138,12 +149,15 @@ async function sendEmails({ itemTitle, name, phone, email, message, imageUrls, p
       (prefs.preferredContact
         ? `<p><strong>Preferred contact:</strong> ${esc(preferredContactLabel(prefs.preferredContact, false))}</p>`
         : '');
+    // Owner's copy only — the customer's confirmation below never carries it.
+    const source = adClickSummary(adClick);
+    const sourceHtml = source ? `<p><strong>Source:</strong> ${esc(source)}</p>` : '';
 
     // Notify owner
     await resend.emails.send({
       from: FROM,
       to: OWNER_EMAIL,
-      subject: `New inquiry: ${itemTitle}${inquirySubjectSuffix(prefs.locationArea, prefs.locationDetail, prefs.preferredContact)}`,
+      subject: `New inquiry: ${itemTitle}${inquirySubjectSuffix(prefs.locationArea, prefs.locationDetail, prefs.preferredContact)}${adClickSubjectSuffix(adClick)}`,
       html: `<p><strong>Item:</strong> ${esc(itemTitle)}</p>
              <p><strong>Name:</strong> ${esc(name)}</p>
              <p><strong>Phone:</strong> ${esc(phone)}</p>
@@ -151,7 +165,8 @@ async function sendEmails({ itemTitle, name, phone, email, message, imageUrls, p
              ${prefHtml}
              <p><strong>Message:</strong></p>
              <p>${esc(message).replace(/\n/g, '<br>')}</p>
-             ${photoHtml}`,
+             ${photoHtml}
+             ${sourceHtml}`,
     });
 
     // Confirm to customer
@@ -236,6 +251,9 @@ async function handleJsonInquiry(req: Request) {
   if (preferredContactNeedsEmail(prefs.preferredContact, email)) {
     return NextResponse.json({ error: preferredContactEmailErrorMessage(false) }, { status: 400 });
   }
+  // The Google Ads click the sender arrived with, if any (validated; anything
+  // that is not a click ID is dropped).
+  const adClick = parseAdClickIds((param) => raw[param]);
 
   // Insert as the anon role, which holds the public-insert grant on inquiries.
   // (The service role is intentionally not used here — it lacks INSERT on the table.)
@@ -246,15 +264,15 @@ async function handleJsonInquiry(req: Request) {
     phone: normalizedPhone,
     email: email || null,
     message,
-  }, [], prefs);
+  }, [], prefs, adClick);
 
   if (error) {
     console.error('Inquiry insert error:', error);
     return NextResponse.json({ error: 'Failed to save inquiry' }, { status: 500 });
   }
 
-  await notifyAdminOfInquiry({ kind: 'product-inquiry', itemTitle: item, name, phone: normalizedPhone, email: email || null, message, imageUrls: [], prefs });
-  await sendEmails({ itemTitle: item, name, phone: normalizedPhone, email: email || null, message, imageUrls: [], prefs });
+  await notifyAdminOfInquiry({ kind: 'product-inquiry', itemTitle: item, name, phone: normalizedPhone, email: email || null, message, imageUrls: [], prefs, adClick });
+  await sendEmails({ itemTitle: item, name, phone: normalizedPhone, email: email || null, message, imageUrls: [], prefs, adClick });
 
   return NextResponse.json({ success: true });
 }
@@ -267,12 +285,21 @@ interface InquiryBaseRow {
   message: string;
 }
 
+const MISSING_COLUMN = /uploaded_image_urls|location_area|location_detail|preferred_contact|gclid|gbraid|wbraid|column|schema cache/i;
+
 /**
- * One insert for both paths. Tries the full row (photos + the 2026-09-08
- * preference columns); if the database has not had the matching SQL applied
- * yet (`inquiries-location-contact-2026-09.sql` / `sales-workflow.sql`), the
- * error names the missing column and the row is retried WITHOUT those columns,
- * with the same facts folded into the message text so nothing is ever lost.
+ * One insert for both paths. Tries the full row (photos, the 2026-09-08
+ * preference columns, the 2026-10 ad-click columns); if the database has not
+ * had the matching SQL applied yet, the error names the missing column and the
+ * row is retried WITHOUT those columns, with the same facts folded into the
+ * message text so nothing is ever lost. Two steps down, newest columns first:
+ *
+ *   1. everything
+ *   2. without the ad-click columns (`inquiries-ad-click-2026-10.sql` not run)
+ *      — only reached for a lead that came from an ad
+ *   3. the base row alone (`inquiries-location-contact-2026-09.sql` /
+ *      `sales-workflow.sql` not run)
+ *
  * Returns the insert error, or null.
  */
 async function insertInquiry(
@@ -280,27 +307,37 @@ async function insertInquiry(
   baseRow: InquiryBaseRow,
   imageUrls: string[],
   prefs: InquiryPreferences,
+  adClick: AdClickIds,
 ): Promise<{ message: string } | null> {
-  const fullRow = {
-    ...baseRow,
+  const optionalColumns = {
     ...(imageUrls.length ? { uploaded_image_urls: imageUrls } : {}),
     ...(prefs.locationArea ? { location_area: prefs.locationArea } : {}),
     ...(prefs.locationDetail ? { location_detail: prefs.locationDetail } : {}),
     ...(prefs.preferredContact ? { preferred_contact: prefs.preferredContact } : {}),
   };
-  const { error } = await db.from('inquiries').insert(fullRow);
+  const sourceLines = adClickLines(adClick);
+  const withText = (lines: string[]) => (lines.length ? `${baseRow.message}\n\n${lines.join('\n')}` : baseRow.message);
+
+  const { error } = await db.from('inquiries').insert({ ...baseRow, ...optionalColumns, ...adClick });
   if (!error) return null;
-  if (!/uploaded_image_urls|location_area|location_detail|preferred_contact|column|schema cache/i.test(error.message)) {
-    return error;
+  if (!MISSING_COLUMN.test(error.message)) return error;
+
+  if (sourceLines.length) {
+    console.warn('[inquiries] ad-click columns missing — run supabase/inquiries-ad-click-2026-10.sql; folding into message:', error.message);
+    const withoutAdClick = await db
+      .from('inquiries')
+      .insert({ ...baseRow, ...optionalColumns, message: withText(sourceLines) });
+    if (!withoutAdClick.error) return null;
+    if (!MISSING_COLUMN.test(withoutAdClick.error.message)) return withoutAdClick.error;
   }
+
   console.warn('[inquiries] preference/photo columns missing — run supabase/inquiries-location-contact-2026-09.sql; folding into message:', error.message);
   const extra = [
     ...inquiryPreferenceLines(prefs.locationArea, prefs.locationDetail, prefs.preferredContact),
     ...(imageUrls.length ? [`Photos:\n${imageUrls.join('\n')}`] : []),
+    ...sourceLines,
   ];
-  const retry = await db
-    .from('inquiries')
-    .insert({ ...baseRow, message: extra.length ? `${baseRow.message}\n\n${extra.join('\n')}` : baseRow.message });
+  const retry = await db.from('inquiries').insert({ ...baseRow, message: withText(extra) });
   return retry.error;
 }
 
@@ -354,6 +391,9 @@ async function handleLeadForm(req: Request) {
   if (preferredContactNeedsEmail(prefs.preferredContact, email)) {
     return NextResponse.json({ error: preferredContactEmailErrorMessage(false) }, { status: 400 });
   }
+  // The Google Ads click the sender arrived with, if any. A `File` or a value
+  // that is not a click ID is dropped by the validator.
+  const adClick = parseAdClickIds((param) => form.get(param));
 
   const itemTitle = source === 'free-evaluation' ? 'Free Evaluation Request' : 'Submit Your Item';
 
@@ -413,7 +453,7 @@ async function handleLeadForm(req: Request) {
     phone: normalizedPhone,
     email: email || null,
     message,
-  }, imageUrls, prefs);
+  }, imageUrls, prefs, adClick);
 
   if (insertError) {
     console.error('Inquiry insert error:', insertError);
@@ -422,9 +462,9 @@ async function handleLeadForm(req: Request) {
 
   await notifyAdminOfInquiry({
     kind: source === 'free-evaluation' ? 'free-evaluation' : 'submit-item',
-    itemTitle, name, phone: normalizedPhone, email: email || null, message, imageUrls, prefs,
+    itemTitle, name, phone: normalizedPhone, email: email || null, message, imageUrls, prefs, adClick,
   });
-  await sendEmails({ itemTitle, name, phone: normalizedPhone, email: email || null, message, imageUrls, prefs });
+  await sendEmails({ itemTitle, name, phone: normalizedPhone, email: email || null, message, imageUrls, prefs, adClick });
 
   return NextResponse.json({ success: true });
 }

@@ -19,6 +19,13 @@ import {
   type LocationArea,
   type PreferredContact,
 } from '@/lib/inquiry-fields';
+import {
+  adClickLines,
+  adClickSubjectSuffix,
+  adClickSummary,
+  parseAdClickIds,
+  type AdClickIds,
+} from '@/lib/ads-tracking';
 
 export const runtime = 'nodejs';
 
@@ -55,6 +62,7 @@ async function sendOwnerEmail(
   message: string,
   imageUrls: string[],
   prefs: MessagePreferences,
+  adClick: AdClickIds,
 ): Promise<boolean> {
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) return false;
@@ -72,17 +80,21 @@ async function sendOwnerEmail(
       (prefs.preferredContact
         ? `<p><strong>Preferred contact:</strong> ${esc(preferredContactLabel(prefs.preferredContact, false))}</p>`
         : '');
+    // The Google Ads click the sender arrived with, when there was one.
+    const source = adClickSummary(adClick);
+    const sourceHtml = source ? `<p><strong>Source:</strong> ${esc(source)}</p>` : '';
     const emailOpts: Parameters<InstanceType<typeof Resend>['emails']['send']>[0] = {
       from: FROM,
       to: OWNER_EMAIL,
-      subject: `New website message from ${sender}${inquirySubjectSuffix(prefs.locationArea, prefs.locationDetail, prefs.preferredContact)}`,
+      subject: `New website message from ${sender}${inquirySubjectSuffix(prefs.locationArea, prefs.locationDetail, prefs.preferredContact)}${adClickSubjectSuffix(adClick)}`,
       html: `<p><strong>Name:</strong> ${name ? esc(name) : 'Not provided'}</p>
              <p><strong>Email:</strong> ${email ? esc(email) : 'Not provided'}</p>
              <p><strong>Phone:</strong> ${esc(phone)}</p>
              ${prefHtml}
              <p><strong>Message:</strong></p>
              <p>${esc(message).replace(/\n/g, '<br>')}</p>
-             ${photoHtml}`,
+             ${photoHtml}
+             ${sourceHtml}`,
     };
     if (email) emailOpts.replyTo = email;
     await resend.emails.send(emailOpts);
@@ -135,6 +147,10 @@ export async function POST(req: Request) {
   if (preferredContactNeedsEmail(prefs.preferredContact, email)) {
     return NextResponse.json({ error: preferredContactEmailErrorMessage(false) }, { status: 400 });
   }
+  // The Google Ads click the sender arrived with, if any. This route has no
+  // table row of its own, so the click rides in the message-center body and
+  // the owner's email (validated; anything that is not a click ID is dropped).
+  const adClick = parseAdClickIds((param) => form.get(param));
 
   // Service-role client: required to upload photos (Storage RLS) and to write the
   // admin_notifications row (admin-only RLS). Runs server-side so the key is never
@@ -186,6 +202,7 @@ export async function POST(req: Request) {
     '',
     `Phone: ${normalizedPhone}`,
     ...inquiryPreferenceLines(prefs.locationArea, prefs.locationDetail, prefs.preferredContact),
+    ...adClickLines(adClick),
   ].join('\n');
 
   // Insert into the admin message center.
@@ -203,7 +220,7 @@ export async function POST(req: Request) {
 
   // Best-effort email backup so the message reaches the owner even if the message
   // center write is unavailable (e.g. service role not configured).
-  const emailed = await sendOwnerEmail(name, email, normalizedPhone, message, imageUrls, prefs);
+  const emailed = await sendOwnerEmail(name, email, normalizedPhone, message, imageUrls, prefs, adClick);
 
   if (!savedToMessages && !emailed) {
     return NextResponse.json({ error: 'Failed to send message' }, { status: 500 });

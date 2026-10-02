@@ -11,6 +11,7 @@ import { LeadSendError, leadSendErrorMessage } from '@/lib/lead-form-errors';
 import { leadPhotoCapHint } from '@/lib/lead-photo-limits';
 import { leadPhotosTooLargeMessage, shrinkFormPhotos } from '@/lib/lead-photo-prep';
 import { phoneHoursLabel } from '@/lib/business-location';
+import { appendAdClickFields, sendAdsConversion } from '@/lib/ads-tracking-browser';
 import { FormGrid, PageContainer, Section } from '@/components/layout/ResponsiveLayout';
 
 interface Props {
@@ -66,6 +67,8 @@ export default function MessageUsForm({ locale }: Props) {
         setErr(leadPhotosTooLargeMessage(isEs));
         return;
       }
+      // The Google Ads click this visitor arrived with, if any.
+      appendAdClickFields(fd);
       // Sent as multipart so optional photos ride along with the message.
       const res = await fetch('/api/contact-message', {
         method: 'POST',
@@ -73,6 +76,8 @@ export default function MessageUsForm({ locale }: Props) {
       });
       if (!res.ok) throw new LeadSendError(res.status);
       setDone(true);
+      // ⛔ Only here: after the server accepted the message.
+      sendAdsConversion('leadForm');
     } catch (error) {
       setErr(leadSendErrorMessage(error, isEs, isEs
         ? 'Error al enviar. Por favor inténtelo de nuevo o llámenos.'

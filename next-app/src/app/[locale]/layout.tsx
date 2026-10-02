@@ -8,6 +8,7 @@ import { WishlistProvider } from '@/context/WishlistContext';
 import { CartProvider } from '@/context/CartContext';
 import CookieNotice from '@/components/legal/CookieNotice';
 import MobileContactBar from '@/components/cta/MobileContactBar';
+import GoogleAdsTag from '@/components/ads/GoogleAdsTag';
 import CustomerReveal from '@/components/layout/CustomerReveal';
 import SocialBackgroundPublishProvider from '@/components/admin/SocialBackgroundPublishProvider';
 import RouteProgressBar from '@/components/layout/RouteProgressBar';
@@ -267,6 +268,12 @@ export default async function LocaleLayout({ children, params }: Props) {
               `useSearchParams`, so it cannot deopt the 454 prerendered pages the
               way the bar above could. */}
           <ViewportHeightToken />
+          {/* Google Ads conversion measurement. Renders nothing, and loads
+              Google's script ONLY for a visit that came from an ad click —
+              everyone else gets the site exactly as before
+              (`lib/ads-tracking.ts`, owner decision 2026-10-02). Mounted here
+              so no page file is edited to carry it. */}
+          <GoogleAdsTag />
           <CartProvider locale={locale}>
             <WishlistProvider locale={locale}>
               <SocialBackgroundPublishProvider>

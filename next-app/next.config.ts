@@ -3,20 +3,44 @@ import createNextIntlPlugin from 'next-intl/plugin';
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
+// Google Ads conversion tag (2026-10-02; lib/ads-tracking.ts). The hosts are
+// Google's own list for "Google Ads conversions"
+// (developers.google.com/tag-platform/security/guides/csp). The tag is only
+// ever loaded for a visit that came from an ad click, but the policy is static,
+// so the hosts are allowed for every response. ⛔ Must match root netlify.toml
+// (two-CSP rule) — a host missing from either file blocks the tag in production
+// while it works locally, or the reverse.
+//
+// www.gstatic.com is NOT on Google's list and is needed anyway: the phone
+// snippet (calls through the forwarding number) loads
+// https://www.gstatic.com/wcm/loader.js. Without it the browser blocks that
+// script and the 60-second call conversion never records, with only a console
+// error to say so (measured 2026-10-02).
+const GOOGLE_ADS_CSP = {
+  script: 'https://www.googletagmanager.com https://www.googleadservices.com https://www.google.com https://www.gstatic.com',
+  img: 'https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://pagead2.googlesyndication.com https://www.google.com',
+  connect: 'https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://pagead2.googlesyndication.com https://www.google.com https://ad.doubleclick.net',
+  frame: 'https://www.googletagmanager.com',
+} as const;
+
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   "base-uri 'self'",
   "object-src 'none'",
   "form-action 'self'",
   "frame-ancestors 'none'",
-  "img-src 'self' data: blob: https://evzluixourmsefwdsieu.supabase.co https://s3.tradingview.com https://*.tradingview.com https://*.paypal.com https://*.paypalobjects.com https://*.cloudflarestream.com https://*.videodelivery.net",
+  `img-src 'self' data: blob: https://evzluixourmsefwdsieu.supabase.co https://s3.tradingview.com https://*.tradingview.com https://*.paypal.com https://*.paypalobjects.com https://*.cloudflarestream.com https://*.videodelivery.net ${GOOGLE_ADS_CSP.img}`,
   // challenges.cloudflare.com is Turnstile (Supabase Auth CAPTCHA) — it needs
   // script-src AND frame-src, and must match root netlify.toml (two-CSP rule).
-  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''} https://s3.tradingview.com https://www.paypal.com https://*.paypalobjects.com https://challenges.cloudflare.com`,
+  // Dev only, `http://www.gstatic.com`: Google's call-forwarding loader fetches
+  // its second script protocol-relative, so on http://localhost it asks for the
+  // http:// address, which the https entry above does not cover. Production is
+  // https and never needs this.
+  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval' http://www.gstatic.com" : ''} https://s3.tradingview.com https://www.paypal.com https://*.paypalobjects.com https://challenges.cloudflare.com ${GOOGLE_ADS_CSP.script}`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
-  "connect-src 'self' https://evzluixourmsefwdsieu.supabase.co https://api.gold-api.com https://s3.tradingview.com https://*.tradingview.com https://*.tradingview-widget.com https://*.paypal.com https://*.cloudflarestream.com https://*.videodelivery.net",
-  "frame-src https://*.tradingview.com https://*.tradingview-widget.com https://*.paypal.com https://*.cloudflarestream.com https://*.videodelivery.net https://www.google.com https://maps.google.com https://challenges.cloudflare.com",
+  `connect-src 'self' https://evzluixourmsefwdsieu.supabase.co https://api.gold-api.com https://s3.tradingview.com https://*.tradingview.com https://*.tradingview-widget.com https://*.paypal.com https://*.cloudflarestream.com https://*.videodelivery.net ${GOOGLE_ADS_CSP.connect}`,
+  `frame-src https://*.tradingview.com https://*.tradingview-widget.com https://*.paypal.com https://*.cloudflarestream.com https://*.videodelivery.net https://www.google.com https://maps.google.com https://challenges.cloudflare.com ${GOOGLE_ADS_CSP.frame}`,
   "media-src 'self' blob: https://*.cloudflarestream.com https://*.videodelivery.net",
   "worker-src 'self' blob:",
 ].join('; ');

@@ -841,6 +841,44 @@ Laptop (admin form)                      Supabase                         Deskto
 - **Camera.** `Permissions-Policy: camera=(self)` (Next headers and Netlify
   headers) — the only sitewide change this feature made.
 
+## Google Ads Conversion Tracking (2026-10-02)
+
+Google's tag, gated to visitors who arrived from an ad. Detail and the test
+method: `features/google-ads-conversion-tracking.md`.
+
+```text
+Visitor lands with ?gclid=… (auto-tagging)      Visitor lands without one
+  GoogleAdsTag (layout, client effect)             GoogleAdsTag → shouldLoadAdsTag() = false
+    remember the click 90 days                       nothing loads, nothing is stored
+    (localStorage nej_ad_click_v1 + cookie nej_gclid)
+    shouldLoadAdsTag() = true → inject gtag.js
+      gtag('set', allow_ad_personalization_signals, false)
+      gtag('config', AW-18463845461)                → page-view hit, _gcl_aw / _gcl_au
+      gtag('config', AW-…/FIP-… , { phone_conversion_callback })
+        → Google's call-tracking script → forwarding number kept in memory
+  one capture-phase click listener on document
+    a[href^="tel:"]  → conversion 4vRp… (tap) and, if a number is held, this tap dials it
+    Google Maps link → conversion kH-k… (directions)
+  EvalForm / MessageUsForm, after res.ok → conversion KySv… (lead)
+  every form → gclid/gbraid/wbraid appended at send time
+    → /api/inquire, /api/contact-message → inquiries.gclid… (SQL) · owner email "Source: Google ad" · admin chip
+```
+
+- **One gate, one file loads the script.** `shouldLoadAdsTag` in
+  `lib/ads-tracking.ts` is pure and unit-tested; `ads-tracking-browser.ts` is
+  the only module that touches storage or Google. Admin, account, checkout and
+  order-lookup paths never start it.
+- **The visible number is never rewritten.** The phone snippet runs with a
+  callback, so Google hands the forwarding number over and the site uses it
+  only as the dial target of a tap. The link's text and resting href stay the
+  real number.
+- **Consent.** `nej_ads_measurement_v1 = off` (notice "Essential only" or the
+  Preferences switch) or Global Privacy Control stops everything and purges
+  the click and Google's `_gcl_*` cookies.
+- **Sitewide changes this feature made:** the CSP allows Google's hosts (+
+  `www.gstatic.com`) in both header files; the cookie notice has two buttons
+  and one more sentence; Privacy + Cookie Preferences were rewritten.
+
 ## Public-shop cache invalidation (2026-07-02)
 
 `/shop` is server-cached (`unstable_cache`, tag `shop-catalog`, `revalidate: 300`).

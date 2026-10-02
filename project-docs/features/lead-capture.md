@@ -26,8 +26,11 @@
   `lib/contact-bar-paths.ts`, links from `lib/contact-links.ts`). Text opens a
   message to the owner's cell that starts "Hi, I have something I'd like to
   sell. Sending photos:" — never the toll-free deals number.
-- No analytics or ad tracking was added for either; the owner judges by
-  business (`DECISIONS.md` → *"Google Ads runs with NO site tag"*).
+- (Until 2026-10-02) no analytics or ad tracking was added for either. Since
+  2026-10-02 the two seller forms report an accepted submission to Google Ads
+  for visitors who arrived from an ad, and carry the ad's click ID — see
+  `features/google-ads-conversion-tracking.md`. Nothing changes for anyone
+  else.
 
 ## Homepage "Join the List" window — email, text alerts, or both (2026-09-15)
 

@@ -12,6 +12,11 @@ interface Props {
   params: Promise<{ locale: string }>;
 }
 
+// 2026-10-02: Google Ads measurement for visitors who arrive from an ad
+// (lib/ads-tracking.ts) replaced the "no Google tag was found" statement.
+// Not exported: a page file may only export what Next.js knows.
+const PRIVACY_UPDATED = 'October 2, 2026';
+
 export default async function PrivacyPage({ params }: Props) {
   const { locale } = await params;
   const isEs = locale === 'es';
@@ -22,7 +27,7 @@ export default async function PrivacyPage({ params }: Props) {
       locale={locale}
       path="/privacy"
       title={spanishCopy?.title ?? 'Privacy Policy'}
-      updated={spanishCopy?.updated}
+      updated={spanishCopy?.updated ?? PRIVACY_UPDATED}
       intro={spanishCopy?.intro ?? [
         isEs
           ? 'Naples Estate Jewelry, operated by Naples Antiques LLC, respects your privacy. This policy explains how we collect and use information when you visit our website, create an account, submit an item, make an inquiry, subscribe for updates, or place an online order.'
@@ -40,6 +45,7 @@ export default async function PrivacyPage({ params }: Props) {
             'Item and listing information, including photos, descriptions, notes, inventory details, and messages you submit for evaluation or inquiry.',
             'Purchase and order history, including cart items, order totals, shipping method, order notes, and payment status. We do not currently store full card numbers on this site.',
             'Technical information such as IP address, browser type, device information, pages visited, timestamps, security logs, and hosting or analytics information generated when the site is used.',
+            'For visitors who arrive from one of our Google ads, the ad click identifier Google adds to the address, which is saved with any form you send us.',
           ],
         },
         {
@@ -54,10 +60,11 @@ export default async function PrivacyPage({ params }: Props) {
           ],
         },
         {
-          title: isEs ? 'Cookies, local storage y analítica' : 'Cookies, Local Storage, and Analytics',
+          title: isEs ? 'Cookies, almacenamiento local y medición publicitaria' : 'Cookies, Local Storage, and Advertising Measurement',
           body: [
-            'The site uses essential cookies and browser storage for authentication, language routing, cart behavior, favorites, cookie notice preferences, and basic security. We also use normal hosting logs. During this audit, no Google Analytics, Google Tag Manager, Meta Pixel, Microsoft Clarity, Hotjar, or similar behavioral advertising pixel was found in the app source.',
-            'If we add non-essential analytics or advertising tools later, we should update this policy and the Cookie Preferences page before enabling them.',
+            'The site uses essential cookies and browser storage for authentication, language routing, cart behavior, favorites, cookie notice preferences, and basic security. We also use normal hosting logs.',
+            'We advertise on Google. If you arrive at this site by clicking one of our Google ads, the Google tag loads for your visit and sets Google Ads cookies in your browser, so Google can measure whether the ad led to a phone call, a directions request, or a form submission. On those visits a call link may dial a Google call-forwarding number that rings our regular line, and the ad click identifier is saved with any form you send us. We keep ad personalization turned off for this tag: it measures results and is not used to build advertising audiences. Visitors who do not arrive from an ad do not load the Google tag.',
+            'You can switch this measurement off at any time on the Cookie Preferences page, and we honor the Global Privacy Control signal. We do not use Google Analytics, Meta Pixel, Microsoft Clarity, Hotjar, or similar behavioral tracking tools.',
           ],
         },
         {
@@ -67,6 +74,8 @@ export default async function PrivacyPage({ params }: Props) {
             'Netlify for website hosting, deployment, serverless/runtime infrastructure, forms, and related logs.',
             'Resend for transactional and administrative email, including inquiry and order notices.',
             'Google Maps for the embedded showroom map on our home and contact pages. The map loads from Google when you scroll to it, and Google may receive your IP address and set its own cookies under its own terms. Nothing you enter on our site is sent to it, and every address, hour, and directions link is also shown as plain text without it.',
+            'Google Ads for measuring the results of our advertising, as described above, only for visitors who arrive from one of our ads. Google processes that data under its own terms.',
+            'TradingView for the live gold, silver, and platinum price charts on our gold, silver, bullion, and live-prices pages. The charts load from TradingView, which may receive your IP address and set its own cookies under its own terms. Nothing you enter on our site is sent to it.',
             'Payment processors if online payment processing is enabled; payment information is handled by the processor under its own terms.',
             'Shipping providers when shipment or insured delivery is arranged.',
             'Professional advisers, fraud-prevention services, or authorities when reasonably necessary for legal, security, accounting, tax, or compliance purposes.',
@@ -86,7 +95,7 @@ export default async function PrivacyPage({ params }: Props) {
             'You may request deletion of personal information, subject to legal, tax, fraud-prevention, inventory, transaction, and record-keeping obligations.',
             'You may opt out of marketing emails at any time by using an unsubscribe link where available or contacting us directly.',
             'If you opted in to text alerts, you may stop them at any time by replying STOP to any message or contacting us directly. We do not share mobile numbers or text-message consent with third parties or affiliates for their marketing purposes.',
-            'You may use Cookie Preferences to reset the site cookie notice. Essential cookies and storage are required for core site functions.',
+            'You may use Cookie Preferences to reset the site cookie notice and to switch Google Ads measurement off or on. Essential cookies and storage are required for core site functions.',
           ],
         },
         {

@@ -32,6 +32,15 @@ const INQUIRY_LIST_SELECT_FULL = [
   'location_detail',
   'preferred_contact',
 ].join(', ');
+// 2026-10-02: the Google Ads click a lead arrived with (supabase/inquiries-ad-click-2026-10.sql).
+const INQUIRY_LIST_SELECT_WITH_AD_CLICK = `${INQUIRY_LIST_SELECT_FULL}, gclid, gbraid, wbraid`;
+// Newest columns first; each step drops the columns of one migration.
+const INQUIRY_LIST_SELECTS = [
+  INQUIRY_LIST_SELECT_WITH_AD_CLICK,
+  INQUIRY_LIST_SELECT_FULL,
+  INQUIRY_LIST_SELECT_WITH_IMAGES,
+  INQUIRY_LIST_SELECT,
+];
 
 export default async function AdminInquiriesPage({ params }: Props) {
   const { locale } = await params;
@@ -54,31 +63,26 @@ export default async function AdminInquiriesPage({ params }: Props) {
     redirect(locale === 'es' ? '/es/account' : '/account');
   }
 
-  // Prefer the full select (photos + the 2026-09-08 preference columns); fall
-  // back step by step if a migration has not been applied yet
-  // (inquiries-location-contact-2026-09.sql, then sales-workflow.sql).
-  const [full, { count: unreadMessagesCount }] = await Promise.all([
-    supabase
-      .from('inquiries')
-      .select(INQUIRY_LIST_SELECT_FULL)
-      .order('created_at', { ascending: false }),
+  // Prefer the newest select (photos, the 2026-09-08 preference columns, the
+  // 2026-10 ad-click columns); fall back step by step if a migration has not
+  // been applied yet (inquiries-ad-click-2026-10.sql, then
+  // inquiries-location-contact-2026-09.sql, then sales-workflow.sql).
+  const listInquiries = (select: string) =>
+    supabase.from('inquiries').select(select).order('created_at', { ascending: false });
+  const [newest, { count: unreadMessagesCount }] = await Promise.all([
+    listInquiries(INQUIRY_LIST_SELECTS[0]),
     supabase
       .from('admin_notifications')
       .select('id', { count: 'exact', head: true })
       .eq('is_read', false),
   ]);
-  let inquiries = full.data;
-  if (full.error) {
-    const withImages = await supabase
-      .from('inquiries')
-      .select(INQUIRY_LIST_SELECT_WITH_IMAGES)
-      .order('created_at', { ascending: false });
-    inquiries = withImages.error
-      ? (await supabase
-          .from('inquiries')
-          .select(INQUIRY_LIST_SELECT)
-          .order('created_at', { ascending: false })).data
-      : withImages.data;
+  let inquiries = newest.data;
+  if (newest.error) {
+    for (const select of INQUIRY_LIST_SELECTS.slice(1)) {
+      const attempt = await listInquiries(select);
+      inquiries = attempt.data;
+      if (!attempt.error) break;
+    }
   }
 
   return (

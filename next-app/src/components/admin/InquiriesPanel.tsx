@@ -9,6 +9,7 @@ import {
   parsePreferredContact,
   preferredContactLabel,
 } from '@/lib/inquiry-fields';
+import { hasAdClick } from '@/lib/ads-tracking';
 
 const GOLD = '#735c00';
 const BORDER = 'rgba(115,92,0,0.2)';
@@ -27,18 +28,33 @@ export interface Inquiry {
   location_area?: string | null;
   location_detail?: string | null;
   preferred_contact?: string | null;
+  /** 2026-10-02 — the Google Ads click the sender arrived with; absent on other rows. */
+  gclid?: string | null;
+  gbraid?: string | null;
+  wbraid?: string | null;
+}
+
+/** The sender arrived from a Google ad (a click ID was saved with the lead). */
+function cameFromGoogleAd(inquiry: Inquiry): boolean {
+  return hasAdClick({
+    gclid: inquiry.gclid ?? undefined,
+    gbraid: inquiry.gbraid ?? undefined,
+    wbraid: inquiry.wbraid ?? undefined,
+  });
 }
 
 /**
- * The two facts the owner asked for, first in the expanded card: how the
- * sender wants to be reached, and where they are (red when outside Southwest
- * Florida). Older rows have neither and render nothing.
+ * The facts the owner asked for, first in the expanded card: how the sender
+ * wants to be reached, where they are (red when outside Southwest Florida),
+ * and whether they came from a Google ad. Older rows have none and render
+ * nothing.
  */
 function PreferenceChips({ inquiry }: { inquiry: Inquiry }) {
   const area = parseLocationArea(inquiry.location_area);
   const preferred = parsePreferredContact(inquiry.preferred_contact);
   const location = formatLocation(area, inquiry.location_detail ?? null);
-  if (!preferred && !location) return null;
+  const fromAd = cameFromGoogleAd(inquiry);
+  if (!preferred && !location && !fromAd) return null;
   const chip = (text: string, warn: boolean) => (
     <span
       style={{
@@ -62,6 +78,7 @@ function PreferenceChips({ inquiry }: { inquiry: Inquiry }) {
     <div style={{ marginBottom: '0.6rem' }}>
       {preferred && chip(`Prefers · ${preferredContactLabel(preferred, false)}`, false)}
       {location && chip(isOutsideServiceArea(area) ? `Outside SWFL · ${inquiry.location_detail?.trim() || 'location not given'}` : location, isOutsideServiceArea(area))}
+      {fromAd && chip('Google Ad', false)}
     </div>
   );
 }

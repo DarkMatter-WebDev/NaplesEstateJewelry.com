@@ -10,6 +10,7 @@ import LeadPhotoCount from '@/components/contact/LeadPhotoCount';
 import { LeadSendError, leadSendErrorMessage } from '@/lib/lead-form-errors';
 import { leadPhotoCapHint } from '@/lib/lead-photo-limits';
 import { leadPhotosTooLargeMessage, shrinkFormPhotos } from '@/lib/lead-photo-prep';
+import { appendAdClickFields, sendAdsConversion } from '@/lib/ads-tracking-browser';
 
 interface Props {
   locale: string;
@@ -75,9 +76,15 @@ export default function EvalForm({ locale, submitted }: Props) {
         return;
       }
       fd.append('source', 'free-evaluation');
+      // The Google Ads click this visitor arrived with, if any — so the lead
+      // says where it came from. Nothing is added for anyone else.
+      appendAdClickFields(fd);
       const res = await fetch('/api/inquire', { method: 'POST', body: fd });
       if (!res.ok) throw new LeadSendError(res.status);
       setDone(true);
+      // ⛔ Only here: after the server accepted the lead. Never on the button,
+      // never from the `submitted` prop (a reload must not count twice).
+      sendAdsConversion('leadForm');
     } catch (error) {
       setErr(leadSendErrorMessage(error, isEs, isEs
         ? 'Error al enviar. Por favor inténtelo de nuevo.'

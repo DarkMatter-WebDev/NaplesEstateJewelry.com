@@ -8,6 +8,7 @@ import {
   COOKIE_NOTICE_KEY,
   applyStoredConsentGate,
 } from '@/lib/cookie-consent';
+import { setAdsMeasurement } from '@/lib/ads-tracking-browser';
 
 /**
  * `useLayoutEffect` on the client, `useEffect` on the server.
@@ -55,6 +56,13 @@ const useGateEffect = typeof window === 'undefined' ? useEffect : useLayoutEffec
  * attribute's equivalent. ⚠️ Do not "simplify" it away as a duplicate of the
  * head script — they cover different events, and only this one survives a soft
  * navigation. `lib/__tests__/cookie-consent-gate.test.ts` guards it.
+ *
+ * Two buttons since 2026-10-02 (owner, Option A of the mockup): the site now
+ * carries one optional thing — Google Ads measurement for visitors who arrive
+ * from an ad (`lib/ads-tracking.ts`) — so the notice offers a real choice, as
+ * the 2026-09-03 decision said it must the day that happened. "Essential only"
+ * switches that measurement off in this browser and keeps it off; "Okay"
+ * leaves it on. Both dismiss the notice the same way.
  */
 export default function CookieNotice({ locale }: { locale: string }) {
   const isEs = locale === 'es';
@@ -66,13 +74,23 @@ export default function CookieNotice({ locale }: { locale: string }) {
     applyStoredConsentGate(document.documentElement);
   }, [locale]);
 
-  function accept() {
+  function dismiss() {
     try {
       localStorage.setItem(COOKIE_NOTICE_KEY, COOKIE_NOTICE_ACCEPTED);
     } catch {
       // Storage blocked: the attribute below still hides it for this pageview.
     }
     document.documentElement.setAttribute(COOKIE_NOTICE_ATTR, '');
+  }
+
+  function accept() {
+    dismiss();
+    setAdsMeasurement(true);
+  }
+
+  function essentialOnly() {
+    dismiss();
+    setAdsMeasurement(false);
   }
 
   return (
@@ -89,12 +107,12 @@ export default function CookieNotice({ locale }: { locale: string }) {
     >
       <div className="min-w-0 text-xs leading-snug md:text-sm md:leading-relaxed">
         <p className="text-[0.78rem] font-bold md:text-sm" style={{ fontFamily: 'var(--font-label)', color: 'var(--color-primary)' }}>
-          {isEs ? 'Cookies y almacenamiento esencial' : 'Essential Cookies and Storage'}
+          {isEs ? 'Cookies y almacenamiento' : 'Cookies and Storage'}
         </p>
         <p style={{ color: 'var(--color-on-surface-variant)' }}>
           {isEs
-            ? 'Usamos cookies esenciales y almacenamiento del navegador para inicio de sesión, carrito, favoritos, idioma y seguridad.'
-            : 'We use essential cookies and browser storage for sign-in, cart, favorites, language routing, and security.'}
+            ? 'Usamos cookies esenciales y almacenamiento del navegador para inicio de sesión, carrito, favoritos, idioma y seguridad. Las visitas desde nuestros anuncios de Google también son medidas por Google.'
+            : 'We use essential cookies and browser storage for sign-in, cart, favorites, language routing, and security. Visits from our Google ads are also measured by Google.'}
         </p>
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2 md:mt-0 md:flex md:flex-shrink-0 md:flex-nowrap md:items-center">
@@ -110,8 +128,13 @@ export default function CookieNotice({ locale }: { locale: string }) {
         <Link href={`${prefix}/cookie-preferences`} prefetch={false} className="outline-button justify-center px-3 py-1.5 text-[0.62rem] md:px-4 md:py-2 md:text-[0.68rem]">
           {isEs ? 'Preferencias' : 'Preferences'}
         </Link>
-        <button type="button" onClick={accept} className="gold-button col-span-2 justify-center px-3 py-1.5 text-[0.62rem] md:px-4 md:py-2 md:text-[0.68rem]">
-          {/* Owner, 2026-09-03: an information notice, not a consent choice — the site stores essential items only (see DECISIONS.md → Cookie banner). 'Okay' rather than 'Accept' so it does not read as agreeing to tracking; a Reject button would be a fake choice. */}
+        {/* The real choice (owner, 2026-10-02): this button actually blocks the
+            Google tag — see DECISIONS.md → "Cookie banner". */}
+        <button type="button" onClick={essentialOnly} className="outline-button justify-center px-3 py-1.5 text-[0.62rem] md:px-4 md:py-2 md:text-[0.68rem]">
+          {isEs ? 'Solo esenciales' : 'Essential only'}
+        </button>
+        <button type="button" onClick={accept} className="gold-button justify-center px-3 py-1.5 text-[0.62rem] md:px-4 md:py-2 md:text-[0.68rem]">
+          {/* Owner, 2026-09-03: 'Okay' rather than 'Accept' — it reads as acknowledgement. Since 2026-10-02 it also leaves ad measurement on. */}
           {isEs ? 'De acuerdo' : 'Okay'}
         </button>
       </div>

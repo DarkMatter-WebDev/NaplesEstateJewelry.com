@@ -10,6 +10,9 @@ export interface SpanishLegalPageCopy {
 }
 
 const UPDATED = '19 de junio de 2026';
+// Privacy + Cookie Preferences: Google Ads measurement for visitors who arrive
+// from an ad (2026-10-02, lib/ads-tracking.ts). Mirrors the English pages.
+const UPDATED_ADS_MEASUREMENT = '2 de octubre de 2026';
 
 /**
  * The shipping-policy sections as a FACTORY, because bullet one prints the
@@ -33,7 +36,7 @@ export function spanishShippingSections(hoursLineEs: string): LegalSection[] {
 export const SPANISH_LEGAL_COPY: Record<LegalPageKey, SpanishLegalPageCopy> = {
   privacy: {
     title: 'Política de Privacidad',
-    updated: UPDATED,
+    updated: UPDATED_ADS_MEASUREMENT,
     intro: [
       'Naples Estate Jewelry, operada por Naples Antiques LLC, respeta su privacidad. Esta política explica cómo recopilamos y utilizamos información cuando visita nuestro sitio web, crea una cuenta, envía un artículo, realiza una consulta, se suscribe a novedades o hace un pedido en línea.',
       'Esta política corresponde a nuestro sitio web actual de pequeña empresa. No afirma el cumplimiento de ninguna certificación o marco de privacidad que no hayamos obtenido por separado.',
@@ -47,6 +50,7 @@ export const SPANISH_LEGAL_COPY: Record<LegalPageKey, SpanishLegalPageCopy> = {
           'Información de artículos y publicaciones, incluidas fotos, descripciones, notas, datos de inventario y mensajes enviados para una evaluación o consulta.',
           'Historial de compras y pedidos, incluidos los artículos del carrito, los totales, el método de envío, las notas y el estado del pago. Actualmente no almacenamos números completos de tarjetas en este sitio.',
           'Información técnica, como dirección IP, tipo de navegador, dispositivo, páginas visitadas, marcas de tiempo, registros de seguridad y datos de alojamiento o análisis generados al utilizar el sitio.',
+          'Para los visitantes que llegan desde uno de nuestros anuncios de Google, el identificador de clic que Google añade a la dirección, que se guarda junto con cualquier formulario que nos envíe.',
         ],
       },
       {
@@ -61,10 +65,11 @@ export const SPANISH_LEGAL_COPY: Record<LegalPageKey, SpanishLegalPageCopy> = {
         ],
       },
       {
-        title: 'Cookies, Almacenamiento Local y Analítica',
+        title: 'Cookies, Almacenamiento Local y Medición Publicitaria',
         body: [
-          'El sitio utiliza cookies esenciales y almacenamiento del navegador para autenticación, selección de idioma, funcionamiento del carrito y favoritos, preferencias del aviso de cookies y seguridad básica. También utilizamos los registros normales del proveedor de alojamiento. Durante esta auditoría no se encontró en el código de la aplicación Google Analytics, Google Tag Manager, Meta Pixel, Microsoft Clarity, Hotjar ni un píxel publicitario de comportamiento similar.',
-          'Si en el futuro añadimos herramientas no esenciales de analítica o publicidad, deberemos actualizar esta política y la página de Preferencias de Cookies antes de habilitarlas.',
+          'El sitio utiliza cookies esenciales y almacenamiento del navegador para autenticación, selección de idioma, funcionamiento del carrito y favoritos, preferencias del aviso de cookies y seguridad básica. También utilizamos los registros normales del proveedor de alojamiento.',
+          'Nos anunciamos en Google. Si llega a este sitio al hacer clic en uno de nuestros anuncios de Google, la etiqueta de Google se carga durante su visita y guarda cookies de Google Ads en su navegador, para que Google pueda medir si el anuncio generó una llamada telefónica, una solicitud de indicaciones o el envío de un formulario. En esas visitas, un enlace de llamada puede marcar un número de desvío de Google que suena en nuestra línea habitual, y el identificador de clic del anuncio se guarda junto con cualquier formulario que nos envíe. Mantenemos desactivada la personalización de anuncios para esta etiqueta: mide resultados y no se utiliza para crear audiencias publicitarias. Los visitantes que no llegan desde un anuncio no cargan la etiqueta de Google.',
+          'Puede desactivar esta medición en cualquier momento en la página de Preferencias de Cookies, y respetamos la señal Global Privacy Control. No utilizamos Google Analytics, Meta Pixel, Microsoft Clarity, Hotjar ni herramientas similares de seguimiento del comportamiento.',
         ],
       },
       {
@@ -73,6 +78,9 @@ export const SPANISH_LEGAL_COPY: Record<LegalPageKey, SpanishLegalPageCopy> = {
           'Supabase para autenticación, registros de base de datos, perfiles, favoritos, carritos, consultas, productos y datos administrativos.',
           'Netlify para alojamiento, despliegue, infraestructura de ejecución, formularios y registros relacionados.',
           'Resend para correo transaccional y administrativo, incluidos avisos de consultas y pedidos.',
+          'Google Maps para el mapa del salón incrustado en nuestras páginas de inicio y de contacto. El mapa se carga desde Google cuando se desplaza hasta él, y Google puede recibir su dirección IP y guardar sus propias cookies conforme a sus propios términos. Nada de lo que escribe en nuestro sitio se le envía, y la dirección, los horarios y el enlace de indicaciones también se muestran como texto sin él.',
+          'Google Ads para medir los resultados de nuestra publicidad, como se describe arriba, solo para los visitantes que llegan desde uno de nuestros anuncios. Google trata esos datos conforme a sus propios términos.',
+          'TradingView para las gráficas en vivo de los precios del oro, la plata y el platino en nuestras páginas de oro, plata, lingotes y precios en vivo. Las gráficas se cargan desde TradingView, que puede recibir su dirección IP y guardar sus propias cookies conforme a sus propios términos. Nada de lo que escribe en nuestro sitio se le envía.',
           'Procesadores de pago cuando se habilitan pagos en línea; la información de pago es gestionada por el procesador conforme a sus propios términos.',
           'Proveedores de envío cuando se coordina un envío o una entrega asegurada.',
           'Asesores profesionales, servicios de prevención de fraude o autoridades cuando sea razonablemente necesario por motivos legales, de seguridad, contabilidad, impuestos o cumplimiento.',
@@ -92,7 +100,7 @@ export const SPANISH_LEGAL_COPY: Record<LegalPageKey, SpanishLegalPageCopy> = {
           'Puede solicitar la eliminación de información personal, sujeta a obligaciones legales, fiscales, de prevención de fraude, inventario, transacciones y conservación de registros.',
           'Puede cancelar los correos de marketing en cualquier momento mediante el enlace de cancelación disponible o comunicándose directamente con nosotros.',
           'Si aceptó recibir alertas por texto, puede detenerlas en cualquier momento respondiendo STOP a cualquier mensaje o comunicándose directamente con nosotros. No compartimos números de celular ni el consentimiento para mensajes de texto con terceros o afiliados para sus fines de marketing.',
-          'Puede utilizar Preferencias de Cookies para restablecer el aviso del sitio. Las cookies y el almacenamiento esenciales son necesarios para las funciones principales.',
+          'Puede utilizar Preferencias de Cookies para restablecer el aviso del sitio y para desactivar o activar la medición de Google Ads. Las cookies y el almacenamiento esenciales son necesarios para las funciones principales.',
         ],
       },
       {
@@ -234,11 +242,11 @@ export const SPANISH_LEGAL_COPY: Record<LegalPageKey, SpanishLegalPageCopy> = {
   },
   'cookie-preferences': {
     title: 'Preferencias de Cookies',
-    updated: UPDATED,
-    intro: ['Este sitio utiliza actualmente cookies esenciales y almacenamiento del navegador para operar sus funciones principales. Durante la auditoría de cumplimiento no se encontró en el código de la aplicación Google Analytics, Google Tag Manager, Meta Pixel, Microsoft Clarity, Hotjar ni un píxel de seguimiento similar.'],
+    updated: UPDATED_ADS_MEASUREMENT,
+    intro: ['Este sitio utiliza cookies esenciales y almacenamiento del navegador para operar sus funciones principales. Para los visitantes que llegan desde uno de nuestros anuncios de Google, también carga la etiqueta de Google para medir si el anuncio generó una llamada telefónica, una solicitud de indicaciones o el envío de un formulario. No se utiliza ninguna otra herramienta de analítica o publicidad.'],
     sections: [
-      { title: 'Cookies y Almacenamiento Esenciales', bullets: ['Cookies de autenticación de Supabase para el inicio de sesión y las sesiones de cuenta.', 'Cookies de selección de idioma, como NEXT_LOCALE.', 'Almacenamiento del carrito y los favoritos en el navegador para conservar estas funciones entre páginas.', 'Almacenamiento del aviso de cookies para que no vuelva a aparecer después de aceptarlo.'] },
-      { title: 'Cookies Opcionales de Analítica o Publicidad', body: ['Actualmente no está habilitado ningún sistema opcional de cookies de analítica o publicidad en el código revisado. Si esto cambia, esta página deberá actualizarse con un control real de aceptación o rechazo antes de habilitar esas herramientas.'] },
+      { title: 'Cookies y Almacenamiento Esenciales', bullets: ['Cookies de autenticación de Supabase para el inicio de sesión y las sesiones de cuenta.', 'Cookies de selección de idioma, como NEXT_LOCALE.', 'Almacenamiento del carrito y los favoritos en el navegador para conservar estas funciones entre páginas.', 'Almacenamiento del aviso de cookies para que no vuelva a aparecer después de aceptarlo.', 'Su elección sobre la medición de anuncios (nej_ads_measurement_v1), para recordar el interruptor de abajo.'] },
+      { title: 'Medición de Google Ads (opcional)', body: ['La etiqueta de Google se carga solo cuando su visita comienza desde uno de nuestros anuncios de Google (Google añade a la dirección un identificador de clic como gclid) y permanece desactivada para todos los demás. En esas visitas guarda cookies de Google Ads en su navegador (_gcl_aw, _gcl_au), y Google puede guardar sus propias cookies y almacenamiento en dominios de Google. También conservamos el identificador de clic en una cookie llamada nej_gclid y en el almacenamiento del navegador durante 90 días, para que un formulario que nos envíe pueda incluirlo.', 'La personalización de anuncios está desactivada para esta etiqueta: mide resultados y no se utiliza para crear audiencias publicitarias. En esas visitas, un enlace de llamada puede marcar un número de desvío de Google que suena en nuestra línea habitual.', 'Utilice el interruptor de abajo para desactivar o volver a activar esta medición. El botón "Solo esenciales" del aviso de cookies también la desactiva, y respetamos la señal Global Privacy Control.'] },
       { title: 'Administrar los Controles del Navegador', body: ['También puede borrar las cookies y el almacenamiento local desde la configuración del navegador. Esto puede cerrar su sesión, borrar el carrito o los favoritos locales, restablecer el idioma o hacer que vuelva a aparecer el aviso de cookies.'] },
     ],
   },

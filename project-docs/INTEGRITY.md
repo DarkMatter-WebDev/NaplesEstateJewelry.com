@@ -1,6 +1,6 @@
 # Integrity Rules And Pre-Publish Checklist
 
-> Current rules for the Next.js app. Last reconciled: **2026-08-30**.
+> Current rules for the Next.js app. Last reconciled: **2026-10-02**.
 
 ## Verification Commands
 
@@ -15,11 +15,14 @@ npm audit --omit=dev
 ```
 
 `npm run build` is the publish gate and must exit 0. Current local baseline
-(measured 2026-09-02, after the editor-batch revert): **1197/1197 tests across 116 files**, TypeScript clean,
-lint clean, and a build that exits 0 with **74 prerendered routes = 34 EN +
-34 ES + 6 non-locale** (`/_global-error`, `/_not-found`, `/favicon.ico`,
-`/icon.png`, `/robots.txt`, `/sitemap.xml`). Every locale page adds one to
-each side; a lopsided count means a page is missing from one locale.
+(measured 2026-10-02, the Google Ads conversion-tracking batch): **1642/1642
+tests across 156 files**, TypeScript clean, lint clean (3 pre-existing `<img>`
+warnings in `TextDealsManager.tsx`), and a build that exits 0 with **88
+prerendered routes = 41 EN + 41 ES + 6 non-locale** (`/_global-error`,
+`/_not-found`, `/favicon.ico`, `/icon.png`, `/robots.txt`, `/sitemap.xml`).
+(2026-09-02 baseline, for the record: 1197 tests / 116 files, 74 routes = 34 +
+34 + 6.) Every locale page adds one to each side; a lopsided count means a
+page is missing from one locale.
 
 ⛔ **Do not record the build's `(N/N) static pages` line as the baseline.** It
 is a progress counter that scales with the product catalog, not a page count —
@@ -62,6 +65,17 @@ totals must reconcile exactly to cents.
 Current tax behavior is 6% on merchandise plus charged shipping for Florida
 taxable orders, and $0 Florida tax for non-Florida destinations. Do not add
 county or other-state tax rules without reviewed jurisdiction requirements.
+
+### Keep the Google tag behind its gate
+
+The Google Ads tag (`src/lib/ads-tracking.ts`, 2026-10-02) loads ONLY for a
+visit that came from an ad click. Any change that makes Google's script load
+for an organic visitor, replaces the visible phone number, fires a conversion
+before the server accepted a lead, or counts the shop's product-inquiry form
+breaks an owner decision (`DECISIONS.md` → *"Google Ads conversion
+tracking…"*). The security policy must list Google's hosts (incl.
+`https://www.gstatic.com`) in BOTH `next.config.ts` and root `netlify.toml`;
+`lib/__tests__/ads-tracking.test.ts` guards all of it.
 
 ### Keep public writes behind the app
 

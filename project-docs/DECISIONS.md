@@ -4,7 +4,21 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-09-30**.
+> compaction. Last reconciled: **2026-10-02**.
+
+## Google Ads conversion tracking: the tag loads only for visitors who clicked an ad; the number people see is never replaced; the notice gained a real "Essential only" (2026-10-02)
+
+Owner, 2026-10-02 (*"we're going to work on the google ads"*, with another agent's install instructions and the four conversion actions already created in Google Ads). This **reverses the 2026-09-20 "no site tag" rule** below and applies the 2026-09-03 cookie-banner rule's "the day a pixel is added" clause. Rulings, each asked and answered:
+
+- **Who loads the tag — ad visitors only** (owner picked over "every visitor"). `shouldLoadAdsTag` (`lib/ads-tracking.ts`) starts Google's script only when the visit carries a click ID (`gclid` / `gbraid` / `wbraid`), the browser remembers one from the last 90 days, Google's own `_gcl_aw`/`_gcl_gb` cookie exists, or Tag Assistant's `gtm_debug` is on the URL. Organic visitors, Google's crawler and PageSpeed get the site with no Google script and no new cookie — the "organic visibility is the overriding rule" line of the 09-20 entry still governs. Trade-off accepted: a seller who clicks the ad on one device and converts on another is not counted. Never on `/admin`, `/account`, `/checkout`, `/order-lookup`.
+- ⛔ **The visible phone number is never replaced; only what a TAP dials is swapped** (owner picked over the handoff's visible swap and over "no forwarding number"). Google's forwarding numbers "can change or be reassigned" (Google's words), the site says "call or text" beside the number in ~40 places, and a forwarding line is for calls. So the phone snippet runs with `phone_conversion_callback` — Google hands the number over instead of rewriting the page — and the one click listener makes a tap on a (239) 404-8505 link dial it, putting the href back 2 s later. Desktop visitors who read the number and dial by hand are not counted; the 60-second website-call conversion counts the taps that ring through. Caller ID still works (Google). ⛔ Never `phone_conversion_css_class` or the default text replacement.
+- **Lead conversion = the two SELLER forms only** (free evaluation, contact message), fired once, only after the server accepted the lead. The shop's product inquiry is a buyer and Join the List is not a lead; both still carry the click ID so the owner can see where they came from.
+- **Measurement only, no remarketing:** `allow_ad_personalization_signals` is false. Enhanced conversions (hashed email/phone to Google) are not sent.
+- **Click IDs ride at send time, never as hidden inputs**, so the ranking pages' HTML did not change (proven by a built-vs-live diff: title, description, canonical, hreflang, H1, JSON-LD, body text identical). Stored in `inquiries.gclid/gbraid/wbraid` (`supabase/inquiries-ad-click-2026-10.sql`, insert falls back to the message text until it runs); shown as a **Google Ad** chip in Admin → Inquiries and as `Source: Google ad — …` in the owner's email + ` · Google ad` on the subject.
+- **Cookie notice — Option A** (owner, from the mockup): **Okay + Essential only**, same button rows as today; shorter added sentence *"Visits from our Google ads are also measured by Google."*; title "Cookies and Storage". Essential only switches measurement off and keeps it off (`nej_ads_measurement_v1 = off`, the remembered click and Google's `_gcl_*` cookies removed); Okay leaves it on. `/cookie-preferences` carries the Turn off / Turn on switch; Global Privacy Control is honoured as off. Privacy + Cookie Preferences (EN + ES) rewritten; "no Google tag was found" is gone; a TradingView line was added to Service Providers (the price charts set their own cookies — pre-existing, noticed while testing) and the Spanish Service Providers list gained the Google Maps bullet the English one already had.
+- **Security policy:** Google's documented hosts for "Google Ads conversions" **plus `https://www.gstatic.com` in `script-src`** (the call-forwarding loader; not on Google's list; blocked = no call conversion and only a console error). Both header files, guarded by `ads-tracking.test.ts`. Dev only: `http://www.gstatic.com` as well, because the loader's second script is protocol-relative.
+- **Facts that govern reading the numbers:** one `gtag` conversion = three requests carrying the label (googleadservices `pagead/conversion` is the count; doubleclick `viewthroughconversion` and google.com `1p-conversion` are companions). Google's tag skips the forwarding lookup in ~1 visit in 20 (its own `tag_exp` arms) — those taps count as taps only. A `gclid` does NOT bypass Netlify's page cache (`Netlify-Vary: query=__nextDataReq|_rsc`), so the 09-20 reason for switching auto-tagging off was mistaken; **auto-tagging must be ON** for any of this to record. Test pings carry a fake click ID and are never credited.
+- Not legal advice; the copy states exactly what the site does.
 
 ## Buy receipts: the paper is the form, the desktop prints by itself, the ID photo is private (2026-09-30)
 
@@ -56,6 +70,7 @@ Engineering rules that came out of the build:
 - ⛔ **Never pick "Another organization's legal name"** on *"What legal name should appear in the ad disclosure?"* — it turns the account into an **agency** advertising for a client (the tasks become "Provide your agency's information" + "Provide client's information"). The first option always shows the payments profile's **Organization name**; to verify under a different name, change that first (Billing → Settings → Payer details), then pick the first option. A submitted answer is fixable via Completed tasks → **Edit task** (done 09-28).
 - The payments profile (ID 9126-4764-1640) **Organization name is Naples Antiques LLC** since 09-28 (was "Naples Estate Jewelry Co", a name on no record). It prints on Google invoices and tax documents and applies to every account on that profile. The organization address stays the Sunbiz/D&B legal address (private; the disclosure shows only the country). ⛔ Don't switch it to the showroom — that breaks the D&B match. **Owner re-confirmed 09-28 (after adding the DBA to D&B): D&B keeps the legal address too** ("ok, leave it") — same rule as 09-11 ([TASKS.md "Keep 4243 30th Ave SW"]). If the legal address ever changes, change the official records together in order: Sunbiz → D&B → Google payments profile. Don't re-propose.
 - Showing the DBA instead would take *Reset verification* (Admin → Policy → Account) and re-verifying as "Naples Estate Jewelry" with the Florida fictitious-name registration (Google accepts DBAs when the document shows both the DBA and the legal name), or a request to Google Ads support. Not done; owner's call (`TASKS.md` top).
+- **D&B operational facts (2026-10-02):** the 09-28 Profile Manager update was processed within four days — the profile and D&B's public directory page show *Doing Business As: Naples Estate Jewelry* and the phone. D&B recorded the principal title as **Member** (Managing Member was picked). **The Company Website is not a Profile Manager field:** it is locked there and changes only through a support case at `https://support.dnb.com/?CUST=UpdateSMB` (email → D-U-N-S lookup → a one-field "DUNS Update Request"; the portal's *Case Status Report* tab needs a separate D&B Single Sign-On). Claude fills it, the owner presses Submit — first use: Case #34898777, 10-02. When a D&B request touches the website, say in the note that no address change is wanted — the site shows the showroom, D&B keeps the legal address.
 
 ## Google review replies: drafted in the owner's voice, posted by the owner, one at a time (2026-09-25)
 
@@ -139,6 +154,11 @@ evidence: `SEO_LEAD_AUDIT.md` 2026-09-21.
 
 ## Google Ads runs with NO site tag; the pages that rank are never edited for ads; the goal is any seller contact (2026-09-20)
 
+> **Partly superseded 2026-10-02** (top entry): the owner chose conversion
+> tracking. The "no ad tracking" bullet below is history; the tag loads ONLY
+> for visitors who clicked an ad, so the organic-visibility rule and "the pages
+> that rank are never edited for ads" still hold unchanged.
+
 Owner, 2026-09-19/20, while approving a $300–500/month Google Search
 campaign for sellers:
 
@@ -176,7 +196,7 @@ campaign for sellers:
   owner decision with its own price.
 - **Spend gates:** the owner creates the account and owns billing (the "$500
   after $500 spend" credit is theirs to take or leave; never a reason to raise
-  the budget). Campaigns are built PAUSED and go live only on the owner's
+  the budget — Google DENIED the credit on 2026-10-02, so it no longer applies). Campaigns are built PAUSED and go live only on the owner's
   approval of the exact daily number and the ad text. Weekly report for the
   first month.
 - **Deploys:** "dont worry about netlify deploys.. i dont mind" (09-19) — small
@@ -1325,6 +1345,12 @@ phone sitewide. Rules:
   the signet ring means rings/jewelry, not diamonds.
 
 ## Cookie banner: one "Okay" button, no Reject / "essential only" pair (2026-09-03)
+
+> **Superseded 2026-10-02** (top entry): the day came — Google Ads measurement
+> for ad-click visitors is the site's first optional tool, and the banner now
+> carries **Okay + Essential only**, the second of which really blocks the
+> script, exactly as this entry said it must. The reasoning below is why it
+> stayed one button until then.
 
 Owner asked whether the banner should offer a quick Reject or "accept
 essential only" like other sites. Answer, after re-checking the source:

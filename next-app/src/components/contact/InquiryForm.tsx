@@ -7,6 +7,7 @@ import { PreferredContactField } from '@/components/contact/InquiryPreferenceFie
 import { preferredContactEmailErrorMessage, preferredContactNeedsEmail, type PreferredContact } from '@/lib/inquiry-fields';
 import { LeadSendError, leadSendErrorMessage } from '@/lib/lead-form-errors';
 import { isValidPhoneNumber, phoneErrorMessage } from '@/lib/phone';
+import { adClickFormValues } from '@/lib/ads-tracking-browser';
 
 interface Props {
   locale: string;
@@ -71,7 +72,10 @@ export default function InquiryForm({ locale, itemName, submitted: initialSubmit
       const res = await fetch('/api/inquire', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ item: itemName, name, phone, email, message, preferred_contact: preferredContact, 'bot-field': botField }),
+        // The ad click (if any) rides along so the inquiry says where it came
+        // from. ⛔ No lead conversion is fired here: this form is a BUYER asking
+        // about a listing, and the ads are for sellers (lib/ads-tracking.ts).
+        body: JSON.stringify({ item: itemName, name, phone, email, message, preferred_contact: preferredContact, 'bot-field': botField, ...adClickFormValues() }),
       });
       if (!res.ok) throw new LeadSendError(res.status);
       setDone(true);
