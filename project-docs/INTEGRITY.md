@@ -70,12 +70,13 @@ county or other-state tax rules without reviewed jurisdiction requirements.
 
 The Google Ads tag (`src/lib/ads-tracking.ts`, 2026-10-02) loads ONLY for a
 visit that came from an ad click. Any change that makes Google's script load
-for an organic visitor, replaces the visible phone number, fires a conversion
-before the server accepted a lead, or counts the shop's product-inquiry form
-breaks an owner decision (`DECISIONS.md` → *"Google Ads conversion
-tracking…"*). The security policy must list Google's hosts (incl.
-`https://www.gstatic.com`) in BOTH `next.config.ts` and root `netlify.toml`;
-`lib/__tests__/ads-tracking.test.ts` guards all of it.
+for an organic visitor, adds Google's phone snippet (a forwarding number —
+every call must dial the real number), replaces or rewrites the visible phone
+number, fires a conversion before the server accepted a lead, or counts the
+shop's product-inquiry form breaks an owner decision (`DECISIONS.md` →
+*"Google Ads conversion tracking…"*). The security policy must list exactly
+Google's documented Ads hosts in BOTH `next.config.ts` and root
+`netlify.toml`; `lib/__tests__/ads-tracking.test.ts` guards all of it.
 
 ### Keep public writes behind the app
 

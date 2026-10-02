@@ -15,7 +15,6 @@ import {
   GOOGLE_TAG_SCRIPT_URL,
   adClickFromCookie,
   dialsBusinessNumber,
-  forwardingTelHref,
   hasAdClick,
   isAdsTagExcludedPath,
   isDirectionsHref,
@@ -26,7 +25,6 @@ import {
   type AdClickIds,
   type AdsEventConversion,
 } from './ads-tracking';
-import { CONTACT_PHONE_DISPLAY } from './contact-links';
 
 type Gtag = (...args: unknown[]) => void;
 type AdsWindow = Window & { dataLayer?: unknown[]; gtag?: Gtag };
@@ -35,8 +33,6 @@ type AdsWindow = Window & { dataLayer?: unknown[]; gtag?: Gtag };
 let booted = false;
 /** The visitor switched measurement off during this page session. */
 let stopped = false;
-/** `tel:` href of Google's forwarding number, once the phone snippet has one. */
-let forwardingHref: string | null = null;
 
 function safeStorage(): Storage | null {
   try {
@@ -144,15 +140,9 @@ function bootTag(): void {
   // Measurement only: no remarketing audiences are built from this tag.
   win.gtag('set', 'allow_ad_personalization_signals', false);
   win.gtag('config', GOOGLE_TAG_ID);
-  win.gtag('config', ADS_CONVERSIONS.websiteCall, {
-    phone_conversion_number: CONTACT_PHONE_DISPLAY,
-    // ⛔ With a callback the tag does NOT rewrite the number on the page — the
-    // visible number stays the shop's own. The forwarding number is kept here
-    // and used only as the dial target of a tap (`onDocumentClick`).
-    phone_conversion_callback: (_formatted: unknown, mobile: unknown) => {
-      forwardingHref = forwardingTelHref(mobile);
-    },
-  });
+  // ⛔ No phone snippet (`phone_conversion_number`): every call from the site
+  // dials the shop's real number and the number on the page is never rewritten
+  // (owner, 2026-10-02 — see ads-tracking.ts). Calls are counted as taps.
   const script = document.createElement('script');
   script.async = true;
   script.src = GOOGLE_TAG_SCRIPT_URL;
@@ -162,6 +152,7 @@ function bootTag(): void {
 /**
  * Fire one conversion. Does nothing unless the tag is running, so callers
  * need no checks of their own: an organic visitor's form or tap sends nothing.
+ * (The 60-second "website call" action is Google's and is not fired here.)
  */
 export function sendAdsConversion(kind: AdsEventConversion): boolean {
   if (typeof window === 'undefined' || !booted || stopped) return false;
@@ -173,7 +164,8 @@ export function sendAdsConversion(kind: AdsEventConversion): boolean {
 
 // One listener for every call and directions link on the site, present and
 // future. Capture phase, so it runs before the browser follows the link; it
-// never prevents or delays the link.
+// never prevents, delays or changes the link — a tap dials exactly what the
+// page says.
 function onDocumentClick(event: MouseEvent): void {
   if (!booted || stopped) return;
   const target = event.target;
@@ -182,13 +174,8 @@ function onDocumentClick(event: MouseEvent): void {
   if (!(anchor instanceof HTMLAnchorElement)) return;
   const href = anchor.getAttribute('href') ?? '';
   if (/^tel:/i.test(href)) {
-    sendAdsConversion('callTap');
-    if (forwardingHref && dialsBusinessNumber(href)) {
-      // This tap dials Google's forwarding number, which rings the shop's own
-      // line; the link's text is untouched and its href is put back after.
-      anchor.setAttribute('href', forwardingHref);
-      window.setTimeout(() => anchor.setAttribute('href', href), 2000);
-    }
+    // Only the shop's own number counts as a call lead.
+    if (dialsBusinessNumber(href)) sendAdsConversion('callTap');
     return;
   }
   if (isDirectionsHref(href)) sendAdsConversion('directions');
@@ -233,7 +220,6 @@ export function setAdsMeasurement(on: boolean): void {
   }
   stopped = !on || browserSendsPrivacySignal();
   if (on) return;
-  forwardingHref = null;
   try {
     storage?.removeItem(AD_CLICK_STORAGE_KEY);
   } catch {

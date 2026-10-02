@@ -31,7 +31,7 @@ export default async function CookiePreferencesPage({ params }: Props) {
       title={spanishCopy?.title ?? 'Cookie Preferences'}
       updated={spanishCopy?.updated ?? COOKIE_PREFERENCES_UPDATED}
       intro={spanishCopy?.intro ?? [
-        'This site uses essential cookies and browser storage to operate its core features. For visitors who arrive from one of our Google ads, it also loads the Google tag to measure whether the ad led to a phone call, a directions request, or a form submission. No other analytics or advertising tool is used.',
+        'This site uses essential cookies and browser storage to operate its core features. For visitors who arrive from one of our Google ads, it also loads the Google tag to measure whether the ad led to a tap on our phone number, a directions request, or a form submission. No other analytics or advertising tool is used.',
       ]}
       sections={spanishCopy?.sections ?? [
         {
@@ -48,7 +48,7 @@ export default async function CookiePreferencesPage({ params }: Props) {
           title: isEs ? 'Medición de Google Ads (opcional)' : 'Google Ads Measurement (Optional)',
           body: [
             'The Google tag loads only when your visit starts from one of our Google ads (Google adds a click ID such as gclid to the address) and stays off for everyone else. On those visits it sets Google Ads cookies in your browser (_gcl_aw, _gcl_au), and Google may set its own cookies and browser storage on Google domains. We also keep the click ID in a cookie named nej_gclid and in browser storage for 90 days, so a form you send us can carry it.',
-            'Ad personalization is turned off for this tag: it measures results and is not used to build advertising audiences. On those visits a call link may dial a Google call-forwarding number that rings our regular line.',
+            'Ad personalization is turned off for this tag: it measures results and is not used to build advertising audiences. Every call link dials our regular number; nothing on the page is rewritten.',
             'Use the switch below to turn this measurement off or back on. The "Essential only" button on the cookie notice turns it off as well, and we honor the Global Privacy Control signal.',
           ],
         },

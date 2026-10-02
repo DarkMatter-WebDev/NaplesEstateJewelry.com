@@ -9,9 +9,13 @@
 // - The Google tag loads ONLY for a visit that came from an ad click (now, or
 //   within the 90 days the click is remembered). Organic visitors, Google's
 //   crawler and PageSpeed get the site with no Google script and no new cookie.
-// - ⛔ The phone number people SEE is never replaced. Google's forwarding
-//   numbers "can change or be reassigned" (Google's wording), and the site says
-//   "call or text" beside the number. Only what a TAP dials is swapped.
+// - ⛔ Every call from the site dials the shop's real number, and the number
+//   people SEE is never replaced. Google's forwarding numbers "can change or be
+//   reassigned" (Google's wording) and would sit in a customer's recent-calls
+//   list; the owner chose taps over the 60-second call measurement (evening of
+//   2026-10-02, after a first version swapped a tap's dial target). The
+//   "Website - Calls (forwarding number)" action in Google Ads
+//   (`AW-18463845461/FIP-CNaCo44dENXYn-RE`) is therefore unused by the site.
 // - The lead-form conversion counts the two SELLER forms (free evaluation,
 //   contact message). The shop's product inquiry is a buyer; Join the List is
 //   not a lead.
@@ -26,20 +30,22 @@ export const GOOGLE_TAG_ID = 'AW-18463845461';
 /** The script the tag loads from — the only third-party script this feature adds. */
 export const GOOGLE_TAG_SCRIPT_URL = `https://www.googletagmanager.com/gtag/js?id=${GOOGLE_TAG_ID}`;
 
-/** `send_to` values of the conversion actions created in Google Ads (2026-10-02). */
+/**
+ * `send_to` values of the conversion actions the site fires (created in
+ * Google Ads 2026-10-02). ⛔ Not here on purpose: "Website - Calls (forwarding
+ * number)", `AW-18463845461/FIP-CNaCo44dENXYn-RE` — it would need the phone
+ * snippet, which the owner ruled out (see the header).
+ */
 export const ADS_CONVERSIONS = {
   /** Primary. A seller form the server accepted. */
   leadForm: `${GOOGLE_TAG_ID}/KySvCNOCo44dENXYn-RE`,
-  /** Primary. A call through Google's forwarding number, 60+ seconds — Google counts it, the site never fires it. */
-  websiteCall: `${GOOGLE_TAG_ID}/FIP-CNaCo44dENXYn-RE`,
-  /** Secondary. A tap on any `tel:` link. */
+  /** A tap on any `tel:` link — the site's call signal (Primary once Google Ads is switched over). */
   callTap: `${GOOGLE_TAG_ID}/4vRpCNmCo44dENXYn-RE`,
   /** Secondary. A click on a Google Maps directions link. */
   directions: `${GOOGLE_TAG_ID}/kH-kCM6d5v4cENXYn-RE`,
 } as const;
 
-/** The conversions the site itself fires as events. */
-export type AdsEventConversion = Exclude<keyof typeof ADS_CONVERSIONS, 'websiteCall'>;
+export type AdsEventConversion = keyof typeof ADS_CONVERSIONS;
 
 // ---------------------------------------------------------------------------
 // Ad click identifiers
@@ -213,23 +219,9 @@ export function isDirectionsHref(href: string | null | undefined): boolean {
   return host.startsWith('maps.') || url.pathname.startsWith('/maps');
 }
 
-/** A `tel:` link to the shop's own number — the only one Google forwards. */
+/** A `tel:` link to the shop's own number (the business card pages dial other people). */
 export function dialsBusinessNumber(href: string | null | undefined): boolean {
   if (!href || !/^tel:/i.test(href)) return false;
   const digits = href.replace(/\D/g, '');
   return digits === CONTACT_PHONE_DIGITS || digits === `1${CONTACT_PHONE_DIGITS}`;
-}
-
-/**
- * The `tel:` href for the forwarding number Google hands the phone snippet's
- * callback. Null when it is not a usable number, or is simply our own (Google
- * had no forwarding number to give).
- */
-export function forwardingTelHref(mobileNumber: unknown): string | null {
-  if (typeof mobileNumber !== 'string') return null;
-  const plus = mobileNumber.trim().startsWith('+') ? '+' : '';
-  const digits = mobileNumber.replace(/\D/g, '');
-  if (digits.length < 10 || digits.length > 15) return null;
-  if (digits.endsWith(CONTACT_PHONE_DIGITS)) return null;
-  return `tel:${plus}${digits}`;
 }

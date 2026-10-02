@@ -10,12 +10,13 @@
 Visitors who arrive from a Google ad (the URL carries a click ID — `gclid`,
 or `gbraid` / `wbraid` from an iPhone) load Google's tag; everyone else gets
 the site exactly as before — no Google script, no new cookie. For those
-visitors the site reports four things to Google Ads: a seller form that the
-server accepted (Primary), a call through Google's forwarding number lasting
-60+ seconds (Primary; Google counts it, the site only makes a tap dial the
-forwarding number), a tap on any call link (Secondary) and a click on a
-Directions link (Secondary). The phone number people SEE is never replaced.
-Ad personalization is off. The click ID is saved with the lead so Admin →
+visitors the site reports three things to Google Ads: a seller form that the
+server accepted, a tap on a call link to the shop's number, and a click on a
+Directions link. **Every call dials (239) 404-8505 — no Google forwarding
+number is used anywhere on the site, and the number people see is never
+replaced** (owner, evening of 2026-10-02; the first version that afternoon
+swapped a tap's dial target and was taken out the same day). Ad
+personalization is off. The click ID is saved with the lead so Admin →
 Inquiries shows a **Google Ad** chip and a later offline-conversion import is
 possible.
 
@@ -25,13 +26,16 @@ possible.
 |---|---|
 | Google tag ID | `AW-18463845461` |
 | Lead form submit (Primary) | `AW-18463845461/KySvCNOCo44dENXYn-RE` |
-| Website call, 60+ s, via forwarding number (Primary) | `AW-18463845461/FIP-CNaCo44dENXYn-RE` |
-| Click-to-call tap (Secondary) | `AW-18463845461/4vRpCNmCo44dENXYn-RE` |
+| Click-to-call tap (the site's call signal — make it Primary in Google Ads) | `AW-18463845461/4vRpCNmCo44dENXYn-RE` |
 | Get directions click (Secondary) | `AW-18463845461/kH-kCM6d5v4cENXYn-RE` |
+| Website call, 60+ s, via forwarding number — **exists in Google Ads, NOT used by the site** | `AW-18463845461/FIP-CNaCo44dENXYn-RE` |
 | Google Ads account | 321-137-8976 (login info@naplesestatejewelry.com) |
 
 All four actions were created in Google Ads by another agent on 2026-10-02;
-the site uses them exactly as given (`next-app/src/lib/ads-tracking.ts`).
+the site fires the first three exactly as given
+(`next-app/src/lib/ads-tracking.ts`). The forwarding-number action would need
+Google's phone snippet, which the owner ruled out: in Google Ads it should be
+set Secondary or paused so it never competes with the tap for "Primary".
 
 ## When the tag loads (`shouldLoadAdsTag`)
 
@@ -55,29 +59,28 @@ stays for the page session (client-side navigation never reloads it).
 - `https://www.googletagmanager.com/gtag/js?id=AW-18463845461`, then Google's
   page-view hit (`www.google.com/ccm/collect`, `npa=1`) and the click cookies
   `_gcl_aw`, `_gcl_au` (plus Google's own partitioned cookies on Google
-  domains).
-- The phone snippet asks Google for a forwarding number (loader
-  `www.gstatic.com/wcm/loader.js` → `call-tracking_N.js` → lookup at
-  `googleadservices.com/pagead/conversion/<id>/wcm` and
-  `google.com/pagead/attribution/wcm`). With a real click Google answers with
-  a number; the site keeps it in memory and uses it ONLY as the dial target
-  of a tap on a call link to (239) 404-8505 — the link's text and href at
-  rest stay the real number, and the href is put back 2 s after the tap.
-  Google's script caches the lookup in `localStorage` for ~3 hours and
-  refreshes the number every ~4 minutes while the page is visible.
-- ⚠️ In about 1 visit in 20 (measured 2026-10-02: 3 skips in 63 clean
-  visits) Google's tag never runs the lookup — those visits carry different
-  `tag_exp` experiment IDs, so it is Google's own holdback, not a site
-  defect. Those visitors' taps dial the real number and count as taps only.
+  domains). Nothing else: no phone snippet, so no `gstatic.com` script and no
+  forwarding-number lookup — the acceptance check asserts their absence.
+- For the record, what the phone snippet did in the first (same-day) version,
+  in case it is ever wanted again: `gtag('config', '<call label>', {
+  phone_conversion_number, phone_conversion_callback })` loads
+  `www.gstatic.com/wcm/loader.js` → `call-tracking_N.js` → a lookup at
+  `googleadservices.com/pagead/conversion/<id>/wcm` /
+  `google.com/pagead/attribution/wcm`; a real click gets
+  `{ phoneNumber, formattedPhoneNumber, refreshDuration, refreshPeriod }`, a
+  fake one `errorCode 2 "no ad click"`; the callback form hands the number
+  over without rewriting the page; Google skipped the lookup in ~1 visit in
+  20 (its own `tag_exp` arms); `https://www.gstatic.com` must then be in
+  `script-src` of BOTH header files, plus `http://www.gstatic.com` in dev.
 
 ## What fires, and from where
 
 | Conversion | Where | Rule |
 |---|---|---|
 | Lead form | `EvalForm.tsx` (`/free-evaluation`), `MessageUsForm.tsx` (`/contact`) | Only after `res.ok` from the API, once per submission. ⛔ Never on the button, never from the `?submitted=1` page state. Not the shop's product inquiry (`InquiryForm.tsx`, a buyer) and not Join the List. |
-| Click-to-call tap | one capture-phase listener on `document` (`ads-tracking-browser.ts`) | Any `a[href^="tel:"]`; one event per tap; the link is never blocked or delayed. |
+| Click-to-call tap | one capture-phase listener on `document` (`ads-tracking-browser.ts`) | `a[href^="tel:"]` that dials the shop's number (`dialsBusinessNumber`); one event per tap; the link is never blocked, delayed or changed — it dials exactly what the page says. |
 | Directions | same listener | `isDirectionsHref`: Google Maps links (`mapsUrl()`); the Business Profile `?cid=` link, the embedded map and the review link do not count. |
-| Website call | Google, from the forwarding number | Nothing to fire on the site. |
+| Website call (forwarding number) | — | Not used. Exists in Google Ads only. |
 
 One `gtag('event', 'conversion')` makes **three** requests that carry the
 label: `www.googleadservices.com/pagead/conversion/<id>/` (the count),
@@ -115,15 +118,14 @@ label: `www.googleadservices.com/pagead/conversion/<id>/` (the count),
 
 ## Security policy
 
-Both header files carry Google's documented hosts for "Google Ads
-conversions" **plus `https://www.gstatic.com` in `script-src`** — the
-call-forwarding loader lives there and Google's list omits it (blocked, the
-60-second call conversion never records and only a console error says so).
-`next.config.ts` (`GOOGLE_ADS_CSP`) and root `netlify.toml` must stay in sync;
-`lib/__tests__/ads-tracking.test.ts` compares them. Dev only, `next.config.ts`
-also allows `http://www.gstatic.com`: the loader fetches its second script
-protocol-relative, so on `http://localhost` that is an http URL. Production is
-https and never needs it.
+Both header files carry exactly Google's documented hosts for "Google Ads
+conversions" (`googletagmanager.com`, `googleadservices.com`,
+`googleads.g.doubleclick.net`, `pagead2.googlesyndication.com`,
+`www.google.com`, `ad.doubleclick.net`). `next.config.ts` (`GOOGLE_ADS_CSP`)
+and root `netlify.toml` must stay in sync; `lib/__tests__/ads-tracking.test.ts`
+compares them and asserts `www.gstatic.com` is NOT there — that host is only
+needed by the phone snippet the owner ruled out, so its return is the signal
+that decision changed.
 
 ## Outside the site
 
@@ -144,44 +146,43 @@ https and never needs it.
 ### Local (2026-10-02)
 
 Headless Chrome over the DevTools protocol, one clean browser context per
-scenario, against `npm run dev` (http://localhost:3007): **62 / 62** checks —
-organic visit loads nothing · ad visit loads the tag once, visible number and
-every call link unchanged, nothing blocked, no console error · one tap = one
-click-to-call conversion, one Directions click = one directions conversion,
-a Text link fires nothing · with a simulated forwarding-number answer a tap
-dials the forwarding number, the text never changes and the link is put back
-· free-evaluation and contact forms: one lead conversion after a 200, none
+scenario (scratchpad scripts `cdp-harness.mjs` + `verify.mjs`; the method is
+in `DECISIONS.md` and the memory notes). Final, taps-only build, against the
+production build (`next start`, http://localhost:3003): **55 / 55** — organic
+visit loads nothing · ad visit loads the tag once, no `gstatic.com` script
+and no forwarding lookup, visible number and every call link unchanged,
+nothing blocked, no console error · one tap = one click-to-call conversion,
+one Directions click = one directions conversion, a Text link fires nothing ·
+free-evaluation and contact forms: one lead conversion after a 200, none
 after a 500, none on an invalid phone, none for an organic visitor; click ID
 in the POST; product inquiry fires no lead conversion · Essential only / the
 Preferences switch / Global Privacy Control stop everything · the tag never
 starts on `/checkout` or `/order-lookup` · Spanish, `gtm_debug`, `wbraid` and
 client-side navigation behave. Lead POSTs were answered by the test script,
-so no lead, email or database row was created. The same run against the
-production build (`next start`, http://localhost:3003): 57 / 62, the five
-misses all being the http-only block of the call-forwarding script described
-above. Notice buttons and the Preferences switch: 16 / 16 (EN + ES, GPC).
-Built HTML vs the live site for `/`, `/gold-services`, `/silver-services`,
-`/estate-jewelry`, `/free-evaluation`, `/sell/naples`, `/bullion`,
-`/es/gold-services`, `/contact`: title, description, canonical, hreflang, H1,
-JSON-LD and body text identical (the only body differences are the live spot
-prices); no Google tag in any page's HTML.
+so no lead, email or database row was created. Notice buttons and the
+Preferences switch: 16 / 16 (EN + ES, GPC). Built HTML vs the live site for
+`/`, `/gold-services`, `/silver-services`, `/estate-jewelry`,
+`/free-evaluation`, `/sell/naples`, `/bullion`, `/es/gold-services`,
+`/contact`: title, description, canonical, hreflang, H1, JSON-LD and body
+text identical (the only body differences are the live spot prices); no
+Google tag in any page's HTML. (The first, same-day version with the
+forwarding-number swap had passed 62 / 62 on dev and live before it was
+taken out.)
 
-### Live (after the deploy and auto-tagging ON)
+### Live (after a deploy; auto-tagging is ON since 2026-10-02)
 
-1. Open a seller page with `?gclid=test` in a browser without an ad blocker;
-   the tag loads, the number shown stays (239) 404-8505, and every call link
-   dials it (a fake click gets no forwarding number: Google answers
-   `errorCode 2 "no ad click"`).
-2. Add `#google-wcc-debug` to a page URL: Google's own debug panel for the
-   phone snippet appears.
-3. Google Tag Assistant: connect to `https://naplesestatejewelry.com` (it
+1. Open a seller page with `?gclid=test` in a browser without an ad blocker:
+   the tag loads once, no `gstatic.com` script is requested, the number shown
+   stays (239) 404-8505 and every call link dials it.
+2. Google Tag Assistant: connect to `https://naplesestatejewelry.com` (it
    adds `gtm_debug`, which opens the gate).
-4. The real forwarding number can only be seen after a real ad click; Google
-   Ads → Goals → Conversions shows the actions moving from *Inactive* to
-   *No recent conversions* / *Recording conversions*.
-5. A tap on a call link / a Directions click / a test form from such a visit
-   each appear in Google Ads within a few hours (test pings carry a fake
-   click ID and are never credited to an ad).
+3. Google Ads → Goals → Conversions: the website actions read *No recent
+   conversions* once Google has seen the tag (read 2026-10-02) and *Recording
+   conversions* after the first credited one. Only a real ad click can be
+   credited — test pings carry a fake click ID.
+4. The headless run below can be pointed at production with
+   `BASE=https://naplesestatejewelry.com` (it answers the lead POSTs itself,
+   so no lead is created).
 
 ## Code map
 

@@ -11,13 +11,13 @@ const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 // (two-CSP rule) — a host missing from either file blocks the tag in production
 // while it works locally, or the reverse.
 //
-// www.gstatic.com is NOT on Google's list and is needed anyway: the phone
-// snippet (calls through the forwarding number) loads
-// https://www.gstatic.com/wcm/loader.js. Without it the browser blocks that
-// script and the 60-second call conversion never records, with only a console
-// error to say so (measured 2026-10-02).
+// Not listed on purpose: www.gstatic.com. Google's phone snippet (calls through
+// a forwarding number) loads https://www.gstatic.com/wcm/loader.js from there,
+// and the owner ruled the forwarding number out on 2026-10-02 — every call from
+// the site dials the real number. If that ever changes, add the host here AND
+// in netlify.toml, or the snippet is blocked with only a console error to say so.
 const GOOGLE_ADS_CSP = {
-  script: 'https://www.googletagmanager.com https://www.googleadservices.com https://www.google.com https://www.gstatic.com',
+  script: 'https://www.googletagmanager.com https://www.googleadservices.com https://www.google.com',
   img: 'https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://pagead2.googlesyndication.com https://www.google.com',
   connect: 'https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://pagead2.googlesyndication.com https://www.google.com https://ad.doubleclick.net',
   frame: 'https://www.googletagmanager.com',
@@ -32,11 +32,7 @@ const CONTENT_SECURITY_POLICY = [
   `img-src 'self' data: blob: https://evzluixourmsefwdsieu.supabase.co https://s3.tradingview.com https://*.tradingview.com https://*.paypal.com https://*.paypalobjects.com https://*.cloudflarestream.com https://*.videodelivery.net ${GOOGLE_ADS_CSP.img}`,
   // challenges.cloudflare.com is Turnstile (Supabase Auth CAPTCHA) — it needs
   // script-src AND frame-src, and must match root netlify.toml (two-CSP rule).
-  // Dev only, `http://www.gstatic.com`: Google's call-forwarding loader fetches
-  // its second script protocol-relative, so on http://localhost it asks for the
-  // http:// address, which the https entry above does not cover. Production is
-  // https and never needs this.
-  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval' http://www.gstatic.com" : ''} https://s3.tradingview.com https://www.paypal.com https://*.paypalobjects.com https://challenges.cloudflare.com ${GOOGLE_ADS_CSP.script}`,
+  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''} https://s3.tradingview.com https://www.paypal.com https://*.paypalobjects.com https://challenges.cloudflare.com ${GOOGLE_ADS_CSP.script}`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
   `connect-src 'self' https://evzluixourmsefwdsieu.supabase.co https://api.gold-api.com https://s3.tradingview.com https://*.tradingview.com https://*.tradingview-widget.com https://*.paypal.com https://*.cloudflarestream.com https://*.videodelivery.net ${GOOGLE_ADS_CSP.connect}`,

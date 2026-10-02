@@ -13,7 +13,6 @@ import {
   adClickSubjectSuffix,
   adClickSummary,
   dialsBusinessNumber,
-  forwardingTelHref,
   hasAdClick,
   isAdsTagExcludedPath,
   isDirectionsHref,
@@ -32,20 +31,22 @@ const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts),
 // Google Ads conversion measurement (owner decision 2026-10-02, reversing the
 // 2026-09-20 "no site tag" rule). What these tests hold in place:
 //   - Google's script loads ONLY for a visit that came from an ad click;
-//   - the phone number people see is never replaced — only what a tap dials;
+//   - every call dials the real number and the number people see is never
+//     replaced — calls are counted as taps, there is no phone snippet;
 //   - a lead conversion fires once, after the server accepted a SELLER form;
 //   - the security policy allows the tag in BOTH header files.
 
 describe('ads tracking: the account values', () => {
-  it('uses the tag ID and conversion labels created in Google Ads', () => {
+  it('uses the tag ID and the three conversion labels the site fires', () => {
     expect(GOOGLE_TAG_ID).toBe('AW-18463845461');
     expect(GOOGLE_TAG_SCRIPT_URL).toBe('https://www.googletagmanager.com/gtag/js?id=AW-18463845461');
     expect(ADS_CONVERSIONS).toEqual({
       leadForm: 'AW-18463845461/KySvCNOCo44dENXYn-RE',
-      websiteCall: 'AW-18463845461/FIP-CNaCo44dENXYn-RE',
       callTap: 'AW-18463845461/4vRpCNmCo44dENXYn-RE',
       directions: 'AW-18463845461/kH-kCM6d5v4cENXYn-RE',
     });
+    // The forwarding-number action exists in Google Ads and is deliberately not used.
+    expect(JSON.stringify(ADS_CONVERSIONS)).not.toContain('FIP-CNaCo44dENXYn-RE');
   });
 });
 
@@ -203,7 +204,7 @@ describe('ads tracking: links', () => {
     expect(isDirectionsHref(null)).toBe(false);
   });
 
-  it('forwards only the shop’s own number', () => {
+  it('counts a tap only when it dials the shop’s own number', () => {
     expect(dialsBusinessNumber(TEL_HREF)).toBe(true);
     expect(dialsBusinessNumber('tel:+12394048505')).toBe(true);
     expect(dialsBusinessNumber('tel:(239) 404-8505')).toBe(true);
@@ -211,20 +212,6 @@ describe('ads tracking: links', () => {
     expect(dialsBusinessNumber('tel:8884237522')).toBe(false);
     expect(dialsBusinessNumber(smsHref())).toBe(false);
     expect(dialsBusinessNumber(null)).toBe(false);
-  });
-
-  it('turns Google’s forwarding number into a tel: link, and refuses anything that is not one', () => {
-    expect(forwardingTelHref('+12395550123')).toBe('tel:+12395550123');
-    expect(forwardingTelHref('(239) 555-0123')).toBe('tel:2395550123');
-    expect(forwardingTelHref('18005550123')).toBe('tel:18005550123');
-    // Google had no forwarding number and handed back our own: nothing to swap.
-    expect(forwardingTelHref('2394048505')).toBeNull();
-    expect(forwardingTelHref('+1 (239) 404-8505')).toBeNull();
-    expect(forwardingTelHref('555')).toBeNull();
-    expect(forwardingTelHref('javascript:alert(1)')).toBeNull();
-    expect(forwardingTelHref('')).toBeNull();
-    expect(forwardingTelHref(undefined)).toBeNull();
-    expect(forwardingTelHref(2395550123)).toBeNull();
   });
 });
 
@@ -297,19 +284,20 @@ describe('ads tracking: wiring', () => {
     expect(browser).toContain("win.gtag('set', 'allow_ad_personalization_signals', false)");
   });
 
-  it('never replaces the phone number people see', () => {
-    // A callback makes the phone snippet hand the number over instead of
-    // rewriting the page; the forwarding number is used for a tap's dial target.
-    expect(browser).toContain('phone_conversion_number: CONTACT_PHONE_DISPLAY');
-    expect(browser).toContain('phone_conversion_callback');
+  it('runs no phone snippet: every call dials the real number and nothing on the page is rewritten', () => {
+    // Owner, 2026-10-02 evening: no forwarding number. The CALL (not a comment)
+    // would be `gtag('config', …, { phone_conversion_number … })`.
+    expect(browser).not.toMatch(/phone_conversion_number\s*:/);
+    expect(browser).not.toMatch(/phone_conversion_callback\s*:/);
     expect(browser).not.toContain('phone_conversion_css_class');
     expect(browser).not.toMatch(/textContent\s*=|innerHTML\s*=|innerText\s*=/);
-    expect(browser).toContain("anchor.setAttribute('href', forwardingHref)");
-    expect(browser).toContain("window.setTimeout(() => anchor.setAttribute('href', href), 2000)");
-    expect(browser).toContain('dialsBusinessNumber(href)');
+    expect(browser).not.toMatch(/setAttribute\('href'/);
+    expect(browser).not.toContain('gstatic');
+    // Only the shop's number counts as a call lead.
+    expect(browser).toMatch(/if \(dialsBusinessNumber\(href\)\) sendAdsConversion\('callTap'\);/);
   });
 
-  it('fires nothing unless the tag is running, and never blocks a link', () => {
+  it('fires nothing unless the tag is running, and never blocks or changes a link', () => {
     expect(browser).toMatch(/export function sendAdsConversion[\s\S]*?if \(typeof window === 'undefined' \|\| !booted \|\| stopped\) return false;/);
     expect(browser).toMatch(/function onDocumentClick[\s\S]*?if \(!booted \|\| stopped\) return;/);
     expect(browser).not.toContain('preventDefault');
@@ -426,10 +414,12 @@ describe('ads tracking: the notice, the switch and the legal pages say what the 
     }
   });
 
-  it('Privacy and Cookie Preferences describe the measurement, the forwarding number, the switch and GPC — EN and ES', () => {
+  it('Privacy and Cookie Preferences describe the measurement, the real number, the switch and GPC — EN and ES', () => {
     for (const source of [privacyEn, cookiesEn]) {
       expect(source).toContain('Global Privacy Control');
-      expect(source).toMatch(/call-forwarding number/);
+      // No forwarding number is used (owner, 2026-10-02 evening), so the pages must not say one is.
+      expect(source).not.toMatch(/forwarding/);
+      expect(source).toMatch(/dials our regular number/);
       expect(source).toContain('October 2, 2026');
     }
     expect(privacyEn).toContain('Visitors who do not arrive from an ad do not load the Google tag.');
@@ -438,7 +428,8 @@ describe('ads tracking: the notice, the switch and the legal pages say what the 
     expect(cookiesEn).toContain('nej_ads_measurement_v1');
     // Spanish twins.
     expect(spanish).toContain('Global Privacy Control');
-    expect(spanish).toMatch(/número de desvío de Google/);
+    expect(spanish).not.toMatch(/número de desvío/);
+    expect(spanish).toMatch(/nuestro número habitual/);
     expect(spanish).toContain('TradingView');
     expect(spanish).toContain('nej_gclid');
     expect(spanish).toContain("updated: UPDATED_ADS_MEASUREMENT");
@@ -481,18 +472,20 @@ describe('ads tracking: the security policy allows the tag in BOTH header files'
     }
   });
 
-  it('adds only the hosts the tag uses, no wildcard', () => {
+  it('adds only Google’s documented hosts, no wildcard', () => {
     for (const key of ['script', 'img', 'connect', 'frame'] as const) {
       for (const host of nextHosts(key)) {
-        expect(host).toMatch(/^https:\/\/(www\.googletagmanager\.com|www\.googleadservices\.com|googleads\.g\.doubleclick\.net|pagead2\.googlesyndication\.com|www\.google\.com|ad\.doubleclick\.net|www\.gstatic\.com)$/);
+        expect(host).toMatch(/^https:\/\/(www\.googletagmanager\.com|www\.googleadservices\.com|googleads\.g\.doubleclick\.net|pagead2\.googlesyndication\.com|www\.google\.com|ad\.doubleclick\.net)$/);
       }
     }
   });
 
-  it('lets the call-forwarding script load (it is not on Google’s published list)', () => {
-    // https://www.gstatic.com/wcm/loader.js — blocked, the 60-second call
-    // conversion never records and only a console error says so.
-    expect(nextHosts('script')).toContain('https://www.gstatic.com');
-    expect(netlifyDirective('script-src')).toContain('https://www.gstatic.com');
+  it('does not open the policy to the phone snippet’s host (no forwarding number is used)', () => {
+    // https://www.gstatic.com/wcm/loader.js is what the phone snippet loads;
+    // the owner ruled the forwarding number out on 2026-10-02. Adding the host
+    // back is the signal that decision changed — do it in both files.
+    expect(nextHosts('script')).not.toContain('https://www.gstatic.com');
+    expect(netlifyDirective('script-src')).not.toContain('https://www.gstatic.com');
+    expect(nextConfig).not.toMatch(/http:\/\/www\.gstatic\.com/);
   });
 });

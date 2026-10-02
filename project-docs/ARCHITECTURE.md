@@ -854,10 +854,9 @@ Visitor lands with ?gclid=… (auto-tagging)      Visitor lands without one
     shouldLoadAdsTag() = true → inject gtag.js
       gtag('set', allow_ad_personalization_signals, false)
       gtag('config', AW-18463845461)                → page-view hit, _gcl_aw / _gcl_au
-      gtag('config', AW-…/FIP-… , { phone_conversion_callback })
-        → Google's call-tracking script → forwarding number kept in memory
+      (no phone snippet: every call dials the real number — owner, 2026-10-02)
   one capture-phase click listener on document
-    a[href^="tel:"]  → conversion 4vRp… (tap) and, if a number is held, this tap dials it
+    a[href^="tel:"] to the shop's number → conversion 4vRp… (tap); the link is never changed
     Google Maps link → conversion kH-k… (directions)
   EvalForm / MessageUsForm, after res.ok → conversion KySv… (lead)
   every form → gclid/gbraid/wbraid appended at send time
@@ -868,16 +867,17 @@ Visitor lands with ?gclid=… (auto-tagging)      Visitor lands without one
   `lib/ads-tracking.ts` is pure and unit-tested; `ads-tracking-browser.ts` is
   the only module that touches storage or Google. Admin, account, checkout and
   order-lookup paths never start it.
-- **The visible number is never rewritten.** The phone snippet runs with a
-  callback, so Google hands the forwarding number over and the site uses it
-  only as the dial target of a tap. The link's text and resting href stay the
-  real number.
+- **No forwarding number, nothing rewritten.** Calls are counted as taps on a
+  link to the shop's number; the link dials exactly what the page says. The
+  60-second "website call" action exists in Google Ads but the site never
+  fires it (owner's choice: the customer's phone must only ever show the real
+  number).
 - **Consent.** `nej_ads_measurement_v1 = off` (notice "Essential only" or the
   Preferences switch) or Global Privacy Control stops everything and purges
   the click and Google's `_gcl_*` cookies.
-- **Sitewide changes this feature made:** the CSP allows Google's hosts (+
-  `www.gstatic.com`) in both header files; the cookie notice has two buttons
-  and one more sentence; Privacy + Cookie Preferences were rewritten.
+- **Sitewide changes this feature made:** the CSP allows Google's documented
+  Ads hosts in both header files; the cookie notice has two buttons and one
+  more sentence; Privacy + Cookie Preferences were rewritten.
 
 ## Public-shop cache invalidation (2026-07-02)
 
