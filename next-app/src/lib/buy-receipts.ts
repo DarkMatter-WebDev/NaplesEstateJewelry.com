@@ -553,6 +553,27 @@ export function receiptPrintLabel(row: Pick<BuyReceiptRow, 'print_requested_at' 
   return 'Not printed';
 }
 
+/** The ids of the listed receipts that are waiting for the desktop — what the Log watches. */
+export function pendingReceiptIds(rows: Pick<BuyReceiptRow, 'id' | 'print_requested_at' | 'printed_at'>[]): string[] {
+  return rows.filter((row) => isPrintPending(row)).map((row) => row.id).sort();
+}
+
+/**
+ * Fresh copies of some listed receipts folded into the list, order kept. Returns
+ * the SAME array when nothing changed, so a poll that finds no news re-renders nothing.
+ */
+export function mergeFreshReceipts(current: BuyReceiptRow[], fresh: BuyReceiptRow[]): BuyReceiptRow[] {
+  const byId = new Map(fresh.map((row) => [row.id, row]));
+  let changed = false;
+  const next = current.map((row) => {
+    const update = byId.get(row.id);
+    if (!update || update.updated_at === row.updated_at) return row;
+    changed = true;
+    return update;
+  });
+  return changed ? next : current;
+}
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** A route param that can be a receipt id; anything else is a 404, not a database error. */

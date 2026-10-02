@@ -8,6 +8,10 @@
 // Two levels of type, owner ruling 2026-09-30: section titles ("Seller",
 // "Items purchased") are larger and near-black with a gold rule; field labels
 // stay small, uppercase and muted so the title clearly outranks them.
+//
+// Field labels sit UNDER their line (owner, 2026-10-01: the way a paper form
+// reads, and how the signature lines already worked). Table column headings
+// stay on top — they head a column, they do not label one blank.
 
 export const BUY_RECEIPT_SHEET_CSS = `
 .buy-receipt-sheet {
@@ -66,7 +70,7 @@ export const BUY_RECEIPT_SHEET_CSS = `
 }
 .buy-receipt-sheet .brs-label {
   display: block;
-  margin: 0 0 2px;
+  margin: 2px 0 0;
   font-size: 10.5px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -108,7 +112,9 @@ export const BUY_RECEIPT_SHEET_CSS = `
 .buy-receipt-sheet .sheet-input:focus { border-bottom-color: #735c00; background: #fffdf3; box-shadow: 0 1px 0 #735c00; }
 .buy-receipt-sheet .sheet-input::placeholder { color: #a79e8b; }
 .buy-receipt-sheet .brs-right { text-align: right; }
-.buy-receipt-sheet .brs-email-copy { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 11.5px; color: #746b5b; cursor: pointer; }
+/* The Email label and the short "Email copy" box share one line under the field. */
+.buy-receipt-sheet .brs-label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.buy-receipt-sheet .brs-email-copy { display: flex; flex: none; align-items: center; gap: 5px; margin-top: 2px; font-size: 11.5px; line-height: 1.3; white-space: nowrap; color: #746b5b; cursor: pointer; }
 .buy-receipt-sheet .brs-email-copy input { width: 14px; height: 14px; margin: 0; accent-color: #735c00; }
 .buy-receipt-sheet .brs-email-copy:has(input:disabled) { opacity: 0.55; cursor: default; }
 
@@ -283,7 +289,10 @@ export const BUY_RECEIPT_SHEET_CSS = `
   .buy-receipt-sheet .brs-pay-row {
     grid-template-columns: minmax(0, 1fr) 28px;
     grid-template-areas: 'method tools' 'reference reference' 'amount amount';
+    /* No row gap: the two optional rows are usually empty, and their gaps pushed the "Paid by" label away from its line. */
+    row-gap: 0;
   }
+  .buy-receipt-sheet .brs-pay-row > input { margin-top: 8px; }
   .buy-receipt-sheet .brs-pay-row > select { grid-area: method; }
   .buy-receipt-sheet .brs-pay-row > :nth-child(2) { grid-area: reference; }
   .buy-receipt-sheet .brs-pay-row > :nth-child(3) { grid-area: amount; }

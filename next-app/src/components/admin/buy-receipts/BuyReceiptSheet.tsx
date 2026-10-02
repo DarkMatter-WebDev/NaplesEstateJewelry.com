@@ -1,6 +1,6 @@
 'use client';
 
-import { useLayoutEffect, useRef } from 'react';
+import { useId, useLayoutEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { BUSINESS_NAME, cityLine, streetLine } from '@/lib/business-location';
 import { BUSINESS_EMAIL, BUSINESS_PHONE } from '@/lib/order-email-branding';
@@ -194,6 +194,7 @@ function Value({ children }: { children?: ReactNode }) {
 function EditSheet({ draft, onChange, receiptNumber, dateIso, idPhotoSlot, emailCopy = false, onEmailCopyChange }: EditProps) {
   // Set when the owner picks "Check", so the check-number field takes focus as it appears.
   const focusCheckRow = useRef<number | null>(null);
+  const emailId = useId();
 
   const set = (patch: Partial<BuyReceiptDraft>) => onChange({ ...draft, ...patch });
   const setItem = (index: number, patch: Partial<BuyReceiptDraftItem>) =>
@@ -224,62 +225,63 @@ function EditSheet({ draft, onChange, receiptNumber, dateIso, idPhotoSlot, email
       <h2 className="sheet-section-title">Seller</h2>
       <div className="brs-grid">
         <label className="brs-c5">
-          <span className="brs-label">Name</span>
           <input className="sheet-input" value={draft.sellerName} autoComplete="off" onChange={(e) => set({ sellerName: e.target.value })} />
+          <span className="brs-label">Name</span>
         </label>
         <label className="brs-c3">
-          <span className="brs-label">Phone</span>
           <input className="sheet-input" value={draft.sellerPhone} inputMode="tel" autoComplete="off" onChange={(e) => set({ sellerPhone: e.target.value })} />
+          <span className="brs-label">Phone</span>
         </label>
         <div className="brs-c4">
-          <label className="block">
-            <span className="brs-label">Email (optional)</span>
-            <input className="sheet-input" value={draft.sellerEmail} inputMode="email" autoComplete="off" placeholder="name@example.com" onChange={(e) => set({ sellerEmail: e.target.value })} />
-          </label>
-          {onEmailCopyChange && (
-            <label className="no-print brs-email-copy">
-              <input
-                type="checkbox"
-                checked={emailCopy}
-                disabled={!draft.sellerEmail.trim()}
-                onChange={(e) => onEmailCopyChange(e.target.checked)}
-              />
-              <span>Email a copy to the seller when saved</span>
-            </label>
-          )}
+          <input id={emailId} className="sheet-input" value={draft.sellerEmail} inputMode="email" autoComplete="off" placeholder="name@example.com" onChange={(e) => set({ sellerEmail: e.target.value })} />
+          <div className="brs-label-row">
+            <label className="brs-label" htmlFor={emailId}>Email (optional)</label>
+            {onEmailCopyChange && (
+              <label className="no-print brs-email-copy" title="Email a copy to the seller when saved">
+                <input
+                  type="checkbox"
+                  checked={emailCopy}
+                  disabled={!draft.sellerEmail.trim()}
+                  aria-label="Email a copy to the seller when saved"
+                  onChange={(e) => onEmailCopyChange(e.target.checked)}
+                />
+                <span>Email copy</span>
+              </label>
+            )}
+          </div>
         </div>
         <label className="brs-c6">
-          <span className="brs-label">Street</span>
           <input className="sheet-input" value={draft.sellerStreet} autoComplete="off" onChange={(e) => set({ sellerStreet: e.target.value })} />
+          <span className="brs-label">Street</span>
         </label>
         <label className="brs-c3">
-          <span className="brs-label">City</span>
           <input className="sheet-input" value={draft.sellerCity} autoComplete="off" onChange={(e) => set({ sellerCity: e.target.value })} />
+          <span className="brs-label">City</span>
         </label>
         <label className="brs-c1">
-          <span className="brs-label">State</span>
           <input className="sheet-input" value={draft.sellerState} maxLength={2} autoComplete="off" onChange={(e) => set({ sellerState: e.target.value.toUpperCase() })} />
+          <span className="brs-label">State</span>
         </label>
         <label className="brs-c2">
-          <span className="brs-label">ZIP</span>
           <input className="sheet-input" value={draft.sellerZip} inputMode="numeric" maxLength={10} autoComplete="off" onChange={(e) => set({ sellerZip: e.target.value })} />
+          <span className="brs-label">ZIP</span>
         </label>
         <label className="brs-c4">
-          <span className="brs-label">ID type</span>
           <select className="sheet-input" value={draft.sellerIdType} onChange={(e) => set({ sellerIdType: e.target.value })}>
             <option value="">Choose…</option>
             {BUY_RECEIPT_ID_TYPES.map((type) => (
               <option key={type} value={type}>{type}</option>
             ))}
           </select>
+          <span className="brs-label">ID type</span>
         </label>
         <label className="brs-c2">
-          <span className="brs-label">ID last 4</span>
           <input className="sheet-input" value={draft.sellerIdLast4} maxLength={4} autoComplete="off" onChange={(e) => set({ sellerIdLast4: e.target.value })} />
+          <span className="brs-label">ID last 4</span>
         </label>
         <label className="brs-c3">
-          <span className="brs-label">Date of birth</span>
           <input className="sheet-input" type="date" value={draft.sellerDob} onChange={(e) => set({ sellerDob: e.target.value })} />
+          <span className="brs-label">Date of birth</span>
         </label>
       </div>
       {idPhotoSlot}
@@ -329,7 +331,6 @@ function EditSheet({ draft, onChange, receiptNumber, dateIso, idPhotoSlot, email
       </div>
 
       <div className="brs-pay">
-        <span className="brs-label">Paid by</span>
         {draft.payments.map((payment, index) => (
           <div className="brs-pay-row" key={index}>
             <select
@@ -380,6 +381,7 @@ function EditSheet({ draft, onChange, receiptNumber, dateIso, idPhotoSlot, email
             )}
           </div>
         ))}
+        <span className="brs-label">Paid by</span>
         {split && (
           <p className={`brs-hint ${balance.matches ? 'is-ok' : 'is-off'}`} role="status">
             {balance.message}
@@ -388,8 +390,8 @@ function EditSheet({ draft, onChange, receiptNumber, dateIso, idPhotoSlot, email
       </div>
 
       <div className="brs-notes">
-        <span className="brs-label">Notes (optional)</span>
         <AutoGrowTextarea value={draft.notes} maxLength={BUY_RECEIPT_NOTES_MAX} ariaLabel="Notes" onChange={(notes) => set({ notes })} />
+        <span className="brs-label">Notes (optional)</span>
       </div>
 
       <p className="brs-attest">{BUY_RECEIPT_ATTESTATION}</p>
@@ -416,14 +418,14 @@ function PrintSheet({ receipt, idPhotoUrl, showIdPhoto, variant = 'shop' }: Prin
 
       <h2 className="sheet-section-title">Seller</h2>
       <div className="brs-grid">
-        <div className="brs-c5"><span className="brs-label">Name</span><Value>{receipt.seller_name}</Value></div>
-        <div className="brs-c3"><span className="brs-label">Phone</span><Value>{receipt.seller_phone}</Value></div>
-        <div className="brs-c4"><span className="brs-label">Email</span><Value>{receipt.seller_email}</Value></div>
-        <div className="brs-c6"><span className="brs-label">Street</span><Value>{receipt.seller_street}</Value></div>
-        <div className="brs-c6"><span className="brs-label">City, state, ZIP</span><Value>{cityStateZip}</Value></div>
-        <div className="brs-c4"><span className="brs-label">ID type</span><Value>{receipt.seller_id_type}</Value></div>
-        <div className="brs-c2"><span className="brs-label">ID last 4</span><Value>{receipt.seller_id_last4}</Value></div>
-        <div className="brs-c3"><span className="brs-label">Date of birth</span><Value>{formatDob(receipt.seller_dob)}</Value></div>
+        <div className="brs-c5"><Value>{receipt.seller_name}</Value><span className="brs-label">Name</span></div>
+        <div className="brs-c3"><Value>{receipt.seller_phone}</Value><span className="brs-label">Phone</span></div>
+        <div className="brs-c4"><Value>{receipt.seller_email}</Value><span className="brs-label">Email</span></div>
+        <div className="brs-c6"><Value>{receipt.seller_street}</Value><span className="brs-label">Street</span></div>
+        <div className="brs-c6"><Value>{cityStateZip}</Value><span className="brs-label">City, state, ZIP</span></div>
+        <div className="brs-c4"><Value>{receipt.seller_id_type}</Value><span className="brs-label">ID type</span></div>
+        <div className="brs-c2"><Value>{receipt.seller_id_last4}</Value><span className="brs-label">ID last 4</span></div>
+        <div className="brs-c3"><Value>{formatDob(receipt.seller_dob)}</Value><span className="brs-label">Date of birth</span></div>
       </div>
 
       <h2 className="sheet-section-title">Items purchased by {BUSINESS_NAME}</h2>
@@ -454,13 +456,13 @@ function PrintSheet({ receipt, idPhotoUrl, showIdPhoto, variant = 'shop' }: Prin
       </div>
 
       <div className="brs-pay">
-        <span className="brs-label">Paid by</span>
         <Value>{paymentsLine(receipt.payments)}</Value>
+        <span className="brs-label">Paid by</span>
       </div>
 
       <div className="brs-notes">
-        <span className="brs-label">Notes</span>
         <Value>{receipt.notes}</Value>
+        <span className="brs-label">Notes</span>
       </div>
 
       <p className="brs-attest">{BUY_RECEIPT_ATTESTATION}</p>

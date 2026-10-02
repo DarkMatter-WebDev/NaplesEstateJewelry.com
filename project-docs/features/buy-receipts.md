@@ -50,6 +50,22 @@ Only the seller's **first and last name**, **one item** and **how it was paid**
 are required. Everything else may be left blank so the form never holds up a
 sale.
 
+## Label placement
+
+Field labels sit **under** their line, on the form and on every printed copy
+(owner, 2026-10-01); the items table keeps its column headings on top. The
+email box is a short **Email copy** on the same line as the *Email (optional)*
+label (screen only).
+
+## The Log keeps itself current
+
+A row tagged **Waiting for the desktop** is watched: the Log re-reads just the
+waiting rows from Supabase (every 3 s for two minutes, then every 15 s, up to
+half an hour; immediately when the tab comes back to the front) and the tag
+changes to *Printed ×N* without a refresh. Nothing is read while no row is
+waiting or while the tab is hidden. Code: `BuyReceiptLog.tsx` (the watch),
+`pendingReceiptIds` / `mergeFreshReceipts` in `src/lib/buy-receipts.ts`.
+
 ## Emailing the seller their copy
 
 Under the Email field: **Email a copy to the seller when saved** (greyed out

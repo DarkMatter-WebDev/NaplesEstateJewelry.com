@@ -2,13 +2,17 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { createClient } from '@/lib/supabase/client';
 import {
+  BUY_RECEIPT_COLUMNS,
   BUY_RECEIPT_DEFAULT_PRINT_SET,
   BUY_RECEIPT_PRINT_SETS,
   formatReceiptDate,
   formatReceiptTime,
   isPrintPending,
+  mergeFreshReceipts,
   paymentsLine,
+  pendingReceiptIds,
   receiptPrintLabel,
   type BuyReceiptRow,
 } from '@/lib/buy-receipts';
@@ -21,9 +25,20 @@ import { markPrinted, requestPrint } from './buy-receipt-client';
  * number, seller or phone. A row opens the receipt (print options, edit, void,
  * duplicate). "Send to printer" and "Print here" (owner, 2026-09-30) are quick
  * enough to keep on the row; both use the default set — a shop copy and a seller's copy.
+ *
+ * Rows that are "Waiting for the desktop" are WATCHED (owner, 2026-10-01: on the
+ * iPad the tag stayed on "waiting" after the desktop had printed, until a manual
+ * refresh). The page re-reads just those rows straight from Supabase — no
+ * Netlify function — every 3 s for two minutes, then every 15 s for up to half
+ * an hour, and at once when the tab comes back to the front (a tablet freezes
+ * timers in the background). It stops by itself when nothing is waiting.
  */
 
 const SEARCH_DELAY_MS = 300;
+const WATCH_EVERY_MS = 3_000;
+const WATCH_SLOW_EVERY_MS = 15_000;
+const WATCH_FAST_FOR_MS = 2 * 60_000;
+const WATCH_FOR_MS = 30 * 60_000;
 const hintStyle = { color: 'var(--color-on-surface-variant)' } as const;
 
 function Tag({ children, tone }: { children: React.ReactNode; tone: 'gold' | 'red' | 'grey' | 'green' }) {
@@ -76,6 +91,61 @@ export default function BuyReceiptLog({ adminBasePath, initialRows }: { adminBas
       window.clearTimeout(timer);
     };
   }, [query]);
+
+  // Watch the rows that are waiting for the desktop. Keyed by WHICH rows are
+  // waiting, so a row that prints (or a new send) restarts or ends the watch.
+  const pendingKey = pendingReceiptIds(rows).join(',');
+  useEffect(() => {
+    if (!pendingKey) return;
+    const ids = pendingKey.split(',');
+    const supabase = createClient();
+    const startedAt = Date.now();
+    let cancelled = false;
+    let timer = 0;
+    let reading = false;
+
+    const refresh = async () => {
+      if (reading) return;
+      reading = true;
+      try {
+        // Hydrate the session first, or the read goes out as anon and RLS returns nothing.
+        await supabase.auth.getSession();
+        const { data } = await supabase.from('buy_receipts').select(BUY_RECEIPT_COLUMNS).in('id', ids);
+        if (cancelled || !data) return;
+        const fresh = data as unknown as BuyReceiptRow[];
+        setRows((current) => mergeFreshReceipts(current, fresh));
+      } catch {
+        // A missed read is retried on the next tick.
+      } finally {
+        reading = false;
+      }
+    };
+    const schedule = () => {
+      const elapsed = Date.now() - startedAt;
+      if (elapsed > WATCH_FOR_MS) return;
+      timer = window.setTimeout(tick, elapsed < WATCH_FAST_FOR_MS ? WATCH_EVERY_MS : WATCH_SLOW_EVERY_MS);
+    };
+    const tick = async () => {
+      if (cancelled) return;
+      if (document.visibilityState === 'visible') await refresh();
+      if (!cancelled) schedule();
+    };
+    const onReturn = () => {
+      if (document.visibilityState === 'visible') void refresh();
+    };
+
+    schedule();
+    document.addEventListener('visibilitychange', onReturn);
+    window.addEventListener('focus', onReturn);
+    window.addEventListener('pageshow', onReturn);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onReturn);
+      window.removeEventListener('focus', onReturn);
+      window.removeEventListener('pageshow', onReturn);
+    };
+  }, [pendingKey]);
 
   async function send(row: BuyReceiptRow) {
     if (sendingId) return;

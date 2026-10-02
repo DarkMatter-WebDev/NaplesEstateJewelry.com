@@ -1,6 +1,33 @@
 
 # Changelog
 
+## 2026-10-01 (23) — Buy Receipts: every field label now sits UNDER its line (form + printed copies); "Email copy" box beside the Email label — STAGED with (22), awaiting the push (no SQL)
+
+Owner: *"lets do a mockup of the buy receipt form, and see how it looks if we move each field label under the field (under the line)"* → mockup shown → *"yes, build it... but change the long 'email a copy to the seller when saved' box label to simply 'email copy', so we can fit it on the same line to the right of the 'email (optional)' text and save space"*.
+
+- **`BuyReceiptSheet.tsx`** — in edit AND print modes the label follows its field: Name, Phone, Email, Street, City, State, ZIP (print: City, state, ZIP), ID type, ID last 4, Date of birth, Paid by (under the payment rows), Notes. The items table keeps its column headings on top (they head a column). The signature lines already worked this way.
+- **Email cell** — the label and a short **Email copy** checkbox share one line under the field (`.brs-label-row`); the full sentence stays as the box's tooltip and `aria-label`. The Email input is tied to its label by `useId` now that the two are siblings. One line of form height saved on screen; the box never prints.
+- **`buy-receipt-sheet-css.ts`** — `.brs-label` margin `2px 0 0` (was `0 0 2px`); `.brs-label-row`; on phones the payment row has no row gap (its two optional rows are usually empty and their gaps pushed "Paid by" away from its line).
+- **Test** — source guard: no `brs-label` span is followed by an input / select / `Value` / textarea; the print cell is `<Value>…</Value><span class="brs-label">Name</span>`; the box reads `Email copy`.
+- **Verification** — temporary preview page (deleted; folder gone) in headless Chrome: the form at 390 / 768 / 1280 px, no horizontal overflow at any width, labels under every field, "Email (optional)" and "Email copy" on one line at all three; the REAL print path to PDF: shop + seller pair = 2 pages in 1 job, a six-item shop copy = 1 page (label move is height-neutral on paper). `tsc` 0 · lint 0 errors · **1595/1595** · build 0.
+
+## 2026-10-01 (22) — Buy Receipts Log: a row "Waiting for the desktop" now updates by itself — STAGED, awaiting the push (no SQL)
+
+Owner (production, iPad, Chrome): *"when i printed an existing receipt through the desktop, it worked successfully, but on the ipad, the row stuck at 'waiting for printer'… until i refreshed the page manually.. any way to have it update status automatically?"*
+
+- **Cause**: the Log wrote the row once, from the print-request response, and never read it again. Only the after-save panel and the receipt's own page watched a sent job (`ReceiptPrintControls.tsx`); the Log's **Send to printer** (added 09-30) had no watcher.
+- **Fix** (`next-app/src/components/admin/buy-receipts/BuyReceiptLog.tsx`): while any listed row is waiting, the page re-reads JUST those rows straight from Supabase under the admin session (`.in('id', ids)` — no Netlify function, no new route): every 3 s for the first two minutes, then every 15 s, for up to 30 minutes; plus an immediate read on `visibilitychange` / `focus` / `pageshow`, because a tablet freezes timers while the tab is in the background. It reads nothing while the tab is hidden and stops by itself when no row is waiting. This also covers a job sent from ANOTHER device (laptop form → the iPad's Log shows it print).
+- **Pure helpers** in `next-app/src/lib/buy-receipts.ts`: `pendingReceiptIds(rows)` and `mergeFreshReceipts(current, fresh)` (keeps the order; returns the same array when nothing changed, so an idle poll re-renders nothing).
+- **Verification**: new unit test (waiting ids; no-news merge is identity; a printed row replaces its entry and the tag reads *Printed ×2*; source guards for the direct read and the return-to-tab listener). `tsc` 0 · lint 0 errors · **1595/1595** · build 0. Dev Log page in the owner's Chrome: loads, no console errors, and makes NO `buy_receipts` reads when nothing is waiting. ⚠️ **Not exercised end to end**: that needs a real job through the desktop station (two sheets of paper), so it was not sent from here — the owner's next print from the iPad is the check.
+
+## 2026-10-01 (21) — (20) DEPLOYED (owner pushed); live-verified; BUY-00002 emailed again to the owner at 10:18 PM ET (Sep 30) with the round-two layout
+
+Owner: *"pushed and deployed, verify it live and email BUY-00002 again"*.
+
+- **Signed out, production:** the email logo → 200 `image/png`; `/admin/buy-receipts` → 307; the email route → 401; `/` → 200.
+- **Signed in (owner's Chrome):** BUY-00002 → **Email again** → status card *Emailed to rcman12589@aol.com · Sep 30, 2026 · 10:18 PM* (was 9:29 PM), no error.
+- ⚠️ The inbox check is the owner's: Paid by + Total on one line, "Received by:" above the signature, three centred footer lines.
+
 ## 2026-10-01 (20) — Buy Receipts: seller email, round two (totals on one line, "Received by:" above the signature, three-line footer) — STAGED, awaiting the push (no SQL)
 
 Owner, on the deployed (18) email: *"move the dollar amount and the 'paid by' answer closer to the labels… move 'received by' up above the signature area, and add a ':'… make sure the 'date' label under the line is snug up against it, on the same line as 'Christopher Surette, Naples Estate Jewelry'… put 'thank you for choosing Naples Estate Jewelry' centered on its own line… the 'questions…' line centered on its own line too."* Then over mockups v6–v10: signature a tiny bit larger (14 → 17 px) and sitting on its rule; *"move 'total paid to seller' and its total to the right, so the dollar value lines up with the other dollar values… move 'paid by' up onto the same line and keep it anchored left… bold 'paid by: cash' similarly"*; and on the real render: the two captions under the line at the body size.

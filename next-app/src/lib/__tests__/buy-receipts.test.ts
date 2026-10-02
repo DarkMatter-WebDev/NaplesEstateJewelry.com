@@ -19,6 +19,8 @@ import {
   formatReceiptDateTime,
   isClaimStale,
   isPrintPending,
+  mergeFreshReceipts,
+  pendingReceiptIds,
   isReceiptId,
   normalizeBuyReceiptInput,
   parseBuyAmount,
@@ -243,6 +245,10 @@ describe('print sets', () => {
     expect(sheet).toContain("const withId = !sellerCopy && Boolean(showIdPhoto && idPhotoUrl);");
     expect(sheet).toContain('{sellerCopy && <p className="brs-thanks">');
     expect(readFileSync(join(process.cwd(), 'src', 'lib', 'signature-font.ts'), 'utf8')).toContain('Alex_Brush');
+    // Field labels sit UNDER their line, on screen and on paper (owner, 2026-10-01).
+    expect(sheet).not.toMatch(/<span className="brs-label">[^<]+<\/span>\s*<(input|select|Value|AutoGrowTextarea)/);
+    expect(sheet).toContain('<Value>{receipt.seller_name}</Value><span className="brs-label">Name</span>');
+    expect(sheet).toContain('<span>Email copy</span>');
   });
 });
 
@@ -276,6 +282,31 @@ describe('print-station helpers', () => {
     expect(receiptPrintLabel({ print_requested_at: null, printed_at: null, print_count: 0 })).toBe('Not printed');
     expect(receiptPrintLabel({ print_requested_at: null, printed_at: '2026-09-30T18:00:05Z', print_count: 2 })).toBe('Printed ×2');
     expect(receiptPrintLabel({ print_requested_at: '2026-09-30T18:00:00Z', printed_at: null, print_count: 0 })).toBe('Waiting for the desktop');
+  });
+  it('the Log watches the waiting rows and folds fresh copies in', () => {
+    const base = sampleBuyReceipt('2026-09-30T18:00:00.000Z');
+    const waiting = { ...base, id: 'b', print_requested_at: '2026-09-30T18:00:00Z', printed_at: null };
+    const idle = { ...base, id: 'a' };
+    expect(pendingReceiptIds([waiting, idle])).toEqual(['b']);
+    expect(pendingReceiptIds([idle])).toEqual([]);
+
+    const list = [waiting, idle];
+    // No news: the very same array, so nothing re-renders.
+    expect(mergeFreshReceipts(list, [{ ...waiting }])).toBe(list);
+    // The desktop printed: that row is replaced, the order and the other row are kept.
+    const printed = { ...waiting, print_requested_at: null, printed_at: '2026-09-30T18:00:09Z', print_count: 2, updated_at: '2026-09-30T18:00:09.000Z' };
+    const merged = mergeFreshReceipts(list, [printed]);
+    expect(merged.map((row) => row.id)).toEqual(['b', 'a']);
+    expect(merged[0]).toBe(printed);
+    expect(merged[1]).toBe(idle);
+    expect(pendingReceiptIds(merged)).toEqual([]);
+    expect(receiptPrintLabel(merged[0])).toBe('Printed ×2');
+
+    const source = readFileSync(join(process.cwd(), 'src', 'components', 'admin', 'buy-receipts', 'BuyReceiptLog.tsx'), 'utf8');
+    expect(source).toContain("select(BUY_RECEIPT_COLUMNS).in('id', ids)");
+    expect(source).toContain("document.addEventListener('visibilitychange', onReturn)");
+    // Straight from Supabase under the admin session — never a new polling route.
+    expect(source).toContain('await supabase.auth.getSession()');
   });
 });
 
