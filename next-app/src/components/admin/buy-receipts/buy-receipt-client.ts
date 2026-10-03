@@ -8,6 +8,7 @@ import {
   type BuyReceiptDraft,
   type BuyReceiptRow,
 } from '@/lib/buy-receipts';
+import { CUSTOMER_MODE_API } from '@/lib/buy-receipt-customer-mode';
 import { prepareLeadPhotos } from '@/lib/lead-photo-prep';
 
 /**
@@ -34,21 +35,72 @@ function json(method: string, body: unknown): RequestInit {
   return { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) };
 }
 
-export type CreateReceiptResult = { receipt: BuyReceiptRow; emailed: boolean; emailError: string | null } | { error: string };
+export type CreateReceiptResult =
+  | { receipt: BuyReceiptRow; emailed: boolean; emailError: string | null; mailingList: 'added' | 'failed' | null }
+  | { error: string };
 
-/** `emailCopy` asks the server to email the seller their copy as part of the save. */
+/**
+ * `emailCopy` asks the server to email the seller their copy as part of the
+ * save; `mailingList` asks it to add the seller's email to the mailing list
+ * (a seller ticked that box on the customer input screen).
+ */
 export async function createReceipt(
   draft: BuyReceiptDraft,
   duplicatedFrom: string | null,
   emailCopy = false,
+  mailingList = false,
 ): Promise<CreateReceiptResult> {
   try {
-    const res = await fetch('/api/admin/buy-receipts', json('POST', { ...draft, duplicatedFrom, emailCopy }));
-    const data = (await res.json().catch(() => ({}))) as { receipt?: BuyReceiptRow; error?: string; emailed?: boolean; emailError?: string | null };
+    const res = await fetch('/api/admin/buy-receipts', json('POST', { ...draft, duplicatedFrom, emailCopy, mailingList }));
+    const data = (await res.json().catch(() => ({}))) as {
+      receipt?: BuyReceiptRow;
+      error?: string;
+      emailed?: boolean;
+      emailError?: string | null;
+      mailingList?: string | null;
+    };
     if (!res.ok || !data.receipt) return { error: data.error ?? 'Could not save the receipt.' };
-    return { receipt: data.receipt, emailed: data.emailed === true, emailError: data.emailError ?? null };
+    return {
+      receipt: data.receipt,
+      emailed: data.emailed === true,
+      emailError: data.emailError ?? null,
+      mailingList: data.mailingList === 'added' || data.mailingList === 'failed' ? data.mailingList : null,
+    };
   } catch {
     return { error: OFFLINE };
+  }
+}
+
+/** Customer input mode: lock this browser before the tablet is handed over. */
+export async function startCustomerMode(): Promise<{ locked: true } | { error: string }> {
+  try {
+    const res = await fetch(CUSTOMER_MODE_API, { method: 'POST' });
+    const data = (await res.json().catch(() => ({}))) as { locked?: boolean; error?: string };
+    if (!res.ok || data.locked !== true) return { error: data.error ?? 'Could not start customer input mode.' };
+    return { locked: true };
+  } catch {
+    return { error: OFFLINE };
+  }
+}
+
+export type EndCustomerModeResult =
+  | { unlocked: true }
+  | { error: string; reason: 'wrong' | 'wait' | 'signed-out' | 'offline'; waitSeconds?: number };
+
+/** Customer input mode: the staff code, checked on the server. Only a right code unlocks the browser. */
+export async function endCustomerMode(code: string): Promise<EndCustomerModeResult> {
+  try {
+    const res = await fetch(CUSTOMER_MODE_API, json('DELETE', { code }));
+    const data = (await res.json().catch(() => ({}))) as { locked?: boolean; error?: string; waitSeconds?: number };
+    if (res.ok && data.locked === false) return { unlocked: true };
+    if (res.status === 429) {
+      return { error: data.error ?? 'Too many tries. Wait half a minute, then try again.', reason: 'wait', waitSeconds: data.waitSeconds ?? 30 };
+    }
+    if (res.status === 401) return { error: 'The sign-in on this device has ended. Sign in again, then enter the code.', reason: 'signed-out' };
+    if (res.status === 403) return { error: data.error ?? 'That code is not right.', reason: 'wrong' };
+    return { error: data.error ?? 'The code could not be checked. Try again.', reason: 'offline' };
+  } catch {
+    return { error: OFFLINE, reason: 'offline' };
   }
 }
 

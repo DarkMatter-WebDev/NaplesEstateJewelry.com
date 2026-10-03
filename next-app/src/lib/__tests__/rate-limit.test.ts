@@ -4,7 +4,7 @@ const createServiceClient = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/supabase/service', () => ({ createServiceClient }));
 
-import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { checkRateLimit, getClientIp, rateLimitState } from '@/lib/rate-limit';
 
 describe('checkRateLimit', () => {
   beforeEach(() => {
@@ -37,6 +37,41 @@ describe('checkRateLimit', () => {
     });
 
     await expect(checkRateLimit('test:192.0.2.1', 5, 60)).resolves.toBe(false);
+  });
+
+  it('refuses once the shared counter says the limit is passed', async () => {
+    createServiceClient.mockReturnValue({ rpc: vi.fn().mockResolvedValue({ data: false, error: null }) });
+
+    await expect(checkRateLimit('test:192.0.2.1', 5, 60)).resolves.toBe(false);
+  });
+});
+
+// The same counter, for a caller that must tell "over the limit" from "the
+// counter could not be reached" (the buy receipt's staff-code keypad).
+describe('rateLimitState', () => {
+  beforeEach(() => {
+    createServiceClient.mockReset();
+  });
+
+  it('reports ok, limited and unavailable as three different things', async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: true, error: null });
+    createServiceClient.mockReturnValue({ rpc });
+    await expect(rateLimitState('code:admin-1', 5, 30)).resolves.toBe('ok');
+    expect(rpc).toHaveBeenCalledWith('check_rate_limit', { p_key: 'code:admin-1', p_max: 5, p_window_seconds: 30 });
+
+    createServiceClient.mockReturnValue({ rpc: vi.fn().mockResolvedValue({ data: false, error: null }) });
+    await expect(rateLimitState('code:admin-1', 5, 30)).resolves.toBe('limited');
+
+    createServiceClient.mockReturnValue({ rpc: vi.fn().mockResolvedValue({ data: null, error: new Error('database unavailable') }) });
+    await expect(rateLimitState('code:admin-1', 5, 30)).resolves.toBe('unavailable');
+
+    createServiceClient.mockReturnValue({ rpc: vi.fn().mockRejectedValue(new Error('network')) });
+    await expect(rateLimitState('code:admin-1', 5, 30)).resolves.toBe('unavailable');
+
+    createServiceClient.mockImplementation(() => {
+      throw new Error('missing credentials');
+    });
+    await expect(rateLimitState('code:admin-1', 5, 30)).resolves.toBe('unavailable');
   });
 });
 

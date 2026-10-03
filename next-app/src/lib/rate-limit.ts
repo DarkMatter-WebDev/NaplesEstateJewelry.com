@@ -19,11 +19,30 @@ export async function checkRateLimit(
   max: number,
   windowSeconds: number,
 ): Promise<boolean> {
+  return (await rateLimitState(key, max, windowSeconds)) === 'ok';
+}
+
+export type RateLimitState = 'ok' | 'limited' | 'unavailable';
+
+/**
+ * The same counter, for the rare caller that must tell "over the limit" from
+ * "the limiter itself could not be reached". `checkRateLimit` treats both as a
+ * refusal (fails closed); a caller that reads this instead decides for itself.
+ *
+ * Added for the buy receipt's staff-code keypad (2026-10-03): the code is
+ * already behind an admin sign-in, and a limiter outage must not leave a
+ * tablet that the right code cannot unlock.
+ */
+export async function rateLimitState(
+  key: string,
+  max: number,
+  windowSeconds: number,
+): Promise<RateLimitState> {
   let service;
   try {
     service = createServiceClient();
   } catch {
-    return false;
+    return 'unavailable';
   }
   try {
     const { data, error } = await service.rpc('check_rate_limit', {
@@ -31,10 +50,10 @@ export async function checkRateLimit(
       p_max: max,
       p_window_seconds: windowSeconds,
     });
-    if (error) return false;
-    return data !== false;
+    if (error) return 'unavailable';
+    return data === false ? 'limited' : 'ok';
   } catch {
-    return false;
+    return 'unavailable';
   }
 }
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
+import { addSellerToMailingList } from '@/lib/buy-receipt-mailing-list';
 import { sendBuyReceiptEmail } from '@/lib/buy-receipt-mailer';
 import {
   BUY_RECEIPT_COLUMNS,
@@ -11,11 +12,14 @@ import {
 
 /**
  * Admin → Buy Receipts. POST saves a new receipt (and, with `emailCopy: true`
- * and a seller email, emails the seller their copy); GET lists / searches the log.
+ * and a seller email, emails the seller their copy; with `mailingList: true`,
+ * adds that email to the mailing list); GET lists / searches the log.
  *
  * Runs on requireAdmin()'s request-scoped client (the `authenticated` role), so
  * the table's admin RLS policy AND its grant are what let this work — see
- * supabase/buy-receipts-2026-09.sql. Never the service role.
+ * supabase/buy-receipts-2026-09.sql. Never the service role. (The mailing-list
+ * sign-up is a different table with its own service-only function; it lives in
+ * lib/buy-receipt-mailing-list.ts and never touches `buy_receipts`.)
  */
 export const runtime = 'nodejs';
 
@@ -68,7 +72,17 @@ export async function POST(req: Request) {
       }
     }
   }
-  return NextResponse.json({ receipt, emailed, emailError }, { status: 201 });
+
+  // "Add me to the mailing list" (owner, 2026-10-03): a seller ticked it on the
+  // customer input screen. Done here, on the save, so an email the owner
+  // corrected on the form is the one that joins. Like the emailed copy, a
+  // failure never costs the receipt — it is reported.
+  let mailingList: 'added' | 'failed' | null = null;
+  if (body?.mailingList === true && receipt.seller_email) {
+    const added = await addSellerToMailingList({ email: receipt.seller_email, name: receipt.seller_name });
+    mailingList = added.ok ? 'added' : 'failed';
+  }
+  return NextResponse.json({ receipt, emailed, emailError, mailingList }, { status: 201 });
 }
 
 export async function GET(req: Request) {

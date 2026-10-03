@@ -5,23 +5,48 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-10-03 (4) — Buy Receipts: Cash App + PayPal, and Delete on the Log — BUILT + gated + STAGED; **awaiting the owner's push** (same push as (1)–(3) below)
+### 🟡 2026-10-03 (5)–(7) — Buy receipt "Customer input mode": **BUILT + gated + STAGED, awaiting the owner's push** — then ⛔ the owner's own try on the iPad before a seller uses it (no SQL, no env vars)
+
+Record: `CHANGELOG.md` 2026-10-03 (7) (the build), (6) and (5) (the two mockups). Runbook: `features/buy-receipts.md` → *Customer input mode* (how to use it, the lock, Guided Access, what to do if it sticks). Rules: `DECISIONS.md` → *"Customer input mode (2026-10-03)"*.
+
+**Owner's go-ahead (10-03, verbatim):** *"make sure the buy receipt form stays as it is in production now.. so stays the same, and the custoemr input mode is optional.. allow us to stay on the normal input form if we want to... the mockup shows the customer input mode as the only way to input customer data... keep the date of birth with the admin like the ID... make sure to take into account what i just said, and build it.. so the only change we should see to the page is the new button.. which then enters into the new mode"*
+
+**What was built:** the form is unchanged; ONE small **Customer input mode** button at the right end of the tabs row. It locks the browser on the server, then shows the seller seven boxes (name, phone, street, city, state, ZIP, email-optional — **no ID, no date of birth**), Save at the bottom, unfinished boxes flagged, **Submit unfinished** behind the staff code, a locked **Thank you** screen, a small **Staff** button. With an email typed: "Email me a copy of my receipt" and "Add me to the mailing list" (added when the owner saves the receipt). Afterwards the form shows a line only if there is something to act on. While locked, that tablet cannot open any admin or account page, call any admin API, or keep another admin tab open.
+
+1. ◻ **Owner: push + deploy** (one push; nothing to run in Supabase, nothing to set in Netlify).
+2. ◻ **Owner, right after the deploy, on the iPad — try it yourself before a seller does** (Chromium cannot prove Safari; `DECISIONS.md` → *"Admin on a phone (2026-09-02)"*). Admin → Buy Receipts → **Customer input mode**, then check:
+   - the boxes and **Save** stay above the keyboard, sideways and upright, and nothing can be dragged or scrolled;
+   - Save with a box empty → red boxes + **Submit unfinished** → the code → back on your form with a yellow line naming what is unfinished;
+   - a complete Save → **Thank you** → **Staff: unlock** → the code → your form with the details in it;
+   - type `naplesestatejewelry.com/admin/orders` in the address bar while it is in the mode → it should land back on the customer screen;
+   - tick **Add me to the mailing list** with a test email, save the receipt → "Mailing list: Added" on the saved panel, and the address under Admin → Subscribers marked **Buy receipt** (then delete that test subscriber and receipt).
+   If anything is off, do not use the button — the form itself is unaffected — and tell Claude what you saw.
+3. ◻ **Owner, optional but recommended: Guided Access on the iPad** (one-time setup + three taps per hand-over — `features/buy-receipts.md` → *One-time iPad setup*). It is the only thing that stops a seller opening another website or app; the site's lock covers only this site's back end.
+4. ℹ️ **Not verified by Claude (no admin sign-in on the dev server, no iPad):** the real lock cookie being set and cleared, a typed admin address on a signed-in locked browser, the mailing-list write against the real database, Safari's keyboard and touch behaviour. Everything else is listed under *Verification* in the runbook.
+5. ℹ️ **The staff code is in one source file** (`next-app/src/lib/buy-receipt-staff-code.ts`, server-only), so it is also in the GitHub repo. It only works on a browser already signed in as an admin. Changing it = that one line + a deploy.
+
+**Gate (final code, 10-03 ~5 PM ET):** `npx tsc --noEmit` 0 · `npm run lint` 0 errors (3 older `<img>` warnings) · `npx vitest run` **1704/1704** (159 files; 53 new) · `npm run build` 0, 88 prerendered routes (41 EN + 41 ES + 6). Browser checks on the real components (temporary login-free pages, deleted): flow **108/108**, touch **11/11**, two tabs **11/11**; dev-server redirects with and without the lock cookie as designed.
+
+**Staging (10-03 (7)):** ✅ synced 2026-10-03 ~5:10 PM ET — dry run listed exactly the 35 touched files (27 under `next-app/src`: `proxy.ts`, `api/admin/buy-receipts/route.ts`, `…/customer-mode/route.ts` + its test, `[locale]/account/layout.tsx`, `[locale]/admin/buy-receipts/page.tsx`, the two order print pages, `AdminHeader.tsx`, six files in `components/admin/buy-receipts/` (three new), seven in `lib/` (four new), four tests (two new); 8 docs), 0 Extras, 1213 total; real run copied 35 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0, exit 0; leak check 0 `.env*` / `.log` / `.tmp-*` / `tsbuildinfo`, no node_modules / .next / .git, launch.json present; no `zz-*` preview page and no `admin/layout.tsx` in source or staging; positive control 241 = 241 `.tsx`, 484 = 484 `.ts`; SHA-256 MATCH on 35 of 35; the staged form carries the button, the staged route `isBuyReceiptStaffCode(body?.code)`, the staged proxy `customerModeRedirect(request)`; `BuyReceiptSheet.tsx` was not among the copied files (unchanged).
+
+
+### 🟢 2026-10-03 (4) — Buy Receipts: Cash App + PayPal, and Delete on the Log — **DEPLOYED** (owner, 10-03 ~3:30 PM ET: *"pushed and deployed, verified live, no need to check"*)
 
 Record: `CHANGELOG.md` 2026-10-03 (4). Rules: `DECISIONS.md` → *"Buy receipts…"* (delete bullet, paid-by bullet). Runbook: `features/buy-receipts.md` → *Deleting*. **No SQL, no env vars.**
 
-1. ◻ **Owner: push + deploy.**
-2. ◻ **Owner, first real use (this is the live test — Claude could not sign in as admin):** Admin → Buy Receipts → Log → the red trash-can on **BUY-00002** (the $1 test) → *Delete this receipt* → the row should disappear and "BUY-00002 was deleted." appear. Then the same for the void test **BUY-00001**. Tell Claude if either says "Nothing was deleted".
+1. ✅ **Pushed + deployed** (owner) — one push carried (1)–(4).
+2. ✅ **Verified live by the owner** (their word; Claude did not check production, as told).
 3. ◻ **Owner, next real purchase paid that way:** pick **Cash App** or **PayPal** in "Paid by" — it should print on the paper and show in the Log.
 4. ℹ️ Delete is permanent (the receipt and its ID photo; the number is not reused). For a real purchase that was reversed use **Void**, which keeps the record. If a recycle bin like the one Orders and Messages have is wanted for receipts, that is a separate change with one SQL step — on request.
 5. ℹ️ On screens under 1100 px wide (an iPad on its side) the Log's buttons are slightly tighter so all four fit; before today that row was already 7 px too wide there.
 
 **Staging (10-03 (4)):** ✅ synced 2026-10-03 ~3:15 PM ET — dry run listed exactly the 11 touched files (`api/admin/buy-receipts/[id]/route.ts`, `buy-receipt-client.ts`, `BuyReceiptLog.tsx`, `lib/buy-receipts.ts`, `lib/__tests__/buy-receipts.test.ts`, CHANGELOG, CURRENT_STATUS, DECISIONS, INTEGRITY, TASKS, `features/buy-receipts.md`), 0 Extras, 1201 total; real run copied 11 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0, exit 0; leak check 0 `.env*` / `.log` / `.git` / `.tmp-*`, no node_modules / .next, launch.json present; positive control 238 = 238 `.tsx`; no `zz-*` preview page in source or staging; SHA-256 MATCH on 11 of 11; the staged route carries `export async function DELETE`, the staged lib carries `cashapp: 'Cash App'`. Gate for this state: `tsc` 0 · lint 0 errors · 1651/1651 · build 0. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 
-### 🟡 2026-10-03 (2) — New storefront photo in all four placements; homepage row = wide photo beside the square map (owner's Option B) — BUILT + gated + STAGED; **awaiting the owner's push** (goes out with (1) below)
+### 🟢 2026-10-03 (2) — New storefront photo in all four placements; homepage row = wide photo beside the square map (owner's Option B) — **DEPLOYED** (owner, 10-03 ~3:30 PM ET, "verified live")
 
 Record: `CHANGELOG.md` 2026-10-03 (2). Rules: `DECISIONS.md` → *"The storefront photo says which door…"* (2026-10-03 bullet). No SQL, no env vars.
 
-1. ◻ **Owner: push + deploy** (one push carries this and the Print Station fix). Then the homepage "Come See Us Today", the contact page, `/sell/naples` and `/card` show the new photo.
+1. ✅ **Pushed + deployed + verified live by the owner** (10-03 ~3:30 PM ET): the homepage "Come See Us Today", the contact page, `/sell/naples` and `/card` carry the new photo.
 2. ✅ **Old photo file removed** (owner: "remove the old photo", 10-03 ~12:35 PM) — `showroom-storefront.webp` deleted after a reference scan (0 uses); the test now asserts it stays gone; tests + build re-run clean (`CHANGELOG.md` 2026-10-03 (3)).
 3. ✅ **Google Ads + Business Profile** (owner: "swap in the new photo on gbp and google ads", done 10-03 ~12:45 PM in the second-PC Chrome; `CHANGELOG.md` 2026-10-03 (3)): Google Ads — two new storefront image assets on the campaign (**Pending — Under review**), the two old ones removed from it (28 assets; 16 images = 14 Eligible + 2 Pending). Business Profile — the photo uploaded, badge **PENDING**.
    - ◻ **Claude, next ads read (~10-05):** the two new image assets should read Eligible; if one is disapproved, read the reason (hover the status) before re-cutting — ⛔ straight crops only, never padding.
@@ -32,12 +57,12 @@ Record: `CHANGELOG.md` 2026-10-03 (2). Rules: `DECISIONS.md` → *"The storefron
 
 **Staging (10-03 (3), old photo removed):** ✅ synced 2026-10-03 ~12:55 PM ET — dry run listed 5 changed files (`storefront-photo.test.ts`, CHANGELOG, CURRENT_STATUS, STRUCTURE, TASKS) and exactly **1 Extra** in staging, the old `showroom-storefront.webp`; real run copied 5, removed that 1, 0 FAILED (robocopy exit 3 = copied + extras removed); follow-up dry run 0, exit 0; the old photo is gone from staging and the `-v2` file is there; leak check 0, launch.json present; 238 = 238 `.tsx`; SHA-256 MATCH on 5 of 5; 1201 files total. Gate: `tsc` 0 · 1647/1647 · build 0. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 
-### 🟡 2026-10-03 (1) — Print Station desktop shortcut fixed (was 260 characters, Windows keeps 259) — BUILT + gated + STAGED; **awaiting the owner's push**
+### 🟢 2026-10-03 (1) — Print Station desktop shortcut fixed (was 260 characters, Windows keeps 259) — **DEPLOYED** (owner, 10-03 ~3:30 PM ET, "verified live")
 
 Record: `CHANGELOG.md` 2026-10-03 (1). Rule: `DECISIONS.md` → *"Buy receipts…"* (shortcut-length bullet). Runbook: `features/buy-receipts.md` → *Why each part of the shortcut matters*. No SQL, no env vars.
 
-1. ◻ **Owner: push + deploy.** After it, the shortcut already on the printer PC (the one that opened `…/statio`) lands on the Print Station by itself — **nothing to re-make**. The setup box on the station page now shows the shorter text (247 characters, opens `/admin/station`) for any future shortcut.
-2. ◻ **Owner, once after the deploy:** open the desktop shortcut on the printer PC → it should show the Print Station, not the dead page. Tell Claude if it does not.
+1. ✅ **Pushed + deployed** (owner, 10-03). The shortcut already on the printer PC (the one that opened `…/statio`) lands on the Print Station by itself — **nothing to re-make**. The setup box on the station page shows the shorter text (247 characters, opens `/admin/station`) for any future shortcut.
+2. ◻ **Owner, if not already done:** open the desktop shortcut on the printer PC once → it should show the Print Station, not the dead page. Tell Claude if it does not. (The owner's "verified live" on 10-03 did not say which parts were checked.)
 3. ℹ️ Not verified by Claude: production and the real shortcut (no unrequested production checks). Locally: both addresses forward with a 307, the station still requires the login.
 
 **Staging (10-03 (1)):** ✅ synced 2026-10-03 ~11:35 AM ET — dry run listed exactly the 10 touched files (`StationSetupHelp.tsx`, `lib/buy-receipts.ts`, `lib/legacy-redirects.ts`, `lib/__tests__/buy-receipts.test.ts`, CHANGELOG, CURRENT_STATUS, DECISIONS, INTEGRITY, TASKS, `features/buy-receipts.md`), 0 Extras, 1201 total; real run copied 10 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0, exit 0; leak check 0 `.env*` / `.log` / `.git` / `.tmp-*`, no node_modules / .next, launch.json present; positive control 238 = 238 `.tsx`; SHA-256 MATCH on 10 of 10; the staged redirect table carries both `/admin/station` and `/admin/buy-receipts/statio`. Gate for this state: `tsc` 0 · lint 0 errors · 1643/1643 · build 0. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.

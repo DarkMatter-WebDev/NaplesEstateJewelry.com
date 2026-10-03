@@ -7,8 +7,12 @@
 > 2026-10-03: the desktop shortcut text was one character too long for Windows
 > — fixed (short address `/admin/station`; the old cut-off shortcut is
 > forwarded too). Same day: **Cash App and PayPal** added to "Paid by", and a
-> **Delete** button on every Log row (see *Deleting*). All STAGED, awaiting the
-> push; no SQL.
+> **Delete** button on every Log row (see *Deleting*). Deployed the same
+> afternoon (owner: "pushed and deployed, verified live"); no SQL.
+> 2026-10-03, later: **Customer input mode** — one optional button on the New
+> receipt form that hands the tablet to the seller on a locked screen (see
+> *Customer input mode*). BUILT + gated + STAGED, awaiting the push; no SQL, no
+> env vars. ⛔ Not yet tried with a real sign-in or on the real iPad.
 
 The receipt for something the shop **buys** from a customer at the counter.
 The owner fills it in on a laptop beside the seller, it is saved to a log in
@@ -98,6 +102,262 @@ a phone (under 520 px) one field per row, each item row becomes a small block
 (description, then qty / amount / remove), payments stack, and inputs are 16 px
 so iOS does not zoom. The webcam starts with the rear camera there. The print
 output is unchanged — every reflow rule is `@media screen`.
+
+## Customer input mode (2026-10-03)
+
+Owner: *"i want to be able to enter a 'customer input mode' on the buy receipt
+input… show the customer entry fields only… lock the screen to be
+unscrollable, especially on tablet mode… a 'save' button at the bottom… if
+they try to save without filling out all fields it flags the unfinished field…
+a button to submit unfinished but asks them to hand back to admin for override
+code… the goal is an unscrollable form where they cant access other parts of
+the website back end."* Then, after two mockups: *"make sure the buy receipt
+form stays as it is in production now… the customer input mode is optional…
+allow us to stay on the normal input form if we want to… keep the date of birth
+with the admin like the ID… the only change we should see to the page is the
+new button."*
+
+### What it is
+
+**The form is unchanged and still fills in everything by itself.** The one new
+thing on the page is a small **Customer input mode** button at the right end
+of the tabs row (New receipt · Log · Print station). Ignore it and nothing is
+different. Tap it and the tablet shows the **seller** a locked screen with only
+their own contact boxes; when it comes back, the form simply has those details
+in it.
+
+1. (Optional) type whatever you like on the form first — items, prices, the ID
+   part. It all stays.
+2. Tap **Customer input mode**. The button says *Locking…* for a moment: the
+   server locks the browser first (below). If that fails, a red line says the
+   tablet is **not** locked and must not be handed over.
+3. Hand the tablet over. The seller sees **Your information** with seven
+   boxes: first and last name · phone · street address · city · state (starts
+   as `FL`) · ZIP · email *(optional)*. **No ID type, no ID last 4, no date of
+   birth, no ID photo, no items, no prices** — those stay on the form for the
+   owner.
+4. **Save** at the bottom.
+   - Something unfinished: each such box turns red with a short reason beside
+     its label (*Needed*, *Add your last name*, *10 digits*, *2 letters*,
+     *5 digits*, *Check this*), the bar says *Please finish the N highlighted
+     boxes*, and only now a **Submit unfinished** button appears. It asks to
+     hand the tablet to staff and needs the staff code. It disappears again
+     once every box is right.
+   - Everything finished: the screen locks on **Thank you, <first name>.
+     Please hand this tablet back to our staff.** → **Staff: unlock** → the
+     staff code.
+5. A small **Staff** button (bottom left) leaves the mode at any time — with
+   the staff code. What was typed is kept.
+6. Back on the form, the seller's boxes are filled in. Add the ID part, the
+   items and the payment (if not already there), and save as always.
+
+**Email is optional.** An empty email is never flagged; a half-typed one is.
+Once an email is typed, two small boxes appear beside it, both unticked:
+**Email me a copy of my receipt** (ticks the form's own *Email copy* box) and
+**Add me to the mailing list**. Clearing the email hides and unticks both.
+
+**What the form shows afterwards.** Nothing, unless there is something to act
+on — the owner's ruling is that the button is the only change to the page. A
+line above the sheet appears for exactly two things: the seller **asked for
+something** (*"The customer asked to join the mailing list — they are added
+when you save the receipt."*), or the form came back **unfinished**
+(*"Submitted unfinished with the staff code. Still to finish: Name, City,
+ZIP."*). The unfinished list shrinks as the owner completes the boxes and the
+line leaves with the last one. It also goes with **Clear** and with a saved
+receipt.
+
+**Typing helpers.** The phone formats itself as digits are typed
+(`(239) 404-8505`; a leading `1` is dropped), the state is upper-cased, the
+ZIP keeps its digits (ZIP+4 gets its dash), Return steps to the next box and
+closes the keyboard after the last. A box passes on the seller's screen only
+if the receipt's own validator would accept it too, so a seller's "Save" never
+hands back a form that then refuses to save.
+
+### The mailing list
+
+The seller's email joins the **same list as the homepage's "Join the List"**
+(`homepage_subscribers`, through the same `subscribe_homepage_v2` function),
+marked `buy_receipt` — the Subscribers page shows those as **Buy receipt**.
+It happens **when the owner saves the receipt**, not when the seller taps Save,
+so an email corrected on the form is the one that joins. Email only — never a
+text sign-up (that needs its own consent wording and a "reply YES"). The saved
+panel then shows *Mailing list: Added*, or says it could not be added (the
+receipt is saved either way). If the receipt is never saved, nobody is added;
+add them by hand under Subscribers.
+
+### The staff code
+
+One code for all three staff actions (submit unfinished, unlock after Save,
+the Staff button). ⛔ **It lives in exactly one place:
+`next-app/src/lib/buy-receipt-staff-code.ts`.** The tablet sends the digits to
+the server, which checks them, so the code is never inside the page the seller
+is holding. To change it, change that one line and deploy. Five tries per half
+minute (per signed-in admin); after that the keypad pauses for half a minute,
+and the server refuses even the right code until the pause is over.
+
+### How it is locked
+
+The owner's goal is that a seller holding a signed-in admin tablet cannot reach
+the back end. Covering the page is not enough — anyone can type an address — so
+the lock is on the **server**:
+
+- **A cookie.** Starting the mode sets `nej_customer_mode` on that browser
+  (HttpOnly — page scripts cannot clear it; 12 hours, so a tablet nobody
+  unlocked frees itself overnight). Only the staff code removes it.
+- **Pages.** While the cookie is there, `src/proxy.ts` sends **every admin page
+  and every account page** on that browser back to the New receipt page, which
+  opens straight into the seller's screen. The only two it lets through are
+  that page and the sign-in page (so an ended sign-in can be renewed).
+  ⛔ `/account/security` and `/account/reset-password` are bounced on purpose:
+  both can change the signed-in password without asking for the old one.
+- **Admin API calls.** `requireAdmin()` answers **423** to a locked browser, so
+  typing an API address shows nothing either. Only the mode's own route
+  (`api/admin/buy-receipts/customer-mode`) is exempt.
+- **Other tabs.** A tab that was already open on an admin or account page asks
+  the server for nothing, so the server cannot refuse it. `CustomerModeTabGuard`
+  (on every admin page through the admin menu, and on every account page) hears
+  the mode start, asks the server whether the lock is real, and if so hides the
+  page and goes to the New receipt page. A stale note is simply deleted.
+- **The screen itself.** It is the only thing displayed (every other part of
+  the page is `display: none`, so there is nothing to scroll to or tab to), it
+  is sized to the part of the screen the keyboard leaves visible, a finger
+  dragged across it moves nothing, the Back button stays on it, and a refresh
+  comes back to it with everything typed (kept in that tab's session storage
+  and wiped when the mode ends).
+- **Every other computer is unaffected.** The lock is per browser: the Print
+  Station, the laptop and the phone never notice it.
+
+⛔ **What a web page cannot do:** remove the browser's own bar. A seller can
+still open a different website or another app — just not this site's back end.
+The iPad's own **Guided Access** closes that (next section).
+
+### One-time iPad setup: Guided Access (optional, recommended)
+
+Guided Access pins the iPad to one app and can switch off parts of the screen.
+
+Once:
+
+1. **Settings → Accessibility → Guided Access** → turn it **on**.
+2. **Passcode Settings → Set Guided Access Passcode** — a code only staff
+   know. (Face ID / Touch ID can be allowed to end a session too.)
+
+Each time (after tapping **Customer input mode**, before handing over):
+
+1. **Triple-click the top button** (the Home button on an iPad that has one).
+2. On the setup screen, **draw a circle around the browser's bar at the top**
+   so it stops answering touches.
+3. **Options** (bottom left): leave **Touch** and **Keyboards** **ON** — with
+   Keyboards off, the seller cannot type at all.
+4. Tap **Start**.
+
+To end: triple-click the top button, enter the Guided Access passcode, tap
+**End**. Then unlock the customer screen with the staff code as usual.
+
+### If something goes wrong
+
+| What you see | What to do |
+|---|---|
+| The tablet shows the customer screen and you want out | **Staff** (bottom left) → the staff code. |
+| "Too many tries. Wait half a minute…" | Wait 30 seconds; the keypad comes back by itself. |
+| "The sign-in on this device has ended. Sign in again…" | Tap **Sign in** in that message, sign in, enter the code. Nothing typed is lost. |
+| Every admin page on the tablet jumps to Buy Receipts | The tablet is still locked. Open Buy Receipts → the staff code. It also frees itself after 12 hours. |
+| Another tab shows a blank customer screen | That tab stepped aside when the mode started. Enter the code there, or just reload it once the tablet is unlocked. |
+| A red line: "The tablet is not locked — do not hand it over yet" | The lock could not be set (no connection). Try the button again. |
+
+### Code
+
+| Piece | File |
+|---|---|
+| The lock: cookie name, what a locked browser may open, limits (⛔ no imports — the proxy loads it on every request) | `next-app/src/lib/customer-mode-lock.ts` |
+| The seven boxes, their rules, typing helpers, the hand-back line, the stored snapshot (pure) | `next-app/src/lib/buy-receipt-customer-mode.ts` |
+| ⛔ The staff code (server-only, the ONE place) | `next-app/src/lib/buy-receipt-staff-code.ts` |
+| Mailing-list sign-up (server-only; the feature's only service-role call, never on `buy_receipts`) | `next-app/src/lib/buy-receipt-mailing-list.ts` |
+| Start / end / "am I locked?" | `next-app/src/app/api/admin/buy-receipts/customer-mode/route.ts` |
+| The 423 for a locked browser | `next-app/src/lib/admin-auth.ts` |
+| The page bounce | `next-app/src/proxy.ts` (`customerModeRedirect`) |
+| The seller's screen + its styles | `components/admin/buy-receipts/BuyReceiptCustomerMode.tsx`, `buy-receipt-customer-css.ts` |
+| The button, the hand-over, the line afterwards | `components/admin/buy-receipts/BuyReceiptForm.tsx` |
+| Other tabs step aside | `components/admin/buy-receipts/CustomerModeTabGuard.tsx` — the hook `useCustomerModeTabGuard()` is called by `components/admin/AdminHeader.tsx` (every admin page with the menu); the component is rendered by the two admin pages with no menu (`admin/orders/[id]/print/page.tsx`, `…/invoice/page.tsx`) and by `app/[locale]/account/layout.tsx` (every account page). ⛔ There is no `app/[locale]/admin/layout.tsx` and there must not be one (`STRUCTURE.md` → *Phone listing editor*); a test fails if an admin page has neither the menu nor the guard |
+| "Try counter" that can tell *limited* from *unreachable* | `rateLimitState` in `next-app/src/lib/rate-limit.ts` |
+| Tests | `lib/__tests__/buy-receipt-customer-mode.test.ts` (38), `api/admin/buy-receipts/customer-mode/route.test.ts` (8), `lib/__tests__/admin-auth.test.ts` (5), plus 2 in `rate-limit.test.ts` |
+
+### ⛔ Rules for this mode
+
+- **The form is not to change.** `BuyReceiptSheet.tsx` knows nothing about the
+  mode (a test checks it never mentions it). Anything the mode needs goes
+  around the sheet, never into it.
+- **Seven boxes.** Never add ID type, ID last 4, date of birth, the ID photo,
+  items or money to the seller's screen (owner: *"i will do the ID stuff"*,
+  *"keep the date of birth with the admin like the ID"*).
+- **Lock first, show second.** `enterCustomerMode` awaits the server before the
+  screen appears. A screen without the server lock is a curtain, not a lock.
+- **The code stays on the server, in one file.** Never compare it in the
+  browser, never put it in a client component, never in a second place.
+- **Every admin route that answers a typed address (GET) must go through
+  `requireAdmin()`** — that is what refuses a locked browser. The twelve routes
+  with their own inline check are all POST/DELETE or cron-secret routes; a new
+  GET route written that way would be readable from a locked tablet.
+- **`duringCustomerMode: true` belongs to the customer-mode route only.**
+- **Never let the bounce target be a guarded page**, and never send a locked
+  non-admin to `/account` (`requireBuyReceiptsAdmin` sends them home instead) —
+  either is an endless redirect.
+- **No `dvh`** on the screen (`viewport-units.test.ts`): the component sets the
+  height from the visible viewport before the first paint.
+- **A new admin page must show the admin menu (or render `<CustomerModeTabGuard />`).**
+  That is how a tab already open on it learns to step aside. ⛔ Not through an
+  admin `layout.tsx` — that file is forbidden (`STRUCTURE.md` → *Phone listing
+  editor*); the first build of this mode used one and it was taken out.
+- The two login-free preview pages used for checking (`[locale]/zz-customer-mode-preview`,
+  `[locale]/admin/zz-guard-preview`) must never be deployed; a test fails while
+  either exists.
+
+### Verification (2026-10-03)
+
+Done:
+
+- `npx tsc --noEmit` 0 · `npm run lint` 0 errors (3 older warnings) ·
+  `npx vitest run` **1704/1704** (159 files; 53 new) · `npm run build` 0, the
+  same 88 prerendered pages as before.
+- **Dev server, signed out, with and without the lock cookie (curl):** with it,
+  `/admin`, `/admin/orders`, `/admin/buy-receipts/log`, `/account`,
+  `/account/security`, `/account/reset-password` and `/es/admin/orders` all
+  answer 307 to the New receipt page (language kept); that page, the sign-in
+  page and the public site load; without it every answer is what it was before.
+  The mode's route answers 401 to a signed-out caller on all three methods.
+- **The real components in headless Chrome** (a temporary login-free copy of
+  the page whose two server calls were answered by the test; deleted
+  afterwards) — **108/108**: the form takes typing in all ten seller boxes by
+  itself; the button is on the tabs row and makes it no taller, the sheet sits
+  where it did; lock-then-show; the seller's screen never mentions ID, birth,
+  items or money; flags, reasons and "Submit unfinished"; wrong code, pause,
+  ended sign-in, the laptop keyboard on the keypad; Thank-you; Back pressed
+  repeatedly; a real reload while locked, then unlock with no second reload;
+  the two small boxes; the mailing-list request on the save call and only
+  then; a plain hand-over leaves no line and the sheet 20 px under the tabs;
+  nothing scrolls and every box and Save are in view at 1024×694, 1024×296
+  (keyboard), 768×950, 768×620 (keyboard), 1133×670, 1133×270 (keyboard),
+  1366×650; a phone (390×760) scrolls only its form area.
+- **Touch emulation — 11/11:** taps reach every control; a finger dragged
+  across the screen or the bottom bar moves nothing; a finger inside a box is
+  left alone; boxes are 16 px.
+- **Two real tabs of one browser — 11/11:** starting the mode in one tab makes
+  an admin tab and an account tab leave by themselves; the sign-in page and the
+  public site are untouched; a stale note heals; an unclear answer keeps the
+  admin page hidden.
+
+Not verified — needs the owner:
+
+1. **With a real admin sign-in:** the button actually setting the lock, a typed
+   admin address landing back on the customer screen, the staff code unlocking,
+   a saved receipt adding the seller to the mailing list (Subscribers → *Buy
+   receipt*).
+2. **On the real iPad in Safari** (a desktop browser cannot prove WebKit's
+   keyboard and touch behaviour — `DECISIONS.md` → *"Admin on a phone
+   (2026-09-02)"*): the boxes and Save stay above the keyboard both ways up;
+   nothing drags or bounces; Safari offers no previous seller's details;
+   Guided Access as described. ⛔ Try it once yourself before handing it to a
+   seller. If anything is off, simply do not use the button — the form itself
+   is unchanged.
 
 ## Seller ID photo
 
@@ -317,7 +577,7 @@ The file ends with verify queries and says what each should return.
 |---|---|
 | Rules, types, validator, print sets, dates | `next-app/src/lib/buy-receipts.ts` |
 | Tests (52) incl. source guards | `next-app/src/lib/__tests__/buy-receipts.test.ts` |
-| Routes | `next-app/src/app/api/admin/buy-receipts/` — `route.ts` (POST, GET), `[id]/route.ts` (GET, PUT, DELETE), `[id]/print-request`, `[id]/printed`, `[id]/void`, `[id]/id-photo` (POST, DELETE), `[id]/email` |
+| Routes (eight) | `next-app/src/app/api/admin/buy-receipts/` — `route.ts` (POST, GET), `[id]/route.ts` (GET, PUT, DELETE), `[id]/print-request`, `[id]/printed`, `[id]/void`, `[id]/id-photo` (POST, DELETE), `[id]/email`, `customer-mode` (GET, POST, DELETE — see *Customer input mode → Code*) |
 | Pages | `next-app/src/app/[locale]/admin/buy-receipts/` — `page.tsx`, `log/`, `[id]/`, `station/` |
 | The paper (edit + print) | `components/admin/buy-receipts/BuyReceiptSheet.tsx` + `buy-receipt-sheet-css.ts` |
 | Printing in place | `components/admin/buy-receipts/BuyReceiptPrintHost.tsx` (`useReceiptPrinter`) |
@@ -326,7 +586,7 @@ The file ends with verify queries and says what each should return.
 | Webcam + photo strip | `IdPhotoCapture.tsx`, `IdPhotoField.tsx` |
 | Browser calls, signed links, print-sized photo | `buy-receipt-client.ts` |
 | Station | `PrintStation.tsx` |
-| Gate + page frame + tabs | `BuyReceiptsShell.tsx`, `BuyReceiptTabs.tsx` |
+| Gate + page frame + tabs | `BuyReceiptsShell.tsx`, `BuyReceiptTabs.tsx` — on the New receipt page the FORM draws the tabs (`showTabs={false}` on the shell) so its Customer input mode button can sit at the end of their row; Log, station and the receipt page keep the shell's tabs |
 | Image wait shared with the order invoice | `next-app/src/lib/print-images.ts` |
 
 ## Rules worth keeping

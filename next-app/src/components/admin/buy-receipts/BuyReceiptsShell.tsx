@@ -10,8 +10,14 @@ import BuyReceiptTabs, { type BuyReceiptTab } from './BuyReceiptTabs';
  * other admin page: a verified user whose `profiles.is_admin` row says so).
  * Returns the request-scoped client — the `authenticated` role — which is what
  * the `buy_receipts` table is granted to.
+ *
+ * `customerModeLocked`: this browser carries the customer-input-mode lock. The
+ * proxy sends a locked browser away from every account page, so a signed-in
+ * visitor who is NOT an admin must not be sent to `/account` here — the two
+ * would bounce each other forever. They go to the home page instead. (The
+ * sign-in page is not bounced, so the signed-out case is unchanged.)
  */
-export async function requireBuyReceiptsAdmin(locale: string) {
+export async function requireBuyReceiptsAdmin(locale: string, { customerModeLocked = false }: { customerModeLocked?: boolean } = {}) {
   const isEs = locale === 'es';
   const adminBasePath = isEs ? '/es/admin' : '/admin';
 
@@ -20,17 +26,25 @@ export async function requireBuyReceiptsAdmin(locale: string) {
   if (!user) redirect(isEs ? '/es/account/sign-in' : '/account/sign-in');
 
   const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single();
-  if (!profile?.is_admin) redirect(isEs ? '/es/account' : '/account');
+  if (!profile?.is_admin) {
+    if (customerModeLocked) redirect(isEs ? '/es' : '/');
+    redirect(isEs ? '/es/account' : '/account');
+  }
 
   return { supabase, user, adminBasePath };
 }
 
-/** Admin header, page title and the three tabs, around a Buy Receipts page. */
+/**
+ * Admin header, page title and the three tabs, around a Buy Receipts page.
+ * `showTabs={false}` is for the New receipt page, whose form draws the tabs
+ * itself so its "Customer input mode" button can sit at the end of their row.
+ */
 export default function BuyReceiptsShell({
   adminBasePath,
   userEmail,
   unreadMessagesCount,
   activeTab,
+  showTabs = true,
   title,
   intro,
   children,
@@ -39,6 +53,7 @@ export default function BuyReceiptsShell({
   userEmail: string | null | undefined;
   unreadMessagesCount: number;
   activeTab: BuyReceiptTab | null;
+  showTabs?: boolean;
   title: string;
   intro: string;
   children: ReactNode;
@@ -59,7 +74,7 @@ export default function BuyReceiptsShell({
               {intro}
             </p>
           </div>
-          <BuyReceiptTabs adminBasePath={adminBasePath} active={activeTab} />
+          {showTabs && <BuyReceiptTabs adminBasePath={adminBasePath} active={activeTab} />}
           {children}
         </div>
       </main>

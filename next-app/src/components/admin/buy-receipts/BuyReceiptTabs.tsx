@@ -1,9 +1,14 @@
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 
 /**
  * The three views of Admin → Buy Receipts. "Print station" is the page left
  * open on the PC that has the printer; it does nothing on any other computer
  * until that computer is chosen as the station, so opening it here is harmless.
+ *
+ * `end` is drawn at the right end of the row (it wraps under the tabs on a
+ * narrow screen). The New receipt form puts its "Customer input mode" button
+ * there (owner, 2026-10-03).
  */
 export type BuyReceiptTab = 'new' | 'log' | 'station';
 
@@ -13,7 +18,15 @@ const TABS: { key: BuyReceiptTab; label: string; path: string }[] = [
   { key: 'station', label: 'Print station', path: '/buy-receipts/station' },
 ];
 
-export default function BuyReceiptTabs({ adminBasePath, active }: { adminBasePath: string; active: BuyReceiptTab | null }) {
+export default function BuyReceiptTabs({
+  adminBasePath,
+  active,
+  end,
+}: {
+  adminBasePath: string;
+  active: BuyReceiptTab | null;
+  end?: ReactNode;
+}) {
   return (
     <nav className="mb-5 flex flex-wrap items-center gap-2" aria-label="Buy receipts">
       {TABS.map((tab) => {
@@ -37,6 +50,7 @@ export default function BuyReceiptTabs({ adminBasePath, active }: { adminBasePat
           </Link>
         );
       })}
+      {end ? <span className="ml-auto flex items-center">{end}</span> : null}
     </nav>
   );
 }

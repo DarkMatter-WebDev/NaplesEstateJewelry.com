@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { type ReactNode, useEffect, useState } from 'react';
 import AdminMessagesLink from './AdminMessagesLink';
 import AdminOrdersLink from './AdminOrdersLink';
+import { useCustomerModeTabGuard } from './buy-receipts/CustomerModeTabGuard';
 import { AppIcon } from '@/components/AppIcon';
 
 const GOLD = '#735c00';
@@ -88,6 +89,10 @@ export default function AdminHeader({
   rightContent?: ReactNode;
 }) {
   const homeHref = adminBasePath.startsWith('/es') ? '/es' : '/';
+  // This menu is on (almost) every admin page, so it is where an admin tab
+  // learns that another tab of this browser was handed to a seller — and
+  // leaves. Inert unless that mode is on. See CustomerModeTabGuard.
+  useCustomerModeTabGuard();
   // Always starts expanded to match SSR (no window/localStorage on the server);
   // the persisted preference is applied after mount, client-side only, to avoid
   // a hydration mismatch when the admin previously collapsed the menu.

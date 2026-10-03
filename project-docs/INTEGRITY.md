@@ -15,9 +15,10 @@ npm audit --omit=dev
 ```
 
 `npm run build` is the publish gate and must exit 0. Current local baseline
-(measured 2026-10-03, the buy-receipt delete + payment methods; 1647 after the
-storefront-photo swap, 1643 after the print-station shortcut fix that morning):
-**1651/1651 tests across 156 files**, TypeScript clean, lint clean (3 pre-existing `<img>`
+(measured 2026-10-03 ~5 PM ET, the buy receipt's customer input mode; 1651 / 156
+files after the buy-receipt delete + payment methods that afternoon, 1647 after
+the storefront-photo swap, 1643 after the print-station shortcut fix that morning):
+**1704/1704 tests across 159 files**, TypeScript clean, lint clean (3 pre-existing `<img>`
 warnings in `TextDealsManager.tsx`), and a build that exits 0 with **88
 prerendered routes = 41 EN + 41 ES + 6 non-locale** (`/_global-error`,
 `/_not-found`, `/favicon.ico`, `/icon.png`, `/robots.txt`, `/sitemap.xml`).
@@ -79,6 +80,32 @@ shop's product-inquiry form breaks an owner decision (`DECISIONS.md` →
 Google's documented Ads hosts in BOTH `next.config.ts` and root
 `netlify.toml`; `lib/__tests__/ads-tracking.test.ts` guards all of it.
 
+### Keep customer input mode locked on the server
+
+The buy receipt's customer input mode (2026-10-03) hands a signed-in admin
+tablet to a seller. A screen that covers the admin page is not a lock; the
+lock is the `nej_customer_mode` cookie, enforced by `src/proxy.ts` (admin and
+account pages), `requireAdmin()` (admin API routes, 423) and the New receipt
+page. Any change that breaks one of these breaks an owner requirement
+(`DECISIONS.md` → *"Customer input mode (2026-10-03)"*):
+
+- the staff code is compared anywhere but the server, or exists in a second
+  file (`lib/buy-receipt-staff-code.ts` is the only one);
+- the seller's screen appears before the server lock is set;
+- an admin route that answers a GET uses its own inline check instead of
+  `requireAdmin()`, or another route passes `duringCustomerMode: true`;
+- `/account/security` or `/account/reset-password` becomes reachable on a
+  locked browser (both change the signed-in password without the old one);
+- the seller's screen gains an ID, date-of-birth, item or money box, or the
+  owner's form (`BuyReceiptSheet.tsx`) changes because of the mode;
+- an admin page has neither the admin menu nor `<CustomerModeTabGuard />`, or
+  an `admin/layout.tsx` is added to carry it.
+
+`lib/__tests__/buy-receipt-customer-mode.test.ts`, `admin-auth.test.ts` and the
+route's own test guard all of it. ⚠️ The staff code is a kiosk convenience, not
+a credential: it only works on a browser already signed in as an admin, which
+is why it may live in source. It is still never written into a client file.
+
 ### Keep public writes behind the app
 
 Apply edge plus distributed route limits before expensive/provider work.
@@ -135,6 +162,10 @@ the same session report to all four files.
       non-Florida shipping, invalid address/method tampering, and exact cents.
 - [ ] Public mutation changes preserve edge/distributed limits and server-only
       secrets.
+- [ ] A new admin page shows the admin menu (or renders `<CustomerModeTabGuard />`),
+      and a new admin route that answers a GET starts with `requireAdmin()` —
+      otherwise a tablet in customer input mode can still reach it.
+- [ ] No `zz-*` preview page is left under `src/app`.
 - [ ] Root `netlify.toml` still builds from `next-app`.
 - [ ] Production SQL/environment/manual steps are called out in `TASKS.md`.
 - [ ] `CURRENT_STATUS.md`, `TASKS.md`, `DECISIONS.md`, and `CHANGELOG.md` reflect

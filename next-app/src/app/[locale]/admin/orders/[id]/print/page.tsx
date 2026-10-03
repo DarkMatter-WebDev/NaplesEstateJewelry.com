@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getVerifiedUser } from '@/lib/auth-claims';
 import { invoiceNumberForOrder } from '@/lib/order-invoice-email';
 import type { Order, OrderItem } from '@/types/sales';
+import CustomerModeTabGuard from '@/components/admin/buy-receipts/CustomerModeTabGuard';
 import PrintOrderClient from './PrintOrderClient';
 
 export const metadata: Metadata = { title: 'Print Order' };
@@ -143,12 +144,16 @@ export default async function AdminOrderPrintPage({ params }: Props) {
   const invoiceNumber = invoiceNumberForOrder(typedOrder, invoices?.[0]?.invoice_number ?? null);
 
   return (
-    <PrintOrderClient
-      adminEmail={user.email ?? null}
-      backHref={`${adminBasePath}/orders/${id}`}
-      invoiceNumber={invoiceNumber}
-      order={typedOrder}
-      printedAt={new Date().toISOString()}
-    />
+    <>
+      <PrintOrderClient
+        adminEmail={user.email ?? null}
+        backHref={`${adminBasePath}/orders/${id}`}
+        invoiceNumber={invoiceNumber}
+        order={typedOrder}
+        printedAt={new Date().toISOString()}
+      />
+      {/* No admin menu on this page, so the guard the menu carries is added here. Draws nothing. */}
+      <CustomerModeTabGuard />
+    </>
   );
 }

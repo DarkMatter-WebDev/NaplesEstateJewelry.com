@@ -5,6 +5,7 @@ import { getVerifiedUser } from '@/lib/auth-claims';
 import { buildInvoiceEmailContent, formatPickupHours } from '@/lib/order-invoice-email';
 import { getStoreHours } from '@/lib/store-hours';
 import type { Order, OrderItem } from '@/types/sales';
+import CustomerModeTabGuard from '@/components/admin/buy-receipts/CustomerModeTabGuard';
 import PrintInvoiceClient from './PrintInvoiceClient';
 
 export const metadata: Metadata = { title: 'Print Invoice' };
@@ -93,11 +94,15 @@ export default async function AdminOrderInvoicePrintPage({ params }: Props) {
   });
 
   return (
-    <PrintInvoiceClient
-      invoiceHtml={invoiceContent.html}
-      invoiceNumber={invoiceContent.invoiceNumber}
-      orderNumber={typedOrder.order_number}
-      backHref={`${adminBasePath}/orders/${id}`}
-    />
+    <>
+      <PrintInvoiceClient
+        invoiceHtml={invoiceContent.html}
+        invoiceNumber={invoiceContent.invoiceNumber}
+        orderNumber={typedOrder.order_number}
+        backHref={`${adminBasePath}/orders/${id}`}
+      />
+      {/* No admin menu on this page, so the guard the menu carries is added here. Draws nothing. */}
+      <CustomerModeTabGuard />
+    </>
   );
 }

@@ -56,7 +56,12 @@ export function nextSubscriberSort(current: SubscriberSort, key: SubscriberSortK
 export function subscriberSourceLabel(row: Pick<SubscriberRow, 'source' | 'subscriberSource'>): string {
   const source = row.source ?? '';
   const parts: string[] = [];
-  if (source.includes('subscriber')) parts.push(row.subscriberSource === 'admin_manual' ? 'Admin manual' : 'Newsletter subscriber');
+  if (source.includes('subscriber')) {
+    // 'buy_receipt' = a seller ticked "Add me to the mailing list" on the buy receipt's customer screen.
+    parts.push(
+      row.subscriberSource === 'admin_manual' ? 'Admin manual' : row.subscriberSource === 'buy_receipt' ? 'Buy receipt' : 'Newsletter subscriber',
+    );
+  }
   if (source.includes('account')) parts.push('Account holder');
   if (source.includes('buyer')) parts.push('Past buyer');
   return parts.length > 0 ? parts.join(' + ') : 'Newsletter subscriber';

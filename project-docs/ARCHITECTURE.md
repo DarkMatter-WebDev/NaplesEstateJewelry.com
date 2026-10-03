@@ -839,7 +839,49 @@ Laptop (admin form)                      Supabase                         Deskto
   the station from a Chrome shortcut with `--kiosk-printing`; the page only
   calls `window.print()`.
 - **Camera.** `Permissions-Policy: camera=(self)` (Next headers and Netlify
-  headers) — the only sitewide change this feature made.
+  headers) — the only sitewide change this feature made until 2026-10-03
+  (customer input mode, next).
+
+### Customer input mode: a per-browser lock (2026-10-03)
+
+One optional button on the New receipt form hands the tablet to the seller on
+a locked screen with only their own contact boxes. The form itself is
+unchanged. Runbook: `features/buy-receipts.md` → *Customer input mode*.
+
+```text
+Tablet (signed in as admin)                          Server
+  tap "Customer input mode"
+    POST /api/admin/buy-receipts/customer-mode  ──►  Set-Cookie nej_customer_mode (HttpOnly, 12 h)
+    …only then the seller's screen is shown           │
+                                                       ▼  while that cookie is on THIS browser:
+  seller types an admin / account address    ──►  proxy.ts → 307 → /admin/buy-receipts (the lock page)
+  seller types an admin API address          ──►  requireAdmin() → 423
+  another tab already on an admin page       ──►  CustomerModeTabGuard asks GET …/customer-mode → leaves
+  refresh / Back                             ──►  the lock page again; the form is restored from sessionStorage
+  staff code on the keypad
+    DELETE …/customer-mode { code }          ──►  checked server-side (lib/buy-receipt-staff-code.ts);
+                                                  5 tries / 30 s; right code clears the cookie
+```
+
+- **The lock is the cookie, and it is enforced in three places:** the proxy
+  (pages), `requireAdmin()` (admin API routes — this is why every admin route
+  that answers a GET must use it), and the New receipt page, which reads the
+  cookie and starts the form in the seller's screen. Rules for what a locked
+  browser may open live in the import-free `lib/customer-mode-lock.ts`, shared
+  by the proxy and the tab guard.
+- **Per browser, never per account.** The Print Station, the laptop and every
+  other device are untouched; nothing is stored in the database.
+- **Two sitewide touch points, both inert without the cookie / the note:**
+  `proxy.ts` (one `request.cookies.has` on every request) and `requireAdmin()`
+  (one cookie read after the admin check). A third, the tab guard, runs only on
+  admin pages (through `AdminHeader`) and account pages (`account/layout.tsx`).
+- **The seller's screen is the only thing displayed** (a `<body>` portal with
+  every other child `display: none`), so there is nothing to scroll or tab to.
+- **Mailing list:** a seller's tick is acted on when the owner saves the
+  receipt — `POST /api/admin/buy-receipts` → `lib/buy-receipt-mailing-list.ts`
+  → `subscribe_homepage_v2` (service role; the feature's only service-role
+  call, and never on `buy_receipts`).
+- **No SQL, no env vars.**
 
 ## Google Ads Conversion Tracking (2026-10-02)
 
@@ -902,14 +944,27 @@ Supabase Auth is configured through:
 - `next-app/src/proxy.ts`, which refreshes Supabase sessions during routing only
   for user-state route prefixes. It also owns, in this order: legacy-HOST 301s to
   the canonical `.com` origin, then retired-path redirects
-  (`lib/legacy-redirects.ts`), then the locale rewrite. The order matters — see
-  the request-ordering note near the top of this document.
+  (`lib/legacy-redirects.ts`), then — only for a browser carrying the
+  customer-input-mode cookie — the bounce of admin and account pages to the New
+  receipt page (`lib/customer-mode-lock.ts`, 2026-10-03), then the locale
+  rewrite. The order matters — see the request-ordering note near the top of
+  this document.
 
 Protected admin pages and shared admin server actions use
 `next-app/src/lib/auth-claims.ts` to verify the JWT with Supabase `getClaims()`.
 The current project uses ES256 signing, allowing cached-JWKS local verification;
 authorization still requires a live `profiles.is_admin` database row. Never
 replace that database role check with a claim or unverified session object.
+
+Admin API routes start with `requireAdmin()` (`next-app/src/lib/admin-auth.ts`).
+Since 2026-10-03 it also answers **423** to an admin whose browser carries the
+buy receipt's customer-input-mode cookie, so a seller holding the tablet cannot
+read the back end by typing an API address. Only the mode's own route passes
+`duringCustomerMode: true`. ⛔ Twelve routes under `api/admin/` do their own
+inline check instead (all POST/DELETE, or cron-secret routes) and are therefore
+NOT covered — harmless while none answers a GET, which is the only method an
+address bar can send. A new admin route that returns data to a GET must use
+`requireAdmin()`.
 
 Admin product loading is intentionally two-stage. `/admin` initially selects
 the compact contract in `next-app/src/lib/admin-product-summary.ts`; full

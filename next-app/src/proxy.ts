@@ -2,6 +2,7 @@ import createIntlMiddleware from 'next-intl/middleware';
 import { createServerClient } from '@supabase/ssr';
 import { type NextRequest, NextResponse } from 'next/server';
 import { routing } from './i18n/routing';
+import { CUSTOMER_MODE_COOKIE, customerModeBounce } from './lib/customer-mode-lock';
 import { resolveDefaultLocalePrefixRedirect, resolveLegacyRedirect } from './lib/legacy-redirects';
 
 const intl = createIntlMiddleware(routing);
@@ -66,6 +67,21 @@ function legacyRedirect(request: NextRequest): NextResponse | null {
   return NextResponse.redirect(url, match.permanent ? 308 : 307);
 }
 
+// Buy receipt "Customer input mode" (owner, 2026-10-03): a tablet handed to a
+// seller carries the lock cookie, and while it does, every admin and account
+// page on THAT browser goes back to the New receipt page, which shows only the
+// customer screen. Without the cookie — every other visitor and computer —
+// this returns at once. Rules and reasons: lib/customer-mode-lock.ts.
+function customerModeRedirect(request: NextRequest): NextResponse | null {
+  if (!request.cookies.has(CUSTOMER_MODE_COOKIE)) return null;
+  const destination = customerModeBounce(request.nextUrl.pathname);
+  if (!destination) return null;
+  const url = request.nextUrl.clone();
+  url.pathname = destination;
+  url.search = '';
+  return NextResponse.redirect(url, 307);
+}
+
 async function refreshSupabaseSession(request: NextRequest, response: NextResponse) {
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -103,6 +119,11 @@ export async function proxy(request: NextRequest) {
   // Legacy/retired paths next — nothing below may run for these.
   const legacy = legacyRedirect(request);
   if (legacy) return legacy;
+
+  // A browser in customer input mode never gets past this line to an admin or
+  // account page.
+  const locked = customerModeRedirect(request);
+  if (locked) return locked;
 
   const needsSessionRefresh = shouldRefreshSupabaseSession(pathname);
 
