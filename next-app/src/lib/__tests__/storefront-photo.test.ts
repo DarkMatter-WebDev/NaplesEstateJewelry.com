@@ -27,6 +27,8 @@ describe('storefront photo asset', () => {
     // Re-using `showroom-storefront.webp` would have kept serving the old picture.
     expect(STOREFRONT_PHOTO_SRC).toBe('/assets/images/pages/showroom-storefront-v2.webp');
     expect(existsSync(join(ROOT, 'public', STOREFRONT_PHOTO_SRC))).toBe(true);
+    // The superseded file was removed on the owner's word the same day; nothing may bring it back unused.
+    expect(existsSync(join(ROOT, 'public', 'assets', 'images', 'pages', 'showroom-storefront.webp'))).toBe(false);
   });
 });
 
