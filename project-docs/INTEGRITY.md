@@ -15,8 +15,9 @@ npm audit --omit=dev
 ```
 
 `npm run build` is the publish gate and must exit 0. Current local baseline
-(measured 2026-10-03, the storefront-photo swap; 1643 after the print-station
-shortcut fix that morning): **1647/1647 tests across 156 files**, TypeScript clean, lint clean (3 pre-existing `<img>`
+(measured 2026-10-03, the buy-receipt delete + payment methods; 1647 after the
+storefront-photo swap, 1643 after the print-station shortcut fix that morning):
+**1651/1651 tests across 156 files**, TypeScript clean, lint clean (3 pre-existing `<img>`
 warnings in `TextDealsManager.tsx`), and a build that exits 0 with **88
 prerendered routes = 41 EN + 41 ES + 6 non-locale** (`/_global-error`,
 `/_not-found`, `/favicon.ico`, `/icon.png`, `/robots.txt`, `/sitemap.xml`).

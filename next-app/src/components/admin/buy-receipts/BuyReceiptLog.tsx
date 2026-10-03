@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import AdminModal from '@/components/admin/AdminModal';
+import { AppIcon } from '@/components/AppIcon';
 import { createClient } from '@/lib/supabase/client';
 import {
   BUY_RECEIPT_COLUMNS,
@@ -18,13 +20,17 @@ import {
 } from '@/lib/buy-receipts';
 import { formatCurrency } from '@/types/sales';
 import { useReceiptPrinter } from './BuyReceiptPrintHost';
-import { markPrinted, requestPrint } from './buy-receipt-client';
+import { deleteReceipt, markPrinted, requestPrint } from './buy-receipt-client';
 
 /**
  * Admin → Buy Receipts → Log: every saved receipt, newest first. Search by
  * number, seller or phone. A row opens the receipt (print options, edit, void,
  * duplicate). "Send to printer" and "Print here" (owner, 2026-09-30) are quick
  * enough to keep on the row; both use the default set — a shop copy and a seller's copy.
+ *
+ * "Delete" (owner, 2026-10-03) removes a receipt for good, with its ID photo —
+ * for test and mistaken entries. It always asks first, in the same pop-up
+ * window Void uses, and says that Void is the one that keeps the record.
  *
  * Rows that are "Waiting for the desktop" are WATCHED (owner, 2026-10-01: on the
  * iPad the tag stayed on "waiting" after the desktop had printed, until a manual
@@ -62,6 +68,10 @@ export default function BuyReceiptLog({ adminBasePath, initialRows }: { adminBas
   const [error, setError] = useState<string | null>(null);
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [printingId, setPrintingId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<BuyReceiptRow | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const printer = useReceiptPrinter();
   const firstRun = useRef(true);
 
@@ -180,6 +190,33 @@ export default function BuyReceiptLog({ adminBasePath, initialRows }: { adminBas
     }
   }
 
+  function askDelete(row: BuyReceiptRow) {
+    setDeleteError(null);
+    setNotice(null);
+    setDeleting(row);
+  }
+
+  function closeDelete() {
+    if (deleteBusy) return;
+    setDeleting(null);
+    setDeleteError(null);
+  }
+
+  async function confirmDelete() {
+    if (!deleting || deleteBusy) return;
+    setDeleteBusy(true);
+    setDeleteError(null);
+    const result = await deleteReceipt(deleting.id);
+    setDeleteBusy(false);
+    if ('error' in result) {
+      setDeleteError(result.error);
+      return;
+    }
+    setRows((current) => current.filter((item) => item.id !== deleting.id));
+    setNotice(`${deleting.receipt_number} was deleted.`);
+    setDeleting(null);
+  }
+
   const busy = sendingId !== null || printingId !== null;
 
   return (
@@ -205,6 +242,11 @@ export default function BuyReceiptLog({ adminBasePath, initialRows }: { adminBas
           {error}
         </p>
       )}
+      {notice && (
+        <p role="status" className="mb-3 border px-3 py-2 text-sm" style={{ borderColor: 'var(--color-outline-variant)', color: 'var(--color-on-surface)' }}>
+          {notice}
+        </p>
+      )}
 
       {rows.length === 0 ? (
         <div className="border bg-white px-5 py-10 text-center" style={{ borderColor: 'var(--color-outline-variant)' }}>
@@ -222,7 +264,19 @@ export default function BuyReceiptLog({ adminBasePath, initialRows }: { adminBas
         </div>
       ) : (
         <div className="overflow-x-auto border bg-white" style={{ borderColor: 'var(--color-outline-variant)' }}>
-          <table className="w-full text-sm" style={{ borderCollapse: 'collapse', minWidth: 760 }}>
+          {/* Below 1100px (an iPad on its side is 1024) the row was 7px too wide even before the
+              Delete button existed, and with it the button sat off the edge of the table. So on
+              those screens only, the cells and the three worded buttons give up a little side
+              padding: 1013px → about 905px, which fits the 958px the page leaves. Wider screens
+              are untouched. Plain CSS on purpose — a Tailwind utility cannot out-rank the
+              `.outline-button` rule in globals.css. */}
+          <style>{`
+            @media (max-width: 1100px) {
+              .brl-table th, .brl-table td { padding-left: 0.75rem; padding-right: 0.75rem; }
+              .brl-table .brl-actions .outline-button { padding-left: 0.85rem; padding-right: 0.85rem; }
+            }
+          `}</style>
+          <table className="brl-table w-full text-sm" style={{ borderCollapse: 'collapse', minWidth: 760 }}>
             <thead>
               <tr className="text-left text-[0.65rem] uppercase tracking-[0.14em]" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
                 <th className="px-4 py-3">Receipt</th>
@@ -266,7 +320,7 @@ export default function BuyReceiptLog({ adminBasePath, initialRows }: { adminBas
                         {row.emailed_at && <Tag tone="green">Emailed</Tag>}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                    <td className="brl-actions px-4 py-3 text-right whitespace-nowrap">
                       <button type="button" className="outline-button text-xs" disabled={busy} onClick={() => void printHere(row)}>
                         {printingId === row.id ? 'Printing…' : 'Print here'}
                       </button>
@@ -276,6 +330,20 @@ export default function BuyReceiptLog({ adminBasePath, initialRows }: { adminBas
                       <Link href={`${adminBasePath}/buy-receipts/${row.id}`} className="outline-button ml-2 text-xs">
                         Open
                       </Link>
+                      {/* A trash-can, not a fourth worded button: with "Delete" spelled out the
+                          row was too wide for an iPad and the button sat off the edge of the
+                          table (measured 2026-10-03). The pop-up window names the receipt. */}
+                      <button
+                        type="button"
+                        className="outline-button ml-2 text-xs"
+                        style={{ color: 'var(--color-error)', borderColor: 'var(--color-error)', paddingLeft: '0.7rem', paddingRight: '0.7rem' }}
+                        disabled={busy}
+                        aria-label={`Delete ${row.receipt_number}`}
+                        title="Delete"
+                        onClick={() => askDelete(row)}
+                      >
+                        <AppIcon name="delete" className="text-[1rem]" aria-hidden="true" />
+                      </button>
                     </td>
                   </tr>
                 );
@@ -283,6 +351,36 @@ export default function BuyReceiptLog({ adminBasePath, initialRows }: { adminBas
             </tbody>
           </table>
         </div>
+      )}
+
+      {deleting && (
+        <AdminModal title={`Delete ${deleting.receipt_number}`} onClose={closeDelete}>
+          <div className="grid gap-3">
+            <p className="text-sm font-semibold">
+              {deleting.seller_name} · {formatReceiptDate(deleting.created_at)} · {formatCurrency(deleting.total)}
+            </p>
+            <p className="text-sm" style={hintStyle}>
+              This removes the receipt from the log for good{deleting.seller_id_photo_path ? ', together with its ID photo' : ''}. It cannot be
+              undone, and the number {deleting.receipt_number} will not be used again.
+            </p>
+            <p className="text-sm" style={hintStyle}>
+              For a real purchase that was reversed, open the receipt and use <strong>Void</strong> instead — a void receipt stays in the log.
+            </p>
+            {deleteError && <p role="alert" className="text-sm" style={{ color: 'var(--color-error)' }}>{deleteError}</p>}
+            <div className="flex justify-end gap-2">
+              <button type="button" className="outline-button text-xs" disabled={deleteBusy} onClick={closeDelete}>Keep it</button>
+              <button
+                type="button"
+                className="gold-button text-xs"
+                style={{ background: 'var(--color-error)', boxShadow: 'none' }}
+                disabled={deleteBusy}
+                onClick={() => void confirmDelete()}
+              >
+                {deleteBusy ? 'Deleting…' : 'Delete this receipt'}
+              </button>
+            </div>
+          </div>
+        </AdminModal>
       )}
     </div>
   );

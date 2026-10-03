@@ -64,7 +64,13 @@ export function stationShortcutTarget(siteUrl: string): string {
 export const BUY_RECEIPT_ID_TYPES = ['Driver license', 'State ID', 'Passport', 'Military ID', 'Other'] as const;
 export type BuyReceiptIdType = (typeof BUY_RECEIPT_ID_TYPES)[number];
 
-export const BUY_RECEIPT_PAYMENT_METHODS = ['cash', 'check', 'zelle', 'venmo', 'bank_transfer', 'store_credit'] as const;
+/**
+ * How the seller was paid, in the order the form lists them: cash and check
+ * first, then the payment apps together. Cash App and PayPal joined on
+ * 2026-10-03 (owner). The database keeps `payments` as a free list, so a new
+ * method here needs no SQL.
+ */
+export const BUY_RECEIPT_PAYMENT_METHODS = ['cash', 'check', 'zelle', 'venmo', 'cashapp', 'paypal', 'bank_transfer', 'store_credit'] as const;
 export type BuyReceiptPaymentMethod = (typeof BUY_RECEIPT_PAYMENT_METHODS)[number];
 
 export const BUY_RECEIPT_PAYMENT_LABELS: Record<BuyReceiptPaymentMethod, string> = {
@@ -72,6 +78,8 @@ export const BUY_RECEIPT_PAYMENT_LABELS: Record<BuyReceiptPaymentMethod, string>
   check: 'Check',
   zelle: 'Zelle',
   venmo: 'Venmo',
+  cashapp: 'Cash App',
+  paypal: 'PayPal',
   bank_transfer: 'Bank transfer',
   store_credit: 'Store credit / trade',
 };
@@ -613,9 +621,14 @@ export function isReceiptId(value: unknown): value is string {
   return typeof value === 'string' && UUID_RE.test(value);
 }
 
+/** A receipt's own folder in the private bucket — everything in it belongs to that receipt. */
+export function buyReceiptIdPhotoFolder(receiptId: string): string {
+  return `receipts/${receiptId}`;
+}
+
 /** Where a receipt's ID photo lives in the private bucket. A new name on every upload. */
 export function buyReceiptIdPhotoPath(receiptId: string, fileId: string): string {
-  return `receipts/${receiptId}/${fileId}.webp`;
+  return `${buyReceiptIdPhotoFolder(receiptId)}/${fileId}.webp`;
 }
 
 /** Item rows plus wrapped note lines: past `BUY_RECEIPT_ONE_PAGE_LINES` the paper may need a second page. */

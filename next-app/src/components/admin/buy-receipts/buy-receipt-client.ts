@@ -72,6 +72,20 @@ export function voidReceipt(id: string, reason: string): Promise<ReceiptResult> 
   return call(`/api/admin/buy-receipts/${id}/void`, json('POST', { reason }), 'Could not void the receipt.');
 }
 
+export type DeleteReceiptResult = { deleted: true } | { error: string };
+
+/** Removes the receipt and its ID photo for good. There is no way back. */
+export async function deleteReceipt(id: string): Promise<DeleteReceiptResult> {
+  try {
+    const res = await fetch(`/api/admin/buy-receipts/${id}`, { method: 'DELETE' });
+    const data = (await res.json().catch(() => ({}))) as { deleted?: boolean; error?: string };
+    if (!res.ok || data.deleted !== true) return { error: data.error ?? 'Could not delete the receipt.' };
+    return { deleted: true };
+  } catch {
+    return { error: OFFLINE };
+  }
+}
+
 export function removeIdPhoto(id: string): Promise<ReceiptResult> {
   return call(`/api/admin/buy-receipts/${id}/id-photo`, { method: 'DELETE' }, 'Could not remove the photo.');
 }

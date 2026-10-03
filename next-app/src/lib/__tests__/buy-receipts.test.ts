@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -6,12 +6,15 @@ import {
   BUY_RECEIPT_ATTESTATION_SELLER,
   BUY_RECEIPT_FORM_ROWS,
   BUY_RECEIPT_DEFAULT_PRINT_SET,
+  BUY_RECEIPT_PAYMENT_LABELS,
+  BUY_RECEIPT_PAYMENT_METHODS,
   BUY_RECEIPT_PRINT_SETS,
   BUY_RECEIPT_STATION_PATH,
   BUY_RECEIPT_STATION_SHORT_PATH,
   WINDOWS_SHORTCUT_TARGET_MAX,
   blankBuyReceiptDraft,
   buyReceiptContentColumns,
+  buyReceiptIdPhotoFolder,
   buyReceiptIdPhotoPath,
   buyReceiptTotal,
   draftFromReceipt,
@@ -215,6 +218,31 @@ describe('payments on the paper and in the form', () => {
       ]),
     ).toBe('Cash $500.00 · Check #2041 $750.00');
     expect(paymentsLine([])).toBe('');
+  });
+
+  it('offers Cash App and PayPal beside the other payment apps (owner, 2026-10-03)', () => {
+    // The order is the order of the form's list: cash and check, then the apps together.
+    expect([...BUY_RECEIPT_PAYMENT_METHODS]).toEqual(['cash', 'check', 'zelle', 'venmo', 'cashapp', 'paypal', 'bank_transfer', 'store_credit']);
+    for (const method of BUY_RECEIPT_PAYMENT_METHODS) expect(BUY_RECEIPT_PAYMENT_LABELS[method]).toBeTruthy();
+    expect(paymentLabel('cashapp', null)).toBe('Cash App');
+    expect(paymentLabel('paypal', null)).toBe('PayPal');
+    // Saved like any other method: the whole total, and no reference (only a check has one).
+    expect(value(draft({ payments: [{ method: 'cashapp', reference: 'x', amount: '' }] })).payments).toEqual([
+      { method: 'cashapp', reference: null, amount: 1250 },
+    ]);
+    expect(value(draft({ payments: [{ method: 'paypal', reference: '', amount: '750' }, { method: 'cash', reference: '', amount: '500' }] })).payments).toEqual([
+      { method: 'paypal', reference: null, amount: 750 },
+      { method: 'cash', reference: null, amount: 500 },
+    ]);
+    expect(paymentsLine([{ method: 'paypal', reference: null, amount: 750 }, { method: 'cashapp', reference: null, amount: 500 }])).toBe(
+      'PayPal $750.00 · Cash App $500.00',
+    );
+    // The form's list is built from the same constants, so the two cannot drift apart.
+    const sheet = readFileSync(join(process.cwd(), 'src', 'components', 'admin', 'buy-receipts', 'BuyReceiptSheet.tsx'), 'utf8');
+    expect(sheet).toContain('{BUY_RECEIPT_PAYMENT_METHODS.map((method) => (');
+    // The database keeps payments as a free list — a new method must not need a migration.
+    const sql = readFileSync(join(process.cwd(), '..', 'supabase', 'buy-receipts-2026-09.sql'), 'utf8');
+    expect(sql).not.toMatch(/venmo|zelle/i);
   });
 
   it('tells the owner whether a split adds up', () => {
@@ -453,6 +481,66 @@ describe('buy receipts: routes', () => {
     expect(route).toContain("cacheControl: '0'");
     // A replace removes the previous object.
     expect(route).toContain('bucket.remove([previous])');
+  });
+
+  it('deletes a receipt with its ID photo, photo first, and nothing if the photo cannot go (owner, 2026-10-03)', () => {
+    const route = read('src', 'app', 'api', 'admin', 'buy-receipts', '[id]', 'route.ts');
+    expect(route).toContain('export async function DELETE(');
+    // The private bucket has no garbage collector: the photo is removed BEFORE the row.
+    const listAt = route.indexOf('bucket.list(folder');
+    const removeAt = route.indexOf('bucket.remove([...paths])');
+    const deleteAt = route.indexOf(".from('buy_receipts').delete().eq('id', id)");
+    expect(listAt).toBeGreaterThan(-1);
+    expect(removeAt).toBeGreaterThan(listAt);
+    expect(deleteAt).toBeGreaterThan(removeAt);
+    expect(route).toContain('Nothing was deleted.');
+    expect(route).toContain('BUY_RECEIPT_ID_BUCKET');
+    expect(route).toContain('buyReceiptIdPhotoFolder(id)');
+    expect(buyReceiptIdPhotoFolder('abc')).toBe('receipts/abc');
+    expect(buyReceiptIdPhotoPath('abc', 'f1')).toBe('receipts/abc/f1.webp');
+    // Unknown ids are a 404, and both kinds of receipt can go: no status check stands in the way.
+    const handler = route.slice(route.indexOf('export async function DELETE('));
+    expect(handler).toContain('if (!isReceiptId(id)) return notFound();');
+    expect(handler).toContain('if (!current) return notFound();');
+    expect(handler).not.toContain("status === 'void'");
+  });
+
+  it('needs no new SQL for a delete: the grant, the copy link and the guard already allow it', () => {
+    const sql = read('..', 'supabase', 'buy-receipts-2026-09.sql');
+    expect(sql).toContain('grant select, insert, update, delete on public.buy_receipts to authenticated');
+    expect(sql).toContain('duplicated_from      uuid references public.buy_receipts (id) on delete set null');
+    // The guard watches updates only, so a void receipt can still be deleted.
+    expect(sql).toContain('before update on public.buy_receipts');
+    expect(sql).not.toMatch(/before delete/i);
+    expect(sql).toContain('create policy "Admins delete buy receipt ids"');
+  });
+
+  it('the Log asks before deleting, in a pop-up window, and points to Void for a real purchase', () => {
+    const log = components('BuyReceiptLog.tsx');
+    expect(log).toContain('deleteReceipt(deleting.id)');
+    expect(log).toContain('<AdminModal title={`Delete ${deleting.receipt_number}`}');
+    expect(log).toContain('It cannot be');
+    expect(log).toContain('<strong>Void</strong>');
+    expect(log).toContain('Keep it');
+    // The row leaves the list only after the server confirmed it.
+    const refusedAt = log.search(/if \('error' in result\) \{\s+setDeleteError\(result\.error\);\s+return;/);
+    expect(refusedAt).toBeGreaterThan(-1);
+    expect(refusedAt).toBeLessThan(log.indexOf('current.filter((item) => item.id !== deleting.id)'));
+    // No browser confirm box: it blocks the page and looks nothing like the rest of Admin.
+    expect(log).not.toContain('window.confirm');
+    // The button is a trash-can with a spoken name — a fourth worded button did not fit an iPad.
+    expect(log).toContain('aria-label={`Delete ${row.receipt_number}`}');
+    expect(log).toContain('<AppIcon name="delete"');
+    // Below 1100px the cells and the worded buttons give up side padding so all four controls fit.
+    expect(log).toContain('@media (max-width: 1100px)');
+    expect(log).toContain('.brl-table .brl-actions .outline-button { padding-left: 0.85rem; padding-right: 0.85rem; }');
+    expect(log).toContain('className="brl-table w-full text-sm"');
+    expect(log).toContain('className="brl-actions px-4 py-3 text-right whitespace-nowrap"');
+    // No preview page is ever shipped.
+    expect(existsSync(join(root, 'src', 'app', '[locale]', 'zz-receipt-log-preview'))).toBe(false);
+    const client = components('buy-receipt-client.ts');
+    expect(client).toContain("fetch(`/api/admin/buy-receipts/${id}`, { method: 'DELETE' })");
+    expect(client).toContain('data.deleted !== true');
   });
 });
 

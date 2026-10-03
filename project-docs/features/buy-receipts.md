@@ -6,7 +6,9 @@
 > **unverified until the owner's first use** — see *Verification* at the end.
 > 2026-10-03: the desktop shortcut text was one character too long for Windows
 > — fixed (short address `/admin/station`; the old cut-off shortcut is
-> forwarded too). STAGED, awaiting the push.
+> forwarded too). Same day: **Cash App and PayPal** added to "Paid by", and a
+> **Delete** button on every Log row (see *Deleting*). All STAGED, awaiting the
+> push; no SQL.
 
 The receipt for something the shop **buys** from a customer at the counter.
 The owner fills it in on a laptop beside the seller, it is saved to a log in
@@ -35,10 +37,12 @@ edit it, duplicate it, void it, add or replace the ID photo.
 - **Items purchased**: quantity, description, amount. The form starts with one
   row ("+ Add item" for more) and the paper prints only the rows entered. ⛔ The amount is the
   **line total** as typed; there is no unit price. The total is the sum.
-- **Paid by**: Cash, Check (asks for the check number), Zelle, Venmo, Bank
-  transfer, Store credit / trade. The **+** button adds another method for a
-  split payment; with two or more, each gets an amount and they must add up to
-  the total.
+- **Paid by**: Cash, Check (asks for the check number), Zelle, Venmo, Cash App,
+  PayPal, Bank transfer, Store credit / trade (Cash App and PayPal added
+  2026-10-03; the list is `BUY_RECEIPT_PAYMENT_METHODS`, and the database
+  keeps payments as a free list, so a new method needs no SQL). The **+**
+  button adds another method for a split payment; with two or more, each gets
+  an amount and they must add up to the total.
 - Notes: one line tall, grows only if more is typed.
 - The ownership statement (`BUY_RECEIPT_ATTESTATION` in `lib/buy-receipts.ts`).
   ⚠️ Owner: confirm this wording with your attorney.
@@ -261,6 +265,34 @@ default printer is "Microsoft Print to PDF" or none.
 - Receipt numbers can skip (BUY-00004 → BUY-00006) when a save fails part-way.
   That is normal. ⛔ Never reuse a number.
 
+## Deleting (2026-10-03)
+
+The Log has a red trash-can button on every row (owner: *"add a 'delete' option
+to the log of receipts"*). It is for **test and mistaken entries**; a real
+purchase that was reversed should be **voided**, which keeps the record.
+
+- It always asks first, in the same pop-up window Void uses: seller, date and
+  total, "cannot be undone", "the number will not be used again", and a line
+  pointing to Void. Buttons **Keep it** / **Delete this receipt**.
+- Delete is permanent and works on recorded **and** void receipts. The row
+  goes, and so does the seller's ID photo.
+- ⛔ **The ID photo is removed FIRST** (`DELETE /api/admin/buy-receipts/[id]`).
+  The private bucket has no garbage collector, so a photo whose row is gone
+  would stay there for ever. If the photo cannot be removed, nothing is
+  deleted. The receipt's whole folder (`receipts/<id>/`) is cleared, not just
+  the path on the row.
+- No SQL was needed: the table already grants DELETE to `authenticated` behind
+  the admin-only policy, `duplicated_from` is `on delete set null` (a copy made
+  from a deleted receipt simply loses its "duplicated from" link), and the guard
+  trigger only watches updates.
+- A receipt deleted while it waits for the desktop is simply never printed: the
+  station finds no request.
+- The only trace is one line in the server log (`[buy-receipts] deleted
+  BUY-000NN by <email>`). There is no recycle bin for receipts.
+- The button is an icon, not the word, because a fourth worded button made the
+  row too wide for an iPad on its side; below 1100 px the table also tightens
+  its side padding so all four controls fit (1013 px → 958 px at 1024).
+
 ## Database
 
 `supabase/buy-receipts-2026-09.sql` — run once in the Supabase SQL editor
@@ -284,8 +316,8 @@ The file ends with verify queries and says what each should return.
 | Piece | File |
 |---|---|
 | Rules, types, validator, print sets, dates | `next-app/src/lib/buy-receipts.ts` |
-| Tests (42) incl. source guards | `next-app/src/lib/__tests__/buy-receipts.test.ts` |
-| Routes | `next-app/src/app/api/admin/buy-receipts/` — `route.ts` (POST, GET), `[id]/route.ts` (GET, PUT), `[id]/print-request`, `[id]/printed`, `[id]/void`, `[id]/id-photo` (POST, DELETE), `[id]/email` |
+| Tests (52) incl. source guards | `next-app/src/lib/__tests__/buy-receipts.test.ts` |
+| Routes | `next-app/src/app/api/admin/buy-receipts/` — `route.ts` (POST, GET), `[id]/route.ts` (GET, PUT, DELETE), `[id]/print-request`, `[id]/printed`, `[id]/void`, `[id]/id-photo` (POST, DELETE), `[id]/email` |
 | Pages | `next-app/src/app/[locale]/admin/buy-receipts/` — `page.tsx`, `log/`, `[id]/`, `station/` |
 | The paper (edit + print) | `components/admin/buy-receipts/BuyReceiptSheet.tsx` + `buy-receipt-sheet-css.ts` |
 | Printing in place | `components/admin/buy-receipts/BuyReceiptPrintHost.tsx` (`useReceiptPrinter`) |

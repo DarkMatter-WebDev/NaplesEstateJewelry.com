@@ -5,6 +5,18 @@
 
 ## ◻ OPEN — needs a human
 
+### 🟡 2026-10-03 (4) — Buy Receipts: Cash App + PayPal, and Delete on the Log — BUILT + gated + STAGED; **awaiting the owner's push** (same push as (1)–(3) below)
+
+Record: `CHANGELOG.md` 2026-10-03 (4). Rules: `DECISIONS.md` → *"Buy receipts…"* (delete bullet, paid-by bullet). Runbook: `features/buy-receipts.md` → *Deleting*. **No SQL, no env vars.**
+
+1. ◻ **Owner: push + deploy.**
+2. ◻ **Owner, first real use (this is the live test — Claude could not sign in as admin):** Admin → Buy Receipts → Log → the red trash-can on **BUY-00002** (the $1 test) → *Delete this receipt* → the row should disappear and "BUY-00002 was deleted." appear. Then the same for the void test **BUY-00001**. Tell Claude if either says "Nothing was deleted".
+3. ◻ **Owner, next real purchase paid that way:** pick **Cash App** or **PayPal** in "Paid by" — it should print on the paper and show in the Log.
+4. ℹ️ Delete is permanent (the receipt and its ID photo; the number is not reused). For a real purchase that was reversed use **Void**, which keeps the record. If a recycle bin like the one Orders and Messages have is wanted for receipts, that is a separate change with one SQL step — on request.
+5. ℹ️ On screens under 1100 px wide (an iPad on its side) the Log's buttons are slightly tighter so all four fit; before today that row was already 7 px too wide there.
+
+**Staging (10-03 (4)):** ✅ synced 2026-10-03 ~3:15 PM ET — dry run listed exactly the 11 touched files (`api/admin/buy-receipts/[id]/route.ts`, `buy-receipt-client.ts`, `BuyReceiptLog.tsx`, `lib/buy-receipts.ts`, `lib/__tests__/buy-receipts.test.ts`, CHANGELOG, CURRENT_STATUS, DECISIONS, INTEGRITY, TASKS, `features/buy-receipts.md`), 0 Extras, 1201 total; real run copied 11 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0, exit 0; leak check 0 `.env*` / `.log` / `.git` / `.tmp-*`, no node_modules / .next, launch.json present; positive control 238 = 238 `.tsx`; no `zz-*` preview page in source or staging; SHA-256 MATCH on 11 of 11; the staged route carries `export async function DELETE`, the staged lib carries `cashapp: 'Cash App'`. Gate for this state: `tsc` 0 · lint 0 errors · 1651/1651 · build 0. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
 ### 🟡 2026-10-03 (2) — New storefront photo in all four placements; homepage row = wide photo beside the square map (owner's Option B) — BUILT + gated + STAGED; **awaiting the owner's push** (goes out with (1) below)
 
 Record: `CHANGELOG.md` 2026-10-03 (2). Rules: `DECISIONS.md` → *"The storefront photo says which door…"* (2026-10-03 bullet). No SQL, no env vars.
