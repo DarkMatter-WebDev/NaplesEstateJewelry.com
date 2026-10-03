@@ -4,6 +4,9 @@
 > checks pass on production). Everything behind the admin login (saving, the webcam,
 > the photo upload, the print station's live loop, the real printer) is
 > **unverified until the owner's first use** — see *Verification* at the end.
+> 2026-10-03: the desktop shortcut text was one character too long for Windows
+> — fixed (short address `/admin/station`; the old cut-off shortcut is
+> forwarded too). STAGED, awaiting the push.
 
 The receipt for something the shop **buys** from a customer at the counter.
 The owner fills it in on a laptop beside the seller, it is saved to a log in
@@ -169,8 +172,12 @@ photo must still fit one page.
 2. Create a desktop shortcut with this target (one line):
 
    ```
-   "C:\Program Files\Google\Chrome\Application\chrome.exe" --user-data-dir="%LOCALAPPDATA%\NEJStation" --kiosk-printing --disable-backgrounding-occluded-windows --disable-background-timer-throttling --app=https://naplesestatejewelry.com/admin/buy-receipts/station
+   "C:\Program Files\Google\Chrome\Application\chrome.exe" --user-data-dir="%LOCALAPPDATA%\NEJStation" --kiosk-printing --disable-backgrounding-occluded-windows --disable-background-timer-throttling --app=https://naplesestatejewelry.com/admin/station
    ```
+
+   (`/admin/station` is a short address that forwards to
+   `/admin/buy-receipts/station` — see the length note below. The station page
+   shows this same text with a Copy button.)
 
 3. Open it. Sign in once (the sign-in stays in that separate Chrome profile).
 4. Click **Use this computer as the print station**.
@@ -184,8 +191,19 @@ photo must still fit one page.
 - `--user-data-dir=…` gives the station its **own Chrome**. Without it, if the
   everyday Chrome is already open, Windows just hands it the address and the
   kiosk switch is silently ignored — the dialog comes back.
-- 253 characters: the Windows "Create Shortcut" wizard cuts a target off at
-  259 (the owner hit it, 2026-09-30).
+- **247 characters. Windows keeps 259 of a shortcut target and silently drops
+  the rest.** With the full station address the text was 260, so Windows cut
+  the final "n" and the shortcut opened `…/buy-receipts/statio` — a dead page
+  (owner, 2026-10-03; the "253" written here on 09-30 was a miscount). Fixed
+  two ways: the shortcut now opens the short address `/admin/station`, and
+  both `/admin/station` and the cut-off `/admin/buy-receipts/statio` forward to
+  the station (`lib/legacy-redirects.ts`), so **the shortcut made on 09-30
+  works as it is — it does not need to be re-made.** The text is built by
+  `stationShortcutTarget` in `lib/buy-receipts.ts`; its length is pinned in
+  `lib/__tests__/buy-receipts.test.ts`, so it is counted by the test, never by
+  hand.
+- ⛔ `%LOCALAPPDATA%\NEJStation` must stay as it is: the station's sign-in and
+  its "this computer is the print station" choice live in that Chrome profile.
 - The two `--disable-…` switches are the cure for a slow print: Chrome holds a
   covered or background window's `print()` and slows its timers. A job sent from
   the laptop sat for over a minute when the station ran as a background tab in

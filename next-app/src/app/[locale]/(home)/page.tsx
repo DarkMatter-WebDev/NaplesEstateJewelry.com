@@ -575,7 +575,8 @@ export default async function HomePage({ params }: Props) {
         >
           <PageContainer max="content">
           {/* One centred column, then a two-up row of the storefront photo and
-              the map (owner, 2026-09-08, mockup V2). History, so nobody
+              the map (owner, 2026-09-08, mockup V2; the row's proportions
+              changed 2026-10-03 — see the note above it). History, so nobody
               re-derives it: this block was a single narrow stack until
               2026-08-23; it became two columns (details left, map right) so
               all seven hours rows would not push the map off the fold; on
@@ -722,22 +723,30 @@ export default async function HomePage({ params }: Props) {
               </p>
             </div>
 
-            {/* Orientation sentence, then the storefront photo and the map as
-                two equal squares (owner, 2026-09-08, mockup V2). The photo is
-                the door, the map is the pin; no caption by the owner's call —
-                the alt text carries the cues. Map: still SQUARE and still lazy
-                (both recorded decisions — the square replaced a letterbox that
-                showed a corridor of Shirley St with no context north or south
-                of the door, and lazy keeps a heavy third-party frame off the
-                critical path). The photo is cropped to the same square, toward
-                the door and the curb number. */}
+            {/* Orientation sentence, then the storefront photo and the map side
+                by side. The photo is the door, the map is the pin; no caption
+                by the owner's call — the alt text carries the cues. Map: still
+                SQUARE and still lazy (both recorded decisions — the square
+                replaced a letterbox that showed a corridor of Shirley St with
+                no context north or south of the door, and lazy keeps a heavy
+                third-party frame off the critical path).
+
+                Since 2026-10-03 (owner, mockup "Option B") the photo keeps its
+                natural WIDE shape instead of being cropped to a square: the
+                new photo shows the teal unit on the left and the green one on
+                the right, and a square cut both off. ⚠️ The `4fr 3fr` columns
+                are what make the two tiles the SAME HEIGHT — a 4:3 photo in a
+                4-wide column is exactly as tall as a square map in a 3-wide
+                one. Change one number and the heights stop matching. From
+                2026-09-08 until then the pair was two equal squares (mockup
+                V2). */}
             <p className="responsive-copy mx-auto mt-10 max-w-2xl" style={{ color: 'var(--color-on-surface-variant)' }}>
               {isEs
                 ? 'Estamos en Shirley St, justo al norte de Pine Ridge Rd, con estacionamiento en la puerta. Pase durante el horario de atención, o llámenos antes y concertamos una cita privada.'
                 : 'We’re on Shirley St just north of Pine Ridge Rd, with parking right at the door. Walk in during showroom hours, or call ahead and we’ll set a private appointment.'}
             </p>
-            <div className="mt-6 grid w-full max-w-4xl gap-4 md:grid-cols-2">
-              <StorefrontPhoto locale={locale} aspect="1:1" className="w-full" sizes="(min-width: 1024px) 28rem, (min-width: 768px) 50vw, 100vw" />
+            <div className="mt-6 grid w-full max-w-4xl gap-4 md:grid-cols-[4fr_3fr]">
+              <StorefrontPhoto locale={locale} aspect="4:3" className="w-full" sizes="(min-width: 1024px) 32rem, (min-width: 768px) 57vw, 100vw" />
               <ShowroomMap locale={locale} maxWidth="100%" className="w-full" />
             </div>
           </div>

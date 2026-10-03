@@ -34,6 +34,15 @@ export const LEGACY_REDIRECTS: Record<string, LegacyRedirect> = {
   // purpose: /live is a convenience, /spot-prices is the canonical URL.
   '/live': { to: '/spot-prices', permanent: false },
 
+  // Print Station (Admin → Buy Receipts). Its desktop shortcut carries Chrome
+  // switches, and Windows keeps only 259 characters of a shortcut target, so
+  // the shortcut opens a short address (2026-10-03; `stationShortcutTarget` in
+  // lib/buy-receipts.ts). The second line is the address the owner's FIRST
+  // shortcut ended up with: the pasted text was 260 characters and Windows
+  // dropped the final "n". Keeping it means that shortcut works as it is.
+  '/admin/station': { to: '/admin/buy-receipts/station', permanent: false },
+  '/admin/buy-receipts/statio': { to: '/admin/buy-receipts/station', permanent: false },
+
   // Cart / saved items are drawers, not pages — keep habitual URLs off 404.
   '/cart': { to: '/shop', permanent: false },
   '/wishlist': { to: '/shop', permanent: false },

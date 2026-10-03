@@ -3,7 +3,7 @@
 > What the Google tag on this site does, for whom, and how to check it.
 > Built 2026-10-02 (owner decision, reversing the 2026-09-20 "no site tag"
 > rule — `DECISIONS.md` → *"Google Ads conversion tracking…"*). Last updated:
-> **2026-10-02**.
+> **2026-10-02** (night: account state note under *Outside the site*).
 
 ## In one paragraph
 
@@ -34,8 +34,11 @@ possible.
 All four actions were created in Google Ads by another agent on 2026-10-02;
 the site fires the first three exactly as given
 (`next-app/src/lib/ads-tracking.ts`). The forwarding-number action would need
-Google's phone snippet, which the owner ruled out: in Google Ads it should be
-set Secondary or paused so it never competes with the tap for "Primary".
+Google's phone snippet, which the owner ruled out; in Google Ads it was set
+**Secondary** and the tap action **Primary** the same evening (read back in
+the all-actions table). **Call reporting is OFF** in the account since then
+too (owner: the ad's call button must dial the real number) — Google's
+"Calls from ads" action stays enabled but records nothing.
 
 ## When the tag loads (`shouldLoadAdsTag`)
 
@@ -133,6 +136,15 @@ that decision changed.
   was switched off on 2026-09-20 because the site had no tag; Google:
   *"Auto-tagging is a required feature"* for conversion tracking. Without it no
   URL carries a click ID and nothing records.
+- **Account state after 2026-10-02 night** (`CHANGELOG.md` 2026-10-02 (7)–(8)):
+  budget **$25.00/day** (was $19), 99 campaign-level negatives (9 electronics
+  terms added as insurance — the search terms showed no device or bullion-buyer
+  traffic to speak of), Maximize Clicks re-learning. The campaign's two
+  conversions before this build were Google's own "Calls from ads" (forwarding
+  number) — that counter stops with call reporting off; the site's tap action
+  and the Mobile clicks-to-call click type are the call signals now.
+  ⚠️ Google's "Confirm it's you" prompt on sensitive saves can be skipped only
+  until **Oct 4, 2026**; afterwards those saves need the owner's passkey.
 - A `gclid` in the URL does **not** bypass Netlify's page cache: the Next.js
   runtime sets `Netlify-Vary: query=__nextDataReq|_rsc`, so only those two
   parameters vary the cache key (`@netlify/plugin-nextjs` 5.15.11,
@@ -189,8 +201,8 @@ taken out.)
 - `next-app/src/lib/ads-tracking.ts` — IDs, labels, click-ID validation,
   storage shape, `shouldLoadAdsTag`, link classifiers (pure; the API routes
   import only this).
-- `next-app/src/lib/ads-tracking-browser.ts` — storage, the tag boot, the
-  phone callback, the click listener, `sendAdsConversion`,
+- `next-app/src/lib/ads-tracking-browser.ts` — storage, the tag boot (no
+  phone snippet), the click listener, `sendAdsConversion`,
   `setAdsMeasurement`.
 - `next-app/src/components/ads/GoogleAdsTag.tsx` — mounted once in
   `[locale]/layout.tsx`; renders nothing.

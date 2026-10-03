@@ -7,6 +7,9 @@ import {
   BUY_RECEIPT_FORM_ROWS,
   BUY_RECEIPT_DEFAULT_PRINT_SET,
   BUY_RECEIPT_PRINT_SETS,
+  BUY_RECEIPT_STATION_PATH,
+  BUY_RECEIPT_STATION_SHORT_PATH,
+  WINDOWS_SHORTCUT_TARGET_MAX,
   blankBuyReceiptDraft,
   buyReceiptContentColumns,
   buyReceiptIdPhotoPath,
@@ -31,8 +34,10 @@ import {
   receiptPrintLabel,
   resolvePrintCopies,
   sampleBuyReceipt,
+  stationShortcutTarget,
   type BuyReceiptDraft,
 } from '../buy-receipts';
+import { LEGACY_REDIRECTS, resolveLegacyRedirect } from '../legacy-redirects';
 
 const NOW = new Date('2026-09-30T18:00:00Z');
 
@@ -277,6 +282,34 @@ describe('print-station helpers', () => {
     expect(isClaimStale({ print_claimed_at: null }, now)).toBe(true);
     expect(isClaimStale({ print_claimed_at: '2026-09-30T18:01:30Z' }, now)).toBe(false);
     expect(isClaimStale({ print_claimed_at: '2026-09-30T18:00:00Z' }, now)).toBe(true);
+  });
+  it('keeps the desktop shortcut inside what Windows stores — it was 260 characters once and lost its last letter', () => {
+    const target = stationShortcutTarget('https://naplesestatejewelry.com');
+    // Counted here, never by hand: a comment once said "253" for a 260-character
+    // string, and the owner's shortcut opened …/statio (2026-10-03).
+    expect(target.length).toBe(247);
+    expect(target.length).toBeLessThanOrEqual(WINDOWS_SHORTCUT_TARGET_MAX);
+    expect(target).toBe(
+      '"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" '
+      + '--user-data-dir="%LOCALAPPDATA%\\NEJStation" --kiosk-printing '
+      + '--disable-backgrounding-occluded-windows --disable-background-timer-throttling '
+      + '--app=https://naplesestatejewelry.com/admin/station',
+    );
+    // A trailing slash on the site address must not cost a character or break the path.
+    expect(stationShortcutTarget('https://naplesestatejewelry.com/')).toBe(target);
+  });
+  it('the short station address, and the cut-off one the first shortcut has, both reach the station', () => {
+    expect(BUY_RECEIPT_STATION_SHORT_PATH).toBe('/admin/station');
+    expect(resolveLegacyRedirect(BUY_RECEIPT_STATION_SHORT_PATH)).toEqual({ destination: BUY_RECEIPT_STATION_PATH, permanent: false });
+    expect(resolveLegacyRedirect('/admin/buy-receipts/statio')).toEqual({ destination: BUY_RECEIPT_STATION_PATH, permanent: false });
+    expect(resolveLegacyRedirect('/es/admin/station')).toEqual({ destination: `/es${BUY_RECEIPT_STATION_PATH}`, permanent: false });
+    // The station page itself is never redirected, and it exists.
+    expect(LEGACY_REDIRECTS[BUY_RECEIPT_STATION_PATH]).toBeUndefined();
+    expect(statSync(join(process.cwd(), 'src', 'app', '[locale]', 'admin', 'buy-receipts', 'station', 'page.tsx')).isFile()).toBe(true);
+    // The setup box on the station page shows the tested text, not a second copy of it.
+    const help = readFileSync(join(process.cwd(), 'src', 'components', 'admin', 'buy-receipts', 'StationSetupHelp.tsx'), 'utf8');
+    expect(help).toContain('stationShortcutTarget(getSiteUrl())');
+    expect(help).not.toContain('chrome.exe');
   });
   it('labels the print state for the log', () => {
     expect(receiptPrintLabel({ print_requested_at: null, printed_at: null, print_count: 0 })).toBe('Not printed');

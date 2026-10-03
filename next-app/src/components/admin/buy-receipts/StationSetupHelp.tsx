@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { stationShortcutTarget } from '@/lib/buy-receipts';
 import { copyTextToClipboard } from '@/lib/clipboard';
 import { getSiteUrl } from '@/lib/order-email-branding';
 
@@ -12,26 +13,13 @@ import { getSiteUrl } from '@/lib/order-email-branding';
  * Silent printing is a Chrome start-up switch, not something a web page can
  * turn on. The page only ever calls `window.print()`; Chrome started with
  * `--kiosk-printing` sends that straight to the Windows default printer.
+ *
+ * The text to paste is built in `lib/buy-receipts.ts` (`stationShortcutTarget`),
+ * where its length is pinned by a test: Windows keeps 259 characters.
  */
-export function stationShortcutTarget(): string {
-  // 253 characters: Windows' Create Shortcut wizard cuts a target at 259 (the
-  // owner hit it, 2026-09-30). The two background switches stay because they are
-  // the cure for "it took a minute to print": Chrome holds a covered or
-  // background window's print() and slows its timers; a job sat for over a
-  // minute in the everyday Chrome that evening. `--disable-renderer-backgrounding`
-  // was the one dropped to fit.
-  return (
-    '"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" '
-    + '--user-data-dir="%LOCALAPPDATA%\\NEJStation" '
-    + '--kiosk-printing '
-    + '--disable-backgrounding-occluded-windows --disable-background-timer-throttling '
-    + `--app=${getSiteUrl()}/admin/buy-receipts/station`
-  );
-}
-
 export default function StationSetupHelp({ open = false }: { open?: boolean }) {
   const [copied, setCopied] = useState<'yes' | 'no' | null>(null);
-  const target = stationShortcutTarget();
+  const target = stationShortcutTarget(getSiteUrl());
 
   async function copy() {
     setCopied((await copyTextToClipboard(target)) ? 'yes' : 'no');

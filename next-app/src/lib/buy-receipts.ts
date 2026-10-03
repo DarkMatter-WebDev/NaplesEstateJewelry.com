@@ -29,6 +29,38 @@ export const BUY_RECEIPT_SIGNER_NAME = 'Christopher Surette';
 /** localStorage flag: this browser is the print station. An un-armed browser never polls or claims. */
 export const BUY_RECEIPT_STATION_KEY = 'nej-buy-receipt-station';
 
+/** The station page, and the short address the desktop shortcut opens (redirected in `legacy-redirects.ts`). */
+export const BUY_RECEIPT_STATION_PATH = '/admin/buy-receipts/station';
+export const BUY_RECEIPT_STATION_SHORT_PATH = '/admin/station';
+/** Windows keeps this many characters of a shortcut's target and silently drops the rest. */
+export const WINDOWS_SHORTCUT_TARGET_MAX = 259;
+
+/**
+ * What the owner pastes into Windows' Create Shortcut box on the printer PC.
+ *
+ * It must fit `WINDOWS_SHORTCUT_TARGET_MAX`: with the full station address it
+ * was 260 characters and Windows dropped the final "n" — the shortcut opened
+ * `…/statio`, a dead page (owner, 2026-10-03; an earlier count of "253" was
+ * wrong). The short address brings it to 247. The length is pinned in
+ * `buy-receipts.test.ts`, so it is counted by the test, never by hand.
+ *
+ * The two background switches stay because they are the cure for "it took a
+ * minute to print": Chrome holds a covered or background window's print() and
+ * slows its timers (a job sat for over a minute in the everyday Chrome,
+ * 2026-09-30). `--disable-renderer-backgrounding` was dropped to fit.
+ * ⛔ `%LOCALAPPDATA%\NEJStation` must not change: the station's sign-in and its
+ * "this computer is the station" flag live in that Chrome profile.
+ */
+export function stationShortcutTarget(siteUrl: string): string {
+  return (
+    '"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" '
+    + '--user-data-dir="%LOCALAPPDATA%\\NEJStation" '
+    + '--kiosk-printing '
+    + '--disable-backgrounding-occluded-windows --disable-background-timer-throttling '
+    + `--app=${siteUrl.replace(/\/$/, '')}${BUY_RECEIPT_STATION_SHORT_PATH}`
+  );
+}
+
 export const BUY_RECEIPT_ID_TYPES = ['Driver license', 'State ID', 'Passport', 'Military ID', 'Other'] as const;
 export type BuyReceiptIdType = (typeof BUY_RECEIPT_ID_TYPES)[number];
 

@@ -365,8 +365,9 @@ export default async function CardLanding({ locale, holder }: CardLandingProps) 
               for it — and a thumbnail, not a hero. 16:9 until 2026-09-24, now
               2:1 with a 4px smaller top margin: those ~25px are what paid for
               the email line above the buttons (owner: the line must not add
-              height to the page). The crop keeps the bottom of the frame, so
-              the door and the curb number stay in the picture. */}
+              height to the page). The crop keeps the BOTTOM of the photo — the
+              ground floor: the door, both signs, and the teal and green
+              neighbours at the edges (new photo, 2026-10-03). */}
           <StorefrontPhoto locale={locale} aspect="2:1" className="mt-2" sizes="(min-width: 448px) 28rem, 100vw" />
           {/* Directions live with the address they point at (owner, 2026-09-03). */}
           <a
