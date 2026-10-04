@@ -5,7 +5,30 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-10-03 (5)–(7) — Buy receipt "Customer input mode": **BUILT + gated + STAGED, awaiting the owner's push** — then ⛔ the owner's own try on the iPad before a seller uses it (no SQL, no env vars)
+### 🟡 2026-10-03 (8) — Buy receipt: "Mailing list" box on the form + customer input mode as the form itself — **BUILT, gated and STAGED (~8:45 PM); awaiting the owner's push** (no SQL, no env vars)
+
+Record: `CHANGELOG.md` 2026-10-03 (10) (the build), (9) and (8) (the mockups). Runbook: `features/buy-receipts.md` → *Customer input mode* and *The mailing list*. Rules: `DECISIONS.md` → *"Customer input mode IS the form, and "Mailing list" is a box on the form (2026-10-03, night)"*.
+
+**Owner's answers on mockup 3b (10-03, verbatim):** *"1 use layout b, 2 yes, 3 make the grey-out a little stronger so its very obvious which fields they need to input — build it"*.
+
+**What was built:**
+
+- **On the form:** a second small box, **Mailing list**, beside "Email copy". The Email box is one column wider and the Name box one narrower (layout B). Nothing else on the form changed; the printed paper did not change at all.
+- **Customer input mode:** the seller now sees **the form itself**, locked to the whole screen — only their seven boxes (and the two small email boxes) can be used; ID, date of birth, the ID photo, items, total, payment, notes and signatures are greyed (shown at 22%, stronger than the mockup's 36%) and cannot be touched. Save, flags, Submit unfinished, the staff code, Thank-you and the whole server-side lock work as before.
+
+Gate: `tsc` 0 · lint 0 errors · **1710/1710** · build 0. Browser checks on the real components: 77/77 with a mouse, 77/77 as a touch tablet.
+
+1. ◻ **Owner — push + deploy** (copy the staging folder as usual).
+2. ◻ **Owner — try it on the iPad before a seller does** (Chromium cannot prove Safari; Claude has not seen this build on a real iPad or behind a real sign-in):
+   - **The form:** "Mailing list" sits beside "Email copy" on one line, sideways and upright; both are greyed until an email is typed; tick it, save a receipt → the saved panel says *Mailing list: Added* and Subscribers shows the address as *Buy receipt*.
+   - **Customer input mode, sideways and upright:** it looks like the form; tapping a greyed part (ID type, an item, the amount, the ID photo buttons) does nothing; the page cannot be dragged or scrolled; with the keyboard up, the "Seller" heading, all seven boxes and **Save** stay above the keys; the keyboard's own "next field" arrows never land on a greyed box.
+   - **Save with a box empty** → red boxes with "Needed", **Submit unfinished** → the code → back on your form with the yellow line naming what is missing.
+   - **A complete Save** → Thank you → Staff: unlock → the code → your form with the details and any ticks.
+   - Is the grey right? It is one number (`BUY_RECEIPT_CUSTOMER_DIM` in `buy-receipt-sheet-css.ts`, now 0.22) — say "lighter" or "darker".
+3. ◻ **Owner — print one receipt** (any copy set) after the deploy and glance at it: the printed paper is meant to be exactly as before (Name wider than Email there). Claude did not run a print for this build.
+4. ◻ **Owner — optional:** should the printed paper also use the wider Email box (Name 4 · Email 5)? Left as it is unless asked.
+
+### 🟢 2026-10-03 (5)–(7) — Buy receipt "Customer input mode": **DEPLOYED** (owner, 10-03 evening: *"pushed and deployed, manually verified in production. Period."*) — its seller's screen is replaced by the build in (8) above once that is pushed
 
 Record: `CHANGELOG.md` 2026-10-03 (7) (the build), (6) and (5) (the two mockups). Runbook: `features/buy-receipts.md` → *Customer input mode* (how to use it, the lock, Guided Access, what to do if it sticks). Rules: `DECISIONS.md` → *"Customer input mode (2026-10-03)"*.
 
@@ -13,8 +36,8 @@ Record: `CHANGELOG.md` 2026-10-03 (7) (the build), (6) and (5) (the two mockups)
 
 **What was built:** the form is unchanged; ONE small **Customer input mode** button at the right end of the tabs row. It locks the browser on the server, then shows the seller seven boxes (name, phone, street, city, state, ZIP, email-optional — **no ID, no date of birth**), Save at the bottom, unfinished boxes flagged, **Submit unfinished** behind the staff code, a locked **Thank you** screen, a small **Staff** button. With an email typed: "Email me a copy of my receipt" and "Add me to the mailing list" (added when the owner saves the receipt). Afterwards the form shows a line only if there is something to act on. While locked, that tablet cannot open any admin or account page, call any admin API, or keep another admin tab open.
 
-1. ◻ **Owner: push + deploy** (one push; nothing to run in Supabase, nothing to set in Netlify).
-2. ◻ **Owner, right after the deploy, on the iPad — try it yourself before a seller does** (Chromium cannot prove Safari; `DECISIONS.md` → *"Admin on a phone (2026-09-02)"*). Admin → Buy Receipts → **Customer input mode**, then check:
+1. ✅ **Pushed + deployed** (owner).
+2. ✅ **Verified in production by the owner** (their word; Claude did not check production, as told). What was on the list: (Chromium cannot prove Safari; `DECISIONS.md` → *"Admin on a phone (2026-09-02)"*). Admin → Buy Receipts → **Customer input mode**, then check:
    - the boxes and **Save** stay above the keyboard, sideways and upright, and nothing can be dragged or scrolled;
    - Save with a box empty → red boxes + **Submit unfinished** → the code → back on your form with a yellow line naming what is unfinished;
    - a complete Save → **Thank you** → **Staff: unlock** → the code → your form with the details in it;
@@ -22,7 +45,7 @@ Record: `CHANGELOG.md` 2026-10-03 (7) (the build), (6) and (5) (the two mockups)
    - tick **Add me to the mailing list** with a test email, save the receipt → "Mailing list: Added" on the saved panel, and the address under Admin → Subscribers marked **Buy receipt** (then delete that test subscriber and receipt).
    If anything is off, do not use the button — the form itself is unaffected — and tell Claude what you saw.
 3. ◻ **Owner, optional but recommended: Guided Access on the iPad** (one-time setup + three taps per hand-over — `features/buy-receipts.md` → *One-time iPad setup*). It is the only thing that stops a seller opening another website or app; the site's lock covers only this site's back end.
-4. ℹ️ **Not verified by Claude (no admin sign-in on the dev server, no iPad):** the real lock cookie being set and cleared, a typed admin address on a signed-in locked browser, the mailing-list write against the real database, Safari's keyboard and touch behaviour. Everything else is listed under *Verification* in the runbook.
+4. ℹ️ **Never verified by Claude — verified by the owner in production instead** (no admin sign-in on the dev server, no iPad): the real lock cookie being set and cleared, a typed admin address on a signed-in locked browser, the mailing-list write against the real database, Safari's keyboard and touch behaviour. Everything else is listed under *Verification* in the runbook.
 5. ℹ️ **The staff code is in one source file** (`next-app/src/lib/buy-receipt-staff-code.ts`, server-only), so it is also in the GitHub repo. It only works on a browser already signed in as an admin. Changing it = that one line + a deploy.
 
 **Gate (final code, 10-03 ~5 PM ET):** `npx tsc --noEmit` 0 · `npm run lint` 0 errors (3 older `<img>` warnings) · `npx vitest run` **1704/1704** (159 files; 53 new) · `npm run build` 0, 88 prerendered routes (41 EN + 41 ES + 6). Browser checks on the real components (temporary login-free pages, deleted): flow **108/108**, touch **11/11**, two tabs **11/11**; dev-server redirects with and without the lock cookie as designed.

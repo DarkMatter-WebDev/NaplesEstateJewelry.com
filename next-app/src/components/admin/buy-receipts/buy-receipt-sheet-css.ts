@@ -12,6 +12,22 @@
 // Field labels sit UNDER their line (owner, 2026-10-01: the way a paper form
 // reads, and how the signature lines already worked). Table column headings
 // stay on top — they head a column, they do not label one blank.
+//
+// The form (edit mode) differs from the printed paper in ONE thing (owner,
+// 2026-10-03, "layout B"): the Email box is one column wider and the Name box
+// one narrower, so the two small boxes "Email copy" and "Mailing list" fit on
+// the Email label's line. The printed paper keeps Name 5 / Phone 3 / Email 4.
+//
+// The seller's view (customer input mode) is this same paper with the owner's
+// parts faded and switched off — see the block near the end.
+
+/**
+ * How faint the owner's parts of the paper are while the seller has the tablet.
+ * Owner, 2026-10-03: "make the grey-out a little stronger so its very obvious
+ * which fields they need to input" (the mockup had 0.36). The one number to
+ * change.
+ */
+export const BUY_RECEIPT_CUSTOMER_DIM = 0.22;
 
 export const BUY_RECEIPT_SHEET_CSS = `
 .buy-receipt-sheet {
@@ -112,11 +128,19 @@ export const BUY_RECEIPT_SHEET_CSS = `
 .buy-receipt-sheet .sheet-input:focus { border-bottom-color: #735c00; background: #fffdf3; box-shadow: 0 1px 0 #735c00; }
 .buy-receipt-sheet .sheet-input::placeholder { color: #a79e8b; }
 .buy-receipt-sheet .brs-right { text-align: right; }
-/* The Email label and the short "Email copy" box share one line under the field. */
+/* The Email label and the two short boxes, "Email copy" and "Mailing list", share one line under the field. */
 .buy-receipt-sheet .brs-label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .buy-receipt-sheet .brs-email-copy { display: flex; flex: none; align-items: center; gap: 5px; margin-top: 2px; font-size: 11.5px; line-height: 1.3; white-space: nowrap; color: #746b5b; cursor: pointer; }
 .buy-receipt-sheet .brs-email-copy input { width: 14px; height: 14px; margin: 0; accent-color: #735c00; }
 .buy-receipt-sheet .brs-email-copy:has(input:disabled) { opacity: 0.55; cursor: default; }
+/* That line holds the label and both boxes in full words down to about 264px. Narrower (a tablet
+   held upright), the word "(optional)" leaves the label in place — nothing stacks, nothing moves.
+   Measured against the Email box itself, not the window: the same paper is also shown, wider, in
+   the seller's view. (A browser without container queries keeps the word.) */
+.buy-receipt-sheet .brs-cell-email { container-type: inline-size; }
+@container (max-width: 270px) {
+  .buy-receipt-sheet .brs-two .brs-opt { display: none; }
+}
 
 .buy-receipt-sheet .brs-value {
   display: block;
@@ -248,6 +272,34 @@ export const BUY_RECEIPT_SHEET_CSS = `
   user-select: none;
 }
 .buy-receipt-sheet .brs-void-line { margin: 8px 0 0; font-size: 12px; font-weight: 600; color: #a32d2d; }
+
+/* ── The seller's view of this same paper (customer input mode; owner, 2026-10-03) ──
+   Nothing here touches the owner's form or a printed sheet: every rule hangs on a class or an
+   attribute that only the seller's view adds.
+   The owner's parts — ID type, ID last 4, date of birth, the ID photo, the items, the money, the
+   notes, the signatures — are faded and cannot be touched (they are also switched off in the
+   markup: disabled + inert). The seven seller boxes keep the paper's normal look. */
+.buy-receipt-sheet .brs-off { opacity: ${BUY_RECEIPT_CUSTOMER_DIM}; pointer-events: none; -webkit-user-select: none; user-select: none; }
+.buy-receipt-sheet fieldset.brs-rest { display: block; min-width: 0; margin: 0; padding: 0; border: 0; }
+/* A switched-off box keeps the paper's own ink (iOS would otherwise fade it a second time), so the
+   one fade above greys every part evenly. */
+.buy-receipt-sheet .brs-off .sheet-input:disabled { opacity: 1; color: #1a1c1c; -webkit-text-fill-color: #1a1c1c; }
+/* A flagged seller box, in the paper's own language: a red line; "Needed" inside an empty box;
+   the reason beside the label of one that is filled in but not right. Nothing changes size. */
+.buy-receipt-sheet .sheet-input[aria-invalid="true"] { border-bottom-color: #ba1a1a; background: #fff6f5; box-shadow: 0 1px 0 #ba1a1a; }
+.buy-receipt-sheet .sheet-input[aria-invalid="true"]::placeholder { color: #ba1a1a; opacity: 1; }
+.buy-receipt-sheet .sheet-input[aria-invalid="true"] + .brs-label,
+.buy-receipt-sheet .sheet-input[aria-invalid="true"] + .brs-label-row > .brs-label { color: #ba1a1a; }
+/* One line, always: a reason too long for its box is cut short rather than pushing the paper down. */
+.buy-receipt-sheet .sheet-input[aria-invalid="true"] + .brs-label { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.buy-receipt-sheet .brs-why { font-weight: 600; letter-spacing: 0; text-transform: none; }
+
+/* Layout B (see the top of this file): only where the paper has its full twelve columns. The two
+   narrower layouts below keep their rows exactly as they were. */
+@media screen and (min-width: 761px) {
+  .buy-receipt-sheet .brs-grid > .brs-cell-name { grid-column: span 4; }
+  .buy-receipt-sheet .brs-grid > .brs-cell-email { grid-column: span 5; }
+}
 
 /* screen ONLY. When a print dialog applies its own margins the page is about 740px wide; without the
    word screen this rule stacked the header and halved the field rows ON PAPER and pushed the last line to a second sheet

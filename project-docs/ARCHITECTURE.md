@@ -845,8 +845,11 @@ Laptop (admin form)                      Supabase                         Deskto
 ### Customer input mode: a per-browser lock (2026-10-03)
 
 One optional button on the New receipt form hands the tablet to the seller on
-a locked screen with only their own contact boxes. The form itself is
-unchanged. Runbook: `features/buy-receipts.md` → *Customer input mode*.
+a locked screen. Since the same-form build (2026-10-03, night) that screen is
+the form's own paper with only the seller's seven contact boxes switched on
+and everything else faded and switched off; the first build drew a separate
+big-box screen. The owner's form is drawn as before. Runbook:
+`features/buy-receipts.md` → *Customer input mode*.
 
 ```text
 Tablet (signed in as admin)                          Server
@@ -877,10 +880,19 @@ Tablet (signed in as admin)                          Server
   admin pages (through `AdminHeader`) and account pages (`account/layout.tsx`).
 - **The seller's screen is the only thing displayed** (a `<body>` portal with
   every other child `display: none`), so there is nothing to scroll or tab to.
-- **Mailing list:** a seller's tick is acted on when the owner saves the
-  receipt — `POST /api/admin/buy-receipts` → `lib/buy-receipt-mailing-list.ts`
-  → `subscribe_homepage_v2` (service role; the feature's only service-role
-  call, and never on `buy_receipts`).
+- **One paper, drawn twice.** `BuyReceiptForm` has one `sheet()` function. It
+  draws `BuyReceiptSheet` for the owner's form, and hands the same function to
+  the locked screen (`BuyReceiptCustomerMode`, the frame), which calls it with
+  the seller's view (`customer` prop: the flags and the typing handlers). Both
+  instances edit the one draft in the form's state, so nothing is copied back.
+  In the seller's view the owner's parts are `disabled` + `inert` + faded; the
+  paper area is clipped (not a scroller) and is moved only by a measured slide
+  when a keyboard needs the room.
+- **Mailing list:** the "Mailing list" box sits beside "Email copy" on the form
+  (the seller can tick it in customer input mode). It is acted on when the
+  owner saves the receipt — `POST /api/admin/buy-receipts` →
+  `lib/buy-receipt-mailing-list.ts` → `subscribe_homepage_v2` (service role;
+  the feature's only service-role call, and never on `buy_receipts`).
 - **No SQL, no env vars.**
 
 ## Google Ads Conversion Tracking (2026-10-02)

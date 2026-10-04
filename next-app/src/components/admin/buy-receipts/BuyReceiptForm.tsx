@@ -23,7 +23,7 @@ import {
 import { CUSTOMER_MODE_MARKER_KEY } from '@/lib/customer-mode-lock';
 import { formatCurrency } from '@/types/sales';
 import BuyReceiptCustomerMode, { releaseCustomerModePage } from './BuyReceiptCustomerMode';
-import BuyReceiptSheet from './BuyReceiptSheet';
+import BuyReceiptSheet, { type BuyReceiptCustomerView } from './BuyReceiptSheet';
 import BuyReceiptTabs from './BuyReceiptTabs';
 import IdPhotoField from './IdPhotoField';
 import ReceiptPrintControls, { PrintSetSelect, printSetAllowed } from './ReceiptPrintControls';
@@ -39,12 +39,17 @@ import { CUSTOMER_MODE_PAGE_CSS } from './buy-receipt-customer-css';
  * behind in storage; and a photo that fails to upload never costs the receipt —
  * the after-save panel says so and offers a retry.
  *
- * "Customer input mode" (owner, 2026-10-03) is OPTIONAL and changes nothing
- * about this form: one small button on the tabs row hands the tablet to the
- * seller, who then sees only their own contact boxes
- * (`BuyReceiptCustomerMode`). Those boxes edit this same draft, so when the
- * tablet comes back the form simply has the details in it. The owner can
- * equally ignore the button and type everything here, as before.
+ * "Customer input mode" (owner, 2026-10-03) is OPTIONAL: one small button on
+ * the tabs row hands the tablet to the seller. They see this same paper,
+ * locked to the whole screen, with only their own contact boxes switched on
+ * and everything else faded (`BuyReceiptCustomerMode` is the locked screen; it
+ * draws the paper through `sheet()` below, so it is the very same paper on the
+ * very same draft). When the tablet comes back the form simply has the details
+ * in it. The owner can equally ignore the button and type everything here.
+ *
+ * "Mailing list" (owner, 2026-10-03) is the second small box beside "Email
+ * copy": ticked — by the owner here, or by the seller in customer input mode —
+ * the email joins the mailing list when the receipt is saved.
  */
 
 type Action = 'save' | 'send' | 'print';
@@ -87,7 +92,7 @@ export default function BuyReceiptForm({
   const [restored, setRestored] = useState(false);
   const [modeBusy, setModeBusy] = useState(false);
   const [modeError, setModeError] = useState<string | null>(null);
-  /** The seller ticked "Add me to the mailing list"; acted on when the receipt is saved. */
+  /** "Mailing list" is ticked (by the owner on this form, or by the seller in customer input mode); acted on when the receipt is saved. */
   const [mailingList, setMailingList] = useState(false);
   const [listState, setListState] = useState<'added' | 'failed' | null>(null);
   /** How the tablet last came back; the line it may leave on the form is worked out from this, live. */
@@ -262,8 +267,27 @@ export default function BuyReceiptForm({
     setSaved({ ...saved, receipt: result.receipt });
   }
 
-  // After a hand-over: a line only if the owner has something to act on (see customerHandBack).
-  const handBack = handBackReason ? customerHandBack(handBackReason, draft, { emailCopy, mailingList }) : null;
+  // After a hand-over: a line only if the owner has something to finish (see customerHandBack).
+  const handBack = handBackReason ? customerHandBack(handBackReason, draft) : null;
+
+  // THE paper. Drawn once by this form, always; and a second time, in its seller's
+  // view, by the locked screen while the tablet is handed over. One function, so the
+  // two can never drift apart: same draft, same boxes, same ticks, same ID photo.
+  const sheet = (customer?: BuyReceiptCustomerView) => (
+    <BuyReceiptSheet
+      mode="edit"
+      draft={draft}
+      onChange={setDraft}
+      receiptNumber={null}
+      dateIso={nowIso}
+      idPhotoSlot={<IdPhotoField previewUrl={photo?.url ?? null} onPick={pickPhoto} onRemove={() => setPhoto(null)} />}
+      emailCopy={emailCopy}
+      onEmailCopyChange={setEmailCopy}
+      mailingList={mailingList}
+      onMailingListChange={setMailingList}
+      customer={customer}
+    />
+  );
 
   // The tabs are drawn here, not by the page shell, because the one new button
   // sits at the right end of their row and needs this form's state. Small on
@@ -380,19 +404,10 @@ export default function BuyReceiptForm({
         {modeError}
       </p>
     )}
-    {/* The only trace of customer input mode on the form, and only when there is something to act on. */}
+    {/* The only trace a hand-over leaves above the form, and only when boxes were left unfinished. */}
     {handBack && (
-      <p
-        role="status"
-        className="mx-auto mb-3 px-3 py-2 text-sm"
-        style={{
-          width: 'min(8.5in, 100%)',
-          borderRadius: '0.625rem',
-          background: handBack.kind === 'ok' ? '#eaf3de' : '#fdf1d6',
-          color: handBack.kind === 'ok' ? '#27500a' : '#6a4a00',
-        }}
-      >
-        {handBack.text}
+      <p role="status" className="mx-auto mb-3 px-3 py-2 text-sm" style={{ width: 'min(8.5in, 100%)', borderRadius: '0.625rem', background: '#fdf1d6', color: '#6a4a00' }}>
+        {handBack}
       </p>
     )}
     {/* In the server's HTML too, so a refresh in the mode never paints the admin page first. */}
@@ -412,6 +427,7 @@ export default function BuyReceiptForm({
         onProgress={setCustomerMode}
         onUnlocked={leaveCustomerMode}
         lockPath={`${adminBasePath}/buy-receipts`}
+        paper={sheet}
       />
     )}
     <form
@@ -424,18 +440,7 @@ export default function BuyReceiptForm({
         </p>
       )}
 
-      <BuyReceiptSheet
-        mode="edit"
-        draft={draft}
-        onChange={setDraft}
-        receiptNumber={null}
-        dateIso={nowIso}
-        idPhotoSlot={
-          <IdPhotoField previewUrl={photo?.url ?? null} onPick={pickPhoto} onRemove={() => setPhoto(null)} />
-        }
-        emailCopy={emailCopy}
-        onEmailCopyChange={setEmailCopy}
-      />
+      {sheet()}
 
       <div className="mx-auto mt-4 grid gap-2" style={{ width: 'min(8.5in, 100%)' }}>
         {error && (

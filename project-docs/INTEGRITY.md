@@ -15,10 +15,12 @@ npm audit --omit=dev
 ```
 
 `npm run build` is the publish gate and must exit 0. Current local baseline
-(measured 2026-10-03 ~5 PM ET, the buy receipt's customer input mode; 1651 / 156
-files after the buy-receipt delete + payment methods that afternoon, 1647 after
-the storefront-photo swap, 1643 after the print-station shortcut fix that morning):
-**1704/1704 tests across 159 files**, TypeScript clean, lint clean (3 pre-existing `<img>`
+(measured 2026-10-03 ~8:40 PM ET, the buy receipt's "Mailing list" box and the
+same-form customer view; 1704 after the first customer input mode build ~5 PM,
+1651 / 156 files after the buy-receipt delete + payment methods that afternoon,
+1647 after the storefront-photo swap, 1643 after the print-station shortcut fix
+that morning):
+**1710/1710 tests across 159 files**, TypeScript clean, lint clean (3 pre-existing `<img>`
 warnings in `TextDealsManager.tsx`), and a build that exits 0 with **88
 prerendered routes = 41 EN + 41 ES + 6 non-locale** (`/_global-error`,
 `/_not-found`, `/favicon.ico`, `/icon.png`, `/robots.txt`, `/sitemap.xml`).
@@ -96,8 +98,16 @@ page. Any change that breaks one of these breaks an owner requirement
   `requireAdmin()`, or another route passes `duringCustomerMode: true`;
 - `/account/security` or `/account/reset-password` becomes reachable on a
   locked browser (both change the signed-in password without the old one);
-- the seller's screen gains an ID, date-of-birth, item or money box, or the
-  owner's form (`BuyReceiptSheet.tsx`) changes because of the mode;
+- a seller becomes able to CHANGE an ID, date-of-birth, item or money box. The
+  seller's screen is the form's own paper (since 2026-10-03, night), so those
+  parts are on it — greyed, `disabled` and `inert`. Only the seven seller boxes
+  and the two small email boxes may be switched on;
+- the owner's own form is drawn differently because of the mode: everything
+  the seller's view adds to `BuyReceiptSheet.tsx` must hang on its `customer`
+  prop, which only the locked screen passes;
+- the paper area on the locked screen becomes a scroller (`overflow: clip` on
+  `.brc-page` and on the cut paper is deliberate — as a scroller, a focused box
+  drags the paper out of place);
 - an admin page has neither the admin menu nor `<CustomerModeTabGuard />`, or
   an `admin/layout.tsx` is added to carry it.
 

@@ -1,11 +1,9 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { BUSINESS_NAME } from '@/lib/business-location';
 import {
-  CUSTOMER_FIELDS,
   CUSTOMER_MODE_CODE_LENGTH,
   customerFirstName,
   customerProblems,
@@ -17,6 +15,7 @@ import {
   type CustomerValues,
 } from '@/lib/buy-receipt-customer-mode';
 import { CUSTOMER_MODE_MAX_TRIES, CUSTOMER_MODE_TRY_WINDOW_SECONDS } from '@/lib/customer-mode-lock';
+import type { BuyReceiptCustomerView } from './BuyReceiptSheet';
 import { endCustomerMode } from './buy-receipt-client';
 import { BUY_RECEIPT_CUSTOMER_CSS, CUSTOMER_MODE_HOST_CLASS, CUSTOMER_MODE_PAGE_CSS } from './buy-receipt-customer-css';
 
@@ -24,8 +23,13 @@ import { BUY_RECEIPT_CUSTOMER_CSS, CUSTOMER_MODE_HOST_CLASS, CUSTOMER_MODE_PAGE_
  * Admin → Buy Receipts → New receipt → "Customer input mode" (owner mockups
  * 2026-10-03): the screen the SELLER holds.
  *
- * It shows only the seller's own contact boxes, covers the whole page, does not
- * scroll, and cannot be left without the staff code:
+ * It is the owner's own receipt form — the same paper, drawn by the same
+ * component — locked to the whole screen (owner, 2026-10-03: "looks exactly
+ * like the regular form but just locks to the full screen … and most of the
+ * other fields are grayed out"). The admin page around it is gone; on the paper
+ * only the seven seller boxes and the two small email boxes can be used, and
+ * every other part is faded and switched off. It does not scroll, and it
+ * cannot be left without the staff code:
  * - "Save" flags every unfinished box; only then is "Submit unfinished"
  *   offered, and that needs the code;
  * - a complete Save locks on "Thank you" until the code is entered;
@@ -33,30 +37,16 @@ import { BUY_RECEIPT_CUSTOMER_CSS, CUSTOMER_MODE_HOST_CLASS, CUSTOMER_MODE_PAGE_
  *
  * The code is checked on the server (`endCustomerMode`); it is not in this file.
  * What the server refuses a locked browser is in `lib/customer-mode-lock.ts`.
- * The boxes edit the SAME draft as the owner's form, so nothing is copied back
+ * The paper edits the SAME draft as the owner's form, so nothing is copied back
  * and forth: when the tablet returns, the form simply has the details in it.
+ *
+ * This file is the frame: the lock on the page, the bar under the paper, the
+ * code keypad, the thank-you. The paper itself — and what its seller's view
+ * looks like — is `BuyReceiptSheet`; the form hands it over through `paper`.
  */
 
 type Phase = 'form' | 'thanks';
 type Flags = Partial<Record<CustomerField, string>>;
-
-type FieldUi = {
-  label: ReactNode;
-  className: string;
-  inputMode?: 'tel' | 'numeric' | 'email';
-  autoCapitalize: 'words' | 'characters' | 'none';
-  maxLength?: number;
-};
-
-const FIELD_UI: Record<CustomerField, FieldUi> = {
-  sellerName: { label: 'First and last name', className: 'brc-f-name', autoCapitalize: 'words' },
-  sellerPhone: { label: 'Phone', className: 'brc-f-phone', inputMode: 'tel', autoCapitalize: 'none' },
-  sellerStreet: { label: 'Street address', className: 'brc-f-street', autoCapitalize: 'words' },
-  sellerCity: { label: 'City', className: 'brc-f-city', autoCapitalize: 'words' },
-  sellerState: { label: 'State', className: 'brc-f-state', autoCapitalize: 'characters', maxLength: 2 },
-  sellerZip: { label: 'ZIP', className: 'brc-f-zip', inputMode: 'numeric', autoCapitalize: 'none', maxLength: 10 },
-  sellerEmail: { label: <>Email <i>(optional)</i></>, className: 'brc-f-email', inputMode: 'email', autoCapitalize: 'none' },
-};
 
 const PAD_TEXT: Record<CustomerHandBackReason, { title: string; sub: string; back: string }> = {
   unfinished: {
@@ -73,6 +63,8 @@ const TOO_MANY_TRIES = 'Too many tries. Wait half a minute, then try again.';
 
 /** A keyboard takes far more than this; the iPad's shortcut strip (a hardware keyboard) takes less. */
 const KEYBOARD_MIN_PX = 140;
+/** Air kept above the "Seller" heading and under the last seller box when the paper is placed. */
+const PAPER_EDGE_PX = 8;
 
 const PAGE_STYLE_ID = 'nej-customer-mode-page';
 const TRAP_STATE_KEY = 'nejCustomerMode';
@@ -139,6 +131,7 @@ export default function BuyReceiptCustomerMode({
   onProgress,
   onUnlocked,
   lockPath,
+  paper,
 }: {
   values: CustomerValues;
   onChange: (patch: Partial<CustomerValues>) => void;
@@ -153,10 +146,13 @@ export default function BuyReceiptCustomerMode({
   onUnlocked: (reason: CustomerHandBackReason) => void;
   /** The New receipt page's address — where "Sign in" returns to if the sign-in ran out mid-way. */
   lockPath: string;
+  /** The owner's receipt paper, drawn in its seller's view (the form supplies it, so it is the very same paper). */
+  paper: (view: BuyReceiptCustomerView) => ReactNode;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const padRef = useRef<HTMLDivElement>(null);
-  const inputs = useRef<Partial<Record<CustomerField, HTMLInputElement | null>>>({});
+  const pageRef = useRef<HTMLDivElement>(null);
+  const paperRef = useRef<HTMLDivElement>(null);
   const wrongTries = useRef(0);
   const pauseTimer = useRef<number | null>(null);
 
@@ -230,6 +226,59 @@ export default function BuyReceiptCustomerMode({
     };
   }, []);
 
+  // Where the paper sits. On a tablet or a computer the seller's boxes are at the top of the
+  // paper and always in view, so nothing moves under a finger. When a keyboard takes the lower
+  // half of a sideways tablet, the paper is slid up just far enough to keep every seller box —
+  // and the bar with Save — above the keys. The sum is made from layout offsets, never from the
+  // position of a box that is already slid. Only a screen too small to hold the seller's boxes
+  // at all (a phone) lets the page move, and then the paper ends where those boxes end.
+  const onForm = !pad && phase === 'form';
+  useLayoutEffect(() => {
+    if (!onForm) return;
+    const page = pageRef.current;
+    const sheet = paperRef.current;
+    if (!page || !sheet) return;
+    const topIn = (element: HTMLElement) => {
+      let y = 0;
+      for (let node: HTMLElement | null = element; node && node !== sheet; node = node.offsetParent as HTMLElement | null) y += node.offsetTop;
+      return y;
+    };
+    const place = () => {
+      const boxes = Array.from(sheet.querySelectorAll<HTMLElement>('[data-customer-field]'));
+      const heading = sheet.querySelector<HTMLElement>('.sheet-section-title');
+      if (boxes.length === 0 || !heading) return;
+      const above = parseFloat(window.getComputedStyle(page).paddingTop) || 0;
+      // From the "Seller" heading to the foot of the lowest seller box (its label included).
+      const start = above + topIn(heading) - PAPER_EDGE_PX;
+      const end =
+        above +
+        Math.max(
+          ...boxes.map((box) => {
+            const cell = box.parentElement ?? box;
+            return topIn(cell) + cell.offsetHeight;
+          }),
+        ) +
+        PAPER_EDGE_PX;
+      const room = page.clientHeight;
+      if (end - start > room) {
+        page.classList.add('brc-scroll');
+        page.style.setProperty('--brc-cut', `${Math.ceil(end - above)}px`);
+        page.style.removeProperty('--brc-slide');
+        return;
+      }
+      page.classList.remove('brc-scroll');
+      page.style.removeProperty('--brc-cut');
+      if (page.scrollTop !== 0) page.scrollTop = 0;
+      page.style.setProperty('--brc-slide', `${Math.max(0, Math.ceil(end - room))}px`);
+    };
+    place();
+    // The screen changes size (a keyboard, a turn of the tablet) and the paper can (its font arriving).
+    const watcher = new ResizeObserver(place);
+    watcher.observe(page);
+    watcher.observe(sheet);
+    return () => watcher.disconnect();
+  }, [onForm]);
+
   // No dragging the screen around and no pinch: only a caret inside a box, or the
   // last-resort scroll on a screen too small to hold the boxes, may move.
   useEffect(() => {
@@ -238,7 +287,7 @@ export default function BuyReceiptCustomerMode({
     const stopMove = (event: TouchEvent) => {
       const target = event.target instanceof Element ? event.target : null;
       if (target?.closest('input')) return;
-      const area = target?.closest('.brc-main, .brc-center');
+      const area = target?.closest('.brc-scroll, .brc-center');
       if (area && area.scrollHeight > area.clientHeight + 1) return;
       event.preventDefault();
     };
@@ -263,14 +312,17 @@ export default function BuyReceiptCustomerMode({
     [],
   );
 
-  const hasEmail = Boolean(values.sellerEmail.trim());
-
   function closeKeyboard() {
     const active = document.activeElement;
     if (active instanceof HTMLElement) active.blur();
   }
 
-  function setField(field: CustomerField, input: HTMLInputElement) {
+  /** One of the seller's boxes on the paper. */
+  function box(field: CustomerField): HTMLInputElement | null {
+    return paperRef.current?.querySelector<HTMLInputElement>(`input[data-customer-field="${field}"]`) ?? null;
+  }
+
+  function typeIn(field: CustomerField, input: HTMLInputElement) {
     const raw = input.value;
     // Brackets and dashes are added only while typing at the end; an edit in the
     // middle is left alone (reformatting there would throw the caret to the end).
@@ -293,6 +345,18 @@ export default function BuyReceiptCustomerMode({
     if (formatted !== values[field]) onChange({ [field]: formatted });
   }
 
+  /** Return steps to the next seller box; after the last one the keyboard closes. */
+  function stepOnReturn(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== 'Enter') return;
+    const from = event.target instanceof HTMLInputElement && event.target.dataset.customerField ? event.target : null;
+    if (!from) return;
+    event.preventDefault();
+    const boxes = Array.from(event.currentTarget.querySelectorAll<HTMLInputElement>('input[data-customer-field]'));
+    const following = boxes[boxes.indexOf(from) + 1];
+    if (following) following.focus();
+    else from.blur();
+  }
+
   function save() {
     const found = customerProblems(values);
     if (found.length === 0) {
@@ -304,7 +368,7 @@ export default function BuyReceiptCustomerMode({
     }
     setFlags(toFlags(found));
     onProgress({ phase: 'form', tried: true });
-    inputs.current[found[0].field]?.focus();
+    box(found[0].field)?.focus();
   }
 
   function openPad(reason: CustomerHandBackReason) {
@@ -444,82 +508,37 @@ export default function BuyReceiptCustomerMode({
     const unfinished = tried && customerProblems(values).length > 0;
     screen = (
       <div className="brc-screen brc-form">
-        <div className="brc-top">
-          <div className="brc-in">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/assets/images/branding/nav-logo.webp" width={157} height={120} alt="" />
-            <span className="brc-brand">{BUSINESS_NAME}</span>
-            <span className="brc-tag">Seller information</span>
-          </div>
-        </div>
-        <div className="brc-main">
-          <div className="brc-in">
-            <div className="brc-title">
-              <h2>Your information</h2>
-              <p>Please fill in the boxes, then tap <b>Save</b>.</p>
-            </div>
-            <div className="brc-grid">
-              {CUSTOMER_FIELDS.map((field, index) => {
-                const ui = FIELD_UI[field];
-                const flag = flags[field];
-                const nextField = CUSTOMER_FIELDS[index + 1];
-                return (
-                  <label key={field} className={`brc-fld ${ui.className}${flag ? ' brc-bad' : ''}`}>
-                    <span className="brc-lab">
-                      <span>{ui.label}</span>
-                      {flag && <span className="brc-why">{flag}</span>}
-                    </span>
-                    <input
-                      ref={(element) => {
-                        inputs.current[field] = element;
-                      }}
-                      type="text"
-                      value={values[field]}
-                      inputMode={ui.inputMode}
-                      maxLength={ui.maxLength}
-                      // One seller must never be offered another's details, and nothing here is to be remembered.
-                      autoComplete="off"
-                      autoCorrect="off"
-                      autoCapitalize={ui.autoCapitalize}
-                      spellCheck={false}
-                      data-1p-ignore=""
-                      data-lpignore="true"
-                      data-form-type="other"
-                      enterKeyHint={nextField ? 'next' : 'done'}
-                      aria-invalid={flag ? true : undefined}
-                      onChange={(event) => setField(field, event.currentTarget)}
-                      onBlur={() => tidyField(field)}
-                      onKeyDown={(event) => {
-                        if (event.key !== 'Enter') return;
-                        // Return steps to the next box; after the last one the keyboard closes.
-                        event.preventDefault();
-                        const following = nextField ? inputs.current[nextField] : null;
-                        if (following) following.focus();
-                        else event.currentTarget.blur();
-                      }}
-                    />
-                  </label>
-                );
-              })}
-              <div className={`brc-opts${hasEmail ? ' brc-on' : ''}`} aria-hidden={hasEmail ? undefined : true}>
-                <label className="brc-opt">
-                  <input type="checkbox" checked={emailCopy} disabled={!hasEmail} onChange={(event) => onAsk({ emailCopy: event.target.checked })} />
-                  Email me a copy of my receipt
-                </label>
-                <label className="brc-opt">
-                  <input type="checkbox" checked={mailingList} disabled={!hasEmail} onChange={(event) => onAsk({ mailingList: event.target.checked })} />
-                  Add me to the mailing list
-                </label>
-              </div>
-            </div>
+        <div
+          ref={pageRef}
+          className="brc-page"
+          // A browser that cannot clip (see the styles) may try to scroll the paper to a focused box: hold it at the top.
+          onScroll={(event) => {
+            const page = event.currentTarget;
+            if (!page.classList.contains('brc-scroll') && page.scrollTop !== 0) page.scrollTop = 0;
+          }}
+        >
+          <div
+            ref={paperRef}
+            className="brc-paper"
+            onKeyDown={stepOnReturn}
+            // The paper never moves inside its own frame (same fallback as above, for the cut paper on a phone).
+            onScroll={(event) => {
+              if (event.currentTarget.scrollTop !== 0) event.currentTarget.scrollTop = 0;
+            }}
+          >
+            {paper({ flags, onType: typeIn, onLeave: tidyField })}
           </div>
         </div>
         <div className="brc-bar">
           <div className="brc-in">
             <button type="button" className="brc-staff" onClick={() => openPad('staff')}><LockIcon />Staff</button>
-            <span className="brc-msg" role="alert">
-              {tried && flagged > 0 ? (flagged === 1 ? 'Please finish the highlighted box.' : `Please finish the ${flagged} highlighted boxes.`) : null}
-            </span>
+            {tried && flagged > 0 ? (
+              <span className="brc-msg brc-err" role="alert">
+                {flagged === 1 ? 'Please finish the highlighted box.' : 'Please finish the highlighted boxes.'}
+              </span>
+            ) : (
+              <span className="brc-msg brc-hint">Please fill in the boxes under “Seller”, then tap Save.</span>
+            )}
             {unfinished && <button type="button" className="brc-unf" onClick={() => openPad('unfinished')}>Submit unfinished</button>}
             <button type="button" className="brc-save" onClick={save}>Save</button>
           </div>

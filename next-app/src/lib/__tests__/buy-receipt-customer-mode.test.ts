@@ -2,12 +2,17 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { blankBuyReceiptDraft, normalizeBuyReceiptInput } from '../buy-receipts';
+import { BUY_RECEIPT_CUSTOMER_DIM, BUY_RECEIPT_SHEET_CSS } from '../../components/admin/buy-receipts/buy-receipt-sheet-css';
 import {
   CUSTOMER_FIELDS,
+  CUSTOMER_FIELD_CAPITALS,
   CUSTOMER_MODE_API,
   CUSTOMER_MODE_CODE_LENGTH,
+  CUSTOMER_NEEDED,
   customerFieldProblem,
   customerFirstName,
+  customerFlagNote,
+  customerFlagPlaceholder,
   customerHandBack,
   customerProblems,
   formatCustomerField,
@@ -32,10 +37,12 @@ import { subscriberSourceLabel } from '../subscriber-sort';
 
 // Buy receipt "Customer input mode" (owner, 2026-10-03): the seller types their
 // own contact details on a locked screen. The owner's rulings, pinned here:
-// the receipt form itself is unchanged and still fills in everything; the mode
-// is one optional button; the seller sees seven boxes and no ID, no date of
-// birth; email is optional; nothing on that browser reaches the back end
-// without the staff code.
+// the receipt form still fills in everything by itself; the mode is one
+// optional button; the seller's screen is that SAME form, locked to the screen,
+// with seven boxes switched on (no ID, no date of birth) and everything else
+// greyed and switched off; email is optional; nothing on that browser reaches
+// the back end without the staff code. And on the form: a "Mailing list" box
+// beside "Email copy", with the Email box one column wider (layout B).
 
 const FULL: CustomerValues = {
   sellerName: 'Maria Lopez',
@@ -48,8 +55,10 @@ const FULL: CustomerValues = {
 };
 
 describe('what the seller is asked for', () => {
-  it('is seven boxes — never the ID type, the ID number or the date of birth (owner: "i will do the ID stuff")', () => {
-    expect([...CUSTOMER_FIELDS]).toEqual(['sellerName', 'sellerPhone', 'sellerStreet', 'sellerCity', 'sellerState', 'sellerZip', 'sellerEmail']);
+  it('is seven boxes, in the paper\'s order — never the ID type, the ID number or the date of birth (owner: "i will do the ID stuff")', () => {
+    // Name · Phone · Email on the first line, Street · City · State · ZIP on the second: Return steps through them in this order.
+    expect([...CUSTOMER_FIELDS]).toEqual(['sellerName', 'sellerPhone', 'sellerEmail', 'sellerStreet', 'sellerCity', 'sellerState', 'sellerZip']);
+    expect(Object.keys(CUSTOMER_FIELD_CAPITALS).sort()).toEqual([...CUSTOMER_FIELDS].sort());
     for (const kept of ['sellerIdType', 'sellerIdLast4', 'sellerDob']) {
       expect(CUSTOMER_FIELDS as readonly string[]).not.toContain(kept);
     }
@@ -82,6 +91,26 @@ describe('what the seller is asked for', () => {
         expect(customerFieldProblem(field, sample).length, `${field}: ${sample}`).toBeLessThanOrEqual(18);
       }
     }
+  });
+
+  it('says it in the paper\'s own language: "Needed" inside an empty box, the reason beside the label of a wrong one', () => {
+    expect(CUSTOMER_NEEDED).toBe('Needed');
+    for (const field of CUSTOMER_FIELDS) {
+      // An empty box: the word goes inside it — except State, one column wide, where it would be cut.
+      expect(customerFlagPlaceholder(field, 'Needed'), field).toBe(field === 'sellerState' ? undefined : 'Needed');
+      expect(customerFlagNote(field, 'Needed'), field).toBe('');
+      // Not flagged: nothing.
+      expect(customerFlagPlaceholder(field, undefined), field).toBeUndefined();
+      expect(customerFlagNote(field, undefined), field).toBe('');
+    }
+    expect(customerFlagNote('sellerName', 'Add your last name')).toBe('add your last name');
+    expect(customerFlagNote('sellerName', 'Check this')).toBe('check this');
+    expect(customerFlagNote('sellerPhone', '10 digits')).toBe('10 digits');
+    expect(customerFlagNote('sellerZip', '5 digits')).toBe('5 digits');
+    expect(customerFlagPlaceholder('sellerPhone', '10 digits')).toBeUndefined();
+    // No room for words beside these two labels: the red line and the red label say it.
+    expect(customerFlagNote('sellerState', '2 letters')).toBe('');
+    expect(customerFlagNote('sellerEmail', 'Check this')).toBe('');
   });
 
   it('keeps the email optional but checks one that is typed (owner: "keep the email optional")', () => {
@@ -170,48 +199,31 @@ describe('typing helpers', () => {
 });
 
 describe('the line the form shows when the tablet comes back', () => {
-  const none = { emailCopy: false, mailingList: false };
-
   const withEmail = { ...FULL, sellerEmail: 'm@example.com' };
 
-  it('is not there at all when nothing needs the owner (owner: "the only change we should see to the page is the new button")', () => {
-    expect(customerHandBack('saved', FULL, none)).toBeNull();
-    expect(customerHandBack('saved', withEmail, none)).toBeNull();
-    expect(customerHandBack('staff', FULL, none)).toBeNull();
+  it('is not there at all when nothing is left to finish', () => {
+    expect(customerHandBack('saved', FULL)).toBeNull();
+    expect(customerHandBack('saved', withEmail)).toBeNull();
+    expect(customerHandBack('staff', FULL)).toBeNull();
+    // The small Staff button on a half-filled form: the boxes are simply as the seller left them.
+    expect(customerHandBack('staff', { ...FULL, sellerZip: '' })).toBeNull();
   });
 
-  it('says what the seller asked for, because the form has no other place that does', () => {
-    expect(customerHandBack('saved', withEmail, { emailCopy: false, mailingList: true })).toEqual({
-      kind: 'ok',
-      text: 'The customer asked to join the mailing list — they are added when you save the receipt.',
-    });
-    expect(customerHandBack('saved', withEmail, { emailCopy: true, mailingList: false })).toEqual({
-      kind: 'ok',
-      text: 'The customer asked for an emailed copy — Email copy is ticked.',
-    });
-    expect(customerHandBack('staff', withEmail, { emailCopy: true, mailingList: true })).toEqual({
-      kind: 'ok',
-      text: 'The customer asked for an emailed copy — Email copy is ticked. They also asked to join the mailing list — they are added when you save the receipt.',
-    });
-  });
-
-  it('names what is still unfinished after "Submit unfinished", in the form\'s own words', () => {
+  it('names what is still unfinished after "Submit unfinished", in the form\'s own words and the paper\'s order', () => {
     const unfinished = { ...FULL, sellerName: 'Maria', sellerCity: '', sellerZip: '3410' };
-    expect(customerHandBack('unfinished', unfinished, none)).toEqual({
-      kind: 'warn',
-      text: 'Submitted unfinished with the staff code. Still to finish: Name, City, ZIP.',
-    });
-    expect(customerHandBack('unfinished', { ...unfinished, sellerEmail: 'm@example.com' }, { emailCopy: false, mailingList: true })?.text).toBe(
-      'Submitted unfinished with the staff code. Still to finish: Name, City, ZIP. The customer asked to join the mailing list — they are added when you save the receipt.',
-    );
+    expect(customerHandBack('unfinished', unfinished)).toBe('Submitted unfinished with the staff code. Still to finish: Name, City, ZIP.');
+    expect(customerHandBack('unfinished', { ...unfinished, sellerEmail: 'maria@' })).toBe('Submitted unfinished with the staff code. Still to finish: Name, Email, City, ZIP.');
     // The list shrinks as the owner finishes the boxes, and the line leaves with the last one.
-    expect(customerHandBack('unfinished', { ...FULL, sellerZip: '3410' }, none)?.text).toBe('Submitted unfinished with the staff code. Still to finish: ZIP.');
-    expect(customerHandBack('unfinished', FULL, none)).toBeNull();
+    expect(customerHandBack('unfinished', { ...FULL, sellerZip: '3410' })).toBe('Submitted unfinished with the staff code. Still to finish: ZIP.');
+    expect(customerHandBack('unfinished', FULL)).toBeNull();
   });
 
-  it('never promises an emailed copy or the mailing list without an email', () => {
-    expect(customerHandBack('staff', FULL, { emailCopy: true, mailingList: true })).toBeNull();
-    expect(customerHandBack('saved', FULL, { emailCopy: true, mailingList: true })).toBeNull();
+  it('says nothing about an emailed copy or the mailing list — those are ticks on the form itself now', () => {
+    // (Owner, 2026-10-03: "Add the add to mailing list checkbox near the email to the regular form too.")
+    expect(customerHandBack.length).toBe(2);
+    expect(read('src', 'lib', 'buy-receipt-customer-mode.ts')).not.toContain('asked to join the mailing list');
+    const form = component('BuyReceiptForm.tsx');
+    expect(form).toContain('const handBack = handBackReason ? customerHandBack(handBackReason, draft) : null;');
   });
 });
 
@@ -417,14 +429,69 @@ describe('customer input mode: the server refuses a locked browser', () => {
   });
 });
 
-describe('customer input mode: the form is unchanged and the mode is optional', () => {
-  it('leaves the owner\'s paper form exactly as it was — all ten seller boxes, typed by the owner', () => {
+describe('customer input mode: the owner\'s form, the paper and the seller\'s view of it', () => {
+  const SELLER_BOXES = ['sellerName', 'sellerPhone', 'sellerEmail', 'sellerStreet', 'sellerCity', 'sellerState', 'sellerZip'];
+  const OWNER_BOXES = ['sellerIdType', 'sellerIdLast4', 'sellerDob'];
+
+  it('keeps all ten seller boxes the owner\'s to type, and draws the owner\'s form exactly as before', () => {
     const sheet = component('BuyReceiptSheet.tsx');
-    for (const field of ['sellerName', 'sellerPhone', 'sellerEmail', 'sellerStreet', 'sellerCity', 'sellerState', 'sellerZip', 'sellerIdType', 'sellerIdLast4', 'sellerDob']) {
+    for (const field of [...SELLER_BOXES, ...OWNER_BOXES]) {
       expect(sheet, field).toContain(`set({ ${field}: e.target.value`);
     }
-    // The paper knows nothing about the mode.
-    expect(sheet.toLowerCase()).not.toContain('customer');
+    // Everything the seller's view adds comes from three helpers, and each gives nothing without the `customer` prop.
+    expect(sheet).toContain('const seat = (field: CustomerField) => {\n    if (!customer) return undefined;');
+    expect(sheet).toContain("const words = customer ? customerFlagNote(field, customer.flags[field]) : '';");
+    expect(sheet).toContain('const off = customer ? true : undefined;');
+    expect(sheet).toContain("const offCell = customer ? ' brs-off' : '';");
+    // The owner's part is one piece, drawn bare on the owner's form (no wrapper, no extra element).
+    expect(sheet).toMatch(/\) : \(\s*ownerPart\s*\)\}/);
+    // Only the locked screen asks for the seller's view; the edit view of a saved receipt never does.
+    expect(component('BuyReceiptDetail.tsx')).not.toContain('customer=');
+    expect(component('BuyReceiptForm.tsx').match(/customer=\{customer\}/g)).toHaveLength(1);
+  });
+
+  it('switches on exactly the seven seller boxes in the seller\'s view, and switches off everything else', () => {
+    const sheet = component('BuyReceiptSheet.tsx');
+    for (const field of SELLER_BOXES) {
+      expect(sheet.split(`{...seat('${field}')}`).length - 1, field).toBe(1);
+    }
+    expect(sheet.match(/\{\.\.\.seat\('/g)).toHaveLength(CUSTOMER_FIELDS.length);
+    for (const field of OWNER_BOXES) expect(sheet, field).not.toContain(`seat('${field}')`);
+    // ID type, ID last 4, date of birth: faded, inert and disabled.
+    expect(sheet.match(/className=\{`brs-c\d\$\{offCell\}`\} inert=\{off\}/g)).toHaveLength(3);
+    expect(sheet.match(/disabled=\{off\}/g)).toHaveLength(3);
+    for (const field of OWNER_BOXES) {
+      const line = sheet.split('\n').find((text) => text.includes(`set({ ${field}: e.target.value`)) ?? '';
+      expect(line, field).toContain('disabled={off}');
+    }
+    // Everything below the seller's boxes — ID photo, items, money, notes, signatures — in one disabled, inert fieldset.
+    expect(sheet).toContain('<fieldset className="brs-off brs-rest" disabled inert>\n          {ownerPart}\n        </fieldset>');
+    const ownerPart = sheet.slice(sheet.indexOf('const ownerPart = ('), sheet.indexOf('  return (\n    <div className="buy-receipt-sheet">\n      <Header receiptNumber={receiptNumber}'));
+    for (const piece of ['{idPhotoSlot}', 'className="brs-items"', 'onClick={addItem}', 'className="brs-total"', 'className="brs-pay"', 'className="brs-notes"', '{BUY_RECEIPT_ATTESTATION}', '<SignatureBlock dateIso={dateIso} />']) {
+      expect(ownerPart, piece).toContain(piece);
+    }
+    // …and none of the seller's boxes are in that piece.
+    expect(ownerPart).not.toContain('seat(');
+  });
+
+  it('fades the owner\'s parts more strongly than the mockup did (owner: "a little stronger so its very obvious")', () => {
+    expect(BUY_RECEIPT_CUSTOMER_DIM).toBeLessThan(0.36);
+    expect(BUY_RECEIPT_CUSTOMER_DIM).toBeGreaterThanOrEqual(0.15);
+    expect(BUY_RECEIPT_SHEET_CSS).toContain(`.buy-receipt-sheet .brs-off { opacity: ${BUY_RECEIPT_CUSTOMER_DIM}; pointer-events: none;`);
+    // A switched-off box is not faded a second time by the browser.
+    expect(BUY_RECEIPT_SHEET_CSS).toContain('.buy-receipt-sheet .brs-off .sheet-input:disabled { opacity: 1;');
+    // The fieldset adds no frame of its own.
+    expect(BUY_RECEIPT_SHEET_CSS).toContain('.buy-receipt-sheet fieldset.brs-rest { display: block; min-width: 0; margin: 0; padding: 0; border: 0; }');
+  });
+
+  it('flags a seller box on the paper itself, without changing its size', () => {
+    expect(BUY_RECEIPT_SHEET_CSS).toContain('.buy-receipt-sheet .sheet-input[aria-invalid="true"] { border-bottom-color: #ba1a1a;');
+    expect(BUY_RECEIPT_SHEET_CSS).toContain('.buy-receipt-sheet .sheet-input[aria-invalid="true"]::placeholder { color: #ba1a1a; opacity: 1; }');
+    expect(BUY_RECEIPT_SHEET_CSS).toContain('.buy-receipt-sheet .sheet-input[aria-invalid="true"] + .brs-label { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }');
+    const sheet = component('BuyReceiptSheet.tsx');
+    expect(sheet).toContain("'aria-invalid': problem ? true : undefined,");
+    expect(sheet).toContain('return words ? <span className="brs-why"> — {words}</span> : null;');
+    for (const field of ['sellerName', 'sellerPhone', 'sellerStreet', 'sellerCity', 'sellerZip']) expect(sheet, field).toContain(`{why('${field}')}</span>`);
   });
 
   it('adds one button, on the tabs row, and always draws the form', () => {
@@ -432,9 +499,13 @@ describe('customer input mode: the form is unchanged and the mode is optional', 
     expect(form).toContain("{modeBusy ? 'Locking…' : 'Customer input mode'}");
     expect(form).toContain('<BuyReceiptTabs');
     expect(form).toContain('active="new"');
+    // ONE paper: the form draws it, and hands the very same function to the locked screen.
     expect(form.match(/<BuyReceiptSheet/g)).toHaveLength(1);
-    // The sheet is not behind any condition on the mode.
-    expect(form).not.toMatch(/customerMode \? [\s\S]*<BuyReceiptSheet/);
+    expect(form).toContain('const sheet = (customer?: BuyReceiptCustomerView) => (');
+    expect(form).toContain('      {sheet()}\n');
+    expect(form).toContain('paper={sheet}');
+    // The form's own paper is not behind any condition on the mode.
+    expect(form).not.toMatch(/customerMode (\?|&&) [\s\S]{0,40}\{sheet\(\)\}/);
     expect(read('src', 'app', '[locale]', 'admin', 'buy-receipts', 'page.tsx')).toContain('showTabs={false}');
     // The other Buy Receipts pages keep the shell's own tabs.
     for (const page of ['log', 'station', '[id]']) {
@@ -454,17 +525,21 @@ describe('customer input mode: the form is unchanged and the mode is optional', 
     expect(enter).toContain('do not hand it over yet');
   });
 
-  it('shows the seller only the seller boxes, on a screen that is the only thing on the page', () => {
+  it('shows the seller the owner\'s own paper, on a screen that is the only thing on the page', () => {
     const screen = component('BuyReceiptCustomerMode.tsx');
-    for (const hidden of ['sellerDob', 'sellerIdType', 'sellerIdLast4', 'items', 'payments', 'amount', 'notes']) {
-      expect(screen, hidden).not.toContain(hidden);
-    }
+    // The screen draws no box of its own: the paper comes from the form.
+    expect(screen).toContain('{paper({ flags, onType: typeIn, onLeave: tidyField })}');
+    expect(screen).not.toContain('<input');
+    expect(screen).toContain("import type { BuyReceiptCustomerView } from './BuyReceiptSheet';");
     expect(screen).toContain('createPortal(');
     expect(screen).toContain('document.body');
     const css = component('buy-receipt-customer-css.ts');
     expect(css).toContain('body > *:not(.${CUSTOMER_MODE_HOST_CLASS}) { display: none !important; }');
     expect(css).toContain("export const CUSTOMER_MODE_HOST_CLASS = 'buy-receipt-customer-host';");
     expect(css).toContain('html, body { overflow: hidden !important; overscroll-behavior: none !important; }');
+    // The frame does not restyle the paper: no rule in it reaches into the sheet.
+    expect(css).not.toContain('.sheet-input');
+    expect(css).not.toContain('.brs-');
     // In the server's HTML as well, so a refresh never paints the admin page first.
     expect(component('BuyReceiptForm.tsx')).toContain('{customerMode && <style>{CUSTOMER_MODE_PAGE_CSS}</style>}');
     // No links out of the screen except the sign-in recovery.
@@ -472,13 +547,36 @@ describe('customer input mode: the form is unchanged and the mode is optional', 
     expect(screen).not.toContain("from 'next/link'");
   });
 
-  it('never suggests one seller\'s details to the next, and never zooms on a tap', () => {
-    const screen = component('BuyReceiptCustomerMode.tsx');
-    expect(screen).toContain('autoComplete="off"');
-    expect(screen).toContain('autoCorrect="off"');
-    expect(screen).toContain('spellCheck={false}');
+  it('keeps the paper still: clipped, not scrollable — and slid only as far as a keyboard forces', () => {
     const css = component('buy-receipt-customer-css.ts');
-    expect(css).toMatch(/\.brc-fld input \{[^}]*font-size: 16px;/);
+    expect(css).toContain('.buy-receipt-customer-host .brc-page { flex: 1; min-height: 0; position: relative; padding: 16px 16px 0; overflow: hidden; overflow: clip; }');
+    expect(css).toContain('.buy-receipt-customer-host .brc-paper { position: relative; transform: translateY(calc(var(--brc-slide, 0px) * -1)); }');
+    const screen = component('BuyReceiptCustomerMode.tsx');
+    // The slide is worked out from layout offsets, never from the position of a box that is already moved.
+    expect(screen).toContain('y += node.offsetTop;');
+    expect(screen).not.toContain('getBoundingClientRect');
+    expect(screen).toContain("page.style.setProperty('--brc-slide', `${Math.max(0, Math.ceil(end - room))}px`);");
+    expect(screen).toContain('const watcher = new ResizeObserver(place);');
+    // Only a screen too small to hold the seller's boxes may move, and then only as far as they go.
+    expect(screen).toContain("if (end - start > room) {\n        page.classList.add('brc-scroll');");
+    // …and the cut paper is clipped too: as a scroller, a focused box would slide it past its own cut.
+    expect(css).toContain('.buy-receipt-customer-host .brc-scroll .brc-paper { transform: none; max-height: var(--brc-cut, none); overflow: hidden; overflow: clip; }');
+    expect(screen).toContain('if (event.currentTarget.scrollTop !== 0) event.currentTarget.scrollTop = 0;');
+    // Return steps through the seller's boxes in the paper's order.
+    expect(screen).toContain("const boxes = Array.from(event.currentTarget.querySelectorAll<HTMLInputElement>('input[data-customer-field]'));");
+  });
+
+  it('never suggests one seller\'s details to the next, and never zooms on a tap', () => {
+    const sheet = component('BuyReceiptSheet.tsx');
+    for (const helper of ["autoCorrect: 'off',", 'spellCheck: false,', "'data-1p-ignore': '',", "'data-lpignore': 'true',", 'autoCapitalize: CUSTOMER_FIELD_CAPITALS[field],']) {
+      expect(sheet, helper).toContain(helper);
+    }
+    for (const field of ['sellerName', 'sellerPhone', 'sellerEmail', 'sellerStreet', 'sellerCity', 'sellerState', 'sellerZip']) {
+      const line = sheet.split('\n').find((text) => text.includes(`{...seat('${field}')}`)) ?? '';
+      expect(line, field).toContain('autoComplete="off"');
+    }
+    // 16px in every box on a touch screen, or iOS zooms the page on each tap.
+    expect(BUY_RECEIPT_SHEET_CSS).toMatch(/@media screen and \(hover: none\) and \(pointer: coarse\) \{\s*\.buy-receipt-sheet \.sheet-input \{ font-size: 16px; \}/);
   });
 
   it('offers "Submit unfinished" only after a Save that found a problem, and the code screen for every way out', () => {
@@ -545,13 +643,53 @@ describe('customer input mode: the mailing list', () => {
     expect(subscriberSourceLabel({ source: 'subscriber', subscriberSource: 'homepage_hero' })).toBe('Newsletter subscriber');
   });
 
-  it('starts both small boxes unticked and shows them only beside a typed email', () => {
+  it('starts both small boxes unticked, and keeps them greyed until an email is typed', () => {
+    const sheet = component('BuyReceiptSheet.tsx');
+    expect(sheet).toContain('<span>Email copy</span>');
+    expect(sheet).toContain('<span>Mailing list</span>');
+    expect(sheet.match(/disabled=\{!draft\.sellerEmail\.trim\(\)\}/g)).toHaveLength(2);
+    expect(sheet).toContain('onChange={(e) => onMailingListChange(e.target.checked)}');
+    // Screen only: neither box is ever printed.
+    expect(sheet.match(/<label className="no-print brs-email-copy"/g)).toHaveLength(2);
     const screen = component('BuyReceiptCustomerMode.tsx');
-    expect(screen).toContain('Email me a copy of my receipt');
-    expect(screen).toContain('Add me to the mailing list');
-    expect(screen).toContain("className={`brc-opts${hasEmail ? ' brc-on' : ''}`}");
     expect(screen).toContain("if (field === 'sellerEmail' && !next.trim() && (emailCopy || mailingList)) onAsk({ emailCopy: false, mailingList: false });");
     const form = component('BuyReceiptForm.tsx');
     expect(form).toContain('const [mailingList, setMailingList] = useState(false);');
+    // The same two ticks on the owner's form and in the seller's view: one state, in the form.
+    expect(form).toContain('mailingList={mailingList}\n      onMailingListChange={setMailingList}');
+    expect(form).toContain('emailCopy={emailCopy}\n      onEmailCopyChange={setEmailCopy}');
+  });
+});
+
+describe('the form: "Mailing list" beside "Email copy" (owner, 2026-10-03: layout B)', () => {
+  it('gives the Email box one column from the Name box — on the form only, and only in the full layout', () => {
+    expect(BUY_RECEIPT_SHEET_CSS).toContain(
+      '@media screen and (min-width: 761px) {\n  .buy-receipt-sheet .brs-grid > .brs-cell-name { grid-column: span 4; }\n  .buy-receipt-sheet .brs-grid > .brs-cell-email { grid-column: span 5; }\n}',
+    );
+    const sheet = component('BuyReceiptSheet.tsx');
+    expect(sheet).toContain('<label className="brs-c5 brs-cell-name">');
+    expect(sheet).toContain('<div className="brs-c4 brs-cell-email">');
+    // Not `brs-name`: that is the letterhead's business name (headline type, 21px, gold) — a box
+    // given that class is set in the wrong face. Each of the two new names styles exactly one thing.
+    expect(sheet.match(/className="brs-name"/g)).toHaveLength(1);
+    expect(sheet).toContain('<div className="brs-name">{BUSINESS_NAME}</div>');
+    expect(BUY_RECEIPT_SHEET_CSS.match(/\.brs-cell-name\b/g)).toHaveLength(1);
+    expect(BUY_RECEIPT_SHEET_CSS.match(/\.brs-cell-email\b/g)).toHaveLength(2);
+    // The printed paper has no small boxes and keeps its columns: Name 5, Phone 3, Email 4.
+    expect(sheet).toContain('<div className="brs-c5"><Value>{receipt.seller_name}</Value><span className="brs-label">Name</span></div>');
+    expect(sheet).toContain('<div className="brs-c4"><Value>{receipt.seller_email}</Value><span className="brs-label">Email</span></div>');
+    // The two narrower layouts are the ones that were there before.
+    expect(BUY_RECEIPT_SHEET_CSS).toContain('.buy-receipt-sheet .brs-grid > .brs-c5, .buy-receipt-sheet .brs-grid > .brs-c6 { grid-column: span 12; }');
+  });
+
+  it('drops "(optional)" from the label in place when the Email box is too narrow for all three', () => {
+    const sheet = component('BuyReceiptSheet.tsx');
+    expect(sheet).toContain('<label className="brs-label" htmlFor={emailId}>Email<span className="brs-opt"> (optional)</span></label>');
+    expect(sheet).toContain("<div className={onEmailCopyChange && onMailingListChange ? 'brs-label-row brs-two' : 'brs-label-row'}>");
+    // Measured against the box, not the window: the same paper is wider in the seller's view.
+    expect(BUY_RECEIPT_SHEET_CSS).toContain('.buy-receipt-sheet .brs-cell-email { container-type: inline-size; }');
+    expect(BUY_RECEIPT_SHEET_CSS).toContain('@container (max-width: 270px) {\n  .buy-receipt-sheet .brs-two .brs-opt { display: none; }\n}');
+    // The line itself is unchanged: one row, never stacked.
+    expect(BUY_RECEIPT_SHEET_CSS).toContain('.buy-receipt-sheet .brs-label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }');
   });
 });

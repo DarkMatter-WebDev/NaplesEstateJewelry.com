@@ -11,8 +11,17 @@
 > afternoon (owner: "pushed and deployed, verified live"); no SQL.
 > 2026-10-03, later: **Customer input mode** — one optional button on the New
 > receipt form that hands the tablet to the seller on a locked screen (see
-> *Customer input mode*). BUILT + gated + STAGED, awaiting the push; no SQL, no
-> env vars. ⛔ Not yet tried with a real sign-in or on the real iPad.
+> *Customer input mode*). **DEPLOYED** that evening (owner: "pushed and
+> deployed, manually verified in production"); no SQL, no env vars.
+> 2026-10-03, night — 🟡 **BUILT and STAGED, awaiting the owner's push**
+> (`TASKS.md` 2026-10-03 (8), `CHANGELOG.md` 2026-10-03 (10)): a **"Mailing
+> list" box beside "Email copy"** on the form (the Email box is one column
+> wider, the Name box one narrower — the owner's "layout B"), and **customer
+> input mode is now the form itself** — the same paper locked to the screen,
+> with everything except the seller's seven boxes greyed out and switched off
+> — instead of its own big-box screen. No SQL, no env vars. The *Customer
+> input mode* section below describes this build; until the push, production
+> still shows the earlier big-box screen and has no Mailing list box.
 
 The receipt for something the shop **buys** from a customer at the counter.
 The owner fills it in on a laptop beside the seller, it is saved to a log in
@@ -115,33 +124,51 @@ the website back end."* Then, after two mockups: *"make sure the buy receipt
 form stays as it is in production now… the customer input mode is optional…
 allow us to stay on the normal input form if we want to… keep the date of birth
 with the admin like the ID… the only change we should see to the page is the
-new button."*
+new button."* Then, after using it live (2026-10-03 evening): *"Add the add to
+mailing list checkbox near the email to the regular form too. And let's adjust
+the customer input form so that it looks exactly like the regular form but just
+locks to the full screen of the tablet or the computer we're viewing it on. And
+most of the other fields are grayed out."* On the mockup: *"use layout b"* ·
+may the customer see the greyed parts, items and amounts included — *"yes"* ·
+*"make the grey-out a little stronger so its very obvious which fields they
+need to input"*.
 
 ### What it is
 
-**The form is unchanged and still fills in everything by itself.** The one new
-thing on the page is a small **Customer input mode** button at the right end
-of the tabs row (New receipt · Log · Print station). Ignore it and nothing is
-different. Tap it and the tablet shows the **seller** a locked screen with only
-their own contact boxes; when it comes back, the form simply has those details
-in it.
+**The form still fills in everything by itself.** On the page there is a small
+**Customer input mode** button at the right end of the tabs row (New receipt ·
+Log · Print station). Ignore it and nothing is different. Tap it and the tablet
+shows the **seller** this same form, locked to the whole screen, with only
+their own contact boxes switched on; when it comes back, the form simply has
+those details in it.
 
 1. (Optional) type whatever you like on the form first — items, prices, the ID
-   part. It all stays.
+   part. It all stays (and the seller will see it, greyed).
 2. Tap **Customer input mode**. The button says *Locking…* for a moment: the
    server locks the browser first (below). If that fails, a red line says the
    tablet is **not** locked and must not be handed over.
-3. Hand the tablet over. The seller sees **Your information** with seven
-   boxes: first and last name · phone · street address · city · state (starts
-   as `FL`) · ZIP · email *(optional)*. **No ID type, no ID last 4, no date of
-   birth, no ID photo, no items, no prices** — those stay on the form for the
-   owner.
-4. **Save** at the bottom.
-   - Something unfinished: each such box turns red with a short reason beside
-     its label (*Needed*, *Add your last name*, *10 digits*, *2 letters*,
-     *5 digits*, *Check this*), the bar says *Please finish the N highlighted
-     boxes*, and only now a **Submit unfinished** button appears. It asks to
-     hand the tablet to staff and needs the staff code. It disappears again
+3. Hand the tablet over. The seller sees **the receipt form itself** — the
+   letterhead, "Seller", the same boxes with their labels underneath — filling
+   the screen. The admin menu, the page title, the tabs and the form's own
+   buttons are gone. **Seven boxes can be used**: name · phone · email
+   *(optional)* · street · city · state (starts as `FL`) · ZIP — plus the two
+   small boxes on the Email line. **Everything else is greyed out and cannot be
+   touched**: ID type, ID last 4, date of birth, the ID photo strip, the items,
+   the total, how it was paid, the notes, the signatures. The seller can *see*
+   those parts (owner: yes — it is their own sale); they cannot change them.
+   The page does not scroll: the seller's boxes are at the top of the paper and
+   the rest runs off the bottom behind the bar.
+4. The bar at the bottom says *Please fill in the boxes under "Seller", then
+   tap Save.* and holds **Save**.
+   - Something unfinished: each such box gets a red line and a pale red fill;
+     an empty one says **Needed** inside itself; one that is filled in but not
+     right gets the reason beside its label (*NAME — add your last name*,
+     *PHONE — 10 digits*, *ZIP — 5 digits*, *— check this*). State and Email
+     have no room for words beside their labels: the red line and red label say
+     it. Nothing on the paper changes size. The bar turns to *Please finish the
+     highlighted boxes*, and only now a **Submit unfinished** button appears.
+     It asks to hand the tablet to staff and needs the staff code. A flag
+     leaves its box as soon as the seller starts fixing it; the button goes
      once every box is right.
    - Everything finished: the screen locks on **Thank you, <first name>.
      Please hand this tablet back to our staff.** → **Staff: unlock** → the
@@ -152,38 +179,63 @@ in it.
    items and the payment (if not already there), and save as always.
 
 **Email is optional.** An empty email is never flagged; a half-typed one is.
-Once an email is typed, two small boxes appear beside it, both unticked:
-**Email me a copy of my receipt** (ticks the form's own *Email copy* box) and
-**Add me to the mailing list**. Clearing the email hides and unticks both.
+The two small boxes on the Email line — **Email copy** and **Mailing list** —
+are the form's own; in the seller's view the seller can tick them. They are
+greyed until an email is typed, both start unticked, and emptying the email in
+the seller's view unticks both.
 
-**What the form shows afterwards.** Nothing, unless there is something to act
-on — the owner's ruling is that the button is the only change to the page. A
-line above the sheet appears for exactly two things: the seller **asked for
-something** (*"The customer asked to join the mailing list — they are added
-when you save the receipt."*), or the form came back **unfinished**
-(*"Submitted unfinished with the staff code. Still to finish: Name, City,
-ZIP."*). The unfinished list shrinks as the owner completes the boxes and the
-line leaves with the last one. It also goes with **Clear** and with a saved
-receipt.
+**How faint the greyed parts are** is one number, `BUY_RECEIPT_CUSTOMER_DIM`
+in `buy-receipt-sheet-css.ts` (0.22; the mockup had 0.36 and the owner asked
+for stronger). Smaller = fainter.
+
+**With the tablet's keyboard up.** Upright, and on a computer, everything
+already fits. Sideways, the keyboard takes more than half the screen, so the
+paper slides up just far enough (about 49 px on a 10-inch iPad) to keep the
+"Seller" heading, all seven boxes and the bar with Save above the keys; it
+slides back when the keyboard goes. On a phone the seven boxes stack and
+cannot all fit above a keyboard: there, and only there, the page may be moved
+with a finger — and the paper ends right after the last seller box.
+
+**What the form shows afterwards.** Nothing, unless boxes were left
+unfinished: then one line above the sheet says *"Submitted unfinished with the
+staff code. Still to finish: Name, City, ZIP."* The list shrinks as the owner
+completes the boxes and the line leaves with the last one. It also goes with
+**Clear** and with a saved receipt. (What the seller asked for needs no line:
+the ticks are on the form itself.)
 
 **Typing helpers.** The phone formats itself as digits are typed
 (`(239) 404-8505`; a leading `1` is dropped), the state is upper-cased, the
-ZIP keeps its digits (ZIP+4 gets its dash), Return steps to the next box and
-closes the keyboard after the last. A box passes on the seller's screen only
-if the receipt's own validator would accept it too, so a seller's "Save" never
+ZIP keeps its digits (ZIP+4 gets its dash), Return steps to the next box in
+the paper's order (name → phone → email → street → city → state → ZIP) and
+closes the keyboard after the last. A box passes in the seller's view only if
+the receipt's own validator would accept it too, so a seller's "Save" never
 hands back a form that then refuses to save.
 
 ### The mailing list
 
-The seller's email joins the **same list as the homepage's "Join the List"**
-(`homepage_subscribers`, through the same `subscribe_homepage_v2` function),
-marked `buy_receipt` — the Subscribers page shows those as **Buy receipt**.
-It happens **when the owner saves the receipt**, not when the seller taps Save,
-so an email corrected on the form is the one that joins. Email only — never a
-text sign-up (that needs its own consent wording and a "reply YES"). The saved
-panel then shows *Mailing list: Added*, or says it could not be added (the
-receipt is saved either way). If the receipt is never saved, nobody is added;
-add them by hand under Subscribers.
+**"Mailing list" is a small box on the form, beside "Email copy"** (owner,
+2026-10-03). Tick it — you on the form, or the seller in customer input mode —
+and the seller's email joins the **same list as the homepage's "Join the
+List"** (`homepage_subscribers`, through the same `subscribe_homepage_v2`
+function), marked `buy_receipt` — the Subscribers page shows those as **Buy
+receipt**. It happens **when the owner saves the receipt**, not when the box
+is ticked or the seller taps Save, so an email corrected on the form is the
+one that joins. Email only — never a text sign-up (that needs its own consent
+wording and a "reply YES"). The saved panel then shows *Mailing list: Added*,
+or says it could not be added (the receipt is saved either way). If the
+receipt is never saved, nobody is added; add them by hand under Subscribers.
+Like "Email copy", the box is greyed until an email is typed, is never
+printed, and resets with **Clear**.
+
+**Where it sits ("layout B").** The Email label's line was already full, so on
+the form the Email box is **one column wider and the Name box one narrower**
+(Name 4 · Phone 3 · Email 5 of 12) and the line reads *Email (optional)* ·
+*Email copy* · *Mailing list*. When the Email box is narrower than about
+270 px (a tablet held upright), the word *(optional)* leaves the label in
+place — nothing stacks or moves. Below 761 px the form's two narrower layouts
+are the ones from before. ⛔ The **printed paper is unchanged**: it has no
+small boxes and keeps Name 5 · Phone 3 · Email 4. The edit view of a saved
+receipt uses the same widths as the form but has no small boxes.
 
 ### The staff code
 
@@ -224,6 +276,13 @@ the lock is on the **server**:
   dragged across it moves nothing, the Back button stays on it, and a refresh
   comes back to it with everything typed (kept in that tab's session storage
   and wiped when the mode ends).
+- **The paper on it.** It is the form's own paper, drawn a second time by the
+  same component on the same draft. The owner's parts are switched off three
+  ways at once — `disabled` controls (the three ID boxes one by one, everything
+  below them inside one disabled `fieldset`), `inert`, and `pointer-events:
+  none` — so no tap, no Tab key and no "next field" arrow on a tablet keyboard
+  reaches them. The paper area is clipped (`overflow: clip`), which is not a
+  scroller at all: nothing can move it except the measured keyboard slide.
 - **Every other computer is unaffected.** The lock is per browser: the Print
   Station, the laptop and the phone never notice it.
 
@@ -269,26 +328,53 @@ To end: triple-click the top button, enter the Guided Access passcode, tap
 | Piece | File |
 |---|---|
 | The lock: cookie name, what a locked browser may open, limits (⛔ no imports — the proxy loads it on every request) | `next-app/src/lib/customer-mode-lock.ts` |
-| The seven boxes, their rules, typing helpers, the hand-back line, the stored snapshot (pure) | `next-app/src/lib/buy-receipt-customer-mode.ts` |
+| The seven boxes (in the paper's order), their rules, typing helpers, what a flag says and where (`customerFlagPlaceholder`, `customerFlagNote`), the hand-back line, the stored snapshot (pure) | `next-app/src/lib/buy-receipt-customer-mode.ts` |
 | ⛔ The staff code (server-only, the ONE place) | `next-app/src/lib/buy-receipt-staff-code.ts` |
 | Mailing-list sign-up (server-only; the feature's only service-role call, never on `buy_receipts`) | `next-app/src/lib/buy-receipt-mailing-list.ts` |
 | Start / end / "am I locked?" | `next-app/src/app/api/admin/buy-receipts/customer-mode/route.ts` |
 | The 423 for a locked browser | `next-app/src/lib/admin-auth.ts` |
 | The page bounce | `next-app/src/proxy.ts` (`customerModeRedirect`) |
-| The seller's screen + its styles | `components/admin/buy-receipts/BuyReceiptCustomerMode.tsx`, `buy-receipt-customer-css.ts` |
-| The button, the hand-over, the line afterwards | `components/admin/buy-receipts/BuyReceiptForm.tsx` |
+| The locked screen: the frame around the paper — page lock, Back trap, the bar (Staff · message · Submit unfinished · Save), where the paper sits (keyboard slide, phone scroll), keypad, Thank-you — and its styles | `components/admin/buy-receipts/BuyReceiptCustomerMode.tsx`, `buy-receipt-customer-css.ts` |
+| The paper's **seller's view**: the `customer` prop (`BuyReceiptCustomerView`), `seat()` on the seven boxes, `why()` beside their labels, `off` / `brs-off` on the owner's parts, `ownerPart` inside a disabled `fieldset` | `components/admin/buy-receipts/BuyReceiptSheet.tsx` |
+| How the seller's view LOOKS (the fade `BUY_RECEIPT_CUSTOMER_DIM`, a flagged box), the "Mailing list" box, layout B, the `(optional)` container rule | `components/admin/buy-receipts/buy-receipt-sheet-css.ts` |
+| The button, the hand-over, the ONE `sheet()` function that draws the paper for the form and for the locked screen, the line afterwards | `components/admin/buy-receipts/BuyReceiptForm.tsx` |
 | Other tabs step aside | `components/admin/buy-receipts/CustomerModeTabGuard.tsx` — the hook `useCustomerModeTabGuard()` is called by `components/admin/AdminHeader.tsx` (every admin page with the menu); the component is rendered by the two admin pages with no menu (`admin/orders/[id]/print/page.tsx`, `…/invoice/page.tsx`) and by `app/[locale]/account/layout.tsx` (every account page). ⛔ There is no `app/[locale]/admin/layout.tsx` and there must not be one (`STRUCTURE.md` → *Phone listing editor*); a test fails if an admin page has neither the menu nor the guard |
 | "Try counter" that can tell *limited* from *unreachable* | `rateLimitState` in `next-app/src/lib/rate-limit.ts` |
-| Tests | `lib/__tests__/buy-receipt-customer-mode.test.ts` (38), `api/admin/buy-receipts/customer-mode/route.test.ts` (8), `lib/__tests__/admin-auth.test.ts` (5), plus 2 in `rate-limit.test.ts` |
+| Tests | `lib/__tests__/buy-receipt-customer-mode.test.ts` (44), `api/admin/buy-receipts/customer-mode/route.test.ts` (8), `lib/__tests__/admin-auth.test.ts` (5), plus 2 in `rate-limit.test.ts` |
 
 ### ⛔ Rules for this mode
 
-- **The form is not to change.** `BuyReceiptSheet.tsx` knows nothing about the
-  mode (a test checks it never mentions it). Anything the mode needs goes
-  around the sheet, never into it.
-- **Seven boxes.** Never add ID type, ID last 4, date of birth, the ID photo,
-  items or money to the seller's screen (owner: *"i will do the ID stuff"*,
-  *"keep the date of birth with the admin like the ID"*).
+- **One paper.** The seller's view is `BuyReceiptSheet` itself with the
+  `customer` prop — never a second form that imitates it. The form draws the
+  paper through one `sheet()` function and hands that same function to the
+  locked screen, so the two cannot drift apart.
+- **The owner's form is drawn exactly as before.** Everything the seller's view
+  adds comes from three helpers in the sheet (`seat`, `why`, `off`) that give
+  nothing without the `customer` prop, and the owner's part is drawn bare — no
+  wrapper, no extra element (tests check all of it). Only the locked screen
+  passes `customer`; the edit view of a saved receipt never does.
+  *(This replaces the first build's rule "the paper knows nothing about the
+  mode": the owner asked for the customer's screen to BE the form.)*
+- **Seven boxes switched on.** ID type, ID last 4, date of birth, the ID photo,
+  items and money are the owner's (*"i will do the ID stuff"*, *"keep the date
+  of birth with the admin like the ID"*): the seller may see them greyed, and
+  must never be able to change them. A new field on the paper goes inside
+  `ownerPart` (or gets `disabled={off}`) unless the owner says it is the
+  seller's.
+- **The frame does not style the paper.** `buy-receipt-customer-css.ts` has no
+  rule that reaches into the sheet; how the paper looks in the seller's view
+  lives in `buy-receipt-sheet-css.ts`, on classes and attributes that only
+  that view adds.
+- **The paper area is clipped, never a scroller** (`overflow: clip` on
+  `.brc-page`, and on the cut paper in the phone layout). As a scroller, a
+  browser bringing a focused box into view moves the paper — found in testing:
+  the cut paper slid inside its own frame and showed the greyed rows. The
+  keyboard slide is worked out from layout offsets (`offsetTop`), never from
+  the position of a box that is already moved.
+- ⛔ **A class name on the paper must be new.** `.brs-name` is the letterhead's
+  business name (headline type, 21 px, gold); the Name box was given that class
+  for a moment and was set in the wrong face. The two layout-B cells are
+  `brs-cell-name` / `brs-cell-email`.
 - **Lock first, show second.** `enterCustomerMode` awaits the server before the
   screen appears. A screen without the server lock is a curtain, not a lock.
 - **The code stays on the server, in one file.** Never compare it in the
@@ -311,7 +397,61 @@ To end: triple-click the top button, enter the Guided Access passcode, tap
   `[locale]/admin/zz-guard-preview`) must never be deployed; a test fails while
   either exists.
 
-### Verification (2026-10-03)
+### Verification — the same-form build and the "Mailing list" box (2026-10-03, night)
+
+🟡 **STAGED, not deployed.** Done:
+
+- `npx tsc --noEmit` 0 · `npm run lint` 0 errors (3 older warnings) ·
+  `npx vitest run` **1710/1710** (159 files; 6 more than before) ·
+  `npm run build` 0, the same 88 prerendered pages, no preview page in the build.
+- **The real components in headless Chrome** (a temporary login-free copy of
+  the page, its server calls answered by the page itself with a test code;
+  deleted afterwards) — **77/77 with a mouse, and 77/77 again as a touch
+  tablet** (16 px typing, no scrollbar gutter):
+  - *The form:* built as before — same parts in the same order, no wrapper,
+    nothing switched off, the same type in every box; Name 231 px · Phone
+    170 px · Email 292 px on a sideways tablet and a computer; the label and
+    both small boxes share one line at 1024, 768, 1366, 700 and 390 px wide
+    (need 264 px of 292 sideways; upright *(optional)* gives way: 198 of
+    239–246); under 761 px the rows are the old ones; both boxes greyed until
+    an email is typed; a save sends `mailingList: true`; Clear resets them.
+  - *The seller's view:* fills the screen exactly, admin page gone, nothing
+    scrolls; the same paper with the same box widths; exactly seven boxes on,
+    in the paper's order; the three ID boxes and everything below faded to
+    0.22, `disabled`, `inert`, untouchable; a wheel or a tap on a greyed box
+    does nothing; phone, state and ZIP format as typed; Return steps through
+    the seven and lets go; flags (red line, "Needed" inside, reasons beside
+    labels, one line, no change of size); a flag leaves on the first
+    keystroke; Thank-you; wrong code refused; the right code brings the form
+    back with the details and both ticks; the unfinished path and its line;
+    emptying the email unticks both boxes; a reload while locked comes back
+    with what was typed; Back stays; the Staff button.
+  - *Sizes:* sideways tablet with a keyboard (296 px left) — slide 49 px,
+    heading at 100, boxes 134–236, bar from 243; upright with and without a
+    keyboard — no slide; computer; phone 390×664 — all seven boxes fit with a
+    small slide; phone with a keyboard (330 px left) — the page may move, the
+    box being typed in comes into view, the paper ends right after ZIP.
+- **Two faults found by looking at the screenshots, both fixed and now
+  tested:** the Name box was set in the letterhead's typeface (a class-name
+  collision, see the rules above); on a phone with the keyboard up the cut
+  paper slid inside its own frame and showed greyed rows (it was a scroller;
+  now clipped).
+
+**Not checked, and why it matters:**
+
+1. **No real admin sign-in.** The lock, the bounce, the staff code and the
+   mailing-list call are the deployed code, untouched by this build — but this
+   build was only ever run on the login-free copy.
+2. **No real iPad.** Chromium cannot prove Safari's keyboard and touch
+   behaviour (`DECISIONS.md` → *"Admin on a phone (2026-09-02)"*). The owner's
+   list is in `TASKS.md` 2026-10-03 (8).
+3. **No print run.** The printed paper's markup and rules are untouched: the
+   build only ADDS style rules, each on a class or attribute that the form or
+   the seller's view adds; a test pins the printed Seller rows (Name 5 ·
+   Email 4). If a printed copy ever looks different, this is the first place
+   to look.
+
+### Verification (2026-10-03) — the first build (the big-box screen, since replaced)
 
 Done:
 
@@ -345,7 +485,10 @@ Done:
   public site are untouched; a stale note heals; an unclear answer keeps the
   admin page hidden.
 
-Not verified — needs the owner:
+**Verified in production by the owner, 2026-10-03 evening** (*"pushed and
+deployed, manually verified in production. Period."*). Claude never checked
+these two, and they are listed so the next change knows what only the owner
+can confirm:
 
 1. **With a real admin sign-in:** the button actually setting the lock, a typed
    admin address landing back on the customer screen, the staff code unlocking,

@@ -1,12 +1,14 @@
 // Buy receipt "Customer input mode" — what the seller's screen asks for
 // (owner, 2026-10-03). Pure and safe to import from client components.
 //
-// The owner's New receipt form is unchanged and still fills in everything by
-// itself. This mode is the optional hand-over: the tablet shows the seller ONLY
-// their own contact details, checks them, and gives the tablet back locked.
+// The owner's New receipt form still fills in everything by itself. This mode
+// is the optional hand-over: the tablet shows the seller the SAME paper, locked
+// to the screen, with only their own contact boxes switched on (everything else
+// is greyed and cannot be touched), checks those boxes, and gives the tablet
+// back locked.
 //
 // Rules that live here so the screen, the form and the tests agree:
-// - seven boxes, no more: name, phone, street, city, state, ZIP, email. ID
+// - seven boxes, no more: name, phone, email, street, city, state, ZIP. ID
 //   type, ID last 4, date of birth and the ID photo stay with the owner;
 // - every box is required EXCEPT the email — but a typed email must look like one;
 // - a box passes here only if the receipt's own validator
@@ -21,18 +23,32 @@ export const CUSTOMER_MODE_STORAGE_KEY = 'nej-buy-receipt-customer-mode';
 export const CUSTOMER_MODE_API = '/api/admin/buy-receipts/customer-mode';
 export const CUSTOMER_MODE_CODE_LENGTH = 4;
 
-/** The boxes on the seller's screen, in the order they are typed. */
+/** The boxes the seller may use, in the order they sit on the paper (so Return steps through them left to right, top to bottom). */
 export const CUSTOMER_FIELDS = [
   'sellerName',
   'sellerPhone',
+  'sellerEmail',
   'sellerStreet',
   'sellerCity',
   'sellerState',
   'sellerZip',
-  'sellerEmail',
 ] as const;
 export type CustomerField = (typeof CUSTOMER_FIELDS)[number];
 export type CustomerValues = Pick<BuyReceiptDraft, CustomerField>;
+
+/** How a tablet's keyboard should capitalise each box while the seller types. */
+export const CUSTOMER_FIELD_CAPITALS: Record<CustomerField, 'words' | 'characters' | 'none'> = {
+  sellerName: 'words',
+  sellerPhone: 'none',
+  sellerEmail: 'none',
+  sellerStreet: 'words',
+  sellerCity: 'words',
+  sellerState: 'characters',
+  sellerZip: 'none',
+};
+
+/** What an empty required box is told. Also written inside the box itself on the paper. */
+export const CUSTOMER_NEEDED = 'Needed';
 
 /** What the owner's form calls the same boxes — used in the line shown when the tablet comes back. */
 export const CUSTOMER_FIELD_FORM_NAMES: Record<CustomerField, string> = {
@@ -63,7 +79,7 @@ function phoneDigits(value: string): string {
 export function customerFieldProblem(field: CustomerField, raw: unknown): string {
   const value = collapse(raw);
   if (field === 'sellerEmail') return value && !EMAIL_RE.test(value) ? 'Check this' : '';
-  if (!value) return 'Needed';
+  if (!value) return CUSTOMER_NEEDED;
   switch (field) {
     case 'sellerName':
       if (normalizePersonName(value)) return '';
@@ -82,12 +98,33 @@ export function customerFieldProblem(field: CustomerField, raw: unknown): string
 
 export type CustomerProblem = { field: CustomerField; problem: string };
 
-/** Every unfinished box, in screen order. Empty = the seller may save. */
+/** Every unfinished box, in the paper's order. Empty = the seller may save. */
 export function customerProblems(values: CustomerValues): CustomerProblem[] {
   return CUSTOMER_FIELDS.flatMap((field) => {
     const problem = customerFieldProblem(field, values[field]);
     return problem ? [{ field, problem }] : [];
   });
+}
+
+/**
+ * The word written INSIDE a flagged box, in red: "Needed", for an empty one.
+ * Not for State — that box is one column wide and the word would be cut; its
+ * red line and red label say it.
+ */
+export function customerFlagPlaceholder(field: CustomerField, problem: string | undefined): string | undefined {
+  return problem === CUSTOMER_NEEDED && field !== 'sellerState' ? CUSTOMER_NEEDED : undefined;
+}
+
+/**
+ * The few words written BESIDE a flagged box's label on the paper ("NAME — add
+ * your last name"). Empty when the box itself already says it ("Needed"), and
+ * for the two labels with no room for words: State (one column wide) and Email
+ * (its line is shared with the two small boxes).
+ */
+export function customerFlagNote(field: CustomerField, problem: string | undefined): string {
+  if (!problem || problem === CUSTOMER_NEEDED) return '';
+  if (field === 'sellerState' || field === 'sellerEmail') return '';
+  return problem.charAt(0).toLowerCase() + problem.slice(1);
 }
 
 /**
@@ -141,43 +178,25 @@ export function customerFirstName(name: unknown): string {
 
 /** How the tablet came back: a complete Save, "Submit unfinished", or the small Staff button. */
 export type CustomerHandBackReason = 'saved' | 'unfinished' | 'staff';
-export type CustomerHandBack = { kind: 'ok' | 'warn'; text: string };
 
 /**
  * The one line the owner's form shows after the tablet comes back — and only
- * when there is something the owner needs to know. The owner's ruling
- * (2026-10-03) is that the form stays as it is and the button is the only
- * change to the page, so a hand-over that needs no follow-up leaves no line at
- * all: the details are simply in the boxes. A line appears for exactly two things:
- * - the seller asked for something that happens later (an emailed copy, the
- *   mailing list) — the form has no other place that says so;
- * - the form was accepted unfinished — which boxes still need the owner.
+ * when there is something the owner needs to do: the form was accepted
+ * unfinished, and these boxes still need finishing. A hand-over that needs no
+ * follow-up leaves no line at all: the details are simply in the boxes.
+ *
+ * What the seller asked for needs no line either: "Email copy" and "Mailing
+ * list" are boxes on the form itself (owner, 2026-10-03), so the ticks are
+ * right there to see.
+ *
  * The form works it out afresh on every keystroke, so the list of boxes
  * shrinks as the owner finishes them and the line leaves when the last is done.
  * It also goes with "Clear" and with a saved receipt.
  */
-export function customerHandBack(
-  reason: CustomerHandBackReason,
-  values: CustomerValues,
-  asked: { emailCopy: boolean; mailingList: boolean },
-): CustomerHandBack | null {
-  const hasEmail = Boolean(collapse(values.sellerEmail));
-  const copy = asked.emailCopy && hasEmail;
-  const list = asked.mailingList && hasEmail;
-  const asks = [
-    copy ? 'The customer asked for an emailed copy — Email copy is ticked.' : '',
-    list ? `${copy ? 'They also' : 'The customer'} asked to join the mailing list — they are added when you save the receipt.` : '',
-  ]
-    .filter(Boolean)
-    .join(' ');
-
-  if (reason === 'unfinished') {
-    const open = customerProblems(values).map((entry) => CUSTOMER_FIELD_FORM_NAMES[entry.field]);
-    if (open.length > 0) {
-      return { kind: 'warn', text: `Submitted unfinished with the staff code. Still to finish: ${open.join(', ')}.${asks ? ` ${asks}` : ''}` };
-    }
-  }
-  return asks ? { kind: 'ok', text: asks } : null;
+export function customerHandBack(reason: CustomerHandBackReason, values: CustomerValues): string | null {
+  if (reason !== 'unfinished') return null;
+  const open = customerProblems(values).map((entry) => CUSTOMER_FIELD_FORM_NAMES[entry.field]);
+  return open.length > 0 ? `Submitted unfinished with the staff code. Still to finish: ${open.join(', ')}.` : null;
 }
 
 /** What a refresh must bring back while the tablet is handed over. */

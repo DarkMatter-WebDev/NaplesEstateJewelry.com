@@ -42,7 +42,8 @@ export type CreateReceiptResult =
 /**
  * `emailCopy` asks the server to email the seller their copy as part of the
  * save; `mailingList` asks it to add the seller's email to the mailing list
- * (a seller ticked that box on the customer input screen).
+ * (the "Mailing list" box is ticked — by the owner on the form, or by the
+ * seller in customer input mode).
  */
 export async function createReceipt(
   draft: BuyReceiptDraft,
