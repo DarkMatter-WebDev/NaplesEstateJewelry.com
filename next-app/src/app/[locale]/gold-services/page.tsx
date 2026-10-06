@@ -119,12 +119,17 @@ export default async function GoldServicesPage({ params }: Props) {
       <SiteHeader />
       <main className="site-header-offset">
 
-        {/* Hero */}
+        {/* Hero. The photo is the shop's own hand of gold rings (owner's pick
+            from four mockups, 2026-10-05) — it replaced gold bars and coins
+            because the sellers this page is for bring jewelry. Frame, 40%
+            photo over #1a1c1c and copy are unchanged. The source is a 900px
+            wide phone photo: the owner chose it knowing it is soft on a wide
+            screen. */}
         <section className="relative h-[640px] flex items-center bg-[#1a1c1c] overflow-hidden">
           <div className="absolute inset-0 opacity-40">
             <Image
-              src="/assets/images/pages/bullion.webp"
-              alt="Gold bars"
+              src="/assets/images/pages/gold-rings-hero.webp"
+              alt="Gold and gemstone rings"
               fill
               sizes="100vw"
               className="object-cover"

@@ -13,15 +13,16 @@
 > receipt form that hands the tablet to the seller on a locked screen (see
 > *Customer input mode*). **DEPLOYED** that evening (owner: "pushed and
 > deployed, manually verified in production"); no SQL, no env vars.
-> 2026-10-03, night — 🟡 **BUILT and STAGED, awaiting the owner's push**
-> (`TASKS.md` 2026-10-03 (8), `CHANGELOG.md` 2026-10-03 (10)): a **"Mailing
+> 2026-10-03, night — 🟢 **DEPLOYED** (owner, ~10 PM: "pushed and deployed";
+> `TASKS.md` 2026-10-03 (8), `CHANGELOG.md` 2026-10-03 (10)–(11)): a **"Mailing
 > list" box beside "Email copy"** on the form (the Email box is one column
 > wider, the Name box one narrower — the owner's "layout B"), and **customer
 > input mode is now the form itself** — the same paper locked to the screen,
 > with everything except the seller's seven boxes greyed out and switched off
 > — instead of its own big-box screen. No SQL, no env vars. The *Customer
-> input mode* section below describes this build; until the push, production
-> still shows the earlier big-box screen and has no Mailing list box.
+> input mode* section below describes this build. ⚠️ Deployed on the owner's
+> word; not yet reported as tried on the iPad, behind the real sign-in, or on
+> paper — see *Verification — the same-form build*.
 
 The receipt for something the shop **buys** from a customer at the counter.
 The owner fills it in on a laptop beside the seller, it is saved to a log in
@@ -399,7 +400,8 @@ To end: triple-click the top button, enter the Guided Access passcode, tap
 
 ### Verification — the same-form build and the "Mailing list" box (2026-10-03, night)
 
-🟡 **STAGED, not deployed.** Done:
+🟢 **DEPLOYED 2026-10-03 ~10 PM** (owner: *"pushed and deployed"*). Claude did
+not check production (not asked to). Done before the push:
 
 - `npx tsc --noEmit` 0 · `npm run lint` 0 errors (3 older warnings) ·
   `npx vitest run` **1710/1710** (159 files; 6 more than before) ·
@@ -450,6 +452,9 @@ To end: triple-click the top button, enter the Guided Access passcode, tap
    the seller's view adds; a test pins the printed Seller rows (Name 5 ·
    Email 4). If a printed copy ever looks different, this is the first place
    to look.
+
+As of the deploy the owner has not reported any of the three back; the
+try-out list is `TASKS.md` 2026-10-03 (8), items 2–4.
 
 ### Verification (2026-10-03) — the first build (the big-box screen, since replaced)
 

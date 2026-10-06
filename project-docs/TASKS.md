@@ -1,13 +1,31 @@
 # Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-10-03**.
+> in `CHANGELOG.md`. Last reconciled: **2026-10-05**.
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-10-03 (8) — Buy receipt: "Mailing list" box on the form + customer input mode as the form itself — **BUILT, gated and STAGED (~8:45 PM); awaiting the owner's push** (no SQL, no env vars)
+### 🟡 2026-10-05 (1) — `/gold-services` hero photo: bars and coins → the shop's own hand of rings (owner's "option D") — BUILT + gated + STAGED, awaiting the owner's push (no SQL, no env vars)
 
-Record: `CHANGELOG.md` 2026-10-03 (10) (the build), (9) and (8) (the mockups). Runbook: `features/buy-receipts.md` → *Customer input mode* and *The mailing list*. Rules: `DECISIONS.md` → *"Customer input mode IS the form, and "Mailing list" is a box on the form (2026-10-03, night)"*.
+Record: `CHANGELOG.md` 2026-10-05 (1). Rule: `DECISIONS.md` top entry.
+
+**Owner's words (10-05):** *"yes swap the hero, show me the photo candidates"* → four stills → *"option a, build it"* → mid-build *"actually, use option d for the pic"*.
+
+**What was built:** NEW `next-app/public/assets/images/pages/gold-rings-hero.webp` (900 × 1600, 169 KB, WebP read back); the hero `src` + `alt` in `next-app/src/app/[locale]/gold-services/page.tsx`. Nothing else on the page: same frame, same 40% photo over the dark background, same words and buttons.
+
+Gate: `tsc` 0 · lint 0 errors · **1710/1710** · build 0. Built page before/after: title, description, canonical, hreflang, Open Graph, H1, JSON-LD identical; only the hero image and its preload differ. Rendered on the local production server at 1440 and 375 px.
+
+1. ◻ **Owner — push** (copy `C:\Users\rcman\NEJ-repo-staging` into the repo folder, push).
+2. ◻ **Owner — look at `/gold-services` on the phone and on the desk monitor.** The photo is 900 px wide, so it is stretched and a little soft on a wide screen (told before the pick). If that bothers you on the monitor, say so — the fix is a sharper photo of the same kind, not code.
+3. ◻ **Owner — hand the reply to the ads agent** (it is in the chat of 10-05; it tells that agent the tag and the form conversion have been live since 10-02 and how to verify them, and that the hero is swapped once you confirm the deploy).
+4. ℹ️ Not built from the same brief, on purpose: the Google tag on every page and a second `/contact` conversion — both already exist as ruled on 10-02.
+
+**Staging (10-05 (1)):** ✅ synced 2026-10-05 ~11:02 PM ET — dry run listed exactly the 6 touched files (`next-app/public/assets/images/pages/gold-rings-hero.webp` new, `next-app/src/app/[locale]/gold-services/page.tsx`, CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS), 0 Extras, 1214 total; real run copied 6 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0, exit 0; leak check 0 `.env*` / `.log` / `.tmp-*` / `tsbuildinfo`, no node_modules / .next / .git, launch.json present; positive control 241 = 241 `.tsx` under `next-app/src`; SHA-256 MATCH on 6 of 6; the staged page carries `gold-rings-hero.webp`; the short-lived `gold-chains-hero.webp` (option A) is in neither folder. Docs-only re-sync after this line: see the session's final message.
+
+
+### 🟢 2026-10-03 (8) — Buy receipt: "Mailing list" box on the form + customer input mode as the form itself — **DEPLOYED** (owner, 10-03 ~10 PM: *"pushed and deployed"*) — ◻ the owner's own try-out is still open (no SQL, no env vars)
+
+Record: `CHANGELOG.md` 2026-10-03 (11) (the deploy), (10) (the build), (9) and (8) (the mockups). Runbook: `features/buy-receipts.md` → *Customer input mode* and *The mailing list*. Rules: `DECISIONS.md` → *"Customer input mode IS the form, and "Mailing list" is a box on the form (2026-10-03, night)"*.
 
 **Owner's answers on mockup 3b (10-03, verbatim):** *"1 use layout b, 2 yes, 3 make the grey-out a little stronger so its very obvious which fields they need to input — build it"*.
 
@@ -18,7 +36,7 @@ Record: `CHANGELOG.md` 2026-10-03 (10) (the build), (9) and (8) (the mockups). R
 
 Gate: `tsc` 0 · lint 0 errors · **1710/1710** · build 0. Browser checks on the real components: 77/77 with a mouse, 77/77 as a touch tablet.
 
-1. ◻ **Owner — push + deploy** (copy the staging folder as usual).
+1. ✅ **Pushed + deployed** (owner, 10-03 ~10 PM: *"pushed and deployed"*). Nothing was said about trying it, and Claude did not check production (not asked to) — so items 2–4 stay open.
 2. ◻ **Owner — try it on the iPad before a seller does** (Chromium cannot prove Safari; Claude has not seen this build on a real iPad or behind a real sign-in):
    - **The form:** "Mailing list" sits beside "Email copy" on one line, sideways and upright; both are greyed until an email is typed; tick it, save a receipt → the saved panel says *Mailing list: Added* and Subscribers shows the address as *Buy receipt*.
    - **Customer input mode, sideways and upright:** it looks like the form; tapping a greyed part (ID type, an item, the amount, the ID photo buttons) does nothing; the page cannot be dragged or scrolled; with the keyboard up, the "Seller" heading, all seven boxes and **Save** stay above the keys; the keyboard's own "next field" arrows never land on a greyed box.
@@ -28,7 +46,7 @@ Gate: `tsc` 0 · lint 0 errors · **1710/1710** · build 0. Browser checks on th
 3. ◻ **Owner — print one receipt** (any copy set) after the deploy and glance at it: the printed paper is meant to be exactly as before (Name wider than Email there). Claude did not run a print for this build.
 4. ◻ **Owner — optional:** should the printed paper also use the wider Email box (Name 4 · Email 5)? Left as it is unless asked.
 
-### 🟢 2026-10-03 (5)–(7) — Buy receipt "Customer input mode": **DEPLOYED** (owner, 10-03 evening: *"pushed and deployed, manually verified in production. Period."*) — its seller's screen is replaced by the build in (8) above once that is pushed
+### 🟢 2026-10-03 (5)–(7) — Buy receipt "Customer input mode": **DEPLOYED** (owner, 10-03 evening: *"pushed and deployed, manually verified in production. Period."*) — its seller's screen was replaced the same night by the build in (8) above (deployed)
 
 Record: `CHANGELOG.md` 2026-10-03 (7) (the build), (6) and (5) (the two mockups). Runbook: `features/buy-receipts.md` → *Customer input mode* (how to use it, the lock, Guided Access, what to do if it sticks). Rules: `DECISIONS.md` → *"Customer input mode (2026-10-03)"*.
 
