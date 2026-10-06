@@ -15,11 +15,21 @@ import {
 import BuyReceiptSheet from './BuyReceiptSheet';
 import IdPhotoField from './IdPhotoField';
 import ReceiptPrintControls from './ReceiptPrintControls';
-import { emailReceipt, removeIdPhoto, updateReceipt, uploadIdPhoto, useIdPhotoUrl, voidReceipt } from './buy-receipt-client';
+import ThumbprintField from './ThumbprintField';
+import {
+  emailReceipt,
+  removeIdPhoto,
+  removeThumbprint,
+  updateReceipt,
+  uploadIdPhoto,
+  uploadThumbprint,
+  useIdPhotoUrl,
+  voidReceipt,
+} from './buy-receipt-client';
 
 /**
- * One saved receipt: the paper, its ID photo, and what can be done with it —
- * print (here or on the desktop), edit, duplicate, void.
+ * One saved receipt: the paper, its ID photo and thumbprint, and what can be
+ * done with it — print (here or on the desktop), edit, duplicate, void.
  *
  * Owner ruling 2026-09-30: a saved receipt can be edited. A VOID one cannot
  * (the database refuses it too); duplicate it to record the corrected purchase.
@@ -35,6 +45,8 @@ export default function BuyReceiptDetail({ adminBasePath, initialReceipt }: { ad
   const [error, setError] = useState<string | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoNote, setPhotoNote] = useState<{ text: string; ok: boolean } | null>(null);
+  const [thumbprintBusy, setThumbprintBusy] = useState(false);
+  const [thumbprintNote, setThumbprintNote] = useState<{ text: string; ok: boolean } | null>(null);
   const [voiding, setVoiding] = useState(false);
   const [voidReason, setVoidReason] = useState('');
   const [voidError, setVoidError] = useState<string | null>(null);
@@ -43,6 +55,8 @@ export default function BuyReceiptDetail({ adminBasePath, initialReceipt }: { ad
   const [emailNote, setEmailNote] = useState<{ text: string; ok: boolean } | null>(null);
 
   const idPhotoUrl = useIdPhotoUrl(receipt.seller_id_photo_path);
+  // Same private bucket, same ten-minute signed link.
+  const thumbprintUrl = useIdPhotoUrl(receipt.seller_thumbprint_path);
   const isVoid = receipt.status === 'void';
   const editing = draft !== null;
 
@@ -85,6 +99,31 @@ export default function BuyReceiptDetail({ adminBasePath, initialReceipt }: { ad
     setPhotoBusy(false);
     if ('error' in result) {
       setPhotoNote({ text: result.error, ok: false });
+      return;
+    }
+    setReceipt(result.receipt);
+  }
+
+  async function pickThumbprint(print: Blob) {
+    setThumbprintBusy(true);
+    setThumbprintNote(null);
+    const result = await uploadThumbprint(receipt.id, print);
+    setThumbprintBusy(false);
+    if ('error' in result) {
+      setThumbprintNote({ text: result.error, ok: false });
+      return;
+    }
+    setReceipt(result.receipt);
+  }
+
+  async function dropThumbprint() {
+    if (!window.confirm('Remove the thumbprint from this receipt? This cannot be undone.')) return;
+    setThumbprintBusy(true);
+    setThumbprintNote(null);
+    const result = await removeThumbprint(receipt.id);
+    setThumbprintBusy(false);
+    if ('error' in result) {
+      setThumbprintNote({ text: result.error, ok: false });
       return;
     }
     setReceipt(result.receipt);
@@ -134,6 +173,16 @@ export default function BuyReceiptDetail({ adminBasePath, initialReceipt }: { ad
     />
   );
 
+  const thumbprintField = isVoid ? null : (
+    <ThumbprintField
+      previewUrl={thumbprintUrl}
+      busy={thumbprintBusy}
+      note={thumbprintNote ?? (receipt.seller_thumbprint_path && !thumbprintUrl ? { text: 'Loading the thumbprint…', ok: true } : null)}
+      onPick={(print) => void pickThumbprint(print)}
+      onRemove={() => void dropThumbprint()}
+    />
+  );
+
   return (
     <div>
       {editing && draft ? (
@@ -144,9 +193,11 @@ export default function BuyReceiptDetail({ adminBasePath, initialReceipt }: { ad
           receiptNumber={receipt.receipt_number}
           dateIso={receipt.created_at}
           idPhotoSlot={photoField}
+          thumbprintSlot={thumbprintField}
         />
       ) : (
-        <BuyReceiptSheet mode="print" receipt={receipt} />
+        // The shop copy as it is kept on file: with the thumbprint, when there is one.
+        <BuyReceiptSheet mode="print" receipt={receipt} thumbprintUrl={thumbprintUrl} />
       )}
 
       <div className="mx-auto mt-4 grid gap-3" style={{ width: 'min(8.5in, 100%)' }}>
@@ -167,8 +218,9 @@ export default function BuyReceiptDetail({ adminBasePath, initialReceipt }: { ad
           </div>
         ) : (
           <>
-            {/* The photo strip lives on the paper while editing; here it sits under it. */}
+            {/* The two strips live on the paper while editing; here they sit under it. */}
             {photoField}
+            {thumbprintField}
             {isVoid && receipt.seller_id_photo_path && idPhotoUrl && (
               <div className="border bg-white p-3 text-sm" style={cardStyle}>
                 <span style={hintStyle}>Seller ID photo on file</span>

@@ -79,7 +79,7 @@ export async function DELETE(_req: Request, context: Context) {
 
   const { data: current } = await admin.supabase
     .from('buy_receipts')
-    .select('id, receipt_number, seller_id_photo_path')
+    .select('id, receipt_number, seller_id_photo_path, seller_thumbprint_path')
     .eq('id', id)
     .maybeSingle();
   if (!current) return notFound();
@@ -89,7 +89,8 @@ export async function DELETE(_req: Request, context: Context) {
   // row is gone would sit there for ever with nothing pointing at it. If the
   // photo cannot be removed, nothing is deleted and the owner can try again.
   // The folder is listed as well, so a leftover from an earlier failed replace
-  // goes with it.
+  // goes with it. The seller's thumbprint lives in the same folder and goes the
+  // same way.
   const bucket = admin.supabase.storage.from(BUY_RECEIPT_ID_BUCKET);
   const folder = buyReceiptIdPhotoFolder(id);
   const { data: listed, error: listError } = await bucket.list(folder, { limit: 100 });
@@ -99,24 +100,28 @@ export async function DELETE(_req: Request, context: Context) {
   }
   const paths = new Set((listed ?? []).map((object) => `${folder}/${object.name}`));
   if (current.seller_id_photo_path) paths.add(current.seller_id_photo_path);
+  if (current.seller_thumbprint_path) paths.add(current.seller_thumbprint_path);
   if (paths.size > 0) {
     const { error: removeError } = await bucket.remove([...paths]);
     if (removeError) {
       console.error('[buy-receipts] delete: id photo not removed', removeError.message);
-      return NextResponse.json({ error: 'The ID photo could not be removed. Nothing was deleted.' }, { status: 502 });
+      return NextResponse.json({ error: 'The ID photo or thumbprint could not be removed. Nothing was deleted.' }, { status: 502 });
     }
   }
 
   const { data: removed, error } = await admin.supabase.from('buy_receipts').delete().eq('id', id).select('id');
   if (error || !removed || removed.length === 0) {
     console.error('[buy-receipts] delete failed', current.receipt_number, error?.message);
-    if (current.seller_id_photo_path) {
-      // The row is still there but its photo is not: stop it pointing at nothing.
+    if (current.seller_id_photo_path || current.seller_thumbprint_path) {
+      // The row is still there but its pictures are not: stop it pointing at nothing.
       // Best effort — a void row is frozen by the database guard and keeps the stale path.
-      await admin.supabase.from('buy_receipts').update({ seller_id_photo_path: null, print_copies_with_id: 0 }).eq('id', id);
+      await admin.supabase
+        .from('buy_receipts')
+        .update({ seller_id_photo_path: null, seller_thumbprint_path: null, print_copies_with_id: 0 })
+        .eq('id', id);
     }
     return NextResponse.json(
-      { error: paths.size > 0 ? 'The ID photo was removed, but the receipt could not be deleted. Try again.' : 'Could not delete the receipt.' },
+      { error: paths.size > 0 ? 'The ID photo and thumbprint were removed, but the receipt could not be deleted. Try again.' : 'Could not delete the receipt.' },
       { status: 500 },
     );
   }

@@ -6,6 +6,7 @@ import {
   BUY_RECEIPT_ATTESTATION_SELLER,
   BUY_RECEIPT_FORM_ROWS,
   BUY_RECEIPT_DEFAULT_PRINT_SET,
+  BUY_RECEIPT_DEFAULT_PRINT_SET_WITH_ID,
   BUY_RECEIPT_PAYMENT_LABELS,
   BUY_RECEIPT_PAYMENT_METHODS,
   BUY_RECEIPT_PRINT_SETS,
@@ -17,6 +18,7 @@ import {
   buyReceiptIdPhotoFolder,
   buyReceiptIdPhotoPath,
   buyReceiptTotal,
+  defaultPrintSet,
   draftFromReceipt,
   draftTotal,
   easternDayKey,
@@ -258,9 +260,38 @@ describe('payments on the paper and in the form', () => {
 });
 
 describe('print sets', () => {
-  it('defaults to a shop copy plus a seller copy, no ID photo', () => {
+  it('defaults to a shop copy plus a seller copy — the shop copy WITH the ID photo once there is one (owner, 2026-10-06)', () => {
     expect(BUY_RECEIPT_PRINT_SETS[BUY_RECEIPT_DEFAULT_PRINT_SET]).toMatchObject({ plain: 1, withId: 0, seller: 1 });
-    expect(resolvePrintCopies(null, true)).toEqual({ plain: 1, withId: 0, seller: 1 });
+    expect(BUY_RECEIPT_PRINT_SETS[BUY_RECEIPT_DEFAULT_PRINT_SET_WITH_ID]).toMatchObject({ plain: 0, withId: 1, seller: 1 });
+    expect(defaultPrintSet(false)).toBe('shop_and_seller');
+    expect(defaultPrintSet(true)).toBe('shop_id_and_seller');
+    // Either way it is one shop copy and one seller's copy: never a third sheet of paper by default.
+    for (const withPhoto of [false, true]) {
+      const set = BUY_RECEIPT_PRINT_SETS[defaultPrintSet(withPhoto)];
+      expect(set.plain + set.withId).toBe(1);
+      expect(set.seller).toBe(1);
+    }
+    // A print request that names no copies gets that default…
+    expect(resolvePrintCopies(null, true)).toEqual({ plain: 0, withId: 1, seller: 1 });
+    expect(resolvePrintCopies({}, true)).toEqual({ plain: 0, withId: 1, seller: 1 });
+    expect(resolvePrintCopies(null, false)).toEqual({ plain: 1, withId: 0, seller: 1 });
+    // …and one that names some is never topped up with a with-ID copy nobody asked for.
+    expect(resolvePrintCopies({ plain: 1 }, true)).toEqual({ plain: 1, withId: 0, seller: 1 });
+    expect(resolvePrintCopies({ plain: 1, withId: 0, seller: 1 }, true)).toEqual({ plain: 1, withId: 0, seller: 1 });
+  });
+  it('every place that prints without being told what asks the one default (form, print panel, Log)', () => {
+    const form = readFileSync(join(process.cwd(), 'src', 'components', 'admin', 'buy-receipts', 'BuyReceiptForm.tsx'), 'utf8');
+    const panel = readFileSync(join(process.cwd(), 'src', 'components', 'admin', 'buy-receipts', 'ReceiptPrintControls.tsx'), 'utf8');
+    const log = readFileSync(join(process.cwd(), 'src', 'components', 'admin', 'buy-receipts', 'BuyReceiptLog.tsx'), 'utf8');
+    // Null until the owner picks, so the default can follow the photo; a pick is kept.
+    expect(form).toContain('useState<BuyReceiptPrintSetKey | null>(null)');
+    expect(form).toContain('chosenSet && printSetAllowed(chosenSet, hasPhoto) ? chosenSet : defaultPrintSet(hasPhoto)');
+    expect(panel).toContain('chosen && printSetAllowed(chosen, hasIdPhoto) ? chosen : defaultPrintSet(hasIdPhoto)');
+    expect(log.match(/BUY_RECEIPT_PRINT_SETS\[defaultPrintSet\(Boolean\(row\.seller_id_photo_path\)\)\]/g)).toHaveLength(2);
+    // The Log's "Print here" really loads the photo it now prints, and refuses to print without it.
+    expect(log).toContain('idPhoto = await printableIdPhoto(row.seller_id_photo_path);');
+    expect(log).toContain('the ID photo could not be loaded, so nothing was printed.');
+    for (const source of [form, panel, log]) expect(source).not.toContain('BUY_RECEIPT_DEFAULT_PRINT_SET');
   });
   it('turns a with-ID shop copy into a plain one when there is no photo, and never prints nothing', () => {
     expect(resolvePrintCopies({ plain: 0, withId: 1, seller: 1 }, true)).toEqual({ plain: 0, withId: 1, seller: 1 });
@@ -455,9 +486,9 @@ describe('buy receipts: database and storage rules', () => {
 describe('buy receipts: routes', () => {
   const files = routeFiles(join(root, 'src', 'app', 'api', 'admin', 'buy-receipts'));
 
-  it('has the eight routes', () => {
-    // The eighth (2026-10-03) starts and ends customer input mode.
-    expect(files).toHaveLength(8);
+  it('has the nine routes', () => {
+    // The eighth (2026-10-03) starts and ends customer input mode; the ninth (2026-10-06) keeps the seller's thumbprint.
+    expect(files).toHaveLength(9);
   });
 
   it('gates every handler on requireAdmin and never reaches for the service role', () => {
@@ -588,6 +619,9 @@ describe('buy receipts: the seller copy by email', () => {
     expect(mailer).toContain("replyTo: 'info@naplesestatejewelry.com'");
     expect(mailer).not.toContain('attachments');
     expect(mailer).not.toContain('seller_id_photo_path');
+    // Nor the thumbprint: neither the mailer nor the email it builds ever reads that column.
+    expect(mailer).not.toContain('seller_thumbprint_path');
+    expect(read('src', 'lib', 'buy-receipt-email.ts')).not.toContain('seller_thumbprint_path');
   });
 });
 

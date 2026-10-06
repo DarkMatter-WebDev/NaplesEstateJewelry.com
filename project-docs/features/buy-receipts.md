@@ -538,14 +538,211 @@ can confirm:
   `http://localhost:3007`. ⛔ It does **not** work on the LAN address
   (`http://10.0.0.208:3007`).
 
+## Seller thumbprint (2026-10-06)
+
+Owner, after buying a SecuGen Hamster Pro 20 reader: *"i want to explore how we
+can use the capture on my buyer form without using the api paid software"*;
+on the mockup: *"print it on the shops paper copy as well... label it seller
+thumbprint.. 1 and 2 mockups look good.."*. 🟡 **Built 2026-10-06, not yet
+deployed, and the folder watch has never run on the owner's laptop** (see
+*Verification* below).
+
+### Why it works the way it does
+
+- SecuGen's own way for a web page to talk to the reader (**SecuGen WebAPI**,
+  a local program the page calls) is free for 60 days and then needs a licence
+  key per site address. Not used.
+- What IS free: the driver and SecuGen's **Device Diagnostic Utility**
+  (`sgdx_v508.exe`, signed by SecuGen; the owner has it on the laptop). Its
+  **File → Save Image (BMP)** writes the captured print as a 300 × 400
+  greyscale BMP (121 KB) and asks only for a folder and a file name. It has no
+  "save automatically" setting, and it asks Windows for administrator
+  permission each time it starts — leave it open for the day.
+- So the print comes in as a **file**, and the form **watches the folder** it is
+  saved into.
+
+### At the counter (Chrome on the Windows laptop)
+
+1. On the form, under the ID photo strip: **Wait for a print**. The first time
+   on a computer, Chrome asks which folder to watch and whether the site may
+   change files in it — pick the folder the prints will be saved into and
+   allow it. Chrome remembers the folder; after a restart it may ask to allow
+   it again.
+2. In the SecuGen window: **Init** (once), seller's thumb on the reader,
+   **Capture** (or tick *Auto Capture*), then **File → Save Image (BMP)** into
+   that folder, any name.
+3. The print appears on the strip by itself within a second or two, and the
+   saved file is **removed from the folder** (a thumbprint left lying in a
+   folder on the laptop helps nobody).
+
+- ⛔ **Only a file saved AFTER the button was pressed is taken.** An older file
+  in the folder is the previous seller's print. So: press the button first,
+  then save. A print saved before the press is attached with **Choose a file**.
+- **Choose a file** does the same by hand (BMP, PNG or JPEG) and is the only
+  button on a browser that cannot watch a folder — the iPad, Safari, Firefox.
+  A receipt started on the iPad gets its print added afterwards from the
+  laptop, on the receipt's own page.
+- While waiting, the strip names the folder and has **Change folder** and
+  **Stop**. A wait nobody finishes stops by itself after ten minutes.
+- Optional, like the ID photo: a receipt saves without one.
+- On a new receipt the print is held in the browser until the receipt is saved
+  (so an abandoned form leaves nothing in storage); if its upload fails the
+  after-save panel says so and offers **Try the thumbprint again**. On a saved
+  receipt it uploads at once.
+- In customer input mode the strip is part of the owner's greyed, switched-off
+  part of the form, like the ID photo strip.
+
+### Where it is kept, and where it is never shown
+
+- ⛔ **Private, exactly like the ID photo:** the same bucket `buy-receipt-ids`,
+  in the receipt's own folder (`receipts/<id>/thumbprint-<uuid>.webp`); the row
+  stores the **path** (`buy_receipts.seller_thumbprint_path`); shown only
+  through a ten-minute signed link.
+- ⛔ **Never on the seller's copy, never in the seller's email, never public.**
+  The sheet drops it for the seller's copy even when it is handed the picture;
+  the email builder never reads the column (a test checks both).
+- Stored as a **lossless** greyscale WebP: the ridges are the record, and a
+  lossy encode smears exactly those. The browser first turns the BMP into a PNG
+  (the server's encoder cannot open a BMP) and checks it really got a PNG; the
+  server checks it really produced WebP.
+- Deleting the receipt removes it (it lives in the folder the delete empties
+  first). **Remove** on the strip deletes it alone. A void receipt keeps it,
+  frozen (route + database trigger).
+
+### On paper
+
+- ⚠️ **The layout below replaced the first build the same day** (owner, on
+  mockup 2: signatures side by side, the pictures side by side under them, the
+  pictures the first thing to move to a second sheet; then *"1 yes second sheet
+  is fine, 2. update plain shop copy to new layout.. if we have thumbprint we
+  will have id photo going forward"*). The first build put the print to the
+  right of two stacked signature lines (1.05 × 1.4 in) and, beside the ID,
+  small under them (0.54 × 0.72 in); none of that is in the code any more.
+- **Every shop copy — and the form, which is that copy — has ONE signature
+  row:** *Seller signature* + *Date* on the left, *Received by* (your printed
+  cursive signature) + *Date* on the right, both lines on one level. The
+  seller's line is 1.77 in on paper. The printed signature is 30 px here
+  (34 px on the seller's copy) so that it fits its line in one piece.
+- **Under that row, side by side:** the ID photo at card size (a copy that
+  asked for it) and the thumbprint, as tall as the ID (1.59 × 2.125 in),
+  labelled *Seller thumbprint*. A copy with only one of them shows that one;
+  a copy with neither shows nothing there.
+- **The pictures come last on the sheet, so they are the first thing to move
+  to a second sheet**, together and whole; the items, the total and both
+  signatures stay on sheet 1. On sheet 2 they start 0.6 in from the top edge
+  (the printer cuts the first half inch).
+- **What fits one sheet** (real PDFs, one-line items, one-line note): with
+  either picture, **2 items**; from 3 to 10 items it is two sheets (never
+  three). With no picture, at least **10 items** (it was 9 with the stacked
+  lines; 12 is two sheets, 11 was not measured). With 0.4 in browser margins
+  (a print dialog adding its own): 5 items with pictures.
+- **The default print choice follows the ID photo** (owner, 2026-10-06:
+  *"switch the default to with-ID when there's a photo"*). No photo: "Shop
+  copy + seller's copy". A photo: "Shop copy with ID photo + seller's copy" —
+  so the ID and the thumbprint come out side by side without anyone choosing.
+  It applies to the form's "What to print" (which switches by itself when a
+  photo is attached, and back when it is removed), the print panel, the Log's
+  two quick buttons, and a print request that names no copies. A choice made
+  by hand is kept. One function: `defaultPrintSet` in `lib/buy-receipts.ts`.
+- Every way of printing carries it: the print panel, the Log's **Print here**,
+  and the Print Station. The panel and the Log refuse to print if the picture
+  cannot be loaded; the station — nobody is there to retry — prints without it
+  and says so in its notice.
+- The receipt's own page shows the shop copy as it is on file, thumbprint
+  included.
+
+### Code
+
+| Piece | File |
+|---|---|
+| Which file in the folder is the new print (pure, tested) | `next-app/src/lib/buy-receipt-thumbprint.ts` |
+| The strip + the folder watch | `components/admin/buy-receipts/ThumbprintField.tsx` |
+| BMP → PNG, upload, remove, print-sized copy | `buy-receipt-client.ts` (`prepareThumbprint`, `uploadThumbprint`, `removeThumbprint`, `printableThumbprint`) |
+| Store / remove | `app/api/admin/buy-receipts/[id]/thumbprint/route.ts` (POST, DELETE) |
+| On the paper | `BuyReceiptSheet.tsx` (`SignatureBlock` = the signature row, `ThumbprintBlock`, `thumbprintSlot`, `thumbprintUrl`) + `.brs-sign-row` / `.brs-sign-seller` / `.brs-sign-shop` / `.brs-pictures` / `.brs-thumbprint` in `buy-receipt-sheet-css.ts` |
+| SQL | `supabase/buy-receipts-thumbprint-2026-10.sql` |
+| Tests (20) | `next-app/src/lib/__tests__/buy-receipt-thumbprint.test.ts` |
+
+### ⛔ Rules
+
+- ⛔ SQL first, then the deploy: `seller_thumbprint_path` is in the one select
+  list every receipt page, the Log and the station use.
+- ⛔ The folder watch takes a file only if it was saved at or after the press
+  (`pickFreshPrint`), and only once its size has stopped changing.
+- ⛔ Never store the thumbprint lossy, never in `product-images`, never behind
+  a public link, never in an email.
+- ⛔ Measure the signature row and the pictures in the PRINT layout (6.5 in of
+  content), not on screen: the screen's paper is an inch wider and the numbers
+  differ. The row's halves (272 : 328, split 170 + 90 and 226 + 90) are sized
+  for paper; under 640 px of screen the halves stack.
+- ⛔ The pictures block stays LAST on the shop copy and keeps `break-inside:
+  avoid` — that is what makes it the first thing to wrap, in one piece. Its
+  `padding-top: 0.6in` + `margin-top: calc(14px - 0.6in)` is not a typo: there
+  is no `@page` margin, a margin is dropped at a page break and padding is not,
+  so the pair is 14 px on sheet 1 and 0.6 in of clear paper on sheet 2.
+- ⛔ The printed signature on a shop copy is 30 px and `nowrap`. At 34 px it is
+  236 px wide; in any line narrower than that it breaks in two and prints over
+  the label above (it did, beside the ID photo, until 2026-10-06). The seller's
+  copy has a full-width line and keeps 34 px.
+- The folder handle is kept in the browser's IndexedDB (`nej-buy-receipts`);
+  nothing about the folder reaches the server.
+- Whether a scanned print on the shop copy satisfies Florida's secondhand-dealer
+  record rule (s. 538.04 asks for the seller's right thumbprint on the
+  transaction form) is for the owner's attorney or the sheriff's office.
+
+### Verification (2026-10-06)
+
+Done, on the dev server, real components on a temporary login-free page
+(deleted; a test fails while it exists), headless Chrome driven over CDP —
+**33/33**:
+
+- The folder watch, against a browser-private test folder standing in for the
+  picked one: an older file is ignored over three looks; a new BMP is attached
+  in under 2 s as a PNG, 300 × 400; that file is removed and the others are
+  left; Stop ends the wait and later files stay; Remove clears it.
+- **Choose a file with the owner's real SecuGen BMP** (8-bit, 300 × 400): read
+  and shown. A file that is not a picture is refused in words.
+- (First build, since replaced: real PDFs of the stacked layout — one page at
+  6 items for the shop copy with a thumbprint, at 4 and 5 for the with-ID copy.)
+- **The layout now in the code (second run, same method — 25 of 27 in the
+  script, the other two read from the PDF by a second script after the first
+  one's pattern failed to match):** one signature row on every shop copy, both
+  lines level, the signature on one line (208 px in a 226 px line) clear of
+  every label, the seller's line 1.77 in; ID and thumbprint side by side 14 px
+  under the row at 3.375 × 2.125 in and 1.59 × 2.125 in; each picture alone
+  when the other is absent; nothing there when neither is.
+- Real PDFs for 1, 2, 3, 4, 6, 8, 10, 12 and 14 items, all five copies: with a
+  picture one sheet at 1–2 items and two at 3–10; the same receipts without
+  pictures one sheet through 10 (so only the pictures moved). Sheet 2 of a
+  4-item receipt, read from its drawing commands: two images and their two
+  labels, the ID at x 98 px / 59 px from the top, the thumbprint beside it at
+  x 445 px / 59 px; sheet 1 has no image but the logo.
+- **The seller's copy is unchanged:** its own block, the 34 px signature on one
+  line, no seller line, no pictures even when both are handed to it.
+- On screen at 1280, 820, 600 and 390 px (the saved receipt) and 1280, 700 and
+  390 px (the form): side by side above 640 px, stacked under it, the
+  signature inside its line, nothing wider than the paper.
+
+⛔ **Not verified — needs the owner:**
+
+- **The real folder picker on the laptop** (Chrome's "which folder" window,
+  its "let the site edit files" question, being remembered next time). The
+  test used a browser-private folder because that window cannot be driven.
+- **The SecuGen program saving into the watched folder**, and the file really
+  being deleted afterwards (the program may keep it open).
+- **Anything behind the admin sign-in:** the upload, the private bucket, the
+  signed link, the SQL. The route was type-checked, linted and built, never
+  called.
+- **Real paper** from the owner's printer.
+
 ## What prints
 
 The **print set** dropdown (form, after-save panel, receipt page):
 
 | Choice | Pages |
 |---|---|
-| Shop copy + seller's copy **(default)** | shop (blank lines) + seller's (signed) |
-| Shop copy with ID photo + seller's copy | shop with the ID + seller's |
+| Shop copy + seller's copy **(default while there is no ID photo)** | shop (blank lines) + seller's (signed) |
+| Shop copy with ID photo + seller's copy **(default once there is an ID photo — 2026-10-06)** | shop with the ID + seller's |
 | Shop copy only | 1 |
 | Shop copy with ID photo only | 1 |
 | Seller's copy only | 1 |
@@ -555,6 +752,13 @@ the shop copy with the ID, the photo sits **beside the signature lines**, at
 card size (3.375 × 2.125 in). ⚠️ With the current margins that copy needs a
 second sheet once a receipt has about five or more items (the signature-and-ID
 block moves whole to the next page); up to four items it is one page.
+⚠️ **That paragraph describes the layout until 2026-10-06 and is no longer
+true.** Since then every shop copy has its signatures in one row and its
+pictures UNDER them (*Seller thumbprint → On paper*): a copy with a picture is
+one sheet up to 2 items and two sheets from 3, by the owner's choice (*"yes
+second sheet is fine"*). The old beside-the-lines layout also had a fault that
+went with it: the cursive signature did not fit its 176 px line there, broke
+into two lines and printed over the "Seller signature" label.
 
 - **Save and send to desktop printer** saves, uploads the photo, then asks the
   print station to print. The laptop then shows *Sent. Waiting for the
@@ -563,8 +767,9 @@ block moves whole to the next page); up to four items it is one page.
   printer PC?*
 - **Print here** prints on the computer you are using (the normal print
   dialog, unless that browser was started with the shortcut below).
-- The Log's **Send to printer** and **Print here** both use the default set (2
-  copies, no ID photo).
+- The Log's **Send to printer** and **Print here** both use the default set: 2
+  copies — and since 2026-10-06 the shop copy is the one WITH the ID photo
+  when the receipt has a photo (*Seller thumbprint → On paper*).
 
 Printing never opens a pop-up window. The receipt is placed in a hidden holder
 directly under the page body, and the print stylesheet hides everything else.
@@ -683,7 +888,9 @@ purchase that was reversed should be **voided**, which keeps the record.
   total, "cannot be undone", "the number will not be used again", and a line
   pointing to Void. Buttons **Keep it** / **Delete this receipt**.
 - Delete is permanent and works on recorded **and** void receipts. The row
-  goes, and so does the seller's ID photo.
+  goes, and so do the seller's ID photo and thumbprint (2026-10-06: the
+  thumbprint lives in the same folder, and the window names whichever the
+  receipt has).
 - ⛔ **The ID photo is removed FIRST** (`DELETE /api/admin/buy-receipts/[id]`).
   The private bucket has no garbage collector, so a photo whose row is gone
   would stay there for ever. If the photo cannot be removed, nothing is
@@ -706,7 +913,12 @@ purchase that was reversed should be **voided**, which keeps the record.
 `supabase/buy-receipts-2026-09.sql` — run once in the Supabase SQL editor
 **before** the deploy. Safe to re-run. Then
 `supabase/buy-receipts-seller-copy-2026-09.sql` (2026-09-30) adds the
-`print_copies_seller` column. The first file creates:
+`print_copies_seller` column, and
+`supabase/buy-receipts-thumbprint-2026-10.sql` (2026-10-06) adds
+`seller_thumbprint_path` plus a small trigger of its own that freezes it on a
+void receipt (its own function, so re-running the first file cannot drop the
+rule; the bucket and its policies are untouched). ⛔ Each of these is run
+**before** the deploy that reads its column. The first file creates:
 
 - `public.buy_receipts` with admin-only RLS (`is_admin_user`) **and** the table
   grant to `authenticated`. Both are required: the admin routes run on
@@ -724,14 +936,15 @@ The file ends with verify queries and says what each should return.
 | Piece | File |
 |---|---|
 | Rules, types, validator, print sets, dates | `next-app/src/lib/buy-receipts.ts` |
-| Tests (52) incl. source guards | `next-app/src/lib/__tests__/buy-receipts.test.ts` |
-| Routes (eight) | `next-app/src/app/api/admin/buy-receipts/` — `route.ts` (POST, GET), `[id]/route.ts` (GET, PUT, DELETE), `[id]/print-request`, `[id]/printed`, `[id]/void`, `[id]/id-photo` (POST, DELETE), `[id]/email`, `customer-mode` (GET, POST, DELETE — see *Customer input mode → Code*) |
+| Tests (53) incl. source guards | `next-app/src/lib/__tests__/buy-receipts.test.ts` |
+| Routes (nine) | `next-app/src/app/api/admin/buy-receipts/` — `route.ts` (POST, GET), `[id]/route.ts` (GET, PUT, DELETE), `[id]/print-request`, `[id]/printed`, `[id]/void`, `[id]/id-photo` (POST, DELETE), `[id]/thumbprint` (POST, DELETE — see *Seller thumbprint → Code*), `[id]/email`, `customer-mode` (GET, POST, DELETE — see *Customer input mode → Code*) |
 | Pages | `next-app/src/app/[locale]/admin/buy-receipts/` — `page.tsx`, `log/`, `[id]/`, `station/` |
 | The paper (edit + print) | `components/admin/buy-receipts/BuyReceiptSheet.tsx` + `buy-receipt-sheet-css.ts` |
 | Printing in place | `components/admin/buy-receipts/BuyReceiptPrintHost.tsx` (`useReceiptPrinter`) |
 | Print set, send, print here, "did it print?" | `components/admin/buy-receipts/ReceiptPrintControls.tsx` |
 | Form / receipt page / log | `BuyReceiptForm.tsx`, `BuyReceiptDetail.tsx`, `BuyReceiptLog.tsx` |
 | Webcam + photo strip | `IdPhotoCapture.tsx`, `IdPhotoField.tsx` |
+| Thumbprint strip + folder watch | `ThumbprintField.tsx`, `next-app/src/lib/buy-receipt-thumbprint.ts` |
 | Browser calls, signed links, print-sized photo | `buy-receipt-client.ts` |
 | Station | `PrintStation.tsx` |
 | Gate + page frame + tabs | `BuyReceiptsShell.tsx`, `BuyReceiptTabs.tsx` — on the New receipt page the FORM draws the tabs (`showTabs={false}` on the shell) so its Customer input mode button can sit at the end of their row; Log, station and the receipt page keep the shell's tabs |

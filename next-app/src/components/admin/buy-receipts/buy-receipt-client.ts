@@ -9,6 +9,7 @@ import {
   type BuyReceiptRow,
 } from '@/lib/buy-receipts';
 import { CUSTOMER_MODE_API } from '@/lib/buy-receipt-customer-mode';
+import { THUMBPRINT_MAX_EDGE_PX } from '@/lib/buy-receipt-thumbprint';
 import { prepareLeadPhotos } from '@/lib/lead-photo-prep';
 
 /**
@@ -159,7 +160,47 @@ export async function prepareIdPhoto(file: File): Promise<Blob> {
   return prepared.files[0] ?? file;
 }
 
-/** A link to the private ID photo that works for ten minutes, or null. */
+export function removeThumbprint(id: string): Promise<ReceiptResult> {
+  return call(`/api/admin/buy-receipts/${id}/thumbprint`, { method: 'DELETE' }, 'Could not remove the thumbprint.');
+}
+
+export function uploadThumbprint(id: string, print: Blob): Promise<ReceiptResult> {
+  const form = new FormData();
+  form.append('print', print, 'seller-thumbprint.png');
+  return call(`/api/admin/buy-receipts/${id}/thumbprint`, { method: 'POST', body: form }, 'The thumbprint did not upload.');
+}
+
+/**
+ * A saved print (the reader's program writes BMP) → a PNG the server can read.
+ *
+ * The server's encoder cannot open a BMP, and the browser can. PNG because it
+ * is lossless: nothing is taken out of the ridges on the way. A chosen file
+ * larger than the reader's own picture is scaled down to `THUMBPRINT_MAX_EDGE_PX`.
+ * Throws when the file is not a picture this browser can open.
+ */
+export async function prepareThumbprint(file: Blob): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  try {
+    const scale = Math.min(1, THUMBPRINT_MAX_EDGE_PX / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('no canvas');
+    // A print with see-through parts must not come out black on paper.
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+    // `toBlob` may quietly produce another type; the upload is named .png, so check.
+    if (!blob || blob.type !== 'image/png') throw new Error('not a PNG');
+    return blob;
+  } finally {
+    bitmap.close();
+  }
+}
+
+/** A link to the private ID photo (or thumbprint — same bucket) that works for ten minutes, or null. */
 export async function signedIdPhotoUrl(path: string | null | undefined): Promise<string | null> {
   if (!path) return null;
   const supabase = createClient();
@@ -172,6 +213,8 @@ export async function signedIdPhotoUrl(path: string | null | undefined): Promise
 
 /** The printed ID is 3.375 in wide; 1200 px is about 350 dpi at that size. */
 const ID_PRINT_MAX_EDGE = 1200;
+/** The printed thumbprint is about an inch wide; the reader's own 300 × 400 passes through untouched. */
+const THUMBPRINT_PRINT_MAX_EDGE = 800;
 
 export type PrintableIdPhoto = { url: string; release: () => void };
 
@@ -186,14 +229,23 @@ export type PrintableIdPhoto = { url: string; release: () => void };
  * `print()` fires, instead of depending on a hidden <img> finishing its load.
  * If anything here fails, the signed link itself is used.
  */
-export async function printableIdPhoto(path: string | null | undefined): Promise<PrintableIdPhoto | null> {
+export function printableIdPhoto(path: string | null | undefined): Promise<PrintableIdPhoto | null> {
+  return printablePicture(path, ID_PRINT_MAX_EDGE);
+}
+
+/** The seller's thumbprint prepared for printing, the same way and for the same reasons. */
+export function printableThumbprint(path: string | null | undefined): Promise<PrintableIdPhoto | null> {
+  return printablePicture(path, THUMBPRINT_PRINT_MAX_EDGE);
+}
+
+async function printablePicture(path: string | null | undefined, maxEdge: number): Promise<PrintableIdPhoto | null> {
   const signed = await signedIdPhotoUrl(path);
   if (!signed) return null;
   try {
     const response = await fetch(signed);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const bitmap = await createImageBitmap(await response.blob());
-    const scale = Math.min(1, ID_PRINT_MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+    const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
     const canvas = document.createElement('canvas');
     canvas.width = Math.max(1, Math.round(bitmap.width * scale));
     canvas.height = Math.max(1, Math.round(bitmap.height * scale));
@@ -211,7 +263,7 @@ export async function printableIdPhoto(path: string | null | undefined): Promise
   }
 }
 
-/** The signed link for a receipt's ID photo, refreshed when the path changes. */
+/** The signed link for a receipt's ID photo (or its thumbprint — same bucket), refreshed when the path changes. */
 export function useIdPhotoUrl(path: string | null | undefined): string | null {
   const [state, setState] = useState<{ path: string; url: string } | null>(null);
 

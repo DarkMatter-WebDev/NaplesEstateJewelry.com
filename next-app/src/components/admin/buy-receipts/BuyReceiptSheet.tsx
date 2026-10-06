@@ -79,6 +79,8 @@ type EditProps = {
   dateIso: string;
   /** The "Seller ID photo" strip: a screen-only control, never printed. */
   idPhotoSlot?: ReactNode;
+  /** The "Seller thumbprint" strip under it (owner, 2026-10-06): a screen-only control too. */
+  thumbprintSlot?: ReactNode;
   /** "Send via email" (owner, 2026-09-30): a screen-only box under the email field. */
   emailCopy?: boolean;
   onEmailCopyChange?: (checked: boolean) => void;
@@ -96,6 +98,8 @@ type PrintProps = {
   variant?: 'shop' | 'seller';
   idPhotoUrl?: string | null;
   showIdPhoto?: boolean;
+  /** The seller's thumbprint (owner, 2026-10-06): drawn under the signatures of a SHOP copy, beside the ID photo when that copy carries one; never on the seller's. */
+  thumbprintUrl?: string | null;
 };
 
 export type BuyReceiptSheetProps = EditProps | PrintProps;
@@ -210,12 +214,21 @@ function SignedBlock({ dateIso }: { dateIso: string }) {
   );
 }
 
-/** The shop copy: the seller signs above the shop's printed signature. */
+/**
+ * The shop copy (and the form, which is that copy): the seller's line and the
+ * shop's printed signature on ONE level, side by side, each with its date
+ * (owner, 2026-10-06 — they were stacked before, and beside the ID photo the
+ * cursive signature did not fit its line and printed over the label above it).
+ */
 function SignatureBlock({ dateIso }: { dateIso: string }) {
   return (
-    <div className="brs-signatures">
-      <SellerSignAndDate />
-      <SignedReceivedBy dateIso={dateIso} />
+    <div className="brs-sign-row">
+      <div className="brs-sign-pair brs-sign-seller">
+        <SellerSignAndDate />
+      </div>
+      <div className="brs-sign-pair brs-sign-shop">
+        <SignedReceivedBy dateIso={dateIso} />
+      </div>
     </div>
   );
 }
@@ -230,6 +243,7 @@ function EditSheet({
   receiptNumber,
   dateIso,
   idPhotoSlot,
+  thumbprintSlot,
   emailCopy = false,
   onEmailCopyChange,
   mailingList = false,
@@ -295,11 +309,12 @@ function EditSheet({
   const balance = paymentsBalance(draft);
   const split = draft.payments.length > 1;
 
-  // Everything under the seller's boxes — the ID photo strip, the items, the money, the notes, the
-  // signatures. One piece, so the seller's view can switch the whole of it off at once.
+  // Everything under the seller's boxes — the ID photo and thumbprint strips, the items, the money,
+  // the notes, the signatures. One piece, so the seller's view can switch the whole of it off at once.
   const ownerPart = (
     <>
       {idPhotoSlot}
+      {thumbprintSlot}
 
       <h2 className="sheet-section-title">Items purchased by {BUSINESS_NAME}</h2>
       <table className="brs-items">
@@ -509,10 +524,23 @@ function EditSheet({
   );
 }
 
-function PrintSheet({ receipt, idPhotoUrl, showIdPhoto, variant = 'shop' }: PrintProps) {
+/** The seller's thumbprint on a shop copy, as tall as the ID photo it sits beside. */
+function ThumbprintBlock({ url }: { url: string }) {
+  return (
+    <div className="brs-thumbprint">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={url} alt="Seller thumbprint" loading="eager" />
+      <span className="brs-label brs-sign-label">Seller thumbprint</span>
+    </div>
+  );
+}
+
+function PrintSheet({ receipt, idPhotoUrl, showIdPhoto, thumbprintUrl, variant = 'shop' }: PrintProps) {
   const items = receipt.items ?? [];
   const sellerCopy = variant === 'seller';
   const withId = !sellerCopy && Boolean(showIdPhoto && idPhotoUrl);
+  // The seller's copy never carries the thumbprint either.
+  const thumbprint = !sellerCopy && thumbprintUrl ? thumbprintUrl : null;
   const cityStateZip = [[receipt.seller_city, receipt.seller_state].filter(Boolean).join(', '), receipt.seller_zip]
     .filter(Boolean)
     .join(' ');
@@ -575,26 +603,22 @@ function PrintSheet({ receipt, idPhotoUrl, showIdPhoto, variant = 'shop' }: Prin
 
       <p className="brs-attest">{BUY_RECEIPT_ATTESTATION}</p>
       {sellerCopy && <SignedBlock dateIso={receipt.created_at} />}
-      {withId && (
-        // File copy: the ID sits BESIDE the signature lines, at card size, so the
-        // copy still fits one page (under them it ran onto a second sheet).
-        <div className="brs-sign-with-id">
-          <div className="brs-sign-stack">
-            <div className="brs-sign-pair">
-              <SellerSignAndDate />
+      {!sellerCopy && <SignatureBlock dateIso={receipt.created_at} />}
+      {/* The pictures this copy carries, side by side UNDER the signatures (owner, 2026-10-06). They are
+          the last thing on the sheet on purpose: when a receipt is too long for one page they are the
+          first thing to move to a second sheet, together, and the signatures stay with the items. */}
+      {(withId || thumbprint) && (
+        <div className="brs-pictures">
+          {withId && (
+            <div className="brs-id">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={idPhotoUrl ?? undefined} alt="Seller ID" loading="eager" />
+              <span className="brs-label brs-sign-label">Seller ID · file copy only</span>
             </div>
-            <div className="brs-sign-pair">
-              <SignedReceivedBy dateIso={receipt.created_at} />
-            </div>
-          </div>
-          <div className="brs-id">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={idPhotoUrl ?? undefined} alt="Seller ID" loading="eager" />
-            <span className="brs-label brs-sign-label">Seller ID · file copy only</span>
-          </div>
+          )}
+          {thumbprint && <ThumbprintBlock url={thumbprint} />}
         </div>
       )}
-      {!sellerCopy && !withId && <SignatureBlock dateIso={receipt.created_at} />}
 
       {/* The thank-you line is for the seller; the shop copy stays in the shop and needs the room. */}
       {sellerCopy && <p className="brs-thanks">Thank you for choosing {BUSINESS_NAME}.</p>}

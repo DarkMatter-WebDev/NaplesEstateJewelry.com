@@ -467,7 +467,7 @@ describe('customer input mode: the owner\'s form, the paper and the seller\'s vi
     // Everything below the seller's boxes — ID photo, items, money, notes, signatures — in one disabled, inert fieldset.
     expect(sheet).toContain('<fieldset className="brs-off brs-rest" disabled inert>\n          {ownerPart}\n        </fieldset>');
     const ownerPart = sheet.slice(sheet.indexOf('const ownerPart = ('), sheet.indexOf('  return (\n    <div className="buy-receipt-sheet">\n      <Header receiptNumber={receiptNumber}'));
-    for (const piece of ['{idPhotoSlot}', 'className="brs-items"', 'onClick={addItem}', 'className="brs-total"', 'className="brs-pay"', 'className="brs-notes"', '{BUY_RECEIPT_ATTESTATION}', '<SignatureBlock dateIso={dateIso} />']) {
+    for (const piece of ['{idPhotoSlot}', '{thumbprintSlot}', 'className="brs-items"', 'onClick={addItem}', 'className="brs-total"', 'className="brs-pay"', 'className="brs-notes"', '{BUY_RECEIPT_ATTESTATION}', '<SignatureBlock dateIso={dateIso} />']) {
       expect(ownerPart, piece).toContain(piece);
     }
     // …and none of the seller's boxes are in that piece.

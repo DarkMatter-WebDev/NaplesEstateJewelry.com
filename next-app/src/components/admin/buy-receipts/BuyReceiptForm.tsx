@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  BUY_RECEIPT_DEFAULT_PRINT_SET,
   BUY_RECEIPT_ONE_PAGE_LINES,
   blankBuyReceiptDraft,
+  defaultPrintSet,
   draftPaperLines,
   normalizeBuyReceiptInput,
   paymentsLine,
@@ -27,17 +27,19 @@ import BuyReceiptSheet, { type BuyReceiptCustomerView } from './BuyReceiptSheet'
 import BuyReceiptTabs from './BuyReceiptTabs';
 import IdPhotoField from './IdPhotoField';
 import ReceiptPrintControls, { PrintSetSelect, printSetAllowed } from './ReceiptPrintControls';
-import { createReceipt, emailReceipt, startCustomerMode, uploadIdPhoto } from './buy-receipt-client';
+import ThumbprintField from './ThumbprintField';
+import { createReceipt, emailReceipt, startCustomerMode, uploadIdPhoto, uploadThumbprint } from './buy-receipt-client';
 import { CUSTOMER_MODE_PAGE_CSS } from './buy-receipt-customer-css';
 
 /**
  * Admin → Buy Receipts → New receipt (owner mockups 2026-09-29/30).
  *
  * The form IS the receipt: the paper with underlined fields, and one row of
- * buttons under it. Saving goes: receipt → ID photo → print. The photo is held
- * in the browser until the receipt exists, so an abandoned form leaves nothing
- * behind in storage; and a photo that fails to upload never costs the receipt —
- * the after-save panel says so and offers a retry.
+ * buttons under it. Saving goes: receipt → ID photo → thumbprint → print. The
+ * photo and the thumbprint (owner, 2026-10-06) are held in the browser until
+ * the receipt exists, so an abandoned form leaves nothing behind in storage;
+ * and one that fails to upload never costs the receipt — the after-save panel
+ * says so and offers a retry.
  *
  * "Customer input mode" (owner, 2026-10-03) is OPTIONAL: one small button on
  * the tabs row hands the tablet to the seller. They see this same paper,
@@ -78,12 +80,16 @@ export default function BuyReceiptForm({
 }) {
   const [draft, setDraft] = useState<BuyReceiptDraft>(() => initialDraft ?? blankBuyReceiptDraft());
   const [photo, setPhoto] = useState<{ blob: Blob; url: string } | null>(null);
-  const [chosenSet, setChosenSet] = useState<BuyReceiptPrintSetKey>(BUY_RECEIPT_DEFAULT_PRINT_SET);
+  const [thumbprint, setThumbprint] = useState<{ blob: Blob; url: string } | null>(null);
+  /** What the owner picked in "What to print"; null until they pick, so the default can follow the ID photo. */
+  const [chosenSet, setChosenSet] = useState<BuyReceiptPrintSetKey | null>(null);
   const [busy, setBusy] = useState<Action | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<Saved | null>(null);
   const [photoFailed, setPhotoFailed] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
+  const [thumbprintFailed, setThumbprintFailed] = useState<string | null>(null);
+  const [retryingThumbprint, setRetryingThumbprint] = useState(false);
   const [emailCopy, setEmailCopy] = useState(false);
   const [emailState, setEmailState] = useState<EmailState>(null);
   const [emailing, setEmailing] = useState(false);
@@ -99,7 +105,8 @@ export default function BuyReceiptForm({
   const [handBackReason, setHandBackReason] = useState<CustomerHandBackReason | null>(null);
 
   const hasPhoto = photo !== null;
-  const setKey = printSetAllowed(chosenSet, hasPhoto) ? chosenSet : BUY_RECEIPT_DEFAULT_PRINT_SET;
+  // Nobody picked (or the pick needs a photo that is gone): the default — with the ID photo as soon as there is one.
+  const setKey = chosenSet && printSetAllowed(chosenSet, hasPhoto) ? chosenSet : defaultPrintSet(hasPhoto);
 
   useEffect(() => {
     const url = photo?.url;
@@ -107,6 +114,13 @@ export default function BuyReceiptForm({
       if (url) URL.revokeObjectURL(url);
     };
   }, [photo]);
+
+  useEffect(() => {
+    const url = thumbprint?.url;
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [thumbprint]);
 
   useEffect(() => {
     // A refresh in customer input mode: bring back what was typed (the owner's
@@ -152,10 +166,16 @@ export default function BuyReceiptForm({
     setPhoto({ blob, url: URL.createObjectURL(blob) });
   }
 
+  function pickThumbprint(blob: Blob) {
+    setThumbprint({ blob, url: URL.createObjectURL(blob) });
+  }
+
   function startOver() {
     setDraft(blankBuyReceiptDraft());
     setPhoto(null);
-    setChosenSet(BUY_RECEIPT_DEFAULT_PRINT_SET);
+    setThumbprint(null);
+    setThumbprintFailed(null);
+    setChosenSet(null);
     setError(null);
     setSaved(null);
     setPhotoFailed(null);
@@ -235,8 +255,15 @@ export default function BuyReceiptForm({
       if ('error' in uploaded) setPhotoFailed(uploaded.error);
       else receipt = uploaded.receipt;
     }
+    if (thumbprint) {
+      const uploaded = await uploadThumbprint(receipt.id, thumbprint.blob);
+      if ('error' in uploaded) setThumbprintFailed(uploaded.error);
+      else receipt = uploaded.receipt;
+    }
 
-    const usableSet = printSetAllowed(setKey, Boolean(receipt.seller_id_photo_path)) ? setKey : BUY_RECEIPT_DEFAULT_PRINT_SET;
+    // The photo may have failed to upload: a with-ID choice then falls back to the plain default.
+    const savedWithPhoto = Boolean(receipt.seller_id_photo_path);
+    const usableSet = printSetAllowed(setKey, savedWithPhoto) ? setKey : defaultPrintSet(savedWithPhoto);
     setSaved({ receipt, action: action === 'save' ? null : action, setKey: usableSet });
     setBusy(null);
   }
@@ -251,6 +278,19 @@ export default function BuyReceiptForm({
       return;
     }
     setPhotoFailed(null);
+    setSaved({ ...saved, receipt: uploaded.receipt });
+  }
+
+  async function retryThumbprint() {
+    if (!saved || !thumbprint || retryingThumbprint) return;
+    setRetryingThumbprint(true);
+    const uploaded = await uploadThumbprint(saved.receipt.id, thumbprint.blob);
+    setRetryingThumbprint(false);
+    if ('error' in uploaded) {
+      setThumbprintFailed(uploaded.error);
+      return;
+    }
+    setThumbprintFailed(null);
     setSaved({ ...saved, receipt: uploaded.receipt });
   }
 
@@ -281,6 +321,7 @@ export default function BuyReceiptForm({
       receiptNumber={null}
       dateIso={nowIso}
       idPhotoSlot={<IdPhotoField previewUrl={photo?.url ?? null} onPick={pickPhoto} onRemove={() => setPhoto(null)} />}
+      thumbprintSlot={<ThumbprintField previewUrl={thumbprint?.url ?? null} onPick={pickThumbprint} onRemove={() => setThumbprint(null)} />}
       emailCopy={emailCopy}
       onEmailCopyChange={setEmailCopy}
       mailingList={mailingList}
@@ -337,6 +378,7 @@ export default function BuyReceiptForm({
           <div className="flex justify-between gap-3"><span style={hintStyle}>Items</span><span className="text-right">{receipt.items.length}</span></div>
           <div className="flex justify-between gap-3"><span style={hintStyle}>Paid by</span><span className="text-right">{paymentsLine(receipt.payments)}</span></div>
           <div className="flex justify-between gap-3"><span style={hintStyle}>ID photo</span><span className="text-right">{receipt.seller_id_photo_path ? 'Attached' : 'None'}</span></div>
+          <div className="flex justify-between gap-3"><span style={hintStyle}>Thumbprint</span><span className="text-right">{receipt.seller_thumbprint_path ? 'Attached' : 'None'}</span></div>
           <div className="flex items-center justify-between gap-3">
             <span style={hintStyle}>Email</span>
             <span className="flex items-center gap-2 text-right">
@@ -372,6 +414,15 @@ export default function BuyReceiptForm({
             <span>The receipt is saved, but the ID photo did not upload. {photoFailed}</span>
             <button type="button" className="outline-button text-xs justify-self-start" disabled={retrying} onClick={() => void retryPhoto()}>
               {retrying ? 'Uploading…' : 'Try the photo again'}
+            </button>
+          </div>
+        )}
+
+        {thumbprintFailed && (
+          <div role="alert" className="grid gap-2 rounded-[1.25rem] border p-4 text-sm" style={{ borderColor: 'var(--color-error)', color: 'var(--color-error)' }}>
+            <span>The receipt is saved, but the thumbprint did not upload. {thumbprintFailed}</span>
+            <button type="button" className="outline-button text-xs justify-self-start" disabled={retryingThumbprint} onClick={() => void retryThumbprint()}>
+              {retryingThumbprint ? 'Uploading…' : 'Try the thumbprint again'}
             </button>
           </div>
         )}
@@ -473,7 +524,7 @@ export default function BuyReceiptForm({
           </button>
         </div>
         <p className="text-xs" style={hintStyle}>
-          The number is assigned when the receipt is saved. The buttons and the ID photo strip are not printed.
+          The number is assigned when the receipt is saved. The buttons and the ID photo and thumbprint strips are not printed; the thumbprint itself prints on the shop copy only.
         </p>
       </div>
     </form>

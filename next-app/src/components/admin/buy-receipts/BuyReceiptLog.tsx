@@ -7,8 +7,8 @@ import { AppIcon } from '@/components/AppIcon';
 import { createClient } from '@/lib/supabase/client';
 import {
   BUY_RECEIPT_COLUMNS,
-  BUY_RECEIPT_DEFAULT_PRINT_SET,
   BUY_RECEIPT_PRINT_SETS,
+  defaultPrintSet,
   formatReceiptDate,
   formatReceiptTime,
   isPrintPending,
@@ -20,15 +20,16 @@ import {
 } from '@/lib/buy-receipts';
 import { formatCurrency } from '@/types/sales';
 import { useReceiptPrinter } from './BuyReceiptPrintHost';
-import { deleteReceipt, markPrinted, requestPrint } from './buy-receipt-client';
+import { deleteReceipt, markPrinted, printableIdPhoto, printableThumbprint, requestPrint, type PrintableIdPhoto } from './buy-receipt-client';
 
 /**
  * Admin → Buy Receipts → Log: every saved receipt, newest first. Search by
  * number, seller or phone. A row opens the receipt (print options, edit, void,
  * duplicate). "Send to printer" and "Print here" (owner, 2026-09-30) are quick
- * enough to keep on the row; both use the default set — a shop copy and a seller's copy.
+ * enough to keep on the row; both use the default set — a shop copy and a seller's copy,
+ * the shop copy WITH the ID photo when the receipt has one (owner, 2026-10-06).
  *
- * "Delete" (owner, 2026-10-03) removes a receipt for good, with its ID photo —
+ * "Delete" (owner, 2026-10-03) removes a receipt for good, with its ID photo and thumbprint —
  * for test and mistaken entries. It always asks first, in the same pop-up
  * window Void uses, and says that Void is the one that keeps the record.
  *
@@ -46,6 +47,12 @@ const WATCH_SLOW_EVERY_MS = 15_000;
 const WATCH_FAST_FOR_MS = 2 * 60_000;
 const WATCH_FOR_MS = 30 * 60_000;
 const hintStyle = { color: 'var(--color-on-surface-variant)' } as const;
+
+/** What goes with a deleted receipt, for the confirmation window: its ID photo, its thumbprint, both or neither. */
+function deletedWith(row: Pick<BuyReceiptRow, 'seller_id_photo_path' | 'seller_thumbprint_path'>): string {
+  const kept = [row.seller_id_photo_path ? 'ID photo' : null, row.seller_thumbprint_path ? 'thumbprint' : null].filter(Boolean);
+  return kept.length > 0 ? `, together with its ${kept.join(' and ')}` : '';
+}
 
 function Tag({ children, tone }: { children: React.ReactNode; tone: 'gold' | 'red' | 'grey' | 'green' }) {
   const tones = {
@@ -161,7 +168,7 @@ export default function BuyReceiptLog({ adminBasePath, initialRows }: { adminBas
     if (sendingId) return;
     setSendingId(row.id);
     setError(null);
-    const set = BUY_RECEIPT_PRINT_SETS[BUY_RECEIPT_DEFAULT_PRINT_SET];
+    const set = BUY_RECEIPT_PRINT_SETS[defaultPrintSet(Boolean(row.seller_id_photo_path))];
     const result = await requestPrint(row.id, { plain: set.plain, withId: set.withId, seller: set.seller });
     setSendingId(null);
     if ('error' in result) {
@@ -175,9 +182,27 @@ export default function BuyReceiptLog({ adminBasePath, initialRows }: { adminBas
     if (sendingId || printingId) return;
     setPrintingId(row.id);
     setError(null);
+    let idPhoto: PrintableIdPhoto | null = null;
+    let thumbprint: PrintableIdPhoto | null = null;
     try {
-      const set = BUY_RECEIPT_PRINT_SETS[BUY_RECEIPT_DEFAULT_PRINT_SET];
-      const pages = await printer.print(row, { plain: set.plain, withId: 0, seller: set.seller }, null);
+      // The default set: with the ID photo when the receipt has one.
+      const set = BUY_RECEIPT_PRINT_SETS[defaultPrintSet(Boolean(row.seller_id_photo_path))];
+      if (set.withId > 0) {
+        idPhoto = await printableIdPhoto(row.seller_id_photo_path);
+        if (!idPhoto) {
+          setError(`${row.receipt_number}: the ID photo could not be loaded, so nothing was printed.`);
+          return;
+        }
+      }
+      // The shop copy carries the seller's thumbprint when the receipt has one.
+      if (set.plain + set.withId > 0 && row.seller_thumbprint_path) {
+        thumbprint = await printableThumbprint(row.seller_thumbprint_path);
+        if (!thumbprint) {
+          setError(`${row.receipt_number}: the thumbprint could not be loaded, so nothing was printed.`);
+          return;
+        }
+      }
+      const pages = await printer.print(row, { plain: set.plain, withId: set.withId, seller: set.seller }, idPhoto?.url ?? null, thumbprint?.url ?? null);
       if (pages <= 0) return;
       const result = await markPrinted(row.id, pages);
       if ('error' in result) {
@@ -186,6 +211,8 @@ export default function BuyReceiptLog({ adminBasePath, initialRows }: { adminBas
       }
       setRows((current) => current.map((item) => (item.id === row.id ? result.receipt : item)));
     } finally {
+      idPhoto?.release();
+      thumbprint?.release();
       setPrintingId(null);
     }
   }
@@ -360,7 +387,7 @@ export default function BuyReceiptLog({ adminBasePath, initialRows }: { adminBas
               {deleting.seller_name} · {formatReceiptDate(deleting.created_at)} · {formatCurrency(deleting.total)}
             </p>
             <p className="text-sm" style={hintStyle}>
-              This removes the receipt from the log for good{deleting.seller_id_photo_path ? ', together with its ID photo' : ''}. It cannot be
+              This removes the receipt from the log for good{deletedWith(deleting)}. It cannot be
               undone, and the number {deleting.receipt_number} will not be used again.
             </p>
             <p className="text-sm" style={hintStyle}>

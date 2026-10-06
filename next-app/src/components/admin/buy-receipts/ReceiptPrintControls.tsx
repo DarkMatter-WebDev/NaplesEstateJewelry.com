@@ -4,15 +4,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import {
   BUY_RECEIPT_COLUMNS,
-  BUY_RECEIPT_DEFAULT_PRINT_SET,
   BUY_RECEIPT_PRINT_SETS,
   BUY_RECEIPT_PRINT_SET_KEYS,
+  defaultPrintSet,
   isPrintPending,
   type BuyReceiptPrintSetKey,
   type BuyReceiptRow,
 } from '@/lib/buy-receipts';
 import { useReceiptPrinter } from './BuyReceiptPrintHost';
-import { markPrinted, printableIdPhoto, requestPrint, type PrintableIdPhoto } from './buy-receipt-client';
+import { markPrinted, printableIdPhoto, printableThumbprint, requestPrint, type PrintableIdPhoto } from './buy-receipt-client';
 
 /**
  * Printing a SAVED receipt: which copies, "Send to desktop printer" and
@@ -69,19 +69,21 @@ export function PrintSetSelect({
 export default function ReceiptPrintControls({
   receipt,
   onChanged,
-  initialSet = BUY_RECEIPT_DEFAULT_PRINT_SET,
+  initialSet,
   autoAction = null,
 }: {
   receipt: BuyReceiptRow;
   onChanged: (receipt: BuyReceiptRow) => void;
+  /** The set already picked on the form. Left out (the receipt's own page): the default, which follows the ID photo. */
   initialSet?: BuyReceiptPrintSetKey;
   /** Do this once as soon as the panel appears (the form's "Save and send" / "Print here"). */
   autoAction?: 'send' | 'print' | null;
 }) {
   const hasIdPhoto = Boolean(receipt.seller_id_photo_path);
-  const [chosen, setChosen] = useState<BuyReceiptPrintSetKey>(initialSet);
-  // A with-ID set chosen before the photo was removed falls back to the default.
-  const setKey = printSetAllowed(chosen, hasIdPhoto) ? chosen : BUY_RECEIPT_DEFAULT_PRINT_SET;
+  const [chosen, setChosen] = useState<BuyReceiptPrintSetKey | null>(initialSet ?? null);
+  // Nobody picked, or a with-ID set was picked before the photo was removed: the default — the shop
+  // copy WITH the ID photo as soon as the receipt has one (owner, 2026-10-06).
+  const setKey = chosen && printSetAllowed(chosen, hasIdPhoto) ? chosen : defaultPrintSet(hasIdPhoto);
   const copies = BUY_RECEIPT_PRINT_SETS[setKey];
 
   const [busy, setBusy] = useState<'send' | 'print' | null>(null);
@@ -114,13 +116,27 @@ export default function ReceiptPrintControls({
     setBusy('print');
     setError(null);
     let idPhoto: PrintableIdPhoto | null = null;
+    let thumbprint: PrintableIdPhoto | null = null;
     try {
       idPhoto = copies.withId > 0 ? await printableIdPhoto(receipt.seller_id_photo_path) : null;
       if (copies.withId > 0 && !idPhoto) {
         setError('The ID photo could not be loaded, so nothing was printed.');
         return;
       }
-      const pages = await printReceipt(receipt, { plain: copies.plain, withId: copies.withId, seller: copies.seller }, idPhoto?.url ?? null);
+      // The thumbprint goes on every shop copy; a set with only the seller's copy does not need it.
+      if (copies.plain + copies.withId > 0 && receipt.seller_thumbprint_path) {
+        thumbprint = await printableThumbprint(receipt.seller_thumbprint_path);
+        if (!thumbprint) {
+          setError('The thumbprint could not be loaded, so nothing was printed.');
+          return;
+        }
+      }
+      const pages = await printReceipt(
+        receipt,
+        { plain: copies.plain, withId: copies.withId, seller: copies.seller },
+        idPhoto?.url ?? null,
+        thumbprint?.url ?? null,
+      );
       if (pages > 0) {
         const result = await markPrinted(receipt.id, pages);
         if ('error' in result) setError(result.error);
@@ -128,6 +144,7 @@ export default function ReceiptPrintControls({
       }
     } finally {
       idPhoto?.release();
+      thumbprint?.release();
       setBusy(null);
     }
   }, [receipt, copies.plain, copies.withId, copies.seller, printReceipt]);

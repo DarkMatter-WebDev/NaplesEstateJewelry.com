@@ -237,16 +237,42 @@ export const BUY_RECEIPT_SHEET_CSS = `
 .buy-receipt-sheet .brs-signature { font-size: 34px; line-height: 1; color: #1f2540; }
 .buy-receipt-sheet .brs-signature-date { font-size: 13px; line-height: 1.2; }
 
-.buy-receipt-sheet .brs-sign-with-id {
+/* The SHOP copy's signatures (owner, 2026-10-06): the seller's line and the shop's printed signature
+   on ONE level, side by side, each with its date. The halves are 272 : 328 and split 170 + 90 and
+   226 + 90, measured for the printed page (6.5 in of content): the seller keeps a 1.77 in line to
+   sign on, and the cursive signature fits its own line at 30px (208px wide in 226px) — at the 34px
+   it has on the seller's copy it is 236px and broke into two lines over the label above it. Both
+   lines are 40px tall so they sit on one level. (.brs-signatures, above, is now the seller's copy
+   only: one signature, full width, 34px.) */
+.buy-receipt-sheet .brs-sign-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 3.375in;
+  grid-template-columns: 272fr 328fr;
   gap: 24px;
-  align-items: start;
   margin-top: 14px;
   break-inside: avoid;
 }
-.buy-receipt-sheet .brs-sign-stack { display: grid; gap: 12px; }
-.buy-receipt-sheet .brs-sign-pair { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; }
+.buy-receipt-sheet .brs-sign-pair { display: grid; gap: 12px; align-items: start; }
+.buy-receipt-sheet .brs-sign-seller { grid-template-columns: 170fr 90fr; }
+.buy-receipt-sheet .brs-sign-shop { grid-template-columns: 226fr 90fr; }
+.buy-receipt-sheet .brs-sign-row .brs-sign-line { height: 40px; }
+.buy-receipt-sheet .brs-sign-row .brs-signature { font-size: 30px; white-space: nowrap; }
+
+/* The pictures a shop copy carries — the ID photo (a copy that asked for it) and the seller's
+   thumbprint — side by side UNDER the signatures (owner, 2026-10-06). They come last so that on a
+   long receipt they are the first thing to move to a second sheet; break-inside keeps the two
+   together and whole.
+   The padding/negative-margin pair: there is no @page margin (see the print host), so a block that
+   starts a new page starts at the paper's very edge, where the owner's printer cuts. A margin is
+   dropped at a page break and padding is not — so on the first sheet the two cancel to the normal
+   14px gap, and on a second sheet the pictures start 0.6in down. Read back from the PDF, 2026-10-06. */
+.buy-receipt-sheet .brs-pictures {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  break-inside: avoid;
+  padding-top: 0.6in;
+  margin-top: calc(14px - 0.6in);
+}
 .buy-receipt-sheet .brs-id img {
   display: block;
   width: 3.375in;
@@ -255,6 +281,19 @@ export const BUY_RECEIPT_SHEET_CSS = `
   object-fit: contain;
   background: #fbf9f2;
 }
+
+/* The seller's thumbprint (owner, 2026-10-06): SHOP copies only. As tall as the ID card it sits
+   beside (the reader's picture is 3 : 4, so 1.59 x 2.125 in), and the same size when a copy carries
+   no ID photo. */
+.buy-receipt-sheet .brs-thumbprint img {
+  display: block;
+  width: 1.59375in;
+  height: 2.125in;
+  border: 1px solid #d5c697;
+  object-fit: contain;
+  background: #ffffff;
+}
+.buy-receipt-sheet .brs-thumbprint .brs-label { white-space: nowrap; }
 
 .buy-receipt-sheet .brs-thanks { margin: 12px 0 0; text-align: center; font-size: 11px; color: #746b5b; }
 
@@ -313,6 +352,12 @@ export const BUY_RECEIPT_SHEET_CSS = `
   .buy-receipt-sheet .brs-grid > .brs-c5, .buy-receipt-sheet .brs-grid > .brs-c6 { grid-column: span 12; }
 }
 
+/* Under 640px the shop's half of the signature row is narrower than the signature itself (it needs
+   a 220px line): the seller's line, then the shop's, one under the other. screen ONLY, as above. */
+@media screen and (max-width: 640px) {
+  .buy-receipt-sheet .brs-sign-row { grid-template-columns: 1fr; gap: 14px; }
+}
+
 /* Phone (owner, 2026-09-30: usable on tablet and mobile too). One field per row;
    each item row becomes a small block — description across, then qty, amount and
    the remove button; each payment row the same. */
@@ -352,7 +397,9 @@ export const BUY_RECEIPT_SHEET_CSS = `
   .buy-receipt-sheet .brs-pay-row > span:empty { display: none; }
   .buy-receipt-sheet .brs-total { gap: 12px; }
   .buy-receipt-sheet .brs-signatures { grid-template-columns: 1fr; gap: 14px; }
-  .buy-receipt-sheet .brs-signature { font-size: 28px; }
+  .buy-receipt-sheet .brs-pictures { flex-wrap: wrap; }
+  .buy-receipt-sheet .brs-signature,
+  .buy-receipt-sheet .brs-sign-row .brs-signature { font-size: 28px; }
 }
 
 /* Touch screens: 16px inputs, or iOS zooms the page on every tap into a field. */
@@ -390,8 +437,10 @@ export const BUY_RECEIPT_PRINT_HOST_CSS = `
     margin: 0;
     /* The paper's own margin (there is no @page margin, see above). The owner's printer cut the
        edges at half an inch; they asked for bigger again after 0.7 in (2026-09-30). */
-    /* Top 0.85in (owner: more room at the top), bottom 0.45in, sides 1in. Not more in total: a six-item
-       file copy with the ID must still fit one page (0.9 + 0.5 spilled it). */
+    /* Top 0.85in (owner: more room at the top), bottom 0.45in, sides 1in. Not more in total: every
+       tenth of an inch here is paper the receipt cannot use. (The old reason — a file copy with the
+       ID beside its signature lines had to fit one page — went with that layout on 2026-10-06: the
+       pictures now sit under the signatures and move to a second sheet when they do not fit.) */
     padding: 0.85in 1in 0.45in;
     border: 0;
     box-shadow: none;

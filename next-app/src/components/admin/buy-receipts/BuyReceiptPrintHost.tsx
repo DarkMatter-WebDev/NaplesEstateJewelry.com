@@ -88,13 +88,15 @@ function printOnce(): Promise<{ blockedMs: number }> {
 
 /** One sheet per entry, in print order. */
 type PrintSheet = { variant: 'shop' | 'seller'; showIdPhoto: boolean };
-type PrintView = { receipt: BuyReceiptRow; idPhotoUrl: string | null; sheets: PrintSheet[] };
+type PrintView = { receipt: BuyReceiptRow; idPhotoUrl: string | null; thumbprintUrl: string | null; sheets: PrintSheet[] };
 
 /**
- * `print(receipt, copies, idPhotoUrl)` sends ONE print job with one page per
+ * `print(receipt, copies, idPhotoUrl, thumbprintUrl)` sends ONE print job with one page per
  * copy — shop copies first (plain, then with the ID photo), then the seller's
  * copies with the printed signature — and resolves with how many pages were sent. (One job per copy, the
  * first version, meant the printer paused between copies; owner, 2026-09-30.)
+ * The thumbprint, when there is one, is drawn on every SHOP copy; the sheet
+ * itself keeps it off the seller's.
  * Render `host` somewhere in the component — it is the printout.
  *
  * No requestAnimationFrame anywhere: a covered or minimised window stops
@@ -117,7 +119,7 @@ export function useReceiptPrinter() {
   }, []);
 
   const print = useCallback(
-    async (receipt: BuyReceiptRow, copies: BuyReceiptCopies, idPhotoUrl: string | null): Promise<number> => {
+    async (receipt: BuyReceiptRow, copies: BuyReceiptCopies, idPhotoUrl: string | null, thumbprintUrl: string | null = null): Promise<number> => {
       if (busyRef.current) return 0;
       busyRef.current = true;
       let printed = 0;
@@ -131,7 +133,7 @@ export function useReceiptPrinter() {
         ];
         if (sheets.length > 0 && aliveRef.current) {
           // Commit every page to the DOM before looking for their images.
-          flushSync(() => setView({ receipt, idPhotoUrl, sheets }));
+          flushSync(() => setView({ receipt, idPhotoUrl, thumbprintUrl, sheets }));
           const host = document.querySelector('.buy-receipt-print-host');
           await Promise.all([waitForImages(host ? Array.from(host.querySelectorAll('img')) : []), ensureSignatureFont()]);
           await waitForPrintLayout(window);
@@ -153,7 +155,7 @@ export function useReceiptPrinter() {
   const host = view ? (
     <BuyReceiptPrintHost>
       {view.sheets.map((sheet, index) => (
-        <BuyReceiptSheet key={index} mode="print" variant={sheet.variant} receipt={view.receipt} idPhotoUrl={view.idPhotoUrl} showIdPhoto={sheet.showIdPhoto} />
+        <BuyReceiptSheet key={index} mode="print" variant={sheet.variant} receipt={view.receipt} idPhotoUrl={view.idPhotoUrl} showIdPhoto={sheet.showIdPhoto} thumbprintUrl={view.thumbprintUrl} />
       ))}
     </BuyReceiptPrintHost>
   ) : null;

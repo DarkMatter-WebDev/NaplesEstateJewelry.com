@@ -822,6 +822,7 @@ Detail and the desktop shortcut: `features/buy-receipts.md`.
 Laptop (admin form)                      Supabase                         Desktop (Print station tab)
   POST /api/admin/buy-receipts   ──►  buy_receipts row
   POST …/[id]/id-photo           ──►  Storage: buy-receipt-ids (PRIVATE)
+  POST …/[id]/thumbprint         ──►  same bucket, same folder (2026-10-06)
   POST …/[id]/print-request      ──►  print_requested_at = now
                                         ▲        │  poll every 3 s, straight from the browser
   "Printed on the desktop"  ◄── poll ───┘        ▼  (admin session under RLS — no site route)
@@ -835,6 +836,14 @@ Laptop (admin form)                      Supabase                         Deskto
 - **First private bucket.** `buy-receipt-ids` is not public; its four Storage
   policies are admin-only; rows hold the object path and the UI asks for a
   10-minute signed link. The Storage GC does not list this bucket.
+- **Seller thumbprint (2026-10-06): a file, not a device API.** The SecuGen
+  reader is never driven from the page (that route is licensed). The owner
+  saves the captured print as a BMP with SecuGen's free utility; the form's
+  thumbprint strip watches that folder through Chrome's File System Access API
+  (the folder handle lives in the browser's IndexedDB), converts the BMP to PNG
+  in the browser and posts it to `…/[id]/thumbprint`, which stores a lossless
+  greyscale WebP beside the ID photo. `buy_receipts.seller_thumbprint_path`
+  holds the path. No new bucket, no new policy, no new header.
 - **Silent printing is a browser launch flag, not code.** The printer PC opens
   the station from a Chrome shortcut with `--kiosk-printing`; the page only
   calls `window.print()`.

@@ -24,7 +24,7 @@ import {
 } from '@/lib/buy-receipts';
 import { formatCurrency } from '@/types/sales';
 import { useReceiptPrinter } from './BuyReceiptPrintHost';
-import { printableIdPhoto, type PrintableIdPhoto } from './buy-receipt-client';
+import { printableIdPhoto, printableThumbprint, type PrintableIdPhoto } from './buy-receipt-client';
 import StationSetupHelp from './StationSetupHelp';
 
 /**
@@ -177,11 +177,18 @@ export default function PrintStation({ adminBasePath, adminEmail }: { adminBaseP
       setCurrent(row);
       setStatus('printing');
       let idPhoto: PrintableIdPhoto | null = null;
+      let thumbprint: PrintableIdPhoto | null = null;
       try {
         idPhoto = wanted.withId > 0 ? await printableIdPhoto(row.seller_id_photo_path) : null;
         if (wanted.withId > 0 && !idPhoto) setNotice(`${row.receipt_number}: the ID photo could not be loaded, so it printed without it.`);
         const copies = resolvePrintCopies(wanted, Boolean(idPhoto));
-        const pages = await printReceipt(row, copies, idPhoto?.url ?? null);
+        // The thumbprint goes on every shop copy. Nobody is at the station to retry, so a print
+        // that cannot be loaded does not hold the job back — the notice says it is missing.
+        if (copies.plain + copies.withId > 0 && row.seller_thumbprint_path) {
+          thumbprint = await printableThumbprint(row.seller_thumbprint_path);
+          if (!thumbprint) setNotice(`${row.receipt_number}: the thumbprint could not be loaded, so it printed without it.`);
+        }
+        const pages = await printReceipt(row, copies, idPhoto?.url ?? null, thumbprint?.url ?? null);
         if (pages <= 0 || row.id === 'test-print') return;
 
         const mark = { printed_at: new Date().toISOString(), print_count: row.print_count + pages };
@@ -197,6 +204,7 @@ export default function PrintStation({ adminBasePath, adminEmail }: { adminBaseP
         }
       } finally {
         idPhoto?.release();
+        thumbprint?.release();
         printingRef.current = false;
         setCurrent(null);
         if (!stoppedRef.current) setStatus('ready');

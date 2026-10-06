@@ -135,6 +135,20 @@ export const BUY_RECEIPT_PRINT_SETS = {
 export type BuyReceiptPrintSetKey = keyof typeof BUY_RECEIPT_PRINT_SETS;
 export const BUY_RECEIPT_PRINT_SET_KEYS = Object.keys(BUY_RECEIPT_PRINT_SETS) as BuyReceiptPrintSetKey[];
 export const BUY_RECEIPT_DEFAULT_PRINT_SET: BuyReceiptPrintSetKey = 'shop_and_seller';
+/** The default once a receipt has an ID photo (owner, 2026-10-06): the shop copy carries it. */
+export const BUY_RECEIPT_DEFAULT_PRINT_SET_WITH_ID: BuyReceiptPrintSetKey = 'shop_id_and_seller';
+
+/**
+ * What prints when nobody chose: a shop copy and a seller's copy — and the shop
+ * copy is the one WITH the ID photo as soon as the receipt has a photo (owner,
+ * 2026-10-06: "switch the default to with-ID when there's a photo"; a
+ * thumbprint always comes with an ID photo, and the two belong side by side on
+ * the copy kept on file). The form, the print panel, the Log's quick buttons
+ * and a print request that names no copies all ask this one function.
+ */
+export function defaultPrintSet(hasIdPhoto: boolean): BuyReceiptPrintSetKey {
+  return hasIdPhoto ? BUY_RECEIPT_DEFAULT_PRINT_SET_WITH_ID : BUY_RECEIPT_DEFAULT_PRINT_SET;
+}
 
 /** Shop copies without / with the ID photo, and seller's copies. */
 export type BuyReceiptCopies = { plain: number; withId: number; seller: number };
@@ -152,7 +166,11 @@ function clampInt(value: unknown, min: number, max: number, fallback: number): n
  */
 export function resolvePrintCopies(input: unknown, hasIdPhoto: boolean): BuyReceiptCopies {
   const source = (input ?? {}) as Record<string, unknown>;
-  const fallback = BUY_RECEIPT_PRINT_SETS[BUY_RECEIPT_DEFAULT_PRINT_SET];
+  // A request that names no copies at all gets the default set for this receipt (with the ID photo
+  // when it has one). One that names some keeps the old per-count fallback, so a half-filled
+  // request can never add a copy nobody asked for.
+  const named = ['plain', 'withId', 'seller'].some((key) => source[key] !== undefined && source[key] !== null);
+  const fallback = BUY_RECEIPT_PRINT_SETS[named ? BUY_RECEIPT_DEFAULT_PRINT_SET : defaultPrintSet(hasIdPhoto)];
   let plain = clampInt(source.plain, 0, 3, fallback.plain);
   let withId = clampInt(source.withId, 0, 2, fallback.withId);
   const seller = clampInt(source.seller, 0, 3, fallback.seller);
@@ -223,6 +241,8 @@ export type BuyReceiptRow = {
   seller_id_last4: string | null;
   seller_dob: string | null;
   seller_id_photo_path: string | null;
+  /** The seller's thumbprint, in the same PRIVATE bucket (supabase/buy-receipts-thumbprint-2026-10.sql). A path, never a URL. */
+  seller_thumbprint_path: string | null;
   items: BuyReceiptItem[];
   total: number;
   payments: BuyReceiptPayment[];
@@ -252,7 +272,7 @@ export type BuyReceiptRow = {
 /** One select list for the routes, the pages and the station. */
 export const BUY_RECEIPT_COLUMNS =
   'id, seq, receipt_number, status, seller_name, seller_phone, seller_email, seller_street, seller_city, seller_state, '
-  + 'seller_zip, seller_id_type, seller_id_last4, seller_dob, seller_id_photo_path, items, total, payments, notes, '
+  + 'seller_zip, seller_id_type, seller_id_last4, seller_dob, seller_id_photo_path, seller_thumbprint_path, items, total, payments, notes, '
   + 'print_requested_at, print_requested_by, print_copies_plain, print_copies_with_id, print_copies_seller, emailed_at, emailed_to, print_claimed_at, '
   + 'print_claimed_by, printed_at, print_count, void_reason, voided_at, voided_by, duplicated_from, created_by, '
   + 'created_by_email, updated_by_email, created_at, updated_at';
@@ -631,6 +651,15 @@ export function buyReceiptIdPhotoPath(receiptId: string, fileId: string): string
   return `${buyReceiptIdPhotoFolder(receiptId)}/${fileId}.webp`;
 }
 
+/**
+ * Where a receipt's thumbprint lives: the receipt's own folder in the same
+ * private bucket, so deleting the receipt (which empties that folder) takes it
+ * along. A new name on every upload.
+ */
+export function buyReceiptThumbprintPath(receiptId: string, fileId: string): string {
+  return `${buyReceiptIdPhotoFolder(receiptId)}/thumbprint-${fileId}.webp`;
+}
+
 /** Item rows plus wrapped note lines: past `BUY_RECEIPT_ONE_PAGE_LINES` the paper may need a second page. */
 export function draftPaperLines(draft: Pick<BuyReceiptDraft, 'items' | 'notes'>): number {
   const noteLines = draft.notes.trim() ? Math.ceil(draft.notes.length / 95) + (draft.notes.match(/\n/g)?.length ?? 0) : 1;
@@ -655,6 +684,7 @@ export function sampleBuyReceipt(nowIso: string): BuyReceiptRow {
     seller_id_last4: '0000',
     seller_dob: '1970-01-01',
     seller_id_photo_path: null,
+    seller_thumbprint_path: null,
     items: [
       { qty: 1, description: 'This is a test print. Nothing was saved.', amount: 100 },
       { qty: 2, description: 'Sample second line', amount: 50 },
