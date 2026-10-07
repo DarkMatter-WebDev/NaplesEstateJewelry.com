@@ -20,8 +20,9 @@ import {
 
 /**
  * Text deals carry up to five photos (owner, 2026-10-07): one main picture
- * with the price on it, up to four detail shots, all in ONE message with the
- * main picture first.
+ * with the full price card, up to four detail shots with a small price strip,
+ * all in ONE message. Phones show them in a random order, so every picture
+ * carries the price.
  */
 const SRC = join(process.cwd(), 'src');
 const read = (p: string) => readFileSync(join(SRC, p), 'utf8');
@@ -100,14 +101,28 @@ describe('text-deal photos: source guards', () => {
     expect(deals).toContain('if (!dealMediaPaths(deal)) await buildDealMedia(service, deal);');
   });
 
-  it('the price is drawn on the main photo only; detail shots are only resized', () => {
+  it('EVERY picture carries the price: the full card on the main photo, a small strip (price + line, no brand mark, no badge) on each detail shot', () => {
+    // Owner's first test, 2026-10-07: the pictures of one text arrive in a random
+    // order, so the price cannot live on the main picture alone ("option 3", then
+    // "option a, price and the one line").
     const deals = read('lib/text-alerts/deals.ts');
     expect(deals.match(/renderDealCard\(/g)).toHaveLength(1);
-    expect(deals).toContain('renderDealDetail(await readStoredPhoto(service, source), budget.detail)');
+    expect(deals).toContain('renderDealDetail(await readStoredPhoto(service, source), { price: deal.price_text, line: deal.title }, budget.detail)');
     const card = read('lib/text-alerts/card.ts');
     const detail = card.slice(card.indexOf('export async function renderDealDetail('));
+    expect(detail).toContain('renderStripLayer(');
+    expect(detail).toContain('composite(');
     expect(detail).not.toContain('renderTextLayer');
-    expect(detail).not.toContain('composite(');
+    const strip = card.slice(card.indexOf('async function renderStripLayer('), card.indexOf('export async function renderDealDetail('));
+    expect(strip).toContain('node(content.price,');
+    expect(strip).toContain('node(content.line.toUpperCase(),');
+    expect(strip).not.toContain('brandMark');
+    expect(strip).not.toContain('badge');
+    // The price sits above the line in one bottom-anchored column: a wrapped line cannot run over it.
+    expect(strip).toContain("flexDirection: 'column'");
+    // New words need new pictures on every photo: a word change clears the card, and the send renders all again.
+    const route = read('app/api/admin/text-deals/[id]/route.ts');
+    expect(route).toContain('.update({ ...input.value, card_path: null,');
   });
 
   it('photos change only on a draft, through requireAdmin, and a shared photo is never deleted', () => {
@@ -130,7 +145,10 @@ describe('text-deal photos: source guards', () => {
     const manager = read('components/admin/TextDealsManager.tsx');
     expect(manager).toContain('multiple onChange={onPhotos}');
     expect(manager).toContain('Make main');
-    expect(manager).toContain('Price goes here');
+    expect(manager).toContain('Shop name + price');
+    expect(manager).toContain('with the price strip');
+    expect(manager).not.toContain('nothing drawn on');
+    expect(manager).not.toContain('sent as they are');
     expect(manager).toContain('Pictures as they will be sent');
     expect(manager).toContain('!pictures || confirmed === 0');
     // The outer wrapper is not a <label>: a tap on a thumbnail must not open the photo picker.

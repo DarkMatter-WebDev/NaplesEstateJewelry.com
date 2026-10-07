@@ -26,8 +26,8 @@ import { sendTwilioMessage, TwilioError } from './twilio';
  * to every CONFIRMED number. The reply is the claim.
  *
  * Since 2026-10-07 a deal holds up to five photos — one main picture with the
- * price drawn on it and up to four detail shots, only resized — sent as ONE
- * message, the main picture first. The rules are in `deal-photos.ts`.
+ * full price card and up to four detail shots with a small price strip — sent
+ * as ONE message. The rules are in `deal-photos.ts`.
  *
  * Send discipline (memory: after-is-best-effort-on-netlify): one queued row
  * per recipient is written FIRST, each row flips to sent/failed as Twilio
@@ -121,9 +121,9 @@ async function storeDealJpeg(service: SupabaseClient, dealId: string, kind: 'car
 }
 
 /**
- * Render + store every picture the deal sends: the main photo with the price
- * drawn on it, then each detail shot only resized. What Preview shows is
- * exactly what goes out, in this order.
+ * Render + store every picture the deal sends: the main photo with the full
+ * price card, then each detail shot with the small price strip. What Preview
+ * shows is exactly what goes out (a phone may show them in another order).
  */
 export async function buildDealMedia(service: SupabaseClient, deal: DealRow): Promise<{ pictures: DealPicture[]; totalBytes: number }> {
   const [main, ...details] = dealPhotoList(deal);
@@ -135,7 +135,7 @@ export async function buildDealMedia(service: SupabaseClient, deal: DealRow): Pr
   const pictures: DealPicture[] = [{ path: cardPath, url: publicUrl(service, cardPath), bytes: card.bytes, main: true }];
 
   for (const source of details) {
-    const detail = await renderDealDetail(await readStoredPhoto(service, source), budget.detail);
+    const detail = await renderDealDetail(await readStoredPhoto(service, source), { price: deal.price_text, line: deal.title }, budget.detail);
     const path = await storeDealJpeg(service, deal.id, 'detail', detail.jpeg);
     pictures.push({ path, url: publicUrl(service, path), bytes: detail.bytes, main: false });
   }
@@ -200,7 +200,7 @@ export async function removeDealPhoto(service: SupabaseClient, deal: DealRow, pa
   return saved;
 }
 
-/** "Make main": the photo swaps into the first place; the price is drawn on it at the next Preview. */
+/** "Make main": the photo swaps into the first place; it gets the full price card at the next Preview. */
 export async function makeDealPhotoMain(service: SupabaseClient, deal: DealRow, path: string): Promise<DealRow> {
   assertDraft(deal);
   const current = dealPhotoList(deal);

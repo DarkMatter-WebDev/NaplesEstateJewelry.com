@@ -12,8 +12,10 @@ import { DEFAULT_SOLD_REPLY, dealText } from '@/lib/text-alerts/messages';
  * Left: the composer (photos, price, one line, message) → Preview renders the
  * pictures on the server → Send a test to the owner's cell → Send to N.
  * Up to five photos (owner, 2026-10-07): the first is the main picture, with
- * the price drawn on it; the rest are detail shots, sent as they are — all in
- * one text. The rules live in `lib/text-alerts/deal-photos.ts`.
+ * the shop name and the price drawn on it; the rest are detail shots with a
+ * small price strip — all in one text. Phones show them in a random order,
+ * which is why every picture carries the price. The rules live in
+ * `lib/text-alerts/deal-photos.ts`.
  * Right: the deal list; a selected deal shows its send tally and the replies
  * in clock order with the first flagged, plus Mark sold / Mark available.
  * Sold sends the polite one-liner to anyone who answers late (wording
@@ -151,7 +153,7 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
         setPictures(null);
         added += 1;
       }
-      setNotice({ text: `${added === 1 ? 'Photo' : `${added} photos`} saved.${leftOut > 0 ? ` ${leftOut} left out — a deal holds up to ${DEAL_PHOTO_MAX}.` : ''} Preview to see the price on the main one.`, ok: leftOut === 0 });
+      setNotice({ text: `${added === 1 ? 'Photo' : `${added} photos`} saved.${leftOut > 0 ? ` ${leftOut} left out — a deal holds up to ${DEAL_PHOTO_MAX}.` : ''} Preview to see the price on ${photos.length + added === 1 ? 'it' : 'them'}.`, ok: leftOut === 0 });
     } catch (err) {
       const reason = err instanceof Error ? err.message : 'Could not upload the photo.';
       setNotice({ text: added > 0 ? `${added} of ${files.length} saved, then: ${reason}` : reason, ok: false });
@@ -327,7 +329,7 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
                       {index === 0 && <span className="absolute inset-x-0 bottom-0 py-[3px] text-center text-[0.6rem] font-bold uppercase tracking-[0.16em]" style={{ background: 'var(--color-primary-container)', color: '#171717' }}>Main</span>}
                     </div>
                     {index === 0 ? (
-                      <span className="mt-1 block text-center text-[0.7rem]" style={{ color: 'var(--color-on-surface-variant)' }}>Price goes here</span>
+                      <span className="mt-1 flex justify-center whitespace-nowrap text-[0.62rem] sm:text-[0.7rem]" style={{ color: 'var(--color-on-surface-variant)' }}>Shop name + price</span>
                     ) : (
                       <button type="button" onClick={() => changePhotos('main', photo.path)} disabled={busy !== null} className="mt-1 block w-full text-center text-[0.7rem] font-bold underline disabled:opacity-50" style={{ color: 'var(--color-primary)' }}>Make main</button>
                     )}
@@ -335,7 +337,7 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
                 ))}
               </ul>
             )}
-            <span className="mt-1 block text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>Up to {DEAL_PHOTO_MAX}: one main picture (the price is drawn on it) and up to {DEAL_PHOTO_MAX - 1} detail shots, sent as they are. All go out in one text.</span>
+            <span className="mt-1 block text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>Up to {DEAL_PHOTO_MAX}: one main picture (shop name + price) and up to {DEAL_PHOTO_MAX - 1} detail shots with a small price strip. All go out in one text.</span>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-[130px_1fr]">
@@ -374,7 +376,7 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
                         <img key={picture.url} src={picture.url} alt={`Detail shot ${index + 1} preview`} className="aspect-square w-full rounded-lg border object-cover" style={{ borderColor: 'var(--color-outline-variant)' }} />
                       ))}
                     </div>
-                    <span className="mt-1 block text-[0.7rem]" style={{ color: 'var(--color-on-surface-variant)' }}>{pictures.length === 2 ? '2 · detail shot, nothing drawn on it' : `2–${pictures.length} · detail shots, nothing drawn on them`}</span>
+                    <span className="mt-1 block text-[0.7rem]" style={{ color: 'var(--color-on-surface-variant)' }}>{pictures.length === 2 ? '2 · detail shot, with the price strip' : `2–${pictures.length} · detail shots, with the price strip`}</span>
                   </div>
                 )}
               </div>

@@ -6,7 +6,7 @@
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
 > compaction. Last reconciled: **2026-10-07**.
 
-## A text deal carries up to five photos — one main picture with the price, the rest detail shots — in ONE message, the main picture first (2026-10-07)
+## A text deal carries up to five photos in ONE message — the main picture with the full price card, every detail shot with a small price strip, because phones show them in a random order (2026-10-07)
 
 Owner: *"i want to allow admin to upload multiple images (main pics, and a few detail shots)"*; *"1: 5, 2:yes, 3:1 main pic, other others will show details. 4:try to make sure main pic is sent first.. detail shots order doesnt matter."*
 
@@ -14,13 +14,14 @@ Owner: *"i want to allow admin to upload multiple images (main pics, and a few d
 - **Five at most** (`DEAL_PHOTO_MAX`): one main photo and up to four detail shots. The limit is enforced on the server, not only by the greyed button.
 - **One message.** Every picture rides on the same text (`mediaUrls` → one `MediaUrl` per picture). ⛔ Never one text per picture: it multiplies the cost, can arrive out of order, and breaks "replies attach to the subscriber's last deal". Twilio bills per message, not per picture.
 - **The main picture is first in the list handed to Twilio**, always (`dealMediaPaths`: card first). The order of the detail shots does not matter to the owner.
-- **The price is drawn on the main picture only.** Detail shots are only resized — nothing drawn on them, their own shape kept (the "owner's photo, only resized" rule of 09-15, applied to every picture).
-- **The main picture's look is unchanged, by the owner's choice** (*"i wasnt aware that the 'now' had a gradient background behind the text.. that looks good.. leave it that way"*, on mockup 2). ⛔ Do not re-propose a solid bar behind the words.
+- **EVERY picture carries the price** (owner, 10-07 afternoon: *"option 3"*, then on mockup 3 *"option a, price and the one line, build it"* — this replaced that morning's "price on the main picture only" after the first test). The main picture keeps its full card (shop name, "First reply wins", large price, line). Each detail shot keeps its own shape and gets a **small strip**: the same soft dark fade, shorter, a smaller price and the one line — ⛔ no shop name and no badge on detail shots (the owner chose the small strip over the full treatment). The photo itself is still only resized.
+- ⛔ **Never rely on the order of the pictures inside one text.** It is random on real phones (next-to-last bullet). Anything a customer must see goes on every picture or in the words.
+- **The main picture's look is unchanged, by the owner's choice** (*"i wasnt aware that the 'now' had a gradient background behind the text.. that looks good.. leave it that way"*, on mockup 2). ⛔ Do not re-propose a solid bar behind the words. The detail strip uses the same fade for that reason.
 - **Size:** a full message is kept near 1 MB — main ≤ 400 KB when detail shots ride with it (≤ 600 KB alone, as before), each detail shot ≤ 150 KB. The three numbers live at the top of `lib/text-alerts/deal-photos.ts`; lower them there if a carrier drops pictures.
-- **A deal never goes out with a picture missing:** `dealMediaPaths` is null until every photo has its rendered picture, and the send renders again in that case. Any photo change clears the rendered pictures, so Preview must be pressed again before Send.
+- **A deal never goes out with a picture missing or with stale words:** `dealMediaPaths` is null until every photo has its rendered picture, and the send renders every picture again in that case. Any photo change clears the rendered pictures; a change to the price or the line clears the main picture, which has the same effect — so Preview must be pressed again before Send.
 - **Photos change only on a draft** (as before). Reopen copies every photo (shared stored objects); removing a photo or deleting a deal deletes a stored photo only when no other deal points at it, and deletes nothing when the other deals cannot be read. Rendered JPEGs are left to the Storage GC (Twilio may still be fetching one for a test sent a moment ago).
 - **Storage:** `photo_path` / `card_path` remain the main photo and its picture; `detail_photo_paths` / `detail_media_paths` hold the rest. Code that reads a deal treats missing detail columns as "no detail shots", and a one-photo deal's writes name no new column — so the feature degrades to the old behaviour where `supabase/text-deals-photos-2026-10.sql` has not run. Both new columns are in the Storage GC reference scan.
-- ⛔ **Unverified until the owner's test text:** the order and layout on a real phone, and delivery of a five-picture message on every carrier.
+- 🔴 **Tested 10-07 by the owner: all pictures arrive; their order inside the one text is RANDOM** (price picture second on one phone, last on another). Handing Twilio the main picture first is necessary and not enough — never tell the owner the order is guaranteed inside one message. Answered the same day by the price strip on every picture (`CHANGELOG.md` 2026-10-07 (4) the finding, (5) the build). Two texts (price picture first, detail shots second, double the cost) was offered and not chosen.
 
 ## Seller thumbprint on the buy receipt: taken with the free SecuGen utility and picked up from a watched folder; private like the ID photo; printed on the shop copy only — whose signatures are now one row with the pictures under it (2026-10-06)
 

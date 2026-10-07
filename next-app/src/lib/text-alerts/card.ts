@@ -189,21 +189,90 @@ const DETAIL_STEPS = [
 ] as const;
 
 /**
- * A detail shot (owner, 2026-10-07): the photo only resized — nothing is drawn
- * on it and it keeps its own shape. Same 1080 × 1350 box as the main picture,
- * JPEG because carriers do not reliably take WebP, and stepped down until it
- * fits its share of the message.
+ * The small price strip on a detail shot (owner, 2026-10-07, "option a, price
+ * and the one line"): the main picture's soft dark fade, shorter, with a
+ * smaller price and the line — no brand mark, no badge, so the detail stays
+ * the subject. The price sits ABOVE the line in one bottom-anchored column, so
+ * a long line that wraps pushes the price up instead of running over it.
  */
-export async function renderDealDetail(photo: Buffer, targetBytes: number): Promise<RenderedDealCard> {
-  const fitted = await sharp(photo)
+async function renderStripLayer(width: number, height: number, content: Pick<DealCardContent, 'price' | 'line'>): Promise<Buffer> {
+  const fonts = await loadFonts();
+  const unit = width / 1080;
+  const fadeHeight = Math.min(height, Math.max(Math.round(height * 0.2), Math.round(170 * unit)));
+  const element = React.createElement(
+    'div',
+    { style: { display: 'flex', width, height, position: 'relative', backgroundColor: 'transparent' } },
+    node(null, {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      height: fadeHeight,
+      backgroundImage: 'linear-gradient(to top, rgba(0,0,0,0.82), rgba(0,0,0,0))',
+    }),
+    React.createElement(
+      'div',
+      {
+        style: {
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'absolute',
+          left: Math.round(36 * unit),
+          right: Math.round(36 * unit),
+          bottom: Math.round(26 * unit),
+        },
+      },
+      node(content.price, {
+        color: '#e9c349',
+        fontFamily: 'Caslon',
+        fontSize: Math.round(54 * unit),
+        fontWeight: 700,
+        lineHeight: 1.1,
+        textShadow: '0 2px 14px rgba(0,0,0,0.6)',
+      }),
+      node(content.line.toUpperCase(), {
+        marginTop: Math.round(6 * unit),
+        color: '#ffffff',
+        fontFamily: 'Hanken',
+        fontSize: Math.round(20 * unit),
+        fontWeight: 500,
+        letterSpacing: Math.round(2.6 * unit),
+        textShadow: '0 1px 8px rgba(0,0,0,0.7)',
+      }),
+    ),
+  );
+  const response = new ImageResponse(element, {
+    width,
+    height,
+    fonts: [
+      { name: 'Caslon', data: fonts.caslonBold, weight: 700, style: 'normal' },
+      { name: 'Hanken', data: fonts.hankenMedium, weight: 500, style: 'normal' },
+    ],
+  });
+  return Buffer.from(await response.arrayBuffer());
+}
+
+/**
+ * A detail shot (owner, 2026-10-07): the photo resized, keeping its own
+ * shape, with the small price strip at its foot. The strip is there because
+ * phones show the pictures of one text in a RANDOM order (the owner's first
+ * test: the price picture came second on one phone and last on another) — so
+ * every picture has to carry the price. Same 1080 × 1350 box as the main
+ * picture, JPEG because carriers do not reliably take WebP, and stepped down
+ * until it fits its share of the message.
+ */
+export async function renderDealDetail(photo: Buffer, content: Pick<DealCardContent, 'price' | 'line'>, targetBytes: number): Promise<RenderedDealCard> {
+  const resized = await sharp(photo)
     .rotate()
     .resize(DEAL_CARD_MAX_WIDTH, DEAL_CARD_MAX_HEIGHT, { fit: 'inside', withoutEnlargement: true })
     .toColorspace('srgb')
     .flatten({ background: '#ffffff' })
     .png()
     .toBuffer();
-  const meta = await sharp(fitted).metadata();
+  const meta = await sharp(resized).metadata();
   const width = meta.width ?? DEAL_CARD_MAX_WIDTH;
+  const stripLayer = await renderStripLayer(width, meta.height ?? DEAL_CARD_MAX_HEIGHT, content);
+  const fitted = await sharp(resized).composite([{ input: stripLayer, left: 0, top: 0 }]).png().toBuffer();
 
   let jpeg: Buffer<ArrayBuffer> | null = null;
   for (const step of DETAIL_STEPS) {

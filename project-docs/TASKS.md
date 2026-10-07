@@ -7,9 +7,26 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-10-07 (2) — Text Deals: up to five photos per deal, one text, main picture first — **BUILT + STAGED, not deployed** — ◻ SQL → ◻ push → ◻ the owner's test text
+### 🟡 2026-10-07 (5) — Text Deals: a small price strip on every detail shot (the pictures of one text arrive in a random order) — **BUILT + STAGED, not deployed** — ◻ push → ◻ the owner's test text (no SQL, no env vars)
 
-Record: `CHANGELOG.md` 2026-10-07 (2). Rules: `DECISIONS.md` top entry.
+Record: `CHANGELOG.md` 2026-10-07 (5) (the build), (4) (the test that led to it). Rules: `DECISIONS.md` top entry.
+
+**Owner's words (10-07):** *"pics came in random order.. a second user reported the price pic came last"* → *"option 3"* → mockup 3 → *"option a, price and the one line, build it"*.
+
+**What was built:** every detail shot now carries a small strip at its foot — a smaller price and the one line over the same soft dark fade the main picture has. The main picture did not change. In the composer three labels follow: "Shop name + price" under the main square, "…with a small price strip" in the hint, "with the price strip" after Preview.
+
+Gate: `tsc` 0 · lint 0 errors · **1743/1743** · build 0. Real pictures rendered and looked at; composer wording 15/15.
+
+1. ◻ **Owner — copy staging to the repo folder and push.** No SQL.
+2. ◻ **Owner — one test text.** Start a NEW deal (or press **Preview** again on an open draft — a draft rendered before the push still has plain detail shots), 3–5 photos, Preview → every detail shot in "Pictures as they will be sent" should show the price and the line at its foot → **Send a test**. On the phone: is the price readable on whichever picture shows first? Is the strip too big or too small on a real phone photo?
+3. ℹ️ If the strip should be bigger or smaller, the two sizes are in `renderStripLayer` in `src/lib/text-alerts/card.ts` (price 54, line 20, at a 1080 px wide picture).
+4. ℹ️ Never verified by Claude: a real text, anything behind the sign-in.
+
+**Staging (10-07 (5)):** ✅ synced 2026-10-07 ~2:09 PM ET — dry run listed exactly the 11 touched files (5 in the app: `lib/text-alerts/card.ts`, `deals.ts`, `deal-photos.ts`, `components/admin/TextDealsManager.tsx`, `lib/__tests__/text-deal-photos.test.ts`; 6 docs: ARCHITECTURE, CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS), 0 Extras, 1222 total; real run copied 11 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0, exit 0; leak check 0 `.env*` / `.log` / `.tmp-*` / `tsbuildinfo`, no node_modules / .next / .git, launch.json present; no `zz-text-deals-preview` page in source or staging; positive control 242 = 242 `.tsx`, 489 = 489 `.ts` under `next-app/src`; SHA-256 MATCH on 11 of 11; the staged `card.ts` carries `renderStripLayer`, the staged composer carries "Shop name + price". Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### 🟢 2026-10-07 (2) — Text Deals: up to five photos per deal, one text, main picture first — **DEPLOYED** (owner, 10-07 ~11:46 AM ET: *"sql ran, pushed and deployed"*) — ✅ SQL → ✅ pushed → ◻ the owner's test text is still open
+
+Record: `CHANGELOG.md` 2026-10-07 (2) (the build), (3) (the deploy). Rules: `DECISIONS.md` top entry. Nothing was said about trying it and Claude did not check production (not asked to), so item 3 stays open.
 
 **Owner's words (10-07):** *"i want to allow admin to upload multiple images (main pics, and a few detail shots)"* → *"1: 5, 2:yes, 3:1 main pic, other others will show details. 4:try to make sure main pic is sent first.. detail shots order doesnt matter."* → mockup 1: *"1 yes, 2 yes, 3 labels are fine"* → mockup 2 (a solid bar behind the words): *"leave it that way"* (the main picture stays as it is).
 
@@ -17,9 +34,9 @@ Record: `CHANGELOG.md` 2026-10-07 (2). Rules: `DECISIONS.md` top entry.
 
 Gate: `tsc` 0 · lint 0 errors · **1743/1743** · build 0. Browser checks on the real composer: 35/35 desktop, 10/10 phone width.
 
-1. ◻ **Owner — run the SQL FIRST.** Supabase → SQL editor → paste all of [`supabase/text-deals-photos-2026-10.sql`](../supabase/text-deals-photos-2026-10.sql) → Run. It ends with one verify query; expect two rows, `detail_media_paths · ARRAY · NO` and `detail_photo_paths · ARRAY · NO`. Safe to re-run.
-2. ◻ **Owner — copy staging to the repo folder and push.**
-3. ◻ **Owner — try it, on the phone or the desk (Admin → Text Deals):**
+1. ✅ **SQL RUN** (owner, 10-07 ~11:46 AM ET; the result was not seen from here). Was: **Owner — run the SQL FIRST.** Supabase → SQL editor → paste all of [`supabase/text-deals-photos-2026-10.sql`](../supabase/text-deals-photos-2026-10.sql) → Run. It ends with one verify query; expect two rows, `detail_media_paths · ARRAY · NO` and `detail_photo_paths · ARRAY · NO`. Safe to re-run.
+2. ✅ **Pushed + deployed** (owner, 10-07 ~11:46 AM ET).
+3. ✅ **TRIED by the owner 10-07 midday** — 🔴 **Owner's test, 10-07 midday (verbatim):** *"test sent, all pictures arrived, price pic came second..."* then *"pics came in random order.. a second user reported the price pic came last"*. So: every picture is delivered, and **the order inside one text is random** — the app hands Twilio the price picture first and the carrier / phone does not keep it. Nothing in one message can fix that. ✅ **Decided 10-07: a price strip on every picture ("option 3", then "option a, price and the one line") — built, see the 2026-10-07 (5) block above.** The steps as given:
    - Type a price and the one line → **Add photos** → pick 3–5 photos of one piece at once. The squares appear; the first says **Main**.
    - **Make main** on another square → it moves to first place. **×** on a square removes it.
    - **Preview** → "Pictures as they will be sent" shows the main picture with the price, then the detail shots, and the total size. Tell Claude the size it shows for real phone photos.
@@ -28,7 +45,7 @@ Gate: `tsc` 0 · lint 0 errors · **1743/1743** · build 0. Browser checks on th
    - Delete the test draft when done (**Delete deal**).
 4. ℹ️ **Never verified by Claude:** the real upload behind the sign-in, the SQL, any Twilio send with more than one picture, a real phone. Verified: the composer's behaviour against a stand-in server, and the pictures themselves through the real rendering code.
 5. ℹ️ **Size.** The app keeps a full message near 1 MB (Twilio's own limit is 5 MB and it shrinks JPEGs to fit each carrier). No published per-carrier limit for toll-free numbers was found, so step 3's test is the check. If a carrier drops pictures, the numbers to lower are the three byte targets at the top of `src/lib/text-alerts/deal-photos.ts`.
-6. ℹ️ **Order on the phone.** The app hands Twilio the main picture first; a carrier or phone can still rearrange. If your phone shows a detail shot first, tell Claude — the fallback is the price picture as its own text just before the others (two texts, double the cost; not built).
+6. 🔴 **Order on the phone — it IS rearranged (see item 3).** The app hands Twilio the main picture first; a carrier or phone can still rearrange. If your phone shows a detail shot first, tell Claude — the fallback is the price picture as its own text just before the others (two texts, double the cost; not built).
 7. ℹ️ Cost is unchanged: Twilio bills per message, not per picture.
 
 **Staging (10-07 (2)):** ✅ synced 2026-10-07 ~11:27 AM ET — dry run listed exactly the 20 touched files (3 new: `next-app/src/lib/text-alerts/deal-photos.ts`, `next-app/src/lib/__tests__/text-deal-photos.test.ts`, `supabase/text-deals-photos-2026-10.sql`; 10 changed in the app: `lib/text-alerts/deals.ts`, `card.ts`, `twilio.ts`, `api/admin/text-deals/photo/route.ts`, `preview/route.ts`, `[id]/route.ts`, `[id]/reopen/route.ts`, `api/admin/storage-gc/route.ts`, `components/admin/TextDealsManager.tsx`, `lib/__tests__/text-alerts.test.ts`; 7 docs: ARCHITECTURE, CHANGELOG, CURRENT_STATUS, DECISIONS, INTEGRITY, STRUCTURE, TASKS), 0 Extras, 1222 total (1219 + the 3 new); real run copied 20 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0, exit 0; leak check 0 `.env*` / `.log` / `.tmp-*` / `tsbuildinfo`, no node_modules / .next / .git, launch.json present; no `zz-text-deals-preview` page in source or staging; positive control 242 = 242 `.tsx`, 489 = 489 `.ts` under `next-app/src`; SHA-256 MATCH on 20 of 20; the staged `deals.ts` carries `buildDealMedia`, the staged `twilio.ts` carries `form.append('MediaUrl'`. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.

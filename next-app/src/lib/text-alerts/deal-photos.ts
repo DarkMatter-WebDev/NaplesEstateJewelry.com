@@ -4,8 +4,10 @@
  *
  * A deal carries up to five photos: ONE main photo — the price, the line and
  * the brand mark are drawn on it, exactly as before — and up to four detail
- * shots, which are only resized. They all go out in ONE picture message, the
- * main picture first.
+ * shots, each with a small price strip (price + the line). They all go out in
+ * ONE picture message, the main picture first in the list. ⛔ Phones show the
+ * pictures of one message in a RANDOM order (the owner's first test), which is
+ * why every picture carries the price — never rely on the order.
  *
  * Stored on `text_deals` as `photo_path` (the main, as it always was) plus
  * `detail_photo_paths`, and for the rendered JPEGs `card_path` plus

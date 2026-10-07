@@ -786,8 +786,8 @@ Owner-facing flow: homepage **Join the List** window → `homepage_subscribers`
 row with `phone_e164`, `sms_status = 'pending'` → one confirmation text →
 handset replies YES → `confirmed` → Admin → **Text Deals** sends a picture
 message (the owner's photo with the price drawn on it, plus — since
-2026-10-07 — up to four detail shots, all in one message with the main
-picture first) to confirmed numbers →
+2026-10-07 — up to four detail shots, each with a small price strip, all in
+one message; phones show them in a random order) to confirmed numbers →
 replies come back to the toll-free number and are forwarded to the owner's
 cell. Pieces sold this way are never listed on the site; the reply is the
 claim (`DECISIONS.md` → *"Text deals: the reply is the claim…"*).
@@ -814,9 +814,10 @@ claim (`DECISIONS.md` → *"Text deals: the reply is the claim…"*).
   mid-send. Same trigger-agnostic pattern as the marketplace reconciles.
 - **Rendering:** `src/lib/text-alerts/card.ts` — sharp + Satori (next/og)
   with the vendored fonts, traced into the text-deals routes in
-  `next.config.ts`. Detail shots (`renderDealDetail`) are sharp only: resized
-  to the same 1080 × 1350 box, JPEG, nothing drawn. The photo rules (five per
-  deal, sending order, byte targets) are pure, in `deal-photos.ts`.
+  `next.config.ts`. Detail shots (`renderDealDetail`) are resized to the
+  same 1080 × 1350 box and get a small price strip (`renderStripLayer`: price
+  + line over a short fade), JPEG. The photo rules (five per deal, sending
+  order, byte targets) are pure, in `deal-photos.ts`.
 
 ## Buy Receipts + Print Station (2026-09-30)
 
