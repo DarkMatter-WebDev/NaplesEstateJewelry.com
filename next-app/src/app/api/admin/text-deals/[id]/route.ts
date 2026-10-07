@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { createServiceClient } from '@/lib/supabase/service';
 import { normalizeUsPhone } from '@/lib/subscriber-phone';
-import { deleteDeal, loadDeal, markDealAvailable, markDealSold, notifyDealSold } from '@/lib/text-alerts/deals';
+import { dealMediaUrls, dealPhotos, deleteDeal, loadDeal, markDealAvailable, markDealSold, notifyDealSold } from '@/lib/text-alerts/deals';
 import { normalizeDealInput } from '@/lib/text-alerts/deal-input';
 
 /**
@@ -50,8 +50,9 @@ export async function GET(_req: Request, context: Context) {
   });
 
   const card = deal.card_path ? service.storage.from('product-images').getPublicUrl(deal.card_path).data.publicUrl : null;
-  const photo = deal.photo_path ? service.storage.from('product-images').getPublicUrl(deal.photo_path).data.publicUrl : null;
-  return NextResponse.json({ deal: { ...deal, card_url: card, photo_url: photo }, tally, replies: withNames });
+  // Every picture that went (or will go) out, the main one first; just the card until Preview has run.
+  const media = dealMediaUrls(service, deal) ?? (card ? [card] : []);
+  return NextResponse.json({ deal: { ...deal, card_url: card, photos: dealPhotos(service, deal), media_urls: media }, tally, replies: withNames });
 }
 
 export async function DELETE(_req: Request, context: Context) {

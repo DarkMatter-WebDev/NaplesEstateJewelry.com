@@ -148,15 +148,21 @@ export async function POST(req: Request) {
     for (const path of asStringArray(row.rendition_paths)) referencedPaths.add(path);
   }
 
-  // Text deals (2026-09-15): the owner's photo (WebP) and the rendered
-  // picture message (JPEG) under text-deals/<deal>/. Twilio fetches the
-  // picture by URL at send time, so deleting one would break a deal mid-send.
+  // Text deals (2026-09-15): the owner's photos (WebP) and the rendered
+  // pictures (JPEG) under text-deals/<deal>/. Twilio fetches the pictures by
+  // URL at send time, so deleting one would break a deal mid-send. Since
+  // 2026-10-07 a deal also has detail shots (`detail_photo_paths`) and their
+  // pictures (`detail_media_paths`). `select('*')` on purpose: naming those
+  // columns would fail the whole read where their SQL has not been run, and a
+  // failed read here would mark every deal photo as an orphan.
   const { data: textDeals } = await supabase
     .from('text_deals')
-    .select('photo_path, card_path');
-  for (const row of (textDeals as Array<{ photo_path: string | null; card_path: string | null }> | null) ?? []) {
+    .select('*');
+  for (const row of (textDeals as Array<{ photo_path: string | null; card_path: string | null; detail_photo_paths?: unknown; detail_media_paths?: unknown }> | null) ?? []) {
     if (row.photo_path) referencedPaths.add(row.photo_path);
     if (row.card_path) referencedPaths.add(row.card_path);
+    for (const path of asStringArray(row.detail_photo_paths)) referencedPaths.add(path);
+    for (const path of asStringArray(row.detail_media_paths)) referencedPaths.add(path);
   }
 
   const storage = supabase.storage.from(PRODUCT_IMAGES_BUCKET);

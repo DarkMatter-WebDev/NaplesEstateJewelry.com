@@ -1,6 +1,6 @@
 # Integrity Rules And Pre-Publish Checklist
 
-> Current rules for the Next.js app. Last reconciled: **2026-10-02**.
+> Current rules for the Next.js app. Last reconciled: **2026-10-07**.
 
 ## Verification Commands
 
@@ -15,12 +15,14 @@ npm audit --omit=dev
 ```
 
 `npm run build` is the publish gate and must exit 0. Current local baseline
-(measured 2026-10-03 ~8:40 PM ET, the buy receipt's "Mailing list" box and the
+(measured 2026-10-07 ~11:25 AM ET, text deals with up to five photos; 1731 /
+160 files after the buy-receipt thumbprint work of 10-06; 1710 / 159 files on
+2026-10-03 ~8:40 PM, the buy receipt's "Mailing list" box and the
 same-form customer view; 1704 after the first customer input mode build ~5 PM,
 1651 / 156 files after the buy-receipt delete + payment methods that afternoon,
 1647 after the storefront-photo swap, 1643 after the print-station shortcut fix
 that morning):
-**1710/1710 tests across 159 files**, TypeScript clean, lint clean (3 pre-existing `<img>`
+**1743/1743 tests across 161 files**, TypeScript clean, lint clean (4 `<img>`
 warnings in `TextDealsManager.tsx`), and a build that exits 0 with **88
 prerendered routes = 41 EN + 41 ES + 6 non-locale** (`/_global-error`,
 `/_not-found`, `/favicon.ico`, `/icon.png`, `/robots.txt`, `/sitemap.xml`).

@@ -117,7 +117,7 @@ describe('the words on file with Twilio', () => {
     expect(reopen).toContain('reopenDealAsDraft(id)');
     const manager = readFileSync(join(process.cwd(), 'src', 'components', 'admin', 'TextDealsManager.tsx'), 'utf8');
     expect(manager).toContain('className="sr-only"');
-    expect(manager).toContain("photoUrl ? 'Change photo' : 'Choose photo'");
+    expect(manager).toContain("{uploading ?? 'Add photos'}");
     expect(manager).toContain('Reopen — edit & resend');
     expect(manager).toContain("method: 'DELETE'");
   });
@@ -201,6 +201,9 @@ describe('source guards', () => {
     const gc = read('app/api/admin/storage-gc/route.ts');
     expect(gc).toContain(".from('text_deals')");
     expect(gc).toContain('referencedPaths.add(row.card_path)');
+    // Detail shots and their pictures (2026-10-07) are kept too.
+    expect(gc).toContain('asStringArray(row.detail_photo_paths)');
+    expect(gc).toContain('asStringArray(row.detail_media_paths)');
   });
 
   it('the deal routes trace the brand fonts into their bundles', () => {

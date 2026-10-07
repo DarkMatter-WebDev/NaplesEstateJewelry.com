@@ -149,7 +149,7 @@ export interface RenderedDealCard {
  * Fits inside 1080 × 1350 without enlarging; the type layer is rendered at
  * the resulting size, so nothing is stretched.
  */
-export async function renderDealCard(photo: Buffer, content: DealCardContent): Promise<RenderedDealCard> {
+export async function renderDealCard(photo: Buffer, content: DealCardContent, targetBytes = DEAL_CARD_TARGET_BYTES): Promise<RenderedDealCard> {
   const fitted = await sharp(photo)
     .rotate()
     .resize(DEAL_CARD_MAX_WIDTH, DEAL_CARD_MAX_HEIGHT, { fit: 'inside', withoutEnlargement: true })
@@ -165,12 +165,12 @@ export async function renderDealCard(photo: Buffer, content: DealCardContent): P
   const composed = sharp(fitted).composite([{ input: textLayer, left: 0, top: 0 }]);
 
   let jpeg = toOwnedBuffer(await composed.clone().jpeg({ quality: 82, mozjpeg: true }).toBuffer());
-  if (jpeg.byteLength > DEAL_CARD_TARGET_BYTES) {
+  if (jpeg.byteLength > targetBytes) {
     jpeg = toOwnedBuffer(await composed.clone().jpeg({ quality: 70, mozjpeg: true }).toBuffer());
   }
   let outWidth = width;
   let outHeight = height;
-  if (jpeg.byteLength > DEAL_CARD_TARGET_BYTES) {
+  if (jpeg.byteLength > targetBytes) {
     const shrunk = sharp(jpeg).resize(Math.round(width * 0.8));
     jpeg = toOwnedBuffer(await shrunk.jpeg({ quality: 70, mozjpeg: true }).toBuffer());
     const m = await sharp(jpeg).metadata();
@@ -178,4 +178,40 @@ export async function renderDealCard(photo: Buffer, content: DealCardContent): P
     outHeight = m.height ?? outHeight;
   }
   return { jpeg, width: outWidth, height: outHeight, bytes: jpeg.byteLength };
+}
+
+/** Tried in order until a detail shot fits its byte target; the last one is kept regardless. */
+const DETAIL_STEPS = [
+  { scale: 1, quality: 80 },
+  { scale: 1, quality: 68 },
+  { scale: 0.8, quality: 68 },
+  { scale: 0.65, quality: 64 },
+] as const;
+
+/**
+ * A detail shot (owner, 2026-10-07): the photo only resized — nothing is drawn
+ * on it and it keeps its own shape. Same 1080 × 1350 box as the main picture,
+ * JPEG because carriers do not reliably take WebP, and stepped down until it
+ * fits its share of the message.
+ */
+export async function renderDealDetail(photo: Buffer, targetBytes: number): Promise<RenderedDealCard> {
+  const fitted = await sharp(photo)
+    .rotate()
+    .resize(DEAL_CARD_MAX_WIDTH, DEAL_CARD_MAX_HEIGHT, { fit: 'inside', withoutEnlargement: true })
+    .toColorspace('srgb')
+    .flatten({ background: '#ffffff' })
+    .png()
+    .toBuffer();
+  const meta = await sharp(fitted).metadata();
+  const width = meta.width ?? DEAL_CARD_MAX_WIDTH;
+
+  let jpeg: Buffer<ArrayBuffer> | null = null;
+  for (const step of DETAIL_STEPS) {
+    const base = step.scale === 1 ? sharp(fitted) : sharp(fitted).resize(Math.round(width * step.scale));
+    jpeg = toOwnedBuffer(await base.jpeg({ quality: step.quality, mozjpeg: true }).toBuffer());
+    if (jpeg.byteLength <= targetBytes) break;
+  }
+  if (!jpeg) throw new Error('Could not render the detail shot.');
+  const out = await sharp(jpeg).metadata();
+  return { jpeg, width: out.width ?? width, height: out.height ?? (meta.height ?? DEAL_CARD_MAX_HEIGHT), bytes: jpeg.byteLength };
 }

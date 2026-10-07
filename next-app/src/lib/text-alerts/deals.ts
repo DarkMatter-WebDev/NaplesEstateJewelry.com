@@ -5,7 +5,18 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { PRODUCT_IMAGES_BUCKET } from '@/lib/product-image-storage';
 import { encodeProductImageToWebp } from '@/lib/product-image-encode';
 import { brandMediaUrl, twilioConfigured } from './config';
-import { renderDealCard } from './card';
+import { renderDealCard, renderDealDetail } from './card';
+import {
+  dealMediaPaths,
+  dealPhotoLimitMessage,
+  dealPhotoList,
+  dealPhotoUpdate,
+  dealPictureBudget,
+  DEAL_PHOTO_MAX,
+  withDealPhotoAdded,
+  withDealPhotoAsMain,
+  withDealPhotoRemoved,
+} from './deal-photos';
 import { dealText, DEFAULT_SOLD_REPLY, soldNoticeText, winnerText } from './messages';
 import { sendTwilioMessage, TwilioError } from './twilio';
 
@@ -13,6 +24,10 @@ import { sendTwilioMessage, TwilioError } from './twilio';
  * Text deals — pieces that never reach the website (owner, 2026-09-15):
  * a phone photo, a price, one line, the owner's message → a picture message
  * to every CONFIRMED number. The reply is the claim.
+ *
+ * Since 2026-10-07 a deal holds up to five photos — one main picture with the
+ * price drawn on it and up to four detail shots, only resized — sent as ONE
+ * message, the main picture first. The rules are in `deal-photos.ts`.
  *
  * Send discipline (memory: after-is-best-effort-on-netlify): one queued row
  * per recipient is written FIRST, each row flips to sent/failed as Twilio
@@ -32,6 +47,9 @@ export type DealRow = {
   message: string;
   photo_path: string | null;
   card_path: string | null;
+  /** Detail shots and their rendered JPEGs; absent on a row read before `text-deals-photos-2026-10.sql` ran. */
+  detail_photo_paths?: string[] | null;
+  detail_media_paths?: string[] | null;
   status: DealStatus;
   recipients_count: number;
   sent_at: string | null;
@@ -79,23 +97,149 @@ export async function readStoredPhoto(service: SupabaseClient, path: string): Pr
   return Buffer.from(await data.arrayBuffer());
 }
 
-/** Render + store the picture message for a deal; returns its public URL. */
-export async function buildDealCard(service: SupabaseClient, deal: DealRow): Promise<{ path: string; url: string; bytes: number }> {
-  if (!deal.photo_path) throw new Error('Add a photo before sending.');
-  const photo = await readStoredPhoto(service, deal.photo_path);
-  const card = await renderDealCard(photo, { price: deal.price_text, line: deal.title, badge: 'First reply wins' });
-  const hash = createHash('sha256').update(card.jpeg).digest('hex').slice(0, 12);
-  const path = `${TEXT_DEALS_PREFIX}/${safeId(deal.id)}/card-${hash}.jpg`;
+export type DealPicture = { path: string; url: string; bytes: number; main: boolean };
+export type DealPhoto = { path: string; url: string };
+
+/** The deal's photos with their public URLs, the main one first (for the composer). */
+export function dealPhotos(service: SupabaseClient, deal: DealRow): DealPhoto[] {
+  return dealPhotoList(deal).map((path) => ({ path, url: publicUrl(service, path) }));
+}
+
+/** The rendered pictures' public URLs in sending order, or null when Preview has not run. */
+export function dealMediaUrls(service: SupabaseClient, deal: DealRow): string[] | null {
+  return dealMediaPaths(deal)?.map((path) => publicUrl(service, path)) ?? null;
+}
+
+async function storeDealJpeg(service: SupabaseClient, dealId: string, kind: 'card' | 'detail', jpeg: Buffer): Promise<string> {
+  const hash = createHash('sha256').update(jpeg).digest('hex').slice(0, 12);
+  const path = `${TEXT_DEALS_PREFIX}/${safeId(dealId)}/${kind}-${hash}.jpg`;
   const { error } = await service.storage
     .from(PRODUCT_IMAGES_BUCKET)
-    .upload(path, card.jpeg, { contentType: 'image/jpeg', cacheControl: '31536000', upsert: true });
+    .upload(path, jpeg, { contentType: 'image/jpeg', cacheControl: '31536000', upsert: true });
   if (error) throw new Error(`Could not store the deal picture: ${error.message}`);
-  const { error: updateError } = await service
+  return path;
+}
+
+/**
+ * Render + store every picture the deal sends: the main photo with the price
+ * drawn on it, then each detail shot only resized. What Preview shows is
+ * exactly what goes out, in this order.
+ */
+export async function buildDealMedia(service: SupabaseClient, deal: DealRow): Promise<{ pictures: DealPicture[]; totalBytes: number }> {
+  const [main, ...details] = dealPhotoList(deal);
+  if (!main) throw new Error('Add a photo before sending.');
+  const budget = dealPictureBudget(details.length);
+
+  const card = await renderDealCard(await readStoredPhoto(service, main), { price: deal.price_text, line: deal.title, badge: 'First reply wins' }, budget.card);
+  const cardPath = await storeDealJpeg(service, deal.id, 'card', card.jpeg);
+  const pictures: DealPicture[] = [{ path: cardPath, url: publicUrl(service, cardPath), bytes: card.bytes, main: true }];
+
+  for (const source of details) {
+    const detail = await renderDealDetail(await readStoredPhoto(service, source), budget.detail);
+    const path = await storeDealJpeg(service, deal.id, 'detail', detail.jpeg);
+    pictures.push({ path, url: publicUrl(service, path), bytes: detail.bytes, main: false });
+  }
+
+  const update: Record<string, unknown> = { card_path: cardPath, updated_at: new Date().toISOString() };
+  // Named only when the row has the column or needs it — see `dealPhotoUpdate`.
+  if (details.length > 0 || Array.isArray(deal.detail_media_paths)) {
+    update.detail_media_paths = pictures.slice(1).map((picture) => picture.path);
+  }
+  const { error: updateError } = await service.from('text_deals').update(update).eq('id', deal.id);
+  if (updateError) throw new Error(`Could not save the deal pictures: ${updateError.message}`);
+  return { pictures, totalBytes: pictures.reduce((sum, picture) => sum + picture.bytes, 0) };
+}
+
+/** Thrown for a photo change the owner can fix (limit reached, not a draft, not on the deal). */
+export class DealPhotoError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = 'DealPhotoError';
+  }
+}
+
+async function saveDealPhotos(service: SupabaseClient, deal: DealRow, list: string[]): Promise<DealRow> {
+  const { data, error } = await service
     .from('text_deals')
-    .update({ card_path: path, updated_at: new Date().toISOString() })
-    .eq('id', deal.id);
-  if (updateError) throw new Error(`Could not save the deal picture: ${updateError.message}`);
-  return { path, url: publicUrl(service, path), bytes: card.bytes };
+    .update({ ...dealPhotoUpdate(list, Array.isArray(deal.detail_photo_paths)), updated_at: new Date().toISOString() })
+    .eq('id', deal.id)
+    .eq('status', 'draft')
+    .select('*')
+    .maybeSingle<DealRow>();
+  if (error) throw new Error(`Could not save the photos: ${error.message}`);
+  if (!data) throw new DealPhotoError('The photos can only be changed before the deal is sent.', 409);
+  return data;
+}
+
+function assertDraft(deal: DealRow): void {
+  if (deal.status !== 'draft') throw new DealPhotoError('The photos can only be changed before the deal is sent.', 409);
+}
+
+/** Add one photo to a draft: the first is the main picture, the rest are detail shots. */
+export async function addDealPhoto(service: SupabaseClient, deal: DealRow, input: Buffer): Promise<DealRow> {
+  assertDraft(deal);
+  const current = dealPhotoList(deal);
+  if (current.length >= DEAL_PHOTO_MAX) throw new DealPhotoError(dealPhotoLimitMessage(), 409);
+  const stored = await storeDealPhoto(service, deal.id, input);
+  const next = withDealPhotoAdded(current, stored.path);
+  if ('error' in next) throw new DealPhotoError(next.error, 409);
+  return saveDealPhotos(service, deal, next.list);
+}
+
+/**
+ * Remove one photo from a draft. Its stored object goes too unless another
+ * deal (a reopened copy) still uses it. The rendered JPEGs are left for the
+ * Storage GC: Twilio may still be fetching one for a test sent a moment ago.
+ */
+export async function removeDealPhoto(service: SupabaseClient, deal: DealRow, path: string): Promise<DealRow> {
+  assertDraft(deal);
+  const current = dealPhotoList(deal);
+  if (!current.includes(path)) throw new DealPhotoError('That photo is not on this deal.', 404);
+  const saved = await saveDealPhotos(service, deal, withDealPhotoRemoved(current, path));
+  await removeUnsharedObjects(service, [path], deal.id);
+  return saved;
+}
+
+/** "Make main": the photo swaps into the first place; the price is drawn on it at the next Preview. */
+export async function makeDealPhotoMain(service: SupabaseClient, deal: DealRow, path: string): Promise<DealRow> {
+  assertDraft(deal);
+  const current = dealPhotoList(deal);
+  if (!current.includes(path)) throw new DealPhotoError('That photo is not on this deal.', 404);
+  return saveDealPhotos(service, deal, withDealPhotoAsMain(current, path));
+}
+
+/** Every stored object a deal row points at: its photos and its rendered pictures. */
+function dealObjectPaths(row: Partial<DealRow>): string[] {
+  const detailMedia = Array.isArray(row.detail_media_paths) ? row.detail_media_paths : [];
+  return [...dealPhotoList({ photo_path: row.photo_path ?? null, detail_photo_paths: row.detail_photo_paths }), row.card_path, ...detailMedia]
+    .filter((path): path is string => typeof path === 'string' && path.length > 0);
+}
+
+/**
+ * Remove stored objects that no OTHER deal still points at (a reopened copy
+ * shares its source photos). `select('*')` on purpose: the table is small and
+ * the read must not depend on the detail columns existing. ⛔ If the other
+ * deals cannot be read, nothing is removed — the Storage GC cleans up later.
+ */
+async function removeUnsharedObjects(service: SupabaseClient, candidates: string[], dealId: string): Promise<number> {
+  if (candidates.length === 0) return 0;
+  const { data: others, error } = await service.from('text_deals').select('*').neq('id', dealId);
+  if (error) {
+    console.error('[text-alerts] deal object cleanup skipped', error.message);
+    return 0;
+  }
+  const stillUsed = new Set<string>();
+  for (const row of (others as Array<Partial<DealRow>> | null) ?? []) {
+    for (const path of dealObjectPaths(row)) stillUsed.add(path);
+  }
+  const removable = candidates.filter((p) => !stillUsed.has(p));
+  if (removable.length === 0) return 0;
+  const { error: storageError } = await service.storage.from(PRODUCT_IMAGES_BUCKET).remove(removable);
+  if (storageError) {
+    console.error('[text-alerts] deal object cleanup failed', storageError.message);
+    return 0;
+  }
+  return removable.length;
 }
 
 export async function loadDeal(service: SupabaseClient, dealId: string): Promise<DealRow | null> {
@@ -125,7 +269,7 @@ export async function startDealSend(dealId: string): Promise<SendPassResult> {
   const deal = await loadDeal(service, dealId);
   if (!deal) throw new Error('Deal not found.');
   if (deal.status === 'sold') throw new Error('This deal is marked sold.');
-  if (!deal.card_path) await buildDealCard(service, deal);
+  if (!dealMediaPaths(deal)) await buildDealMedia(service, deal);
 
   const recipients = await listConfirmedRecipients(service);
   if (recipients.length === 0) throw new Error('Nobody has confirmed text alerts yet.');
@@ -156,8 +300,9 @@ export async function runDealSendPass(dealId: string, limit = SEND_PASS_LIMIT): 
     result.notConfigured = true;
     return result;
   }
-  if (!deal.card_path) throw new Error('The deal has no picture yet.');
-  const mediaUrl = publicUrl(service, deal.card_path);
+  // One message, every picture, the main one first.
+  const mediaUrls = dealMediaUrls(service, deal);
+  if (!mediaUrls) throw new Error('The deal has no picture yet.');
   const body = dealText({ title: deal.title, price: deal.price_text, message: deal.message });
 
   const { data: queued, error } = await service
@@ -180,7 +325,7 @@ export async function runDealSendPass(dealId: string, limit = SEND_PASS_LIMIT): 
       .select('id');
     if (!claimed || claimed.length === 0) continue;
     try {
-      const sent = await sendTwilioMessage({ to: row.phone_e164, body, mediaUrl });
+      const sent = await sendTwilioMessage({ to: row.phone_e164, body, mediaUrls });
       await service
         .from('text_deal_sends')
         .update({ status: 'sent', message_sid: sent.sid, sent_at: new Date().toISOString(), updated_at: new Date().toISOString() })
@@ -223,9 +368,9 @@ export async function sendDealTest(dealId: string, to: string): Promise<{ sid: s
   const deal = await loadDeal(service, dealId);
   if (!deal) throw new Error('Deal not found.');
   if (!twilioConfigured()) throw new Error('Twilio is not configured yet.');
-  const card = deal.card_path ? { url: publicUrl(service, deal.card_path) } : await buildDealCard(service, deal);
+  const mediaUrls = dealMediaUrls(service, deal) ?? (await buildDealMedia(service, deal)).pictures.map((picture) => picture.url);
   const body = dealText({ title: deal.title, price: deal.price_text, message: deal.message });
-  const sent = await sendTwilioMessage({ to, body, mediaUrl: card.url });
+  const sent = await sendTwilioMessage({ to, body, mediaUrls });
   await service.from('text_system_messages').insert({ kind: 'deal_test', to_phone: to, deal_id: dealId, message_sid: sent.sid, status: sent.status });
   return { sid: sent.sid };
 }
@@ -318,7 +463,7 @@ export const REOPEN_MESSAGE = 'Back available - the earlier sale fell through. F
 /**
  * "Reopen — edit & resend" (owner, 2026-09-18): when a sale falls through,
  * the deal goes out again as a NEW draft that copies the title, price and
- * photo (same stored object), with a fresh message the owner can edit. A new
+ * every photo (same stored objects), with a fresh message the owner can edit. A new
  * row — not a status flip — because every send is once-per-phone-per-deal
  * (`text_deal_sends`), replies attach to a subscriber's LAST deal, and the
  * sold deal keeps its history. The old row stays as it was.
@@ -327,6 +472,7 @@ export async function reopenDealAsDraft(dealId: string): Promise<DealRow> {
   const service = createServiceClient();
   const source = await loadDeal(service, dealId);
   if (!source) throw new Error('Deal not found.');
+  const details = dealPhotoList(source).slice(1);
   const { data, error } = await service
     .from('text_deals')
     .insert({
@@ -335,6 +481,8 @@ export async function reopenDealAsDraft(dealId: string): Promise<DealRow> {
       message: REOPEN_MESSAGE,
       photo_path: source.photo_path,
       card_path: null,
+      // The detail shots come along; their pictures are rendered again on Preview.
+      ...(details.length > 0 ? { detail_photo_paths: details } : {}),
       status: 'draft',
       sold_reply_text: source.sold_reply_text,
     })
@@ -357,28 +505,9 @@ export async function deleteDeal(dealId: string): Promise<{ removedObjects: numb
   if (!deal) throw new Error('Deal not found.');
   if (deal.status === 'sending') throw new Error('This deal is still sending — wait for it to finish, then delete it.');
 
-  const candidates = [deal.photo_path, deal.card_path].filter((p): p is string => Boolean(p));
-  let removable: string[] = [];
-  if (candidates.length > 0) {
-    const { data: others } = await service
-      .from('text_deals')
-      .select('photo_path, card_path')
-      .neq('id', dealId);
-    const stillUsed = new Set<string>();
-    for (const row of others ?? []) {
-      if (row.photo_path) stillUsed.add(row.photo_path);
-      if (row.card_path) stillUsed.add(row.card_path);
-    }
-    removable = candidates.filter((p) => !stillUsed.has(p));
-  }
-
   const { error } = await service.from('text_deals').delete().eq('id', dealId);
   if (error) throw new Error(`Could not delete the deal: ${error.message}`);
-  if (removable.length > 0) {
-    const { error: storageError } = await service.storage.from(PRODUCT_IMAGES_BUCKET).remove(removable);
-    if (storageError) console.error('[text-alerts] deal object cleanup failed', storageError.message);
-  }
-  return { removedObjects: removable.length };
+  return { removedObjects: await removeUnsharedObjects(service, dealObjectPaths(deal), dealId) };
 }
 
 export async function markDealAvailable(dealId: string): Promise<DealRow> {

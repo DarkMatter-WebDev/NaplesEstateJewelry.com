@@ -785,7 +785,9 @@ profile and feed-read proof before local cleanup.
 Owner-facing flow: homepage **Join the List** window → `homepage_subscribers`
 row with `phone_e164`, `sms_status = 'pending'` → one confirmation text →
 handset replies YES → `confirmed` → Admin → **Text Deals** sends a picture
-message (the owner's photo with the price drawn on it) to confirmed numbers →
+message (the owner's photo with the price drawn on it, plus — since
+2026-10-07 — up to four detail shots, all in one message with the main
+picture first) to confirmed numbers →
 replies come back to the toll-free number and are forwarded to the owner's
 cell. Pieces sold this way are never listed on the site; the reply is the
 claim (`DECISIONS.md` → *"Text deals: the reply is the claim…"*).
@@ -799,6 +801,7 @@ claim (`DECISIONS.md` → *"Text deals: the reply is the claim…"*).
   answers TwiML) — the number's "A message comes in" webhook. Delivery:
   `POST /api/webhooks/twilio/status`.
 - **Tables** (service-role only): `text_deals` (photo_path, card_path,
+  detail_photo_paths, detail_media_paths — `text-deals-photos-2026-10.sql`,
   status draft/sending/sent/sold, sold_reply_text), `text_deal_sends`
   (unique deal+phone, queued→sending→sent/failed, message_sid),
   `text_inbound` (unique message_sid, kind confirm/stop/help/reply,
@@ -811,7 +814,9 @@ claim (`DECISIONS.md` → *"Text deals: the reply is the claim…"*).
   mid-send. Same trigger-agnostic pattern as the marketplace reconciles.
 - **Rendering:** `src/lib/text-alerts/card.ts` — sharp + Satori (next/og)
   with the vendored fonts, traced into the text-deals routes in
-  `next.config.ts`.
+  `next.config.ts`. Detail shots (`renderDealDetail`) are sharp only: resized
+  to the same 1080 × 1350 box, JPEG, nothing drawn. The photo rules (five per
+  deal, sending order, byte targets) are pure, in `deal-photos.ts`.
 
 ## Buy Receipts + Print Station (2026-09-30)
 

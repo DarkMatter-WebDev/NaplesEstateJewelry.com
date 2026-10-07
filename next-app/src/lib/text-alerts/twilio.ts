@@ -24,11 +24,15 @@ export type SentMessage = {
 };
 
 const REQUEST_TIMEOUT_MS = 15_000;
+/** Twilio accepts at most ten pictures on one message. */
+export const TWILIO_MEDIA_MAX = 10;
 
 export async function sendTwilioMessage(input: {
   to: string;
   body: string;
   mediaUrl?: string | null;
+  /** Several pictures on ONE message, in this order (a deal's main picture first). */
+  mediaUrls?: string[];
 }): Promise<SentMessage> {
   const config = twilioConfig();
   if (!config) throw new TwilioError('Twilio is not configured.', null, null);
@@ -38,7 +42,8 @@ export async function sendTwilioMessage(input: {
   form.set('From', config.fromNumber);
   form.set('Body', input.body);
   form.set('StatusCallback', statusCallbackUrl());
-  if (input.mediaUrl) form.set('MediaUrl', input.mediaUrl);
+  const media = input.mediaUrls?.length ? input.mediaUrls : input.mediaUrl ? [input.mediaUrl] : [];
+  for (const url of media.slice(0, TWILIO_MEDIA_MAX)) form.append('MediaUrl', url);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);

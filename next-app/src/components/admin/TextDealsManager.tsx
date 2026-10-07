@@ -3,13 +3,17 @@
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
 import { formatUsPhone } from '@/lib/subscriber-phone';
 import { DEFAULT_DEAL_MESSAGE, DEAL_MESSAGE_MAX, DEAL_TITLE_MAX } from '@/lib/text-alerts/deal-input';
+import { DEAL_PHOTO_MAX, formatPictureBytes } from '@/lib/text-alerts/deal-photos';
 import { DEFAULT_SOLD_REPLY, dealText } from '@/lib/text-alerts/messages';
 
 /**
  * Admin → Text Deals (owner mockup v2 sections 3b + 3c, 2026-09-15).
  *
- * Left: the composer (photo, price, one line, message) → Preview renders the
- * picture on the server → Send a test to the owner's cell → Send to N.
+ * Left: the composer (photos, price, one line, message) → Preview renders the
+ * pictures on the server → Send a test to the owner's cell → Send to N.
+ * Up to five photos (owner, 2026-10-07): the first is the main picture, with
+ * the price drawn on it; the rest are detail shots, sent as they are — all in
+ * one text. The rules live in `lib/text-alerts/deal-photos.ts`.
  * Right: the deal list; a selected deal shows its send tally and the replies
  * in clock order with the first flagged, plus Mark sold / Mark available.
  * Sold sends the polite one-liner to anyone who answers late (wording
@@ -44,7 +48,10 @@ type Reply = {
   first: boolean;
 };
 
-type Detail = { deal: Deal & { card_url: string | null; photo_url: string | null }; tally: Record<string, number>; replies: Reply[] };
+type Photo = { path: string; url: string };
+type Picture = { url: string; bytes: number; main: boolean };
+
+type Detail = { deal: Deal & { card_url: string | null; photos: Photo[]; media_urls: string[] }; tally: Record<string, number>; replies: Reply[] };
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', {
   month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York',
@@ -73,9 +80,9 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
   const [price, setPrice] = useState('');
   const [message, setMessage] = useState(DEFAULT_DEAL_MESSAGE);
   const [draftId, setDraftId] = useState<string | null>(null);
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-  const [cardUrl, setCardUrl] = useState<string | null>(null);
-  const [cardBytes, setCardBytes] = useState<number | null>(null);
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [pictures, setPictures] = useState<Picture[] | null>(null);
+  const [uploading, setUploading] = useState<string | null>(null);
   const [soldReply, setSoldReply] = useState(DEFAULT_SOLD_REPLY);
   const [reopenedFrom, setReopenedFrom] = useState<string | null>(null);
 
@@ -114,7 +121,7 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
     const payload = { title, price, message };
     if (draftId) {
       const data = await readJson(await fetch(`/api/admin/text-deals/${draftId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }));
-      setCardUrl(null);
+      setPictures(null);
       setDeals((current) => current.map((d) => (d.id === draftId ? data.deal : d)));
       return draftId;
     }
@@ -124,20 +131,49 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
     return data.deal.id as string;
   }
 
-  async function onPhoto(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
+  async function onPhotos(event: ChangeEvent<HTMLInputElement>) {
+    const picked = Array.from(event.target.files ?? []);
     event.target.value = '';
-    if (!file) return;
+    if (picked.length === 0) return;
+    const files = picked.slice(0, Math.max(DEAL_PHOTO_MAX - photos.length, 0));
+    const leftOut = picked.length - files.length;
+    if (files.length === 0) { setNotice({ text: `A deal holds up to ${DEAL_PHOTO_MAX} photos. Remove one to add another.`, ok: false }); return; }
+    setBusy('photo');
+    setNotice(null);
+    let added = 0;
+    try {
+      const id = await saveDraft();
+      // One photo per request, in the order picked: the first photo on a deal is the main one.
+      for (const file of files) {
+        setUploading(`Uploading ${added + 1} of ${files.length}…`);
+        const data = await readJson(await fetch(`/api/admin/text-deals/photo?dealId=${encodeURIComponent(id)}`, { method: 'POST', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file }));
+        setPhotos(data.photos ?? []);
+        setPictures(null);
+        added += 1;
+      }
+      setNotice({ text: `${added === 1 ? 'Photo' : `${added} photos`} saved.${leftOut > 0 ? ` ${leftOut} left out — a deal holds up to ${DEAL_PHOTO_MAX}.` : ''} Preview to see the price on the main one.`, ok: leftOut === 0 });
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : 'Could not upload the photo.';
+      setNotice({ text: added > 0 ? `${added} of ${files.length} saved, then: ${reason}` : reason, ok: false });
+    } finally {
+      setUploading(null);
+      setBusy(null);
+    }
+  }
+
+  async function changePhotos(action: 'remove' | 'main', path: string) {
+    if (!draftId) return;
     setBusy('photo');
     setNotice(null);
     try {
-      const id = await saveDraft();
-      const data = await readJson(await fetch(`/api/admin/text-deals/photo?dealId=${encodeURIComponent(id)}`, { method: 'POST', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file }));
-      setPhotoUrl(data.url);
-      setCardUrl(null);
-      setNotice({ text: 'Photo saved. Preview to see the price on it.', ok: true });
+      const base = `/api/admin/text-deals/photo?dealId=${encodeURIComponent(draftId)}`;
+      const data = await readJson(action === 'remove'
+        ? await fetch(`${base}&path=${encodeURIComponent(path)}`, { method: 'DELETE' })
+        : await fetch(base, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ main: path }) }));
+      setPhotos(data.photos ?? []);
+      setPictures(null);
     } catch (err) {
-      setNotice({ text: err instanceof Error ? err.message : 'Could not upload the photo.', ok: false });
+      setNotice({ text: err instanceof Error ? err.message : 'Could not change the photos.', ok: false });
     } finally {
       setBusy(null);
     }
@@ -149,13 +185,12 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
     setNotice(null);
     try {
       const id = await saveDraft();
-      if (!photoUrl) throw new Error('Add a photo first.');
-      const data = await readJson(await fetch('/api/admin/text-deals/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dealId: id }) }));
-      setCardUrl(`${data.url}?v=${Date.now()}`);
-      setCardBytes(data.bytes);
-      setNotice({ text: `Picture ready (${Math.round(data.bytes / 1024)} KB).`, ok: true });
+      if (photos.length === 0) throw new Error('Add a photo first.');
+      const data = (await readJson(await fetch('/api/admin/text-deals/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dealId: id }) }))) as { pictures: Picture[]; totalBytes: number };
+      setPictures(data.pictures);
+      setNotice({ text: `${data.pictures.length === 1 ? 'Picture' : `${data.pictures.length} pictures`} ready (${formatPictureBytes(data.totalBytes)}).`, ok: true });
     } catch (err) {
-      setNotice({ text: err instanceof Error ? err.message : 'Could not render the picture.', ok: false });
+      setNotice({ text: err instanceof Error ? err.message : 'Could not render the pictures.', ok: false });
     } finally {
       setBusy(null);
     }
@@ -176,7 +211,7 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
   }
 
   async function onSend() {
-    if (!draftId || !cardUrl) { setNotice({ text: 'Preview first, then send.', ok: false }); return; }
+    if (!draftId || !pictures) { setNotice({ text: 'Preview first, then send.', ok: false }); return; }
     if (!window.confirm(`Send this deal to ${confirmed} confirmed number${confirmed === 1 ? '' : 's'}?`)) return;
     setBusy('send');
     setNotice(null);
@@ -184,7 +219,7 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
       const data = await readJson(await fetch(`/api/admin/text-deals/${draftId}/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }));
       setNotice({ text: data.finished ? `Sent to ${data.sent}${data.failed ? `, ${data.failed} failed` : ''}.` : `Sending: ${data.sent} so far, ${data.remaining} to go (the sweep finishes it).`, ok: true });
       const id = draftId;
-      setDraftId(null); setTitle(''); setPrice(''); setMessage(DEFAULT_DEAL_MESSAGE); setPhotoUrl(null); setCardUrl(null); setCardBytes(null); setReopenedFrom(null);
+      setDraftId(null); setTitle(''); setPrice(''); setMessage(DEFAULT_DEAL_MESSAGE); setPhotos([]); setPictures(null); setReopenedFrom(null);
       await loadList();
       setSelectedId(id);
     } catch (err) {
@@ -224,11 +259,11 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
       const data = await readJson(await fetch(`/api/admin/text-deals/${detail.deal.id}/reopen`, { method: 'POST' }));
       const d = data.deal;
       setDraftId(d.id); setTitle(d.title); setPrice(d.price_text); setMessage(d.message);
-      setPhotoUrl(d.photo_url ?? null); setCardUrl(null); setCardBytes(null);
+      setPhotos(d.photos ?? []); setPictures(null);
       setReopenedFrom(detail.deal.id);
       await loadList();
       setSelectedId(null); setDetail(null);
-      setNotice({ text: 'Reopened as a new draft with the same photo and price. Edit the message, Preview, then Send.', ok: true });
+      setNotice({ text: 'Reopened as a new draft with the same photos and price. Edit the message, Preview, then Send.', ok: true });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       setNotice({ text: err instanceof Error ? err.message : 'Could not reopen the deal.', ok: false });
@@ -244,7 +279,7 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
     setNotice(null);
     try {
       await readJson(await fetch(`/api/admin/text-deals/${detail.deal.id}`, { method: 'DELETE' }));
-      if (draftId === detail.deal.id) { setDraftId(null); setTitle(''); setPrice(''); setMessage(DEFAULT_DEAL_MESSAGE); setPhotoUrl(null); setCardUrl(null); setCardBytes(null); setReopenedFrom(null); }
+      if (draftId === detail.deal.id) { setDraftId(null); setTitle(''); setPrice(''); setMessage(DEFAULT_DEAL_MESSAGE); setPhotos([]); setPictures(null); setReopenedFrom(null); }
       setSelectedId(null); setDetail(null);
       await loadList();
       setNotice({ text: 'Deal deleted.', ok: true });
@@ -273,17 +308,35 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
             <span className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>{confirmed} confirmed · {pending} pending YES</span>
           </div>
 
-          <label className="block">
-            <span className={label} style={labelStyle}>Photo</span>
+          <div>
+            <span className={label} style={labelStyle}>Photos · {photos.length} of {DEAL_PHOTO_MAX}</span>
             <div className="flex flex-wrap items-center gap-3">
-              <label className="outline-button text-xs cursor-pointer" style={busy !== null ? { opacity: 0.5, pointerEvents: 'none' } : undefined}>
-                {busy === 'photo' ? 'Uploading…' : photoUrl ? 'Change photo' : 'Choose photo'}
-                <input type="file" accept="image/*" onChange={onPhoto} disabled={busy !== null} className="sr-only" />
+              <label className="outline-button text-xs cursor-pointer" style={busy !== null || photos.length >= DEAL_PHOTO_MAX ? { opacity: 0.5, pointerEvents: 'none' } : undefined}>
+                {uploading ?? 'Add photos'}
+                <input type="file" accept="image/*" multiple onChange={onPhotos} disabled={busy !== null || photos.length >= DEAL_PHOTO_MAX} className="sr-only" />
               </label>
-              <span className="text-xs" style={{ color: photoUrl ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}>{photoUrl ? 'Photo saved' : 'No photo yet'}</span>
+              <span className="text-xs" style={{ color: photos.length > 0 ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}>{photos.length === 0 ? 'No photos yet' : photos.length === 1 ? '1 photo saved' : `${photos.length} photos saved`}</span>
             </div>
-            <span className="mt-1 block text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>Any phone photo. It is resized and kept small enough for every carrier.</span>
-          </label>
+            {photos.length > 0 && (
+              <ul className="mt-2.5 flex flex-wrap gap-2.5">
+                {photos.map((photo, index) => (
+                  <li key={photo.path} className="w-20 sm:w-[100px]">
+                    <div className="relative aspect-square overflow-hidden rounded-lg bg-black" style={index === 0 ? { border: '2px solid var(--color-primary-container)', boxShadow: '0 0 0 3px color-mix(in srgb, var(--color-primary-container) 22%, transparent)' } : { border: '1px solid var(--color-outline-variant)' }}>
+                      <img src={photo.url} alt="" className="h-full w-full object-cover" />
+                      <button type="button" onClick={() => changePhotos('remove', photo.path)} disabled={busy !== null} aria-label={`Remove photo ${index + 1}`} title="Remove" className="absolute right-1 top-1 h-[22px] w-[22px] rounded-full text-[13px] font-bold leading-[20px] text-white disabled:opacity-50" style={{ background: 'rgba(0,0,0,0.62)', border: '1px solid rgba(255,255,255,0.75)' }}>×</button>
+                      {index === 0 && <span className="absolute inset-x-0 bottom-0 py-[3px] text-center text-[0.6rem] font-bold uppercase tracking-[0.16em]" style={{ background: 'var(--color-primary-container)', color: '#171717' }}>Main</span>}
+                    </div>
+                    {index === 0 ? (
+                      <span className="mt-1 block text-center text-[0.7rem]" style={{ color: 'var(--color-on-surface-variant)' }}>Price goes here</span>
+                    ) : (
+                      <button type="button" onClick={() => changePhotos('main', photo.path)} disabled={busy !== null} className="mt-1 block w-full text-center text-[0.7rem] font-bold underline disabled:opacity-50" style={{ color: 'var(--color-primary)' }}>Make main</button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <span className="mt-1 block text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>Up to {DEAL_PHOTO_MAX}: one main picture (the price is drawn on it) and up to {DEAL_PHOTO_MAX - 1} detail shots, sent as they are. All go out in one text.</span>
+          </div>
 
           <div className="grid gap-3 sm:grid-cols-[130px_1fr]">
             <label className="block">
@@ -306,23 +359,36 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
             <span className="font-bold">Text as it will read:</span> {previewText}
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 items-start">
-            <div>
-              <span className={label} style={labelStyle}>Photo</span>
-              {photoUrl ? <img src={photoUrl} alt="" className="w-full rounded-lg border" style={{ borderColor: 'var(--color-outline-variant)' }} /> : <div className="rounded-lg border border-dashed p-6 text-center text-xs" style={{ borderColor: 'var(--color-outline-variant)', color: 'var(--color-on-surface-variant)' }}>No photo yet</div>}
-            </div>
-            <div>
-              <span className={label} style={labelStyle}>Picture message{cardBytes ? ` · ${Math.round(cardBytes / 1024)} KB` : ''}</span>
-              {cardUrl ? <img src={cardUrl} alt="Deal picture preview" className="w-full rounded-lg border" style={{ borderColor: 'var(--color-outline-variant)' }} /> : <div className="rounded-lg border border-dashed p-6 text-center text-xs" style={{ borderColor: 'var(--color-outline-variant)', color: 'var(--color-on-surface-variant)' }}>Preview to render</div>}
-            </div>
+          <div>
+            <span className={label} style={labelStyle}>Pictures as they will be sent{pictures ? ` · ${pictures.length === 1 ? '1 picture' : `${pictures.length} pictures`} · ${formatPictureBytes(pictures.reduce((sum, picture) => sum + picture.bytes, 0))}${pictures.length > 1 ? ' in all' : ''}` : ''}</span>
+            {pictures ? (
+              <div className="grid gap-3 sm:grid-cols-[1.25fr_1fr] items-start">
+                <div>
+                  <img src={pictures[0].url} alt="Main picture preview" className="w-full rounded-lg border" style={{ borderColor: 'var(--color-outline-variant)' }} />
+                  <span className="mt-1 block text-[0.7rem]" style={{ color: 'var(--color-on-surface-variant)' }}>1 · main picture, with the price</span>
+                </div>
+                {pictures.length > 1 && (
+                  <div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {pictures.slice(1).map((picture, index) => (
+                        <img key={picture.url} src={picture.url} alt={`Detail shot ${index + 1} preview`} className="aspect-square w-full rounded-lg border object-cover" style={{ borderColor: 'var(--color-outline-variant)' }} />
+                      ))}
+                    </div>
+                    <span className="mt-1 block text-[0.7rem]" style={{ color: 'var(--color-on-surface-variant)' }}>{pictures.length === 2 ? '2 · detail shot, nothing drawn on it' : `2–${pictures.length} · detail shots, nothing drawn on them`}</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed p-6 text-center text-xs" style={{ borderColor: 'var(--color-outline-variant)', color: 'var(--color-on-surface-variant)' }}>Preview to render</div>
+            )}
           </div>
 
           <div className="flex flex-wrap gap-2">
             <button type="submit" className="outline-button text-xs" disabled={busy !== null}>{busy === 'preview' ? 'Rendering…' : 'Preview'}</button>
-            <button type="button" className="outline-button text-xs" onClick={onTest} disabled={busy !== null || !configured || !cardUrl} title={configured ? '' : 'Twilio is not configured yet'}>
+            <button type="button" className="outline-button text-xs" onClick={onTest} disabled={busy !== null || !configured || !pictures} title={configured ? '' : 'Twilio is not configured yet'}>
               {busy === 'test' ? 'Sending…' : `Send a test to ${formatUsPhone(forwardTo)}`}
             </button>
-            <button type="button" className="gold-button text-xs" onClick={onSend} disabled={busy !== null || !configured || !cardUrl || confirmed === 0}>
+            <button type="button" className="gold-button text-xs" onClick={onSend} disabled={busy !== null || !configured || !pictures || confirmed === 0}>
               {busy === 'send' ? 'Sending…' : `Send to ${confirmed}`}
             </button>
           </div>
@@ -357,6 +423,7 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
                   <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
                     {STATUS_LABEL[detail.deal.status]}{detail.deal.sent_at ? ` · sent ${formatWhen(detail.deal.sent_at)} to ${detail.deal.recipients_count}` : ''}
                     {Object.keys(detail.tally).length > 0 && ` · ${Object.entries(detail.tally).map(([k, v]) => `${v} ${k}`).join(', ')}`}
+                    {detail.deal.media_urls.length > 1 && ` · ${detail.deal.media_urls.length} pictures`}
                   </p>
                 </div>
                 {detail.deal.card_url && <img src={detail.deal.card_url} alt="" className="w-20 rounded border" style={{ borderColor: 'var(--color-outline-variant)' }} />}
