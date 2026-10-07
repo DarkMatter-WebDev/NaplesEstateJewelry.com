@@ -7,7 +7,9 @@ import {
   DEAL_DETAIL_TARGET_BYTES,
   DEAL_MESSAGE_TARGET_BYTES,
   DEAL_PHOTO_MAX,
+  dealLineFontSize,
   dealMediaPaths,
+  dealPhotoCounter,
   dealPhotoList,
   dealPhotoUpdate,
   dealPictureBudget,
@@ -83,6 +85,42 @@ describe('text-deal photos: what is sent', () => {
     expect(full.card + (DEAL_PHOTO_MAX - 1) * full.detail).toBeLessThanOrEqual(DEAL_MESSAGE_TARGET_BYTES);
   });
 
+  it('numbers every picture "Photo N of M" — the main one is 1 — and leaves a one-photo deal alone', () => {
+    // Owner, 2026-10-07: "if they view the last one and see 'pic 5 of 5', they know
+    // its the last one and to look at others" → mockup 4 → "option b, and use Photo".
+    expect(dealPhotoCounter(0, 5)).toBe('Photo 1 of 5');
+    expect(dealPhotoCounter(4, 5)).toBe('Photo 5 of 5');
+    expect(dealPhotoCounter(1, 2)).toBe('Photo 2 of 2');
+    expect(dealPhotoCounter(0, 1)).toBeNull();
+    expect(dealPhotoCounter(0, 0)).toBeNull();
+    const deals = read('lib/text-alerts/deals.ts');
+    expect(deals).toContain('const total = details.length + 1;');
+    expect(deals).toContain("badge: 'First reply wins', counter: dealPhotoCounter(0, total) }");
+    // One gold tag, drawn the same way on the main picture and on the detail strip.
+    const card = read('lib/text-alerts/card.ts');
+    expect(card.match(/counterNode\(content\.counter,/g)).toHaveLength(2);
+    expect(card).toContain("backgroundColor: '#e9c349'");
+    expect(card).toContain("content.counter ? counterNode(content.counter, unit, 23) : null");
+  });
+
+  it('a long line shrinks to stay on ONE row instead of wrapping over the price; an ordinary line is untouched', () => {
+    const ordinary = '14K byzantine chain · 20 in · 18.4 g';
+    expect(dealLineFontSize(ordinary, 26, 3)).toBe(26);
+    expect(dealLineFontSize('x'.repeat(57), 26, 3)).toBe(26);
+    expect(dealLineFontSize('x'.repeat(58), 26, 3)).toBeLessThan(26);
+    // The longest line the form takes (80 characters) still fits the row at the size it gets.
+    const longest = dealLineFontSize('x'.repeat(80), 26, 3);
+    expect(longest).toBeGreaterThanOrEqual(15);
+    expect(80 * (0.56 * longest + 3)).toBeLessThanOrEqual(1080 - 72);
+    // The detail strip's smaller line: full size for an ordinary line, one row at 80 characters.
+    expect(dealLineFontSize(ordinary, 20, 2.6)).toBe(20);
+    const stripLongest = dealLineFontSize('x'.repeat(80), 20, 2.6);
+    expect(80 * (0.56 * stripLongest + 2.6)).toBeLessThanOrEqual(1080 - 72);
+    const card = read('lib/text-alerts/card.ts');
+    expect(card).toContain('dealLineFontSize(content.line, 26, 3)');
+    expect(card).toContain('dealLineFontSize(content.line, 20, 2.6)');
+  });
+
   it('prints sizes the way the composer shows them', () => {
     expect(formatPictureBytes(217_000)).toBe('212 KB');
     expect(formatPictureBytes(940_000)).toBe('918 KB');
@@ -107,7 +145,7 @@ describe('text-deal photos: source guards', () => {
     // "option a, price and the one line").
     const deals = read('lib/text-alerts/deals.ts');
     expect(deals.match(/renderDealCard\(/g)).toHaveLength(1);
-    expect(deals).toContain('renderDealDetail(await readStoredPhoto(service, source), { price: deal.price_text, line: deal.title }, budget.detail)');
+    expect(deals).toContain('renderDealDetail(await readStoredPhoto(service, source), { price: deal.price_text, line: deal.title, counter: dealPhotoCounter(index + 1, total) }, budget.detail)');
     const card = read('lib/text-alerts/card.ts');
     const detail = card.slice(card.indexOf('export async function renderDealDetail('));
     expect(detail).toContain('renderStripLayer(');

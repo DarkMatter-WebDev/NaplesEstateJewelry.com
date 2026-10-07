@@ -6,6 +6,7 @@ import React from 'react';
 import sharp from 'sharp';
 import { ImageResponse } from 'next/og';
 import { toOwnedBuffer } from '@/lib/product-image-encode';
+import { dealLineFontSize } from './deal-photos';
 
 /**
  * The text-deal picture: the owner's phone photo with the price drawn on it
@@ -53,6 +54,29 @@ export interface DealCardContent {
   line: string;
   brandMark?: string;
   badge?: string;
+  /** "Photo 2 of 5" — a small gold tag at the right end of the price row; absent on a one-photo deal. */
+  counter?: string | null;
+}
+
+/**
+ * The counter tag, drawn the same way on the main picture and on the detail
+ * strip. ⛔ Written as given — "Photo 5 of 5", NOT capitals (owner,
+ * 2026-10-07: 'use "Photo" instead of "PHOTO"'), unlike every other word on
+ * the pictures.
+ */
+function counterNode(text: string, unit: number, fontSize: number, place: React.CSSProperties = {}) {
+  return node(text, {
+    padding: `${Math.round(7.5 * unit)}px ${Math.round(16 * unit)}px`,
+    borderRadius: Math.round(999 * unit),
+    backgroundColor: '#e9c349',
+    color: '#171717',
+    fontFamily: 'Hanken',
+    fontSize: Math.round(fontSize * unit),
+    fontWeight: 600,
+    letterSpacing: Math.round(1 * unit),
+    whiteSpace: 'nowrap',
+    ...place,
+  });
 }
 
 const node = (children: React.ReactNode, style: React.CSSProperties) =>
@@ -118,11 +142,16 @@ async function renderTextLayer(width: number, height: number, content: DealCardC
       bottom: Math.round(40 * unit),
       color: '#ffffff',
       fontFamily: 'Hanken',
-      fontSize: Math.round(26 * unit),
+      // 26 px, or smaller when the line is too long for one row (it must not wrap over the price).
+      fontSize: Math.round(dealLineFontSize(content.line, 26, 3) * unit),
       fontWeight: 500,
       letterSpacing: Math.round(3 * unit),
       textShadow: '0 1px 8px rgba(0,0,0,0.7)',
     }),
+    // "Photo 1 of 5": the right end of the price row, the one spot free on this picture.
+    content.counter
+      ? counterNode(content.counter, unit, 25, { position: 'absolute', right: Math.round(36 * unit), bottom: Math.round(95 * unit) })
+      : null,
   );
 
   const response = new ImageResponse(element, {
@@ -193,9 +222,12 @@ const DETAIL_STEPS = [
  * and the one line"): the main picture's soft dark fade, shorter, with a
  * smaller price and the line — no brand mark, no badge, so the detail stays
  * the subject. The price sits ABOVE the line in one bottom-anchored column, so
- * a long line that wraps pushes the price up instead of running over it.
+ * a long line that wraps pushes the price up instead of running over it. The
+ * "Photo 3 of 5" tag shares the price's row, at its right end.
  */
-async function renderStripLayer(width: number, height: number, content: Pick<DealCardContent, 'price' | 'line'>): Promise<Buffer> {
+type DealStripContent = Pick<DealCardContent, 'price' | 'line' | 'counter'>;
+
+async function renderStripLayer(width: number, height: number, content: DealStripContent): Promise<Buffer> {
   const fonts = await loadFonts();
   const unit = width / 1080;
   const fadeHeight = Math.min(height, Math.max(Math.round(height * 0.2), Math.round(170 * unit)));
@@ -222,19 +254,24 @@ async function renderStripLayer(width: number, height: number, content: Pick<Dea
           bottom: Math.round(26 * unit),
         },
       },
-      node(content.price, {
-        color: '#e9c349',
-        fontFamily: 'Caslon',
-        fontSize: Math.round(54 * unit),
-        fontWeight: 700,
-        lineHeight: 1.1,
-        textShadow: '0 2px 14px rgba(0,0,0,0.6)',
-      }),
+      React.createElement(
+        'div',
+        { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+        node(content.price, {
+          color: '#e9c349',
+          fontFamily: 'Caslon',
+          fontSize: Math.round(54 * unit),
+          fontWeight: 700,
+          lineHeight: 1.1,
+          textShadow: '0 2px 14px rgba(0,0,0,0.6)',
+        }),
+        content.counter ? counterNode(content.counter, unit, 23) : null,
+      ),
       node(content.line.toUpperCase(), {
         marginTop: Math.round(6 * unit),
         color: '#ffffff',
         fontFamily: 'Hanken',
-        fontSize: Math.round(20 * unit),
+        fontSize: Math.round(dealLineFontSize(content.line, 20, 2.6) * unit),
         fontWeight: 500,
         letterSpacing: Math.round(2.6 * unit),
         textShadow: '0 1px 8px rgba(0,0,0,0.7)',
@@ -247,6 +284,7 @@ async function renderStripLayer(width: number, height: number, content: Pick<Dea
     fonts: [
       { name: 'Caslon', data: fonts.caslonBold, weight: 700, style: 'normal' },
       { name: 'Hanken', data: fonts.hankenMedium, weight: 500, style: 'normal' },
+      { name: 'Hanken', data: fonts.hankenSemiBold, weight: 600, style: 'normal' },
     ],
   });
   return Buffer.from(await response.arrayBuffer());
@@ -261,7 +299,7 @@ async function renderStripLayer(width: number, height: number, content: Pick<Dea
  * picture, JPEG because carriers do not reliably take WebP, and stepped down
  * until it fits its share of the message.
  */
-export async function renderDealDetail(photo: Buffer, content: Pick<DealCardContent, 'price' | 'line'>, targetBytes: number): Promise<RenderedDealCard> {
+export async function renderDealDetail(photo: Buffer, content: DealStripContent, targetBytes: number): Promise<RenderedDealCard> {
   const resized = await sharp(photo)
     .rotate()
     .resize(DEAL_CARD_MAX_WIDTH, DEAL_CARD_MAX_HEIGHT, { fit: 'inside', withoutEnlargement: true })

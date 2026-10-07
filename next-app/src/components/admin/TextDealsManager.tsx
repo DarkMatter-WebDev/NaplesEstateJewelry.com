@@ -18,6 +18,10 @@ import { DEFAULT_SOLD_REPLY, dealText } from '@/lib/text-alerts/messages';
  * `lib/text-alerts/deal-photos.ts`.
  * Right: the deal list; a selected deal shows its send tally and the replies
  * in clock order with the first flagged, plus Mark sold / Mark available.
+ * Mark sold goes to the first reply, or — owner, 2026-10-07 — to any other
+ * reply ("Mark sold" on its row, asked once more before it texts anyone), or
+ * "to someone else" (a walk-in): no buyer text, everyone the deal reached is
+ * told it is taken.
  * Sold sends the polite one-liner to anyone who answers late (wording
  * editable, owner's call 2026-09-15).
  */
@@ -240,7 +244,7 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
       await Promise.all([loadList(), loadDetail(detail.deal.id)]);
       if (action === 'sold') {
         const n = result.notified;
-        const buyer = n?.winner === 'sent' ? 'The buyer got a confirmation text.' : n?.winner === 'already' ? 'The buyer was already texted.' : n?.winner === 'failed' ? 'The buyer text FAILED — text them yourself.' : 'No buyer number on this deal.';
+        const buyer = n?.winner === 'sent' ? 'The buyer got a confirmation text.' : n?.winner === 'already' ? 'The buyer was already texted.' : n?.winner === 'failed' ? 'The buyer text FAILED — text them yourself.' : 'Sold to someone else — nobody got the buyer text.';
         const others = n ? `${n.others.sent} other${n.others.sent === 1 ? '' : 's'} told it's taken${n.others.failed ? ` (${n.others.failed} failed)` : ''}${n.others.already ? ` (${n.others.already} already told)` : ''}.` : '';
         setNotice({ text: `Marked sold. ${buyer} ${others} Late replies get the auto-reply.`.replace(/\s+/g, ' '), ok: n?.winner !== 'failed' });
       } else {
@@ -251,6 +255,13 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
     } finally {
       setBusy(null);
     }
+  }
+
+  /** "Mark sold" on a reply's row: that person is the buyer, whoever answered first. Asks once — the wrong row would text the wrong person. */
+  function sellToReply(reply: Reply) {
+    const who = reply.name ?? formatUsPhone(reply.from_phone);
+    if (!window.confirm(`Mark sold to ${who}? They get the "It's yours" text, and everyone else who got the deal is told it is taken.`)) return;
+    void setSold('sold', reply.from_phone);
   }
 
   async function onReopen() {
@@ -437,11 +448,20 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
                   <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>No replies yet.</p>
                 ) : (
                   <ul className="divide-y" style={{ borderColor: 'var(--color-outline-variant)' }}>
-                    {detail.replies.map((reply) => (
+                    {detail.replies.map((reply, index) => (
                       <li key={reply.id} className="py-2 grid grid-cols-[auto_1fr_auto] gap-3 items-baseline text-sm" style={reply.first ? { background: '#fffbe8', margin: '0 -0.75rem', padding: '0.5rem 0.75rem', borderLeft: '3px solid var(--color-primary-container)' } : undefined}>
                         <span className="font-semibold whitespace-nowrap">{reply.name ?? formatUsPhone(reply.from_phone)}{reply.first && <span className="ml-1 text-[0.55rem] font-extrabold uppercase tracking-[0.16em]" style={{ color: 'var(--color-primary)' }}>1st</span>}</span>
                         <span>{reply.body || (reply.num_media ? '(photo)' : '(empty)')}{reply.auto_reply_sent_at ? <span className="ml-1 text-xs italic" style={{ color: 'var(--color-on-surface-variant)' }}>· sold reply sent</span> : null}{reply.forward_error ? <span className="ml-1 text-xs" style={{ color: 'var(--color-error)' }}>· not forwarded</span> : null}</span>
-                        <span className="text-xs whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>{formatWhen(reply.received_at)}</span>
+                        <span className="flex flex-col items-end gap-1">
+                          <span className="text-xs whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>{formatWhen(reply.received_at)}</span>
+                          {/* One per person (their first reply), and only while the deal is still open. */}
+                          {(detail.deal.status === 'sent' || detail.deal.status === 'sending') && detail.replies.findIndex((r) => r.from_phone === reply.from_phone) === index && (
+                            <button type="button" onClick={() => sellToReply(reply)} disabled={busy !== null} className="-my-1 whitespace-nowrap py-2 pl-3 text-[0.7rem] font-bold underline disabled:opacity-50" style={{ color: 'var(--color-primary)' }}>Mark sold</button>
+                          )}
+                          {detail.deal.status === 'sold' && detail.deal.sold_to_phone === reply.from_phone && detail.replies.findIndex((r) => r.from_phone === reply.from_phone) === index && (
+                            <span className="text-[0.55rem] font-extrabold uppercase tracking-[0.16em]" style={{ color: 'var(--color-primary)' }}>Buyer</span>
+                          )}
+                        </span>
                       </li>
                     ))}
                   </ul>
@@ -461,11 +481,20 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
                         <button type="button" className="gold-button text-xs" onClick={onReopen} disabled={busy !== null}>{busy === 'reopen' ? 'Reopening…' : 'Reopen — edit & resend'}</button>
                       </>
                     ) : (
-                      <button type="button" className="gold-button text-xs" onClick={() => setSold('sold', detail.replies.find((r) => r.first)?.from_phone)} disabled={busy !== null}>
-                        {detail.replies.find((r) => r.first) ? `Mark sold to ${detail.replies.find((r) => r.first)?.name ?? formatUsPhone(detail.replies.find((r) => r.first)!.from_phone)}` : 'Mark sold'}
-                      </button>
+                      <>
+                        <button type="button" className="gold-button text-xs" onClick={() => setSold('sold', detail.replies.find((r) => r.first)?.from_phone)} disabled={busy !== null}>
+                          {detail.replies.find((r) => r.first) ? `Mark sold to ${detail.replies.find((r) => r.first)?.name ?? formatUsPhone(detail.replies.find((r) => r.first)!.from_phone)}` : 'Mark sold'}
+                        </button>
+                        {/* A walk-in or a call: sold, but to none of the replies — no phone goes with it. */}
+                        {detail.replies.some((r) => r.first) && (
+                          <button type="button" className="outline-button text-xs" onClick={() => setSold('sold')} disabled={busy !== null}>Mark sold to someone else</button>
+                        )}
+                      </>
                     )}
                   </div>
+                  {detail.deal.status !== 'sold' && detail.replies.some((r) => r.first) && (
+                    <span className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>Sold to a later reply? Use &quot;Mark sold&quot; on that row. Someone else = a walk-in or anyone who did not reply: nobody gets the &quot;It&apos;s yours&quot; text; everyone who got the deal, the people who replied included, is told it is taken.</span>
+                  )}
                 </div>
               )}
               <div className="flex justify-end border-t pt-3" style={{ borderColor: 'var(--color-outline-variant)' }}>

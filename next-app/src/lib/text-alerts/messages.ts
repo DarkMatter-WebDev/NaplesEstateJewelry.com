@@ -44,7 +44,7 @@ export function withStopLine(text: string): string {
  */
 export function winnerText(copy: { title: string; price: string }): string {
   const what = [copy.title, copy.price].map((s) => s.replace(/\s+/g, ' ').trim()).filter(Boolean).join(' - ');
-  return withStopLine(`${BRAND}: It's yours - ${what}. We'll text you shortly to arrange pickup at our Naples showroom or shipping. Thank you!`);
+  return withStopLine(`${BRAND}: It's yours - ${what}. We'll text you shortly to arrange pickup at our Naples showroom. Thank you!`);
 }
 
 /**
@@ -61,7 +61,7 @@ export type DealCopy = {
   title: string;
   /** Pre-formatted, e.g. "$1,460". */
   price: string;
-  /** The owner's message, e.g. "Not on the website. First reply takes it. Pickup at the showroom or we ship." */
+  /** The owner's message, e.g. "Not on the website. First reply takes it. Pickup at our Naples showroom." */
   message: string;
 };
 

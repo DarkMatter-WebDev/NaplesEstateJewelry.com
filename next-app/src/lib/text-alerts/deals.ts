@@ -8,6 +8,7 @@ import { brandMediaUrl, twilioConfigured } from './config';
 import { renderDealCard, renderDealDetail } from './card';
 import {
   dealMediaPaths,
+  dealPhotoCounter,
   dealPhotoLimitMessage,
   dealPhotoList,
   dealPhotoUpdate,
@@ -129,13 +130,15 @@ export async function buildDealMedia(service: SupabaseClient, deal: DealRow): Pr
   const [main, ...details] = dealPhotoList(deal);
   if (!main) throw new Error('Add a photo before sending.');
   const budget = dealPictureBudget(details.length);
+  // "Photo 2 of 5" on every picture of a deal with more than one — the main picture is 1.
+  const total = details.length + 1;
 
-  const card = await renderDealCard(await readStoredPhoto(service, main), { price: deal.price_text, line: deal.title, badge: 'First reply wins' }, budget.card);
+  const card = await renderDealCard(await readStoredPhoto(service, main), { price: deal.price_text, line: deal.title, badge: 'First reply wins', counter: dealPhotoCounter(0, total) }, budget.card);
   const cardPath = await storeDealJpeg(service, deal.id, 'card', card.jpeg);
   const pictures: DealPicture[] = [{ path: cardPath, url: publicUrl(service, cardPath), bytes: card.bytes, main: true }];
 
-  for (const source of details) {
-    const detail = await renderDealDetail(await readStoredPhoto(service, source), { price: deal.price_text, line: deal.title }, budget.detail);
+  for (const [index, source] of details.entries()) {
+    const detail = await renderDealDetail(await readStoredPhoto(service, source), { price: deal.price_text, line: deal.title, counter: dealPhotoCounter(index + 1, total) }, budget.detail);
     const path = await storeDealJpeg(service, deal.id, 'detail', detail.jpeg);
     pictures.push({ path, url: publicUrl(service, path), bytes: detail.bytes, main: false });
   }
@@ -458,7 +461,7 @@ export async function notifyDealSold(dealId: string): Promise<SoldNotifyOutcome>
 }
 
 /** The message a reopened deal starts with (the owner edits it before sending). */
-export const REOPEN_MESSAGE = 'Back available - the earlier sale fell through. First reply takes it. Pickup at our Naples showroom or we ship.';
+export const REOPEN_MESSAGE = 'Back available - the earlier sale fell through. First reply takes it. Pickup at our Naples showroom.';
 
 /**
  * "Reopen — edit & resend" (owner, 2026-09-18): when a sale falls through,

@@ -7,7 +7,44 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-10-07 (5) — Text Deals: a small price strip on every detail shot (the pictures of one text arrive in a random order) — **BUILT + STAGED, not deployed** — ◻ push → ◻ the owner's test text (no SQL, no env vars)
+### 🟡 2026-10-07 (7) + (8) — Text Deals: "Mark sold to someone else" (a walk-in) and "Mark sold" on every reply row — **BUILT + STAGED, not deployed** — ◻ ONE push → ◻ the first real sale each way (no SQL, no env vars)
+
+Record: `CHANGELOG.md` 2026-10-07 (7), (8). Rule: `DECISIONS.md` top entry. **Final gate on both: `tsc` 0 · lint 0 errors · 1747/1747 · build 0; browser checks 12/12 + 15/15.**
+
+**(8), built after this block was written — owner: *"yes add mark sold on each reply row, ill push and deploy after that change"*.** Each reply row has a small **Mark sold** under its time (one per person, only while the deal is open). It asks first, then that person gets "It's yours" and everyone else is told it is taken; the buyer's row says **Buyer** afterwards.
+
+**Owner's words (10-07):** *"add a button to mark sold to someone else (not one of the txt replies.. if they sell to a walkin customer)"*.
+
+**What was built:** in a sent deal's panel, when the deal has a reply, **Mark sold to someone else** beside the gold "Mark sold to <first reply>". It marks the deal sold with no buyer: nobody gets the "It's yours" text, and everyone who got the deal — the people who replied included — is told it is taken. With no replies there is still the one "Mark sold" button.
+
+Gate: `tsc` 0 · lint 0 errors · **1746/1746** · build 0. Browser checks on the real component: 12/12, and phone width.
+
+1. ◻ **Owner — copy staging to the repo folder and push.** No SQL.
+2. ◻ **Owner — the first real walk-in sale is the test** (the button sends real texts, so there is no dry run): the notice should read "Marked sold. Sold to someone else — nobody got the buyer text. N others told it's taken."
+3. ✅ **ANSWERED AND BUILT 10-07 (8)** — "Mark sold" on every reply row. ◻ Owner, at the first sale to someone who was not first: the question should name the right person, and afterwards that row should say Buyer. Was: **Owner — a question, not built:** the gold button only ever offers the FIRST reply. If the first person backs out and the second one buys, do you want a "Mark sold" on each reply row? Today the choices are the first reply or someone else.
+4. ℹ️ Never verified by Claude: a real Mark sold, anything behind the sign-in.
+
+**Staging (10-07 (8)):** ✅ synced 2026-10-07 ~3:16 PM ET — dry run listed exactly the 7 touched files (2 in the app: `components/admin/TextDealsManager.tsx`, `lib/__tests__/text-alerts.test.ts`; 5 docs: CHANGELOG, CURRENT_STATUS, DECISIONS, INTEGRITY, TASKS), 0 Extras, 1222 total; real run copied 7 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0, exit 0; leak check 0 `.env*` / `.log` / `.tmp-*` / `tsbuildinfo`, no node_modules / .next / .git, launch.json present; no `zz-*` page in source or staging; positive control 242 = 242 `.tsx`, 489 = 489 `.ts` under `next-app/src`; SHA-256 MATCH on 7 of 7; the staged composer carries `sellToReply` and "Mark sold to someone else". Staging holds (7) + (8): one push. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+**Staging (10-07 (7)):** ✅ synced 2026-10-07 ~3:04 PM ET — dry run listed exactly the 7 touched files (2 in the app: `components/admin/TextDealsManager.tsx`, `lib/__tests__/text-alerts.test.ts`; 5 docs: CHANGELOG, CURRENT_STATUS, DECISIONS, INTEGRITY, TASKS), 0 Extras, 1222 total; real run copied 7 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0, exit 0; leak check 0 `.env*` / `.log` / `.tmp-*` / `tsbuildinfo`, no node_modules / .next / .git, launch.json present; no `zz-*` page in source or staging; positive control 242 = 242 `.tsx`, 489 = 489 `.ts` under `next-app/src`; SHA-256 MATCH on 7 of 7; the staged composer carries "Mark sold to someone else". Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### 🟢 2026-10-07 (6) — Text Deals: pickup only + a "Photo 2 of 5" tag on every picture + a long line that shrinks — **DEPLOYED and tried** (owner, 10-07 afternoon: *"pushed and deployed, tested successfully"*)
+
+Record: `CHANGELOG.md` 2026-10-07 (6). Rules: `DECISIONS.md` top entry.
+
+**Owner's words (10-07):** *"remove or we ship..we dont want to ship these quick deals.. and on each pic, add a label like 1 or 3, etc.. so if they view the last one and see 'pic 5 of 5', they know its the last one and to look at others"* → mockup 4 → *"option b, and use 'Photo' instead of 'PIC'"* → *"use 'Photo' instead of 'PHOTO'"*.
+
+Gate: `tsc` 0 · lint 0 errors · **1745/1745** · build 0. Real pictures rendered and looked at.
+
+1. ✅ **Pushed + deployed** (owner, 10-07 afternoon).
+2. ✅ **Tested successfully** (owner, same message). Was: **Owner — one test text** with 3–5 photos: press **Preview** first (a draft rendered before the push has no tags) → every picture shows a gold "Photo N of 5" tag at the right of the price → **Send a test**. The message box should start "…Pickup at our Naples showroom." with no "or we ship".
+3. ◻ (told to the owner 10-07; no objection in the reply that reported the test) **Owner — say if this one should go back:** the buyer's "It's yours" text (sent on Mark sold) said "…to arrange pickup at our Naples showroom or shipping"; Claude took "or shipping" out to match "we dont want to ship these quick deals". You did not ask for that line by name.
+4. ℹ️ A one-photo deal gets no tag. A very long line (over about 57 characters) is now drawn smaller so it stays on one row; before today it wrapped over the price.
+5. ℹ️ Never verified by Claude: a real text, anything behind the sign-in.
+
+**Staging (10-07 (6)):** ✅ synced 2026-10-07 ~2:43 PM ET — dry run listed exactly the 13 touched files (7 in the app: `lib/text-alerts/card.ts`, `deal-input.ts`, `deal-photos.ts`, `deals.ts`, `messages.ts`, `lib/__tests__/text-alerts.test.ts`, `text-deal-photos.test.ts`; 6 docs: CHANGELOG, CURRENT_STATUS, DECISIONS, INTEGRITY, STRUCTURE, TASKS), 0 Extras, 1222 total; real run copied 13 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0, exit 0; leak check 0 `.env*` / `.log` / `.tmp-*` / `tsbuildinfo`, no node_modules / .next / .git, launch.json present; no `zz-*` page in source or staging; positive control 242 = 242 `.tsx`, 489 = 489 `.ts` under `next-app/src`; SHA-256 MATCH on 13 of 13; the staged `card.ts` carries `counterNode`, the staged default message ends "Pickup at our Naples showroom."; the one remaining "we ship" under `lib/text-alerts/` is the owner's own words quoted in the comment above that message. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### 🟢 2026-10-07 (5) — Text Deals: a small price strip on every detail shot (the pictures of one text arrive in a random order) — **DEPLOYED and tried** (owner, 10-07 afternoon: *"pushed and deployed, tested successfully"*)
 
 Record: `CHANGELOG.md` 2026-10-07 (5) (the build), (4) (the test that led to it). Rules: `DECISIONS.md` top entry.
 
@@ -17,8 +54,8 @@ Record: `CHANGELOG.md` 2026-10-07 (5) (the build), (4) (the test that led to it)
 
 Gate: `tsc` 0 · lint 0 errors · **1743/1743** · build 0. Real pictures rendered and looked at; composer wording 15/15.
 
-1. ◻ **Owner — copy staging to the repo folder and push.** No SQL.
-2. ◻ **Owner — one test text.** Start a NEW deal (or press **Preview** again on an open draft — a draft rendered before the push still has plain detail shots), 3–5 photos, Preview → every detail shot in "Pictures as they will be sent" should show the price and the line at its foot → **Send a test**. On the phone: is the price readable on whichever picture shows first? Is the strip too big or too small on a real phone photo?
+1. ✅ **Pushed + deployed** (owner, 10-07 afternoon).
+2. ✅ **Tested successfully** (owner, same message). Was: **Owner — one test text.** Start a NEW deal (or press **Preview** again on an open draft — a draft rendered before the push still has plain detail shots), 3–5 photos, Preview → every detail shot in "Pictures as they will be sent" should show the price and the line at its foot → **Send a test**. On the phone: is the price readable on whichever picture shows first? Is the strip too big or too small on a real phone photo?
 3. ℹ️ If the strip should be bigger or smaller, the two sizes are in `renderStripLayer` in `src/lib/text-alerts/card.ts` (price 54, line 20, at a 1080 px wide picture).
 4. ℹ️ Never verified by Claude: a real text, anything behind the sign-in.
 

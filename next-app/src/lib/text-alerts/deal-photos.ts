@@ -112,6 +112,38 @@ export function dealMediaPaths(deal: DealMediaColumns): string[] | null {
   return [deal.card_path, ...rendered];
 }
 
+/**
+ * The counter drawn on every picture of a deal that has more than one (owner,
+ * 2026-10-07: "on each pic, add a label … so if they view the last one and see
+ * 'pic 5 of 5', they know its the last one and to look at others"; wording
+ * "Photo", gold tag). Phones show the pictures in a random order, so the
+ * counter tells the customer there are more. The main picture is always 1.
+ * A one-photo deal gets none.
+ */
+export function dealPhotoCounter(index: number, total: number): string | null {
+  if (total <= 1) return null;
+  return `Photo ${index + 1} of ${total}`;
+}
+
+/** Capitals in the line's face average about this wide (measured: 62 characters fill the row at 26 px). */
+const DEAL_LINE_GLYPH_EM = 0.56;
+/** The row the line is drawn in, on a 1080-wide picture with 36 px margins. */
+const DEAL_LINE_ROW = 1080 - 2 * 36;
+export const DEAL_LINE_MIN_FONT = 15;
+
+/**
+ * The one line's type size on a 1080-wide picture: `base`, unless the words
+ * would not fit on ONE row — then smaller. A long line used to wrap to a
+ * second row that printed over the price (found 2026-10-07 with an
+ * 80-character line); it now shrinks in place and is never stacked. Lines up
+ * to 57 characters keep the full size on the main picture, so an ordinary
+ * line is drawn exactly as before.
+ */
+export function dealLineFontSize(text: string, base: number, letterSpacing: number): number {
+  const fit = Math.floor((DEAL_LINE_ROW / Math.max(text.length, 1) - letterSpacing) / DEAL_LINE_GLYPH_EM);
+  return Math.max(DEAL_LINE_MIN_FONT, Math.min(base, fit));
+}
+
 /** "212 KB" / "1.1 MB" for the composer. */
 export function formatPictureBytes(bytes: number): string {
   const kb = Math.round(bytes / 1024);

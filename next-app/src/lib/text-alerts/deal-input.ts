@@ -1,9 +1,13 @@
 /**
  * The owner's deal form → a clean row (pure, testable).
  * The price is stored as typed but normalised to "$1,460" when a bare number
- * comes in; the message defaults to the wording on file with Twilio.
+ * comes in; the message has a default the owner can edit per deal.
+ *
+ * ⛔ Text deals are PICKUP ONLY (owner, 2026-10-07: "remove or we ship.. we
+ * dont want to ship these quick deals"). No text this feature writes by
+ * itself may offer shipping — `lib/__tests__/text-alerts.test.ts` guards it.
  */
-export const DEFAULT_DEAL_MESSAGE = 'Not on the website. First reply takes it. Pickup at our Naples showroom or we ship.';
+export const DEFAULT_DEAL_MESSAGE = 'Not on the website. First reply takes it. Pickup at our Naples showroom.';
 export const DEAL_TITLE_MAX = 80;
 export const DEAL_PRICE_MAX = 20;
 export const DEAL_MESSAGE_MAX = 300;

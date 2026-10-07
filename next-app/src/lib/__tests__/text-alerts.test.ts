@@ -90,7 +90,15 @@ describe('the words on file with Twilio', () => {
   it('Mark sold texts: the buyer hears it is theirs, everyone else hears it is taken, STOP once (owner 2026-09-17)', () => {
     const win = winnerText({ title: '14K gold bracelet · 7 in · 11.2 g', price: '$890' });
     expect(win).toContain(`${BRAND}: It's yours - 14K gold bracelet · 7 in · 11.2 g - $890.`);
-    expect(win).toContain('pickup at our Naples showroom or shipping');
+    expect(win).toContain('to arrange pickup at our Naples showroom. Thank you!');
+    // Text deals are pickup only (owner, 2026-10-07): nothing the feature writes by itself offers shipping.
+    const reopenSource = readFileSync(join(process.cwd(), 'src', 'lib', 'text-alerts', 'deals.ts'), 'utf8');
+    const reopenMessage = /export const REOPEN_MESSAGE = '([^']+)';/.exec(reopenSource)?.[1] ?? '';
+    expect(reopenMessage).toContain('Pickup at our Naples showroom.');
+    for (const text of [win, DEFAULT_DEAL_MESSAGE, reopenMessage, soldNoticeText(null), dealText({ title: 'Ring', price: '$100', message: DEFAULT_DEAL_MESSAGE })]) {
+      expect(text).not.toMatch(/ship/i);
+    }
+    expect(DEFAULT_DEAL_MESSAGE).toBe('Not on the website. First reply takes it. Pickup at our Naples showroom.');
     expect(win.match(/Reply STOP/gi)?.length).toBe(1);
     expect(soldNoticeText(null)).toBe(`${BRAND}: Sorry, that one is spoken for. Next one soon. ${STOP_LINE}`);
     expect(soldNoticeText('Gone already! Reply STOP to opt out.')).toBe('Gone already! Reply STOP to opt out.');
@@ -120,6 +128,33 @@ describe('the words on file with Twilio', () => {
     expect(manager).toContain("{uploading ?? 'Add photos'}");
     expect(manager).toContain('Reopen — edit & resend');
     expect(manager).toContain("method: 'DELETE'");
+  });
+
+  it('a deal with replies can also be marked sold to someone else — a walk-in: no buyer phone, so no "It\'s yours" text (owner 2026-10-07)', () => {
+    const manager = readFileSync(join(process.cwd(), 'src', 'components', 'admin', 'TextDealsManager.tsx'), 'utf8');
+    // The new button sends no phone; the first-reply button still sends the first reply's.
+    expect(manager).toContain("onClick={() => setSold('sold')} disabled={busy !== null}>Mark sold to someone else</button>");
+    expect(manager).toContain("onClick={() => setSold('sold', detail.replies.find((r) => r.first)?.from_phone)}");
+    // Offered only when there is a reply to choose against; with none, "Mark sold" already means nobody.
+    expect(manager).toContain('{detail.replies.some((r) => r.first) && (');
+    // No phone → the server stores no buyer, texts no winner, and tells everyone the deal reached.
+    const route = readFileSync(join(process.cwd(), 'src', 'app', 'api', 'admin', 'text-deals', '[id]', 'route.ts'), 'utf8');
+    expect(route).toContain('const soldTo = body.soldToPhone ? normalizeUsPhone(body.soldToPhone) : null;');
+    const deals = readFileSync(join(process.cwd(), 'src', 'lib', 'text-alerts', 'deals.ts'), 'utf8');
+    expect(deals).toContain('const winner = deal.sold_to_phone;\n  if (winner) {');
+    expect(deals).toContain('.filter((phone) => phone && phone !== winner)');
+  });
+
+  it('any reply can be the buyer: "Mark sold" on its row, once per person, asked first (owner 2026-10-07)', () => {
+    const manager = readFileSync(join(process.cwd(), 'src', 'components', 'admin', 'TextDealsManager.tsx'), 'utf8');
+    // The row button sells to THAT reply's number, after one confirmation.
+    expect(manager).toContain('onClick={() => sellToReply(reply)}');
+    expect(manager).toMatch(/function sellToReply\(reply: Reply\) \{[\s\S]*?if \(!window\.confirm\([\s\S]*?\)\) return;\s*void setSold\('sold', reply\.from_phone\);/);
+    // One button per person (their first reply), only while the deal is open; the buyer's row is labelled afterwards.
+    expect(manager).toContain("(detail.deal.status === 'sent' || detail.deal.status === 'sending') && detail.replies.findIndex((r) => r.from_phone === reply.from_phone) === index && (");
+    expect(manager).toContain("detail.deal.status === 'sold' && detail.deal.sold_to_phone === reply.from_phone");
+    // The three ways to mark sold all go through the one function.
+    expect(manager.match(/setSold\('sold'/g)).toHaveLength(3);
   });
 
   it('escapes the TwiML reply', () => {
