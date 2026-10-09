@@ -23,10 +23,14 @@ export async function POST(req: Request, context: Context) {
   const body = await req.json().catch(() => null);
   const { data: current } = await admin.supabase
     .from('buy_receipts')
-    .select('id, seller_id_photo_path')
+    .select('id, status, seller_id_photo_path')
     .eq('id', id)
     .maybeSingle();
   if (!current) return NextResponse.json({ error: 'Receipt not found.' }, { status: 404 });
+  // A draft is not a receipt yet (2026-10-09); the database guard refuses it as well.
+  if (current.status === 'draft') {
+    return NextResponse.json({ error: 'Finish the draft before printing it.' }, { status: 409 });
+  }
 
   const copies = resolvePrintCopies(body, Boolean(current.seller_id_photo_path));
   const { data, error } = await admin.supabase

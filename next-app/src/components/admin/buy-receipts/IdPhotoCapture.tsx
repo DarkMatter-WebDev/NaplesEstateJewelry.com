@@ -6,8 +6,13 @@ import AdminModal from '@/components/admin/AdminModal';
 /**
  * The webcam window for the seller's ID photo (owner mockup 2026-09-30).
  *
- * Live picture with a card-shaped guide → Capture → the still → Retake or
- * Use this photo. The camera is released the moment the window closes.
+ * Live picture → Capture → the still → Retake or Use this photo. The camera is
+ * released the moment the window closes.
+ *
+ * No guide frame is drawn over the picture (owner, 2026-10-09). Capture saves
+ * the WHOLE camera picture, so a frame smaller than the picture left the
+ * license small with the background around it. The seller's ID fills the
+ * picture instead; the one line under the picture says so.
  *
  * The camera needs two things that are easy to miss:
  * - the site's Permissions-Policy must allow it (`camera=(self)` in BOTH
@@ -147,26 +152,12 @@ export default function IdPhotoCapture({ onCapture, onClose }: { onCapture: (pho
             className="absolute inset-0 h-full w-full object-contain"
             style={{ visibility: still ? 'hidden' : 'visible' }}
           />
-          {!still && ready && (
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute left-1/2 top-1/2 flex items-center justify-center text-center text-xs"
-              style={{
-                width: '62%',
-                aspectRatio: '3.375 / 2.125',
-                transform: 'translate(-50%, -50%)',
-                border: '2px dashed #fac775',
-                borderRadius: 10,
-                color: '#fac775',
-              }}
-            >
-              Hold the license inside the frame
-            </div>
-          )}
           {!still && !ready && !error && (
             <p className="absolute inset-0 flex items-center justify-center text-sm text-white">Starting the camera…</p>
           )}
         </div>
+
+        {!still && ready && <p className="text-sm">Hold the license so it fills the whole picture, then press Capture.</p>}
 
         {error && (
           <p role="alert" className="border px-3 py-2 text-sm" style={{ borderColor: 'var(--color-error)', color: 'var(--color-error)' }}>

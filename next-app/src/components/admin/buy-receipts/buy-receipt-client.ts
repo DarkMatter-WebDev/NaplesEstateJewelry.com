@@ -9,6 +9,8 @@ import {
   type BuyReceiptRow,
 } from '@/lib/buy-receipts';
 import { CUSTOMER_MODE_API } from '@/lib/buy-receipt-customer-mode';
+import { DRAFT_NOT_SAVED } from '@/lib/buy-receipt-drafts';
+import type { IdReadFields } from '@/lib/buy-receipt-id-read';
 import { THUMBPRINT_MAX_EDGE_PX } from '@/lib/buy-receipt-thumbprint';
 import { prepareLeadPhotos } from '@/lib/lead-photo-prep';
 
@@ -53,21 +55,50 @@ export async function createReceipt(
   mailingList = false,
 ): Promise<CreateReceiptResult> {
   try {
-    const res = await fetch('/api/admin/buy-receipts', json('POST', { ...draft, duplicatedFrom, emailCopy, mailingList }));
-    const data = (await res.json().catch(() => ({}))) as {
-      receipt?: BuyReceiptRow;
-      error?: string;
-      emailed?: boolean;
-      emailError?: string | null;
-      mailingList?: string | null;
-    };
-    if (!res.ok || !data.receipt) return { error: data.error ?? 'Could not save the receipt.' };
-    return {
-      receipt: data.receipt,
-      emailed: data.emailed === true,
-      emailError: data.emailError ?? null,
-      mailingList: data.mailingList === 'added' || data.mailingList === 'failed' ? data.mailingList : null,
-    };
+    return await recorded(await fetch('/api/admin/buy-receipts', json('POST', { ...draft, duplicatedFrom, emailCopy, mailingList })));
+  } catch {
+    return { error: OFFLINE };
+  }
+}
+
+/** The answer to a save that RECORDS a receipt: the row, and what became of the email copy and the mailing list. */
+async function recorded(res: Response): Promise<CreateReceiptResult> {
+  const data = (await res.json().catch(() => ({}))) as {
+    receipt?: BuyReceiptRow;
+    error?: string;
+    emailed?: boolean;
+    emailError?: string | null;
+    mailingList?: string | null;
+  };
+  if (!res.ok || !data.receipt) return { error: data.error ?? 'Could not save the receipt.' };
+  return {
+    receipt: data.receipt,
+    emailed: data.emailed === true,
+    emailError: data.emailError ?? null,
+    mailingList: data.mailingList === 'added' || data.mailingList === 'failed' ? data.mailingList : null,
+  };
+}
+
+/**
+ * "Save draft" (owner, 2026-10-09): the form as typed, kept under a real BUY
+ * number so it can be opened and finished on any device. `id` null = the first
+ * save (a new draft); otherwise the draft is saved again. Nothing is emailed
+ * and nobody joins the mailing list — the two ticks are only remembered.
+ */
+export function saveDraftReceipt(
+  draft: BuyReceiptDraft,
+  options: { id: string | null; duplicatedFrom: string | null; emailCopy: boolean; mailingList: boolean },
+): Promise<ReceiptResult> {
+  const body = { ...draft, asDraft: true, emailCopy: options.emailCopy, mailingList: options.mailingList };
+  return options.id
+    ? call(`/api/admin/buy-receipts/${options.id}`, json('PUT', body), DRAFT_NOT_SAVED)
+    : call('/api/admin/buy-receipts', json('POST', { ...body, duplicatedFrom: options.duplicatedFrom }), DRAFT_NOT_SAVED);
+}
+
+/** Finish a draft: the full check on the server, then it is a recorded receipt under the number it already has. */
+export async function finishDraftReceipt(id: string, draft: BuyReceiptDraft, emailCopy = false, mailingList = false): Promise<CreateReceiptResult> {
+  try {
+    return await recorded(await fetch(`/api/admin/buy-receipts/${id}`, json('PUT', { ...draft, emailCopy, mailingList })));
   } catch {
     return { error: OFFLINE };
   }
@@ -158,6 +189,23 @@ export function uploadIdPhoto(id: string, photo: Blob): Promise<ReceiptResult> {
 export async function prepareIdPhoto(file: File): Promise<Blob> {
   const prepared = await prepareLeadPhotos([file]);
   return prepared.files[0] ?? file;
+}
+
+/**
+ * "Fill form from ID": the photo goes to the server, which has the AI read it.
+ * Nothing is stored by this call; the photo is uploaded later, with the receipt.
+ */
+export async function readIdPhoto(photo: Blob): Promise<{ fields: IdReadFields } | { error: string }> {
+  const form = new FormData();
+  form.append('photo', photo, 'seller-id.jpg');
+  try {
+    const res = await fetch('/api/admin/buy-receipts/id-read', { method: 'POST', body: form });
+    const data = (await res.json().catch(() => ({}))) as { fields?: IdReadFields; error?: string };
+    if (!res.ok || !data.fields) return { error: data.error ?? 'The ID could not be read. Type the details in.' };
+    return { fields: data.fields };
+  } catch {
+    return { error: OFFLINE };
+  }
 }
 
 export function removeThumbprint(id: string): Promise<ReceiptResult> {

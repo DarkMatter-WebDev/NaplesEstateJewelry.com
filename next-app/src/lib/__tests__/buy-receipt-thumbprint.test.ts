@@ -128,7 +128,7 @@ describe('thumbprint: on the form and on paper', () => {
   it('is the owner’s part of the form: under the ID photo strip, switched off in the seller’s view', () => {
     const ownerPart = sheet.slice(sheet.indexOf('const ownerPart = ('), sheet.indexOf('<h2 className="sheet-section-title">Items purchased by'));
     expect(ownerPart).toMatch(/\{idPhotoSlot\}\s+\{thumbprintSlot\}/);
-    expect(components('BuyReceiptForm.tsx')).toContain('thumbprintSlot={<ThumbprintField');
+    expect(components('BuyReceiptForm.tsx')).toMatch(/thumbprintSlot=\{\s*<ThumbprintField/);
     expect(components('BuyReceiptDetail.tsx')).toContain('thumbprintSlot={thumbprintField}');
   });
 

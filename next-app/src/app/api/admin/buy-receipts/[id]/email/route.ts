@@ -26,6 +26,10 @@ export async function POST(req: Request, context: Context) {
   if (receipt.status === 'void') {
     return NextResponse.json({ error: 'A void receipt is not emailed.' }, { status: 409 });
   }
+  // A draft has no items or total yet (2026-10-09): the seller's copy goes out when it is finished.
+  if (receipt.status === 'draft') {
+    return NextResponse.json({ error: 'Finish the draft before emailing it.' }, { status: 409 });
+  }
 
   const result = await sendBuyReceiptEmail({
     supabase: admin.supabase,

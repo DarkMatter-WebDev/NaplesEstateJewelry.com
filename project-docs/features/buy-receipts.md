@@ -507,11 +507,67 @@ can confirm:
    seller. If anything is off, simply do not use the button — the form itself
    is unchanged.
 
+## Drafts — start on one device, finish on another (2026-10-09)
+
+For a receipt that is not ready to save: the price is not settled, or the
+thumbprint has to be taken on the laptop.
+
+1. **On the iPad (or anywhere):** fill in what you have — the seller's name at
+   least — and press **Save draft** (left of "What to print"). The draft takes
+   its BUY number now. A line above the paper says *Draft BUY-000NN · saved …*.
+   An ID photo already taken goes up with it.
+2. **On the laptop:** Buy Receipts → **Log** → the row with the gold **Draft**
+   tag → **Continue**. The form opens with every box as it was left.
+3. Add what is missing (the thumbprint: **Wait for a print**), then press one of
+   the usual three buttons — **Print here**, **Save**, or **Save and send to
+   desktop printer**. That finishes it: the same number, now a recorded receipt.
+
+Good to know:
+
+- **Save draft** can be pressed as often as you like; it saves the same draft
+  again. Nothing is saved by itself — press it before you walk away.
+- A draft is **not printed, not emailed and cannot be voided**. The email copy
+  and the mailing-list sign-up happen when it is finished; the two small ticks
+  are remembered until then.
+- To throw a draft away: the trash can on its Log row. Its number is not used
+  again.
+- **Customer input mode** is offered only before the first Save draft. Hand the
+  tablet to the seller first, then save the draft.
+- The date and time on the finished receipt are those of the **first Save
+  draft**, not of the finish.
+- SQL (once): `supabase/buy-receipts-drafts-2026-10.sql`. Until it is run,
+  "Save draft" answers *Could not save the draft* and everything else works as
+  before.
+- Code: `lib/buy-receipt-drafts.ts` (rules), `api/admin/buy-receipts/route.ts`
+  and `[id]/route.ts` (save / save again / finish), `BuyReceiptForm.tsx`,
+  `BuyReceiptLog.tsx`. Rules: `DECISIONS.md` → *"A buy receipt can be saved as
+  a DRAFT"*.
+
 ## Seller ID photo
 
-- "Use webcam" opens a capture window (live picture, a card-shaped guide,
-  Capture → Retake / Use this photo). "Choose a photo" takes a picture file,
-  e.g. one taken on a phone.
+- "Use webcam" opens a capture window (live picture, Capture → Retake / Use
+  this photo). "Choose a photo" takes a picture file, e.g. one taken on a
+  phone.
+- The window draws **no guide frame** (since 2026-10-09). Capture saves the
+  whole camera picture, so the license should fill the whole picture; the line
+  under the picture says so. Rule: `DECISIONS.md` → *"The seller-ID webcam
+  window draws no guide frame"*.
+- **Fill form from ID** (2026-10-09) — the small box on the strip, ticked on
+  every new receipt. Ticked: the photo is read by the AI as soon as it is taken
+  or chosen ("Reading the ID…", a few seconds) and the seller boxes that are
+  still empty fill in — name, street, city, state, ZIP, ID type, ID last 4,
+  date of birth. Never phone or email, and never a box that already has
+  something in it. Unticked: nothing is sent. Check the boxes against the card;
+  if the ID could not be read the strip says so in red and you type as before.
+  - The photo goes to Anthropic for that one read (owner's yes, 10-09). Nothing
+    is stored by the read and nothing off the card is logged.
+  - It runs on the listing assistant's settings (`AI_PROVIDER=anthropic`,
+    `ANTHROPIC_API_KEY`, `AI_MODEL`); `AI_ID_READ_MODEL` is an optional
+    override. If those are missing on Netlify every read fails with the red
+    line — the form itself is unaffected.
+  - Code: `lib/buy-receipt-id-read.ts` (rules), `lib/buy-receipt-id-read-provider.ts`
+    (the call), `api/admin/buy-receipts/id-read/route.ts`. Rules: `DECISIONS.md`
+    → *"Fill form from ID"*.
 - Optional. A receipt without one shows a **No ID photo** tag in the Log; it
   can be added later from the receipt's page.
 - ⛔ **Private.** It goes to the Storage bucket `buy-receipt-ids` (not public,

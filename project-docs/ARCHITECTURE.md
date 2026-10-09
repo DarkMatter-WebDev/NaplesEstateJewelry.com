@@ -850,6 +850,23 @@ Laptop (admin form)                      Supabase                         Deskto
   in the browser and posts it to `…/[id]/thumbprint`, which stores a lossless
   greyscale WebP beside the ID photo. `buy_receipts.seller_thumbprint_path`
   holds the path. No new bucket, no new policy, no new header.
+- **"Fill form from ID" (2026-10-09): the one path on which the ID photo leaves
+  our own systems.** With the box on the New receipt form ticked, the browser
+  posts the photo to `POST /api/admin/buy-receipts/id-read`, which sends it once
+  to Anthropic's Messages API (`lib/buy-receipt-id-read-provider.ts`, the
+  listing assistant's `AI_PROVIDER` / `ANTHROPIC_API_KEY` / `AI_MODEL`, or
+  `AI_ID_READ_MODEL`) and returns the checked values for the form's empty
+  boxes. No table, no bucket, no log line holds anything from that call; the
+  photo is stored later, by `…/[id]/id-photo`, when the receipt is saved.
+- **Drafts (2026-10-09): the same table, a third status.** "Save draft" inserts
+  a `buy_receipts` row with `status = 'draft'` (so it has its BUY number) and
+  the form as typed in `draft_form`; the receipt columns stay empty. The draft
+  opens in the New receipt form at `?draft=<id>` on any signed-in device, its
+  pictures go to the same private bucket, and the normal save FINISHES it:
+  `PUT …/[id]` runs the full validator, writes the real columns and sets
+  `recorded`. `draft_form` is read only where a draft is opened — never by the
+  shared select list — so the rest of the feature does not depend on
+  `supabase/buy-receipts-drafts-2026-10.sql` having run.
 - **Silent printing is a browser launch flag, not code.** The printer PC opens
   the station from a Chrome shortcut with `--kiosk-printing`; the page only
   calls `window.print()`.

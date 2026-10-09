@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
+import { DRAFT_NOT_SAVED, buyReceiptDraftColumns, normalizeBuyReceiptDraftSave } from '@/lib/buy-receipt-drafts';
 import { addSellerToMailingList } from '@/lib/buy-receipt-mailing-list';
 import { sendBuyReceiptEmail } from '@/lib/buy-receipt-mailer';
 import {
@@ -14,6 +15,7 @@ import {
  * Admin → Buy Receipts. POST saves a new receipt (and, with `emailCopy: true`
  * and a seller email, emails the seller their copy; with `mailingList: true`,
  * adds that email to the mailing list); GET lists / searches the log.
+ * POST with `asDraft: true` saves a DRAFT instead (2026-10-09, see below).
  *
  * Runs on requireAdmin()'s request-scoped client (the `authenticated` role), so
  * the table's admin RLS policy AND its grant are what let this work — see
@@ -31,11 +33,37 @@ export async function POST(req: Request) {
   if (admin.error) return admin.error;
 
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
-  const normalized = normalizeBuyReceiptInput(body);
-  if ('error' in normalized) return NextResponse.json({ error: normalized.error }, { status: 400 });
-
   const duplicatedFrom = isReceiptId(body?.duplicatedFrom) ? body.duplicatedFrom : null;
   const email = admin.user.email ?? null;
+
+  // "Save draft" (owner, 2026-10-09): the seller's name is all it needs. The row
+  // takes its BUY number now; the form as typed waits in `draft_form` until the
+  // receipt is finished (PUT on `[id]`). Nothing is emailed and nobody joins the
+  // mailing list for a draft.
+  if (body?.asDraft === true) {
+    const draft = normalizeBuyReceiptDraftSave(body);
+    if ('error' in draft) return NextResponse.json({ error: draft.error }, { status: 400 });
+    const { data: saved, error: draftError } = await admin.supabase
+      .from('buy_receipts')
+      .insert({
+        ...buyReceiptDraftColumns(draft.value),
+        status: 'draft',
+        duplicated_from: duplicatedFrom,
+        created_by: admin.user.id,
+        created_by_email: email,
+        updated_by_email: email,
+      })
+      .select(BUY_RECEIPT_COLUMNS)
+      .single();
+    if (draftError || !saved) {
+      console.error('[buy-receipts] draft insert failed', draftError?.message);
+      return NextResponse.json({ error: DRAFT_NOT_SAVED }, { status: 500 });
+    }
+    return NextResponse.json({ receipt: saved as unknown as BuyReceiptRow }, { status: 201 });
+  }
+
+  const normalized = normalizeBuyReceiptInput(body);
+  if ('error' in normalized) return NextResponse.json({ error: normalized.error }, { status: 400 });
 
   const { data, error } = await admin.supabase
     .from('buy_receipts')

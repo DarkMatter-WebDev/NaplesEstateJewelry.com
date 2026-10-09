@@ -1,6 +1,6 @@
 # Integrity Rules And Pre-Publish Checklist
 
-> Current rules for the Next.js app. Last reconciled: **2026-10-07**.
+> Current rules for the Next.js app. Last reconciled: **2026-10-09**.
 
 ## Verification Commands
 
@@ -22,7 +22,7 @@ same-form customer view; 1704 after the first customer input mode build ~5 PM,
 1651 / 156 files after the buy-receipt delete + payment methods that afternoon,
 1647 after the storefront-photo swap, 1643 after the print-station shortcut fix
 that morning):
-**1747/1747 tests across 161 files** (1743 that morning, before the photo counter and the mark-sold buttons), TypeScript clean, lint clean (4 `<img>`
+**1796/1796 tests across 163 files** (measured 2026-10-09 ~11:58 AM ET, buy receipt drafts; 1772 / 162 at ~11:31 AM after "Fill form from ID"; 1748 / 161 earlier that morning after the webcam frame was removed; 1747 / 161 on 2026-10-07, 1743 that morning, before the photo counter and the mark-sold buttons), TypeScript clean, lint clean (4 `<img>`
 warnings in `TextDealsManager.tsx`), and a build that exits 0 with **88
 prerendered routes = 41 EN + 41 ES + 6 non-locale** (`/_global-error`,
 `/_not-found`, `/favicon.ico`, `/icon.png`, `/robots.txt`, `/sitemap.xml`).

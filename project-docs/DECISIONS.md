@@ -4,7 +4,54 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-10-07**.
+> compaction. Last reconciled: **2026-10-09**.
+
+## A buy receipt can be saved as a DRAFT and finished on another device: it takes its number at draft time, needs only the seller's name, and keeps the form as typed (2026-10-09)
+
+Owner: *"can we save a receipt in progress as a draft so that i can easily open it and continue it on a new device (start on ipad, then pick up and finish on the laptop where i can use the thumbprint reader..)"*; then *"build the real draft, number at draft time, name only"*.
+
+**Rules:**
+- **A draft is a real row, `status = 'draft'`, with its BUY number from the first Save draft** (owner: *"number at draft time"*). A deleted draft leaves a gap in the numbers, like any deleted receipt; never reuse one.
+- **The seller's name is the only thing a draft needs** (owner: *"name only"*; one word is enough). ⛔ Never add another required box to "Save draft" — that is what finishing is for.
+- **The form is kept as typed, whole, in `draft_form`; the row's receipt columns stay empty until it is finished.** ⛔ Never write half-finished items or payments into `items` / `payments`: every reader of those columns (the paper, the email, the Log, the station) assumes they are valid.
+- **Finishing = the normal three buttons on an opened draft:** the full validator, then `recorded` under the same number, `draft_form` cleared. The email copy and the mailing-list sign-up happen at the finish, never at "Save draft".
+- **A draft is never printed, emailed or voided** — refused by the routes AND by the database guard. It is finished, or deleted from the Log.
+- **A recorded receipt never goes back to being a draft.**
+- **One form.** A draft opens in the New receipt form (`/admin/buy-receipts?draft=<id>`); its own `/buy-receipts/<id>` page forwards there, and a finished receipt's `?draft=` link forwards to its page. ⛔ Never a second look-alike form for drafts.
+- **On a saved draft the ID photo and the thumbprint are stored the moment they are picked** (like a saved receipt's page); before the first save they wait in the browser and go up with it.
+- **Customer input mode is offered only before the first Save draft** (Claude's call, told to the owner): a refresh while locked lands on the plain New receipt address and the form would lose its draft. The owner's stated flow — the seller types on the iPad first, then Save draft, then the laptop — is unaffected.
+- **The receipt's date is the moment the draft was first saved** (`created_at` cannot change — the 09-30 guard). Accepted as a consequence, told to the owner.
+- ⛔ **`draft_form` stays OUT of `BUY_RECEIPT_COLUMNS`.** That list is read by every receipt page, the Log and the station; a column the database lacks would break them all (what the thumbprint column required on 10-06). Only the draft's own open reads it (`BUY_RECEIPT_DRAFT_COLUMNS`), so only "Save draft" depends on the SQL.
+- **"Save draft" lives on the "What to print" line**, never as a fifth button in the main row (it wrapped the gold button on an upright iPad).
+- Files and guards: `STRUCTURE.md` → *Buy receipt drafts*. SQL: `supabase/buy-receipts-drafts-2026-10.sql`. Record: `CHANGELOG.md` 2026-10-09 (3).
+
+## "Fill form from ID": with the box ticked the AI reads the seller's ID photo and fills only the EMPTY seller boxes; the photo may go to Anthropic for that one read (2026-10-09)
+
+Owner: *"if the buyer manually inputs the info first, it wont auto populate.. maybe add a small checkbox… if thats checked then it will use AI to fill the form for us"*; then *"ok, build it, but leave out the short line that says what was filled.. thats not needed 1, sending license to anrhtopic is ok, 2 checkbox starts checked, 3, fill all boxes it can"*.
+
+**Rules:**
+- **Only empty boxes are written, ever** (`applyIdReadToDraft`). A box with anything in it — typed by the owner, by the seller in customer input mode, or while the ID was being read — stays as it is. ⛔ Never add an "overwrite" mode: the typed value is the seller's own word.
+- **The box starts ticked on every new receipt** (owner's choice) and Clear ticks it again. ⛔ Unticked, the photo is sent nowhere — the read is called from one place, behind the tick.
+- **It fills everything a card carries:** name, street, city, state, ZIP, ID type, ID last 4, date of birth. Never phone or email.
+- ⛔ **No line saying what was filled** (owner: *"thats not needed"*). The only words the feature shows are "Reading the ID…" and, on a failure, "The ID could not be read. Type the details in." Do not re-propose the list.
+- **State:** a blank receipt starts "FL"; the ID's state replaces that default only when street, city and ZIP are all still empty.
+- **Privacy — this narrows the 09-30 rule "the ID photo goes to the private bucket and nowhere else", by the owner's yes:** with the box ticked the photo is sent once to Anthropic to be read. ⛔ That is the ONE outside destination: never another provider, never a second copy, never stored by the read, and nothing read off the card is logged. The model returns the whole ID number; the server keeps its last four characters and only those reach the browser. Storage, the signed link, the paper and the email rules of 09-30 are unchanged.
+- **The site's Privacy page is not changed for this** (owner, 10-09, when a sentence was offered: *"dont add to the privacy policy"*). ⛔ Do not re-propose.
+- **The model's answer is never trusted as it comes:** every value passes `coerceIdRead` and a value without the shape the form accepts is dropped (the box stays empty). The prompt tells the model to return nothing for a value it cannot read with certainty — a wrong digit is worse than an empty box. The owner still checks the boxes against the card.
+- **A failure never costs anything:** the photo stays attached, the receipt saves as before.
+- **New receipt form only.** A saved receipt's page has no box.
+- **The call is portable on purpose:** a plain `fetch` (the app has no Anthropic SDK), model from `AI_ID_READ_MODEL` or `AI_MODEL`, and no temperature / thinking / tool-choice setting in the request, because newer models refuse some of them.
+- Files and guards: `STRUCTURE.md` → *Buy receipt "Fill form from ID"*. Record: `CHANGELOG.md` 2026-10-09 (2).
+
+## The seller-ID webcam window draws no guide frame: Capture saves the whole camera picture, so the ID fills the whole picture (2026-10-09)
+
+Owner: *"the frame either needs to be bigger, or removed, totally.. since the final end photo of the ID does not zoom in at all"*; offered a bigger frame with a crop to it: *"lets not crop, lets just have the user postion the ID in the entire view instead of asking them to hold it back a bit.. that will be easier.."*
+
+**Rules:**
+- **Nothing is drawn over the live picture** in `components/admin/buy-receipts/IdPhotoCapture.tsx`. The one instruction is a line UNDER the picture: "Hold the license so it fills the whole picture, then press Capture."
+- **Capture saves the whole camera picture; nothing is cropped** — the owner's choice over a crop. ⛔ Never draw a guide smaller than what is saved: the old frame (62% of the width) left the license at about 43% of the photo with the background around it.
+- **If a guide ever comes back, the saved photo must match it** (save only what is inside it). That is the fallback if a real camera turns out to blur with the card held close — Claude's caution on 10-09, untested.
+- Guarded by `lib/__tests__/buy-receipts.test.ts` (no dashed frame, the new line, the full-frame draw). Record: `CHANGELOG.md` 2026-10-09 (1).
 
 ## A text deal carries up to five photos in ONE message — the main picture with the full price card, every detail shot with a small price strip, because phones show them in a random order (2026-10-07)
 
@@ -446,7 +493,8 @@ message and didn't buy it."
 - Marking a deal sold stays a manual click (the reply is the claim, the
   owner closes the sale), but the click now sends two texts: the buyer gets
   `winnerText` ("It's yours - <line> - <price>. We'll text you shortly to
-  arrange pickup at our Naples showroom or shipping."), everyone else the
+  arrange pickup at our Naples showroom. Thank you!" — pickup only since
+  2026-10-07; it used to end "or shipping"), everyone else the
   deal was delivered to gets `soldNoticeText` — the deal's own late-reply
   line, so the broadcast and the auto-reply say the same thing.
 - Both are picture messages (`brandMediaUrl()`), like every customer text.

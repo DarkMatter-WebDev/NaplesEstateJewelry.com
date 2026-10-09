@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
+import { draftContinuePath, isDraftReceipt } from '@/lib/buy-receipt-drafts';
 import { BUY_RECEIPT_COLUMNS, isReceiptId, type BuyReceiptRow } from '@/lib/buy-receipts';
 import BuyReceiptsShell, { requireBuyReceiptsAdmin } from '@/components/admin/buy-receipts/BuyReceiptsShell';
 import BuyReceiptDetail from '@/components/admin/buy-receipts/BuyReceiptDetail';
@@ -22,6 +23,8 @@ export default async function AdminBuyReceiptPage({ params }: Props) {
   ]);
   if (!data) notFound();
   const receipt = data as unknown as BuyReceiptRow;
+  // A draft is not a receipt yet (2026-10-09): it opens in the form, to be carried on with.
+  if (isDraftReceipt(receipt)) redirect(draftContinuePath(adminBasePath, receipt.id));
 
   return (
     <BuyReceiptsShell

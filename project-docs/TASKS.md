@@ -1,13 +1,83 @@
 # Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-10-07** (session of 10-06/07 closed —
-> `CHANGELOG.md` 2026-10-07 (1); the one thing owed for that session's work is the
-> owner's laptop try-out, item 3 of the first block below).
+> in `CHANGELOG.md`. Last reconciled: **2026-10-09** (three new blocks, first
+> below: buy receipt drafts — ⛔ one SQL step —, "Fill form from ID" and the
+> seller-ID webcam window, all staged and awaiting ONE push). Before
+> that: session of 10-07 closed —
+> `CHANGELOG.md` 2026-10-08 (1). **What is actually open after that session:**
+> the first real sale through each new Text Deals mark-sold button (first block
+> below); the D&B profile re-read ~10-09; the ~10-12 count of Inquiries with the
+> "Google Ad" chip; one real read of the Google Ads account. The thumbprint
+> try-out, the `/gold-services` look and the ads-agent items were closed on the
+> owner's word on 10-07.
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-10-07 (7) + (8) — Text Deals: "Mark sold to someone else" (a walk-in) and "Mark sold" on every reply row — **BUILT + STAGED, not deployed** — ◻ ONE push → ◻ the first real sale each way (no SQL, no env vars)
+### 🟡 2026-10-09 (3) — Buy receipt DRAFTS (save in progress, finish on another device) — **BUILT + STAGED** → ◻ SQL → ◻ push (one push with (2) and (1) below) → ◻ the owner's first draft
+
+Record: `CHANGELOG.md` 2026-10-09 (3). Rules: `DECISIONS.md` top entry. Runbook: `features/buy-receipts.md` → *Drafts*.
+
+**Owner's words (10-09):** *"build the real draft, number at draft time, name only"*.
+
+**What was built:** **Save draft** on the New receipt form (left of "What to print"); a **Draft** tag and a **Continue** button in the Log; the usual three save buttons finish an opened draft under the same number. No env var.
+
+Gate: `tsc` 0 · lint 0 errors · **1796/1796** · build 0. Browser checks on the real form and Log, stand-in routes: 32/32.
+
+1. ◻ **Owner — run the SQL.** Supabase → SQL editor → paste all of [`supabase/buy-receipts-drafts-2026-10.sql`](../supabase/buy-receipts-drafts-2026-10.sql) → Run. The editor shows the LAST result: expect **two rows** — `buy_receipts_draft_form_check` reading `CHECK (((status = 'draft'::text) OR (draft_form IS NULL)))`, and `buy_receipts_status_check` naming `draft`, `recorded` and `void`. Safe to re-run. Before or after the push — either order is safe; without it only "Save draft" fails.
+   - ⚠️ This file has **never been run** — it was written and read, not executed. If the editor shows an error, paste it to Claude.
+2. ◻ **Owner — push + deploy.**
+3. ◻ **Owner — the first draft, iPad → laptop:**
+   - iPad: New receipt → type the seller's name (or use customer input mode first) → take the ID photo if you like → **Save draft**. A line above the paper should read "Draft BUY-000NN · saved …".
+   - Laptop: **Log** → the row tagged **Draft** → **Continue**. Every box, and the ID photo, should be there.
+   - Laptop: **Wait for a print** for the thumbprint → fill in the items and how the seller was paid → **Save and send to desktop printer**. It should say "Receipt saved" with the SAME number, and the Log row should lose its Draft tag.
+   - If "Save draft" says *Could not save the draft*, the SQL has not been run (or failed).
+4. ◻ **Owner — say if any of these should be different** (Claude's calls, not asked for by name):
+   - Customer input mode is offered only before the first Save draft.
+   - A draft cannot be printed, emailed or voided — only finished or deleted.
+   - The finished receipt carries the date and time of the first Save draft.
+   - Nothing saves by itself: a draft is only as new as the last press of Save draft.
+5. ℹ️ Never verified by Claude: the SQL, a real draft in the real database, the sign-in, an iPad, a second device.
+
+**Staging (10-09 (3)):** ✅ synced 2026-10-09 12:02 PM ET — dry run listed exactly the 24 touched files (3 new: `next-app/src/lib/buy-receipt-drafts.ts`, `src/lib/__tests__/buy-receipt-drafts.test.ts`, `supabase/buy-receipts-drafts-2026-10.sql`; 13 changed in the app: `api/admin/buy-receipts/route.ts`, `[id]/route.ts`, `[id]/email/route.ts`, `[id]/print-request/route.ts`, `[id]/printed/route.ts`, `[locale]/admin/buy-receipts/page.tsx`, `[id]/page.tsx`, `components/admin/buy-receipts/BuyReceiptForm.tsx`, `BuyReceiptLog.tsx`, `buy-receipt-client.ts`, `lib/buy-receipts.ts`, `lib/__tests__/buy-receipt-customer-mode.test.ts`, `buy-receipt-thumbprint.test.ts`; 8 docs: ARCHITECTURE, CHANGELOG, CURRENT_STATUS, DECISIONS, INTEGRITY, STRUCTURE, TASKS, `features/buy-receipts.md`), 0 Extras, 1229 total (1226 + the 3 new); real run copied 24 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0, exit 0; leak check 0 `.env*` / `.log` / `.tmp-*` / `tsbuildinfo` / `zz-*`, no node_modules / .next / .git, launch.json present; no `zz-*` file or page in source or staging; positive control 242 = 242 `.tsx`, 495 = 495 `.ts` under `next-app/src`, 92 = 92 `.sql` under `supabase`; SHA-256 MATCH on 24 of 24; the staged form carries "Save draft", the staged SQL carries `buy_receipts_draft_guard`. Staging holds (1) + (2) + (3): one push. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### 🟡 2026-10-09 (2) — Buy receipt: "Fill form from ID" (the AI reads the seller's ID photo and fills the empty seller boxes) — **BUILT + STAGED** → ◻ push (one push with (1) below) → ◻ the owner's first real ID
+
+Record: `CHANGELOG.md` 2026-10-09 (2). Rules: `DECISIONS.md` top entry. Runbook: `features/buy-receipts.md` → *Seller ID photo*.
+
+**Owner's words (10-09):** *"ok, build it, but leave out the short line that says what was filled.. thats not needed 1, sending license to anrhtopic is ok, 2 checkbox starts checked, 3, fill all boxes it can"*.
+
+**What was built:** a small ticked box, **Fill form from ID**, on the Seller ID photo strip of the New receipt form. Ticked: the photo is read as soon as it is taken or chosen ("Reading the ID…") and the empty seller boxes fill in — name, street, city, state, ZIP, ID type, ID last 4, date of birth. Never phone or email; never a box that already has something in it. Unticked: nothing is sent. No SQL, no new env var.
+
+Gate: `tsc` 0 · lint 0 errors · **1772/1772** · build 0. A real read of a made-up specimen card: 8 of 8 values in 3.3 s. Browser checks on the real form: 18/18.
+
+1. ◻ **Owner — push + deploy** (carries (1) below as well).
+2. ◻ **Owner — the first real ID on the laptop:** New receipt → leave **Fill form from ID** ticked → **Use webcam** → Capture → Use this photo. Within a few seconds the boxes should fill. **Check every box against the card** — the ID last 4 and the date of birth above all.
+   - If the strip says in red *"The ID could not be read. Type the details in."* on every try, Netlify is probably missing one of `AI_PROVIDER=anthropic`, `ANTHROPIC_API_KEY`, `AI_MODEL` (the listing assistant uses the same three, so if that works these are there). Tell Claude what you see.
+   - Then one try the other way round: type the name first, take the photo → the name you typed must stay.
+3. ✅ **ANSWERED 10-09 — no** (owner: *"dont add to the privacy policy"*). The Privacy page stays as it is; do not re-propose. Was: the site's Privacy page does not mention that a seller's ID may be read by an AI service — a sentence (EN + ES) was offered.
+4. ℹ️ The reading uses whatever `AI_MODEL` is on Netlify. To give this job its own model, add `AI_ID_READ_MODEL` there — optional.
+5. ℹ️ Never verified by Claude: a real license, the owner's camera, the sign-in, the route on Netlify.
+
+**Staging (10-09 (2)):** ✅ synced 2026-10-09 ~11:40 AM ET — dry run listed exactly the 16 touched files (4 new: `next-app/src/app/api/admin/buy-receipts/id-read/route.ts`, `src/lib/buy-receipt-id-read.ts`, `src/lib/buy-receipt-id-read-provider.ts`, `src/lib/__tests__/buy-receipt-id-read.test.ts`; 4 changed in the app: `components/admin/buy-receipts/BuyReceiptForm.tsx`, `IdPhotoField.tsx`, `buy-receipt-client.ts`, `lib/__tests__/buy-receipts.test.ts`; 8 docs: ARCHITECTURE, CHANGELOG, CURRENT_STATUS, DECISIONS, INTEGRITY, STRUCTURE, TASKS, `features/buy-receipts.md`), 0 Extras, 1226 total (1222 + the 4 new); real run copied 16 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0, exit 0; leak check 0 `.env*` / `.log` / `.tmp-*` / `tsbuildinfo` / `zz-*`, no node_modules / .next / .git, launch.json present; no `zz-*` file or page in source or staging; positive control 242 = 242 `.tsx`, 493 = 493 `.ts` under `next-app/src`; SHA-256 MATCH on 16 of 16; the staged strip carries "Fill form from ID", the staged form starts the box ticked, the staged webcam window has no `dashed`. Staging holds (1) + (2): one push. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### 🟡 2026-10-09 (1) — Buy receipt: the seller-ID webcam window has no dashed frame; the ID fills the whole picture — **BUILT + STAGED** → ◻ push → ◻ the owner's try with the real camera
+
+Record: `CHANGELOG.md` 2026-10-09 (1). Rule: `DECISIONS.md` top entry.
+
+**Owner's words (10-09):** *"the frame either needs to be bigger, or removed, totally.. since the final end photo of the ID does not zoom in at all"* → *"lets not crop, lets just have the user postion the ID in the entire view instead of asking them to hold it back a bit.. that will be easier.."*
+
+**What was built:** in the "Seller ID photo" webcam window the dashed frame and "Hold the license inside the frame" are gone. Under the picture: "Hold the license so it fills the whole picture, then press Capture." The saved photo is the whole camera picture, exactly as before. No SQL, no env vars.
+
+Gate: `tsc` 0 · lint 0 errors · **1748/1748** · build 0. Real component in headless Chrome with a fake camera: no frame, the still = the camera's full picture.
+
+1. ◻ **Owner — push + deploy.**
+2. ◻ **Owner — one try on the laptop:** New receipt → **Use webcam** → hold a license so it fills the picture → **Capture**. Is the license readable, or does the camera blur when the card is that close? If it blurs, tell Claude — the fallback is a frame with Capture saving only what is inside it (not built).
+3. ℹ️ Never verified by Claude: a real camera, anything behind the sign-in, the iPad.
+
+**Staging (10-09 (1)):** ✅ synced 2026-10-09 11:15 AM ET — dry run listed exactly the 7 touched files (2 in the app: `components/admin/buy-receipts/IdPhotoCapture.tsx`, `lib/__tests__/buy-receipts.test.ts`; 5 docs: CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS, `features/buy-receipts.md`), 0 Extras, 1222 total; real run copied 7 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0, exit 0; leak check 0 `.env*` / `.log` / `.tmp-*` / `tsbuildinfo`, no node_modules / .next / .git, launch.json present; no `zz-*` page in source or staging; positive control 242 = 242 `.tsx`, 489 = 489 `.ts` under `next-app/src`; SHA-256 MATCH on 7 of 7; the staged window carries "fills the whole picture" and no `dashed`. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### 🟢 2026-10-07 (7) + (8) — Text Deals: "Mark sold to someone else" (a walk-in) and "Mark sold" on every reply row — **DEPLOYED** (owner, 10-07 ~4:06 PM ET: *"pushed and deployed"*) — ✅ pushed → ◻ the first real sale each way is still the test
 
 Record: `CHANGELOG.md` 2026-10-07 (7), (8). Rule: `DECISIONS.md` top entry. **Final gate on both: `tsc` 0 · lint 0 errors · 1747/1747 · build 0; browser checks 12/12 + 15/15.**
 
@@ -19,7 +89,7 @@ Record: `CHANGELOG.md` 2026-10-07 (7), (8). Rule: `DECISIONS.md` top entry. **Fi
 
 Gate: `tsc` 0 · lint 0 errors · **1746/1746** · build 0. Browser checks on the real component: 12/12, and phone width.
 
-1. ◻ **Owner — copy staging to the repo folder and push.** No SQL.
+1. ✅ **Pushed + deployed** (owner, 10-07 ~4:06 PM ET; `CHANGELOG.md` 2026-10-07 (9)). Nothing was said about using the buttons and Claude did not check production (not asked to).
 2. ◻ **Owner — the first real walk-in sale is the test** (the button sends real texts, so there is no dry run): the notice should read "Marked sold. Sold to someone else — nobody got the buyer text. N others told it's taken."
 3. ✅ **ANSWERED AND BUILT 10-07 (8)** — "Mark sold" on every reply row. ◻ Owner, at the first sale to someone who was not first: the question should name the right person, and afterwards that row should say Buyer. Was: **Owner — a question, not built:** the gold button only ever offers the FIRST reply. If the first person backs out and the second one buys, do you want a "Mark sold" on each reply row? Today the choices are the first reply or someone else.
 4. ℹ️ Never verified by Claude: a real Mark sold, anything behind the sign-in.
@@ -87,7 +157,7 @@ Gate: `tsc` 0 · lint 0 errors · **1743/1743** · build 0. Browser checks on th
 
 **Staging (10-07 (2)):** ✅ synced 2026-10-07 ~11:27 AM ET — dry run listed exactly the 20 touched files (3 new: `next-app/src/lib/text-alerts/deal-photos.ts`, `next-app/src/lib/__tests__/text-deal-photos.test.ts`, `supabase/text-deals-photos-2026-10.sql`; 10 changed in the app: `lib/text-alerts/deals.ts`, `card.ts`, `twilio.ts`, `api/admin/text-deals/photo/route.ts`, `preview/route.ts`, `[id]/route.ts`, `[id]/reopen/route.ts`, `api/admin/storage-gc/route.ts`, `components/admin/TextDealsManager.tsx`, `lib/__tests__/text-alerts.test.ts`; 7 docs: ARCHITECTURE, CHANGELOG, CURRENT_STATUS, DECISIONS, INTEGRITY, STRUCTURE, TASKS), 0 Extras, 1222 total (1219 + the 3 new); real run copied 20 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0, exit 0; leak check 0 `.env*` / `.log` / `.tmp-*` / `tsbuildinfo`, no node_modules / .next / .git, launch.json present; no `zz-text-deals-preview` page in source or staging; positive control 242 = 242 `.tsx`, 489 = 489 `.ts` under `next-app/src`; SHA-256 MATCH on 20 of 20; the staged `deals.ts` carries `buildDealMedia`, the staged `twilio.ts` carries `form.append('MediaUrl'`. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 
-### 🟢 2026-10-06 (5) + (8) + (9) — Buy receipt: seller thumbprint from the SecuGen reader, the new shop-copy layout (signatures in one row, pictures under it), default print choice follows the ID photo — **DEPLOYED** (owner, 10-06 ~1:30 PM ET: *"pushed and deployed"*) — ✅ SQL done → ✅ pushed → ◻ the owner's try-out on the laptop is still open
+### ✅ 2026-10-06 (5) + (8) + (9) — Buy receipt: seller thumbprint from the SecuGen reader, the new shop-copy layout (signatures in one row, pictures under it), default print choice follows the ID photo — **DEPLOYED** (owner, 10-06 ~1:30 PM ET) and **CONFIRMED WORKING** (owner, 10-07 ~4:08 PM ET: *"buy receipt thumbprint feature confimred working"*) — nothing open
 
 **10-06 ~1:30 PM — DEPLOYED** (`CHANGELOG.md` 2026-10-06 (10)). Nothing was said about trying it and Claude did not check production (not asked to), so item 3 below — the laptop try-out — and the paper check stay open. Where the notes below say "ready to push" or "not deployed", read "deployed".
 
@@ -105,7 +175,7 @@ Gate: `tsc` 0 · lint 0 errors · **1728/1728** · build 0. Browser checks on th
 
 1. ✅ **SQL RUN** (owner, 10-06 ~12:10 PM ET; `CHANGELOG.md` 2026-10-06 (6)). The owner's screenshot showed the last verify query (bucket `buy-receipt-ids`, `public = false`, `["image/webp","image/jpeg"]`); the column was confirmed from here signed out: `seller_thumbprint_path` answers "permission denied" (42501) exactly like the existing `seller_id_photo_path`, while a made-up column answers "does not exist" (42703). The trigger was not read back (the SQL editor shows only the last result) — the script ran without an error. **The push is now safe to make in either order with the signature fix (item 5).** Was: **Owner — run the SQL FIRST.** Supabase → SQL editor → paste all of [`supabase/buy-receipts-thumbprint-2026-10.sql`](../supabase/buy-receipts-thumbprint-2026-10.sql) → Run. It ends with three verify queries; expect: one row `seller_thumbprint_path · text · YES`; one row `buy_receipts_thumbprint_guard`; one row for the bucket with `public = false`. Safe to re-run. ⛔ If the site is deployed before this, every receipt page, the Log and the Print Station say "could not be loaded" until it is run.
 2. ✅ **Pushed + deployed** (owner, 10-06 ~1:30 PM ET).
-3. ◻ **Owner — try it on the laptop (Chrome), with the SecuGen program open:**
+3. ✅ **CONFIRMED WORKING by the owner, 10-07 ~4:08 PM ET** (*"buy receipt thumbprint feature confimred working"*; `CHANGELOG.md` 2026-10-07 (10); the owner did not list the steps one by one). Was: **Owner — try it on the laptop (Chrome), with the SecuGen program open:**
    - New receipt → **Wait for a print** → Chrome asks for a folder: make or pick one just for prints (e.g. `Documents\Thumbprints`) → allow the site to edit files in it.
    - SecuGen: Init → thumb on the reader → Capture → **File → Save Image (BMP)** into that folder, any name.
    - The print should appear on the strip within a couple of seconds, and the file should be gone from the folder. Tell Claude if the file is still there, or if nothing appears.
@@ -126,14 +196,14 @@ Gate: `tsc` 0 · lint 0 errors · **1728/1728** · build 0. Browser checks on th
 
 **Staging (10-06 (5)):** ✅ synced 2026-10-06 ~11:56 AM ET — dry run listed exactly the 25 touched files (5 new: `api/admin/buy-receipts/[id]/thumbprint/route.ts`, `components/admin/buy-receipts/ThumbprintField.tsx`, `lib/buy-receipt-thumbprint.ts`, `lib/__tests__/buy-receipt-thumbprint.test.ts`, `supabase/buy-receipts-thumbprint-2026-10.sql`; 20 changed: `api/admin/buy-receipts/[id]/route.ts`, `lib/buy-receipts.ts`, nine files in `components/admin/buy-receipts/` (`BuyReceiptSheet.tsx`, `buy-receipt-sheet-css.ts`, `BuyReceiptPrintHost.tsx`, `ReceiptPrintControls.tsx`, `PrintStation.tsx`, `BuyReceiptLog.tsx`, `BuyReceiptForm.tsx`, `BuyReceiptDetail.tsx`, `buy-receipt-client.ts`), two tests, seven docs), 0 Extras, 1219 total (1214 + the 5 new); real run 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0, exit 0; leak check 0 `.env*` / `.log` / `.tmp-*` / `tsbuildinfo`, no node_modules / .next / .git, launch.json present; no `zz-thumbprint-preview` page in source or staging; positive control 242 = 242 `.tsx`, 487 = 487 `.ts` under `next-app/src`; SHA-256 MATCH on 25 of 25; the staged route carries `.webp({ lossless: true })`, the staged select list carries `seller_thumbprint_path`. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 
-### 🟡 2026-10-05 (3) — Ads agent changed the Google Ads account (two campaigns, new keywords / negatives / ads) — two points need the owner's word; nothing on the site changed
+### ✅ 2026-10-05 (3) — Ads agent changed the Google Ads account (two campaigns, new keywords / negatives / ads) — **owner, 10-07 ~4:13 PM ET: "ads work done"** (`CHANGELOG.md` 2026-10-07 (11)); the two owner points are closed on that word; only the dated chip count (item 4) and one real read of the account (item 5) remain; nothing on the site changed
 
 Record: `CHANGELOG.md` 2026-10-05 (3) (the reported account state, and the answers given). ⚠️ Reported by the ads agent in a pasted note; Claude has not read the account.
 
 **10-06 update (the ads agent's follow-up note, `CHANGELOG.md` 2026-10-06 (1); as reported, not read in the account):** items 1–3 below are ✅ DONE — both sets of negatives were taken out and "coin appraisal" runs again; Watches → `/watch-buyers` and Diamond Jewelry → `/diamond-buyers` are their own ad groups; the "Paid at Live … Rates" and dental-gold wordings were replaced. Items 4–5 stay open. Two NEW owner questions:
 
-- 🟡 **The older "buy" negatives — RULED 10-06** (*"remove any negatives that may cause us to miss anyone searching 'places that buy gold/silver/ gold coins' etc."*; `DECISIONS.md` top entry, `CHANGELOG.md` 2026-10-06 (2)). ◻ **Owner — hand the instruction (chat, 10-06) to the ads agent**; it removes `"buy gold online"`, `buy coins` in the coins campaign unless exact, and every other phrase / broad negative pairing buy / buys / buying with gold, silver, coins, bullion or jewelry, then lists what is left with match types. ◻ **Claude — when that list comes back, check it against the rule.** The exact bare ones (`[buy gold bars]` …) cannot cause the miss; whether `[buy gold]` / `[buy silver]` also go is in the instruction as a line the owner can delete.
-- ◻ **Owner — the coins campaign's $4/day** against a $6 bid cap: one click can end its day, and the main campaign blocks all coin words, so "places that buy gold coins" searches are then missed. The agent is asked to report "Limited by budget" and lost impression share (budget) for it; decide on the split when that comes back.
+- 🟡 **The older "buy" negatives — RULED 10-06** (*"remove any negatives that may cause us to miss anyone searching 'places that buy gold/silver/ gold coins' etc."*; `DECISIONS.md` top entry, `CHANGELOG.md` 2026-10-06 (2)). ✅ (owner 10-07: *"ads work done"* — no list was shown to Claude, so the check below was not done by Claude) **Owner — hand the instruction (chat, 10-06) to the ads agent**; it removes `"buy gold online"`, `buy coins` in the coins campaign unless exact, and every other phrase / broad negative pairing buy / buys / buying with gold, silver, coins, bullion or jewelry, then lists what is left with match types. ◻ **Claude — when that list comes back, check it against the rule.** The exact bare ones (`[buy gold bars]` …) cannot cause the miss; whether `[buy gold]` / `[buy silver]` also go is in the instruction as a line the owner can delete.
+- ✅ (closed on the owner's 10-07 *"ads work done"*; what was decided was not said) **Owner — the coins campaign's $4/day** against a $6 bid cap: one click can end its day, and the main campaign blocks all coin words, so "places that buy gold coins" searches are then missed. The agent is asked to report "Limited by budget" and lost impression share (budget) for it; decide on the split when that comes back.
 - ✅ **"15+ Years Buying in Naples" in the original ads — CLOSED 10-06: it is true and stays** (owner: *"actually, in naples is true"*; `DECISIONS.md` top entry, `CHANGELOG.md` 2026-10-06 (3)). The ads agent only needs to be told the question is closed (one line in the chat's instruction block).
 
 1. ✅ (10-06: reversed, see above) **Owner — did you approve these two? They reverse your 10-02 rulings** (`DECISIONS.md` → Google Ads conversion tracking entry, negative-keywords bullet):
@@ -145,7 +215,7 @@ Record: `CHANGELOG.md` 2026-10-05 (3) (the reported account state, and the answe
 4. ◻ **~10-12 — count of Inquiries with the "Google Ad" chip** for the ads agent's comparison. Behind the admin sign-in: the owner reads it in Admin → Inquiries, or asks Claude to on that day.
 5. ◻ The real keyword / negative counts and both budgets want one read in the account before any doc quotes them again.
 
-### 🟢 2026-10-05 (1) — `/gold-services` hero photo: bars and coins → the shop's own hand of rings (owner's "option D") — **DEPLOYED** (owner, 10-05 ~11:15 PM ET: *"pushed and deployed"*) — ◻ the owner's own look at the page is still open (no SQL, no env vars)
+### 🟢 2026-10-05 (1) — `/gold-services` hero photo: bars and coins → the shop's own hand of rings (owner's "option D") — **DEPLOYED** (owner, 10-05 ~11:15 PM ET: *"pushed and deployed"*) — ✅ the owner looked, 10-07 ~4:13 PM ET: *"gold-services looks good"* — nothing open (no SQL, no env vars)
 
 Record: `CHANGELOG.md` 2026-10-05 (1) (the build), (2) (the deploy). Rule: `DECISIONS.md` top entry.
 
@@ -156,7 +226,7 @@ Record: `CHANGELOG.md` 2026-10-05 (1) (the build), (2) (the deploy). Rule: `DECI
 Gate: `tsc` 0 · lint 0 errors · **1710/1710** · build 0. Built page before/after: title, description, canonical, hreflang, Open Graph, H1, JSON-LD identical; only the hero image and its preload differ. Rendered on the local production server at 1440 and 375 px.
 
 1. ✅ **Pushed + deployed** (owner, 10-05 ~11:15 PM ET: *"pushed and deployed"*). Nothing was said about looking at the page, and Claude did not check production (not asked to) — so item 2 stays open.
-2. ◻ **Owner — look at `/gold-services` on the phone and on the desk monitor.** The photo is 900 px wide, so it is stretched and a little soft on a wide screen (told before the pick). If that bothers you on the monitor, say so — the fix is a sharper photo of the same kind, not code.
+2. ✅ **Owner looked, 10-07 ~4:13 PM ET: *"gold-services looks good"*.** Was: **Owner — look at `/gold-services` on the phone and on the desk monitor.** The photo is 900 px wide, so it is stretched and a little soft on a wide screen (told before the pick). If that bothers you on the monitor, say so — the fix is a sharper photo of the same kind, not code.
 3. ✅ (10-05/06: handed over — the ads agent answered it twice, see 2026-10-05 (3) above) **Owner — hand the reply to the ads agent** (it is in the chat of 10-05; it tells that agent the tag and the form conversion have been live since 10-02 and how to verify them, and that the hero swap goes live with your deploy — which has now happened).
 4. ℹ️ Not built from the same brief, on purpose: the Google tag on every page and a second `/contact` conversion — both already exist as ruled on 10-02.
 

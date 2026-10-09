@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
+import { DRAFT_NOT_SAVED, buyReceiptDraftColumns, normalizeBuyReceiptDraftSave } from '@/lib/buy-receipt-drafts';
+import { addSellerToMailingList } from '@/lib/buy-receipt-mailing-list';
+import { sendBuyReceiptEmail } from '@/lib/buy-receipt-mailer';
 import {
   BUY_RECEIPT_COLUMNS,
   BUY_RECEIPT_ID_BUCKET,
@@ -14,6 +17,11 @@ import {
  * GET: one receipt. PUT: edit it (owner ruling 2026-09-30: saved receipts are
  * editable). A VOID receipt is frozen — the route answers 409 and the database
  * guard trigger refuses the write as well; duplicate it instead.
+ *
+ * Drafts (owner, 2026-10-09): PUT with `asDraft: true` saves a draft again
+ * (name only); PUT without it on a draft FINISHES it — the full check, then
+ * `status = 'recorded'`, the email copy and the mailing list. DELETE removes a
+ * draft like any other receipt.
  *
  * DELETE (owner, 2026-10-03: "add a delete option to the log of receipts"):
  * removes the receipt for good — recorded or void — together with its ID photo.
@@ -47,9 +55,7 @@ export async function PUT(req: Request, context: Context) {
   const { id } = await context.params;
   if (!isReceiptId(id)) return notFound();
 
-  const body = await req.json().catch(() => null);
-  const normalized = normalizeBuyReceiptInput(body);
-  if ('error' in normalized) return NextResponse.json({ error: normalized.error }, { status: 400 });
+  const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
 
   const { data: current } = await admin.supabase.from('buy_receipts').select('id, status').eq('id', id).maybeSingle();
   if (!current) return notFound();
@@ -57,18 +63,76 @@ export async function PUT(req: Request, context: Context) {
     return NextResponse.json({ error: 'A void receipt cannot be edited. Duplicate it instead.' }, { status: 409 });
   }
 
+  // "Save draft" again: only the name is checked, and the form as typed replaces the stored one.
+  if (body?.asDraft === true) {
+    if (current.status !== 'draft') {
+      return NextResponse.json({ error: 'This receipt is already recorded. It cannot go back to a draft.' }, { status: 409 });
+    }
+    const draft = normalizeBuyReceiptDraftSave(body);
+    if ('error' in draft) return NextResponse.json({ error: draft.error }, { status: 400 });
+    const { data: saved, error: draftError } = await admin.supabase
+      .from('buy_receipts')
+      .update({ ...buyReceiptDraftColumns(draft.value), updated_by_email: admin.user.email ?? null })
+      .eq('id', id)
+      .eq('status', 'draft')
+      .select(BUY_RECEIPT_COLUMNS)
+      .single();
+    if (draftError || !saved) {
+      console.error('[buy-receipts] draft update failed', draftError?.message);
+      return NextResponse.json({ error: DRAFT_NOT_SAVED }, { status: 500 });
+    }
+    return NextResponse.json({ receipt: saved as unknown as BuyReceiptRow });
+  }
+
+  const normalized = normalizeBuyReceiptInput(body);
+  if ('error' in normalized) return NextResponse.json({ error: normalized.error }, { status: 400 });
+
+  // A draft that passes the full check is FINISHED by this save: it becomes a
+  // recorded receipt under the number it already has, and the stored form goes.
+  const finishing = current.status === 'draft';
   const { data, error } = await admin.supabase
     .from('buy_receipts')
-    .update({ ...buyReceiptContentColumns(normalized.value), updated_by_email: admin.user.email ?? null })
+    .update({
+      ...buyReceiptContentColumns(normalized.value),
+      ...(finishing ? { status: 'recorded', draft_form: null } : {}),
+      updated_by_email: admin.user.email ?? null,
+    })
     .eq('id', id)
     .select(BUY_RECEIPT_COLUMNS)
     .single();
 
   if (error || !data) {
     console.error('[buy-receipts] update failed', error?.message);
-    return NextResponse.json({ error: 'Could not save the changes.' }, { status: 500 });
+    return NextResponse.json({ error: finishing ? 'Could not save the receipt. It is still a draft.' : 'Could not save the changes.' }, { status: 500 });
   }
-  return NextResponse.json({ receipt: data as unknown as BuyReceiptRow });
+  let receipt = data as unknown as BuyReceiptRow;
+  if (!finishing) return NextResponse.json({ receipt });
+
+  // Finishing is the moment the receipt is recorded, so what a new receipt does
+  // on its save happens here: the seller's copy by email and the mailing list,
+  // each only if its box is ticked. As there, a failure of either never costs
+  // the receipt — it is reported. (Same rules as POST in ../route.ts.)
+  let emailed = false;
+  let emailError: string | null = null;
+  if (body?.emailCopy === true) {
+    if (!receipt.seller_email) {
+      emailError = 'No email address was entered for the seller.';
+    } else {
+      const sent = await sendBuyReceiptEmail({ supabase: admin.supabase, receipt });
+      if (sent.ok) {
+        receipt = sent.receipt;
+        emailed = true;
+      } else {
+        emailError = sent.error;
+      }
+    }
+  }
+  let mailingList: 'added' | 'failed' | null = null;
+  if (body?.mailingList === true && receipt.seller_email) {
+    const added = await addSellerToMailingList({ email: receipt.seller_email, name: receipt.seller_name });
+    mailingList = added.ok ? 'added' : 'failed';
+  }
+  return NextResponse.json({ receipt, emailed, emailError, mailingList });
 }
 
 export async function DELETE(_req: Request, context: Context) {

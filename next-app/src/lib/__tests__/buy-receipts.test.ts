@@ -486,9 +486,10 @@ describe('buy receipts: database and storage rules', () => {
 describe('buy receipts: routes', () => {
   const files = routeFiles(join(root, 'src', 'app', 'api', 'admin', 'buy-receipts'));
 
-  it('has the nine routes', () => {
-    // The eighth (2026-10-03) starts and ends customer input mode; the ninth (2026-10-06) keeps the seller's thumbprint.
-    expect(files).toHaveLength(9);
+  it('has the ten routes', () => {
+    // The eighth (2026-10-03) starts and ends customer input mode; the ninth (2026-10-06) keeps the seller's thumbprint;
+    // the tenth (2026-10-09) has the AI read the seller's ID for "Fill form from ID".
+    expect(files).toHaveLength(10);
   });
 
   it('gates every handler on requireAdmin and never reaches for the service role', () => {
@@ -676,6 +677,17 @@ describe('buy receipts: the paper, printing and the station', () => {
       // The microphone rule that was already there must survive the edit.
       expect(policy).toContain('microphone=(self)');
     }
+  });
+
+  it('draws no guide frame over the webcam picture, because Capture saves the whole picture', () => {
+    const capture = components('IdPhotoCapture.tsx');
+    // The saved photo is the full camera frame — nothing is cropped.
+    expect(capture).toContain('canvas.width = video.videoWidth;');
+    expect(capture).toContain('context.drawImage(video, 0, 0, canvas.width, canvas.height);');
+    // So a frame smaller than the picture only left the license small (owner, 2026-10-09).
+    expect(capture).not.toContain('dashed');
+    expect(capture).not.toContain('inside the frame');
+    expect(capture).toContain('Hold the license so it fills the whole picture, then press Capture.');
   });
 
   it('is reachable from the admin menu', () => {

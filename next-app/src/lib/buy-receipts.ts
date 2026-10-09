@@ -184,7 +184,8 @@ export function resolvePrintCopies(input: unknown, hasIdPhoto: boolean): BuyRece
 
 export type BuyReceiptItem = { qty: number; description: string; amount: number };
 export type BuyReceiptPayment = { method: BuyReceiptPaymentMethod; reference: string | null; amount: number };
-export type BuyReceiptStatus = 'recorded' | 'void';
+/** `draft` (2026-10-09): saved to be finished later, on any device — see `buy-receipt-drafts.ts`. */
+export type BuyReceiptStatus = 'draft' | 'recorded' | 'void';
 
 /** The form's state: every field a string, exactly as typed. */
 export type BuyReceiptDraftItem = { qty: string; description: string; amount: string };

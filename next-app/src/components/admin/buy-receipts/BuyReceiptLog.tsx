@@ -5,6 +5,7 @@ import Link from 'next/link';
 import AdminModal from '@/components/admin/AdminModal';
 import { AppIcon } from '@/components/AppIcon';
 import { createClient } from '@/lib/supabase/client';
+import { draftContinuePath, isDraftReceipt } from '@/lib/buy-receipt-drafts';
 import {
   BUY_RECEIPT_COLUMNS,
   BUY_RECEIPT_PRINT_SETS,
@@ -32,6 +33,10 @@ import { deleteReceipt, markPrinted, printableIdPhoto, printableThumbprint, requ
  * "Delete" (owner, 2026-10-03) removes a receipt for good, with its ID photo and thumbprint —
  * for test and mistaken entries. It always asks first, in the same pop-up
  * window Void uses, and says that Void is the one that keeps the record.
+ *
+ * A DRAFT (owner, 2026-10-09) sits in the same list with a "Draft" tag and one
+ * button, "Continue", which opens it in the form on whatever device this is.
+ * It has no print buttons — it is finished first — and Delete removes it.
  *
  * Rows that are "Waiting for the desktop" are WATCHED (owner, 2026-10-01: on the
  * iPad the tag stayed on "waiting" after the desktop had printed, until a manual
@@ -318,11 +323,14 @@ export default function BuyReceiptLog({ adminBasePath, initialRows }: { adminBas
             <tbody>
               {rows.map((row) => {
                 const isVoid = row.status === 'void';
+                // A draft (2026-10-09) is not a receipt yet: it opens in the form, and is never printed from here.
+                const isDraft = isDraftReceipt(row);
+                const openHref = isDraft ? draftContinuePath(adminBasePath, row.id) : `${adminBasePath}/buy-receipts/${row.id}`;
                 const pending = isPrintPending(row);
                 return (
                   <tr key={row.id} className="border-t align-top" style={{ borderColor: 'var(--color-outline-variant)', color: isVoid ? 'var(--color-on-surface-variant)' : undefined }}>
                     <td className="px-4 py-3 font-semibold">
-                      <Link href={`${adminBasePath}/buy-receipts/${row.id}`} style={{ color: isVoid ? 'inherit' : 'var(--color-primary)', textDecoration: isVoid ? 'line-through' : 'none' }}>
+                      <Link href={openHref} style={{ color: isVoid ? 'inherit' : 'var(--color-primary)', textDecoration: isVoid ? 'line-through' : 'none' }}>
                         {row.receipt_number}
                       </Link>
                     </td>
@@ -333,30 +341,51 @@ export default function BuyReceiptLog({ adminBasePath, initialRows }: { adminBas
                     <td className="px-4 py-3">
                       {row.seller_name}
                       <span className="block text-xs" style={hintStyle}>
-                        {row.items.length} {row.items.length === 1 ? 'item' : 'items'}
-                        {row.items[0] ? ` · ${row.items[0].description}` : ''}
+                        {isDraft ? (
+                          'Not finished'
+                        ) : (
+                          <>
+                            {row.items.length} {row.items.length === 1 ? 'item' : 'items'}
+                            {row.items[0] ? ` · ${row.items[0].description}` : ''}
+                          </>
+                        )}
                       </span>
                     </td>
-                    <td className="px-4 py-3">{paymentsLine(row.payments)}</td>
-                    <td className="px-4 py-3 text-right whitespace-nowrap">{formatCurrency(row.total)}</td>
+                    <td className="px-4 py-3">{isDraft ? '—' : paymentsLine(row.payments)}</td>
+                    {/* A draft shows the amounts typed so far, or a dash while there are none. */}
+                    <td className="px-4 py-3 text-right whitespace-nowrap">{isDraft && row.total === 0 ? '—' : formatCurrency(row.total)}</td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
                         {isVoid && <Tag tone="red">Void</Tag>}
-                        {pending ? <Tag tone="gold">Waiting for the desktop</Tag> : <Tag tone={row.print_count > 0 ? 'green' : 'grey'}>{receiptPrintLabel(row)}</Tag>}
+                        {isDraft ? (
+                          <Tag tone="gold">Draft</Tag>
+                        ) : pending ? (
+                          <Tag tone="gold">Waiting for the desktop</Tag>
+                        ) : (
+                          <Tag tone={row.print_count > 0 ? 'green' : 'grey'}>{receiptPrintLabel(row)}</Tag>
+                        )}
                         {!row.seller_id_photo_path && <Tag tone="grey">No ID photo</Tag>}
                         {row.emailed_at && <Tag tone="green">Emailed</Tag>}
                       </div>
                     </td>
                     <td className="brl-actions px-4 py-3 text-right whitespace-nowrap">
-                      <button type="button" className="outline-button text-xs" disabled={busy} onClick={() => void printHere(row)}>
-                        {printingId === row.id ? 'Printing…' : 'Print here'}
-                      </button>
-                      <button type="button" className="outline-button ml-2 text-xs" disabled={busy} onClick={() => void send(row)}>
-                        {sendingId === row.id ? 'Sending…' : 'Send to printer'}
-                      </button>
-                      <Link href={`${adminBasePath}/buy-receipts/${row.id}`} className="outline-button ml-2 text-xs">
-                        Open
-                      </Link>
+                      {isDraft ? (
+                        <Link href={openHref} className="gold-button text-xs">
+                          Continue
+                        </Link>
+                      ) : (
+                        <>
+                          <button type="button" className="outline-button text-xs" disabled={busy} onClick={() => void printHere(row)}>
+                            {printingId === row.id ? 'Printing…' : 'Print here'}
+                          </button>
+                          <button type="button" className="outline-button ml-2 text-xs" disabled={busy} onClick={() => void send(row)}>
+                            {sendingId === row.id ? 'Sending…' : 'Send to printer'}
+                          </button>
+                          <Link href={openHref} className="outline-button ml-2 text-xs">
+                            Open
+                          </Link>
+                        </>
+                      )}
                       {/* A trash-can, not a fourth worded button: with "Delete" spelled out the
                           row was too wide for an iPad and the button sat off the edge of the
                           table (measured 2026-10-03). The pop-up window names the receipt. */}
@@ -390,9 +419,12 @@ export default function BuyReceiptLog({ adminBasePath, initialRows }: { adminBas
               This removes the receipt from the log for good{deletedWith(deleting)}. It cannot be
               undone, and the number {deleting.receipt_number} will not be used again.
             </p>
-            <p className="text-sm" style={hintStyle}>
-              For a real purchase that was reversed, open the receipt and use <strong>Void</strong> instead — a void receipt stays in the log.
-            </p>
+            {/* A draft never was a purchase on record, so Void is not its alternative. */}
+            {!isDraftReceipt(deleting) && (
+              <p className="text-sm" style={hintStyle}>
+                For a real purchase that was reversed, open the receipt and use <strong>Void</strong> instead — a void receipt stays in the log.
+              </p>
+            )}
             {deleteError && <p role="alert" className="text-sm" style={{ color: 'var(--color-error)' }}>{deleteError}</p>}
             <div className="flex justify-end gap-2">
               <button type="button" className="outline-button text-xs" disabled={deleteBusy} onClick={closeDelete}>Keep it</button>

@@ -1,12 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { draftContinuePath, normalizeBuyReceiptDraftSave, type BuyReceiptDraftForm } from '@/lib/buy-receipt-drafts';
+import { applyIdReadToDraft } from '@/lib/buy-receipt-id-read';
 import {
   BUY_RECEIPT_ONE_PAGE_LINES,
   blankBuyReceiptDraft,
   defaultPrintSet,
   draftPaperLines,
+  formatReceiptDateTime,
   normalizeBuyReceiptInput,
   paymentsLine,
   type BuyReceiptDraft,
@@ -28,7 +31,19 @@ import BuyReceiptTabs from './BuyReceiptTabs';
 import IdPhotoField from './IdPhotoField';
 import ReceiptPrintControls, { PrintSetSelect, printSetAllowed } from './ReceiptPrintControls';
 import ThumbprintField from './ThumbprintField';
-import { createReceipt, emailReceipt, startCustomerMode, uploadIdPhoto, uploadThumbprint } from './buy-receipt-client';
+import {
+  createReceipt,
+  emailReceipt,
+  finishDraftReceipt,
+  readIdPhoto,
+  removeIdPhoto,
+  removeThumbprint,
+  saveDraftReceipt,
+  startCustomerMode,
+  uploadIdPhoto,
+  uploadThumbprint,
+  useIdPhotoUrl,
+} from './buy-receipt-client';
 import { CUSTOMER_MODE_PAGE_CSS } from './buy-receipt-customer-css';
 
 /**
@@ -52,6 +67,15 @@ import { CUSTOMER_MODE_PAGE_CSS } from './buy-receipt-customer-css';
  * "Mailing list" (owner, 2026-10-03) is the second small box beside "Email
  * copy": ticked — by the owner here, or by the seller in customer input mode —
  * the email joins the mailing list when the receipt is saved.
+ *
+ * "Save draft" (owner, 2026-10-09: "start on ipad, then pick up and finish on
+ * the laptop where i can use the thumbprint reader"): saves the form as typed
+ * under a real BUY number, with nothing but the seller's name required. From
+ * then on the form is LINKED to that draft (`linked`): the ID photo and the
+ * thumbprint are stored the moment they are picked, "Save draft" saves it
+ * again, and the three save buttons FINISH it — the full check, then a
+ * recorded receipt under the same number. The same form opens a draft from the
+ * Log on any device (`draftReceipt` + `draftForm`, from the page).
  */
 
 type Action = 'save' | 'send' | 'print';
@@ -69,6 +93,8 @@ export default function BuyReceiptForm({
   initialDraft,
   duplicatedFrom = null,
   startInCustomerMode = false,
+  draftReceipt = null,
+  draftForm = null,
 }: {
   adminBasePath: string;
   /** The server's clock at render, so the date on the blank paper matches on both sides of hydration. */
@@ -77,10 +103,31 @@ export default function BuyReceiptForm({
   duplicatedFrom?: { id: string; number: string } | null;
   /** This browser carries the customer-mode lock (a refresh, or a bounced address): open straight into the seller's screen. */
   startInCustomerMode?: boolean;
+  /** A saved draft opened to carry on with it (`?draft=<id>`), and the form it was saved with. */
+  draftReceipt?: BuyReceiptRow | null;
+  draftForm?: BuyReceiptDraftForm | null;
 }) {
-  const [draft, setDraft] = useState<BuyReceiptDraft>(() => initialDraft ?? blankBuyReceiptDraft());
+  const [draft, setDraft] = useState<BuyReceiptDraft>(() => draftForm?.draft ?? initialDraft ?? blankBuyReceiptDraft());
+  /** The saved draft this form belongs to; null on a receipt that has never been saved. */
+  const [linked, setLinked] = useState<BuyReceiptRow | null>(draftReceipt);
+  const [draftBusy, setDraftBusy] = useState(false);
+  /** Said under the draft line after a save: only when something did not go with it. */
+  const [draftNote, setDraftNote] = useState<string | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoNote, setPhotoNote] = useState<string | null>(null);
+  const [thumbprintBusy, setThumbprintBusy] = useState(false);
+  const [thumbprintNote, setThumbprintNote] = useState<string | null>(null);
+  // A linked draft's pictures are already in the private bucket: shown through the ten-minute signed link.
+  const storedPhotoUrl = useIdPhotoUrl(linked?.seller_id_photo_path);
+  const storedThumbprintUrl = useIdPhotoUrl(linked?.seller_thumbprint_path);
   const [photo, setPhoto] = useState<{ blob: Blob; url: string } | null>(null);
   const [thumbprint, setThumbprint] = useState<{ blob: Blob; url: string } | null>(null);
+  /** "Fill form from ID" (owner, 2026-10-09): ticked on every new receipt; unticked, the photo is sent nowhere. */
+  const [fillFromId, setFillFromId] = useState(true);
+  const [readingId, setReadingId] = useState(false);
+  const [idReadFailed, setIdReadFailed] = useState<string | null>(null);
+  /** Counts the reads asked for, so an answer that arrives after the photo was replaced or removed is dropped. */
+  const idReadRun = useRef(0);
   /** What the owner picked in "What to print"; null until they pick, so the default can follow the ID photo. */
   const [chosenSet, setChosenSet] = useState<BuyReceiptPrintSetKey | null>(null);
   const [busy, setBusy] = useState<Action | null>(null);
@@ -90,7 +137,7 @@ export default function BuyReceiptForm({
   const [retrying, setRetrying] = useState(false);
   const [thumbprintFailed, setThumbprintFailed] = useState<string | null>(null);
   const [retryingThumbprint, setRetryingThumbprint] = useState(false);
-  const [emailCopy, setEmailCopy] = useState(false);
+  const [emailCopy, setEmailCopy] = useState(draftForm?.emailCopy ?? false);
   const [emailState, setEmailState] = useState<EmailState>(null);
   const [emailing, setEmailing] = useState(false);
   const [customerMode, setCustomerMode] = useState<CustomerMode | null>(startInCustomerMode ? { phase: 'form', tried: false } : null);
@@ -99,12 +146,12 @@ export default function BuyReceiptForm({
   const [modeBusy, setModeBusy] = useState(false);
   const [modeError, setModeError] = useState<string | null>(null);
   /** "Mailing list" is ticked (by the owner on this form, or by the seller in customer input mode); acted on when the receipt is saved. */
-  const [mailingList, setMailingList] = useState(false);
+  const [mailingList, setMailingList] = useState(draftForm?.mailingList ?? false);
   const [listState, setListState] = useState<'added' | 'failed' | null>(null);
   /** How the tablet last came back; the line it may leave on the form is worked out from this, live. */
   const [handBackReason, setHandBackReason] = useState<CustomerHandBackReason | null>(null);
 
-  const hasPhoto = photo !== null;
+  const hasPhoto = linked ? Boolean(linked.seller_id_photo_path) : photo !== null;
   // Nobody picked (or the pick needs a photo that is gone): the default — with the ID photo as soon as there is one.
   const setKey = chosenSet && printSetAllowed(chosenSet, hasPhoto) ? chosenSet : defaultPrintSet(hasPhoto);
 
@@ -162,17 +209,160 @@ export default function BuyReceiptForm({
     }
   }, [restored, customerMode, draft, emailCopy, mailingList]);
 
-  function pickPhoto(blob: Blob) {
-    setPhoto({ blob, url: URL.createObjectURL(blob) });
+  /** Any answer still on its way is for a photo (or a form) that is no longer the current one: drop it. */
+  function dropIdRead() {
+    idReadRun.current += 1;
+    setReadingId(false);
+    setIdReadFailed(null);
   }
 
-  function pickThumbprint(blob: Blob) {
-    setThumbprint({ blob, url: URL.createObjectURL(blob) });
+  /** Have the AI read the ID and fill the seller boxes that are still empty. Never overwrites a box. */
+  async function fillFromPhoto(blob: Blob) {
+    const run = ++idReadRun.current;
+    setReadingId(true);
+    setIdReadFailed(null);
+    const read = await readIdPhoto(blob);
+    if (run !== idReadRun.current) return;
+    setReadingId(false);
+    if ('error' in read) {
+      setIdReadFailed(read.error);
+      return;
+    }
+    // Against the form as it is NOW: a box typed while the ID was being read stays as typed.
+    setDraft((current) => applyIdReadToDraft(current, read.fields));
+  }
+
+  /** On a saved draft a picked photo is stored at once, like on a saved receipt's page; before that it waits in the browser. */
+  async function storePhoto(id: string, blob: Blob) {
+    setPhotoBusy(true);
+    setPhotoNote(null);
+    const result = await uploadIdPhoto(id, blob);
+    setPhotoBusy(false);
+    if ('error' in result) setPhotoNote(result.error);
+    else setLinked(result.receipt);
+  }
+
+  function pickPhoto(blob: Blob) {
+    if (fillFromId) void fillFromPhoto(blob);
+    else dropIdRead();
+    if (linked) void storePhoto(linked.id, blob);
+    else setPhoto({ blob, url: URL.createObjectURL(blob) });
+  }
+
+  async function removePhoto() {
+    if (!linked) {
+      dropIdRead();
+      setPhoto(null);
+      return;
+    }
+    if (!window.confirm('Remove the ID photo from this draft? This cannot be undone.')) return;
+    dropIdRead();
+    setPhotoBusy(true);
+    setPhotoNote(null);
+    const result = await removeIdPhoto(linked.id);
+    setPhotoBusy(false);
+    if ('error' in result) setPhotoNote(result.error);
+    else setLinked(result.receipt);
+  }
+
+  /** Ticking the box with a photo already attached reads that photo; unticking it stops a read on its way. */
+  function changeFillFromId(checked: boolean) {
+    setFillFromId(checked);
+    if (checked && photo) void fillFromPhoto(photo.blob);
+    else dropIdRead();
+  }
+
+  async function pickThumbprint(blob: Blob) {
+    if (!linked) {
+      setThumbprint({ blob, url: URL.createObjectURL(blob) });
+      return;
+    }
+    setThumbprintBusy(true);
+    setThumbprintNote(null);
+    const result = await uploadThumbprint(linked.id, blob);
+    setThumbprintBusy(false);
+    if ('error' in result) setThumbprintNote(result.error);
+    else setLinked(result.receipt);
+  }
+
+  async function dropThumbprint() {
+    if (!linked) {
+      setThumbprint(null);
+      return;
+    }
+    if (!window.confirm('Remove the thumbprint from this draft? This cannot be undone.')) return;
+    setThumbprintBusy(true);
+    setThumbprintNote(null);
+    const result = await removeThumbprint(linked.id);
+    setThumbprintBusy(false);
+    if ('error' in result) setThumbprintNote(result.error);
+    else setLinked(result.receipt);
+  }
+
+  /** The address bar follows the form: a draft's own address while it is one, the plain New receipt address otherwise. A refresh then opens the same thing. */
+  function showAddress(path: string) {
+    try {
+      window.history.replaceState(null, '', path);
+    } catch {
+      // The address is a convenience; the draft is in the Log either way.
+    }
+  }
+
+  /**
+   * "Save draft": the seller's name is all it needs. The first save creates the
+   * draft (it takes its BUY number now) and sends up the photo and thumbprint
+   * held in the browser; from then on the form is linked to it.
+   */
+  async function saveDraft() {
+    if (busy || draftBusy) return;
+    const check = normalizeBuyReceiptDraftSave({ ...draft, emailCopy, mailingList });
+    if ('error' in check) {
+      setError(check.error);
+      return;
+    }
+    setDraftBusy(true);
+    setError(null);
+    setDraftNote(null);
+    const result = await saveDraftReceipt(draft, { id: linked?.id ?? null, duplicatedFrom: duplicatedFrom?.id ?? null, emailCopy, mailingList });
+    if ('error' in result) {
+      setError(`${result.error} ${linked ? 'The draft is as it was last saved.' : 'Try again.'}`);
+      setDraftBusy(false);
+      return;
+    }
+
+    let receipt = result.receipt;
+    const missed: string[] = [];
+    if (!linked) {
+      if (photo) {
+        const uploaded = await uploadIdPhoto(receipt.id, photo.blob);
+        if ('error' in uploaded) missed.push('ID photo');
+        else receipt = uploaded.receipt;
+      }
+      if (thumbprint) {
+        const uploaded = await uploadThumbprint(receipt.id, thumbprint.blob);
+        if ('error' in uploaded) missed.push('thumbprint');
+        else receipt = uploaded.receipt;
+      }
+      // From here the pictures live with the draft, not in this browser.
+      setPhoto(null);
+      setThumbprint(null);
+      showAddress(draftContinuePath(adminBasePath, receipt.id));
+    }
+    setLinked(receipt);
+    setDraftNote(missed.length > 0 ? `The ${missed.join(' and the ')} did not upload — add ${missed.length > 1 ? 'them' : 'it'} again.` : null);
+    setDraftBusy(false);
   }
 
   function startOver() {
+    if (linked) showAddress(`${adminBasePath}/buy-receipts`);
+    setLinked(null);
+    setDraftNote(null);
+    setPhotoNote(null);
+    setThumbprintNote(null);
     setDraft(blankBuyReceiptDraft());
     setPhoto(null);
+    dropIdRead();
+    setFillFromId(true);
     setThumbprint(null);
     setThumbprintFailed(null);
     setChosenSet(null);
@@ -189,7 +379,9 @@ export default function BuyReceiptForm({
 
   /** Lock this browser on the server FIRST; only then is the tablet safe to hand over. */
   async function enterCustomerMode() {
-    if (modeBusy || busy) return;
+    // Not on a saved draft: a refresh while locked lands on the plain New receipt
+    // address, and the form would come back without its draft.
+    if (modeBusy || busy || draftBusy || linked) return;
     setModeBusy(true);
     setModeError(null);
     const started = await startCustomerMode();
@@ -223,7 +415,7 @@ export default function BuyReceiptForm({
   }
 
   async function submit(action: Action) {
-    if (busy) return;
+    if (busy || draftBusy) return;
     const check = normalizeBuyReceiptInput(draft);
     if ('error' in check) {
       setError(check.error);
@@ -234,12 +426,17 @@ export default function BuyReceiptForm({
     setBusy(action);
     setError(null);
 
-    const created = await createReceipt(draft, duplicatedFrom?.id ?? null, wantsEmail, wantsList);
+    // A saved draft is FINISHED by this save (same number); anything else is a new receipt.
+    const created = linked
+      ? await finishDraftReceipt(linked.id, draft, wantsEmail, wantsList)
+      : await createReceipt(draft, duplicatedFrom?.id ?? null, wantsEmail, wantsList);
     if ('error' in created) {
-      setError(`${created.error} Nothing was saved.`);
+      setError(linked ? created.error : `${created.error} Nothing was saved.`);
       setBusy(null);
       return;
     }
+    // No longer a draft: a refresh must not ask for one.
+    if (linked) showAddress(`${adminBasePath}/buy-receipts`);
 
     let receipt = created.receipt;
     if (wantsEmail) {
@@ -318,10 +515,41 @@ export default function BuyReceiptForm({
       mode="edit"
       draft={draft}
       onChange={setDraft}
-      receiptNumber={null}
-      dateIso={nowIso}
-      idPhotoSlot={<IdPhotoField previewUrl={photo?.url ?? null} onPick={pickPhoto} onRemove={() => setPhoto(null)} />}
-      thumbprintSlot={<ThumbprintField previewUrl={thumbprint?.url ?? null} onPick={pickThumbprint} onRemove={() => setThumbprint(null)} />}
+      receiptNumber={linked?.receipt_number ?? null}
+      dateIso={linked?.created_at ?? nowIso}
+      idPhotoSlot={
+        <IdPhotoField
+          previewUrl={linked ? storedPhotoUrl : (photo?.url ?? null)}
+          busy={photoBusy}
+          note={
+            photoNote
+              ? { text: photoNote, ok: false }
+              : idReadFailed
+                ? { text: idReadFailed, ok: false }
+                : linked?.seller_id_photo_path && !storedPhotoUrl
+                  ? { text: 'Loading the photo…', ok: true }
+                  : null
+          }
+          onPick={pickPhoto}
+          onRemove={() => void removePhoto()}
+          autoFill={{ checked: fillFromId, onChange: changeFillFromId, reading: readingId }}
+        />
+      }
+      thumbprintSlot={
+        <ThumbprintField
+          previewUrl={linked ? storedThumbprintUrl : (thumbprint?.url ?? null)}
+          busy={thumbprintBusy}
+          note={
+            thumbprintNote
+              ? { text: thumbprintNote, ok: false }
+              : linked?.seller_thumbprint_path && !storedThumbprintUrl
+                ? { text: 'Loading the thumbprint…', ok: true }
+                : null
+          }
+          onPick={(print) => void pickThumbprint(print)}
+          onRemove={() => void dropThumbprint()}
+        />
+      }
       emailCopy={emailCopy}
       onEmailCopyChange={setEmailCopy}
       mailingList={mailingList}
@@ -338,13 +566,14 @@ export default function BuyReceiptForm({
       adminBasePath={adminBasePath}
       active="new"
       end={
-        saved ? null : (
+        // Offered on a receipt that has not been saved yet — not after a save, and not on a saved draft (see enterCustomerMode).
+        saved || linked ? null : (
           <button
             type="button"
             className="outline-button"
             style={{ padding: '0.5rem 0.95rem', fontSize: '0.64rem' }}
             title="Hand the tablet to the seller: they see only their own name, phone, address and email"
-            disabled={modeBusy || busy !== null}
+            disabled={modeBusy || busy !== null || draftBusy}
             aria-busy={modeBusy}
             onClick={() => void enterCustomerMode()}
           >
@@ -446,6 +675,8 @@ export default function BuyReceiptForm({
   }
 
   const longReceipt = draftPaperLines(draft) > BUY_RECEIPT_ONE_PAGE_LINES;
+  /** A save of either kind is on its way: every button waits. */
+  const working = busy !== null || draftBusy;
 
   return (
     <>
@@ -459,6 +690,13 @@ export default function BuyReceiptForm({
     {handBack && (
       <p role="status" className="mx-auto mb-3 px-3 py-2 text-sm" style={{ width: 'min(8.5in, 100%)', borderRadius: '0.625rem', background: '#fdf1d6', color: '#6a4a00' }}>
         {handBack}
+      </p>
+    )}
+    {/* A saved draft says so, with its number and when it was last saved. */}
+    {linked && (
+      <p role="status" className="mx-auto mb-3 px-3 py-2 text-sm" style={{ width: 'min(8.5in, 100%)', borderRadius: '0.625rem', background: '#fbf5dd', color: '#5c4a00' }}>
+        <strong>Draft {linked.receipt_number}</strong> · saved {formatReceiptDateTime(linked.updated_at)}. Open it from the Log on any device to finish it.
+        {draftNote && <span className="block" style={{ color: 'var(--color-error)' }}>{draftNote}</span>}
       </p>
     )}
     {/* In the server's HTML too, so a refresh in the mode never paints the admin page first. */}
@@ -504,27 +742,38 @@ export default function BuyReceiptForm({
             This receipt is long and may run onto a second page.
           </p>
         )}
-        {/* What prints, on its own line: beside the buttons it pushed the main button onto a second row. */}
-        <div className="flex justify-end">
-          <PrintSetSelect value={setKey} hasIdPhoto={hasPhoto} onChange={setChosenSet} disabled={busy !== null} />
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button type="button" className="outline-button text-xs" disabled={busy !== null} onClick={startOver}>
-            Clear
+        {/* What prints, on its own line: beside the buttons it pushed the main button onto a second row.
+            "Save draft" shares this line for the same reason (measured 2026-10-09: as a fifth button in
+            the row below, the gold button dropped to a second row on an iPad held upright). */}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button type="button" className="outline-button text-xs" disabled={working} title="Keep it to finish later, on this or another device. Only the seller's name is needed." onClick={() => void saveDraft()}>
+            {draftBusy ? 'Saving…' : 'Save draft'}
           </button>
           <span className="flex-1" />
-          <button type="button" className="outline-button text-xs" disabled={busy !== null} onClick={() => void submit('print')}>
+          <PrintSetSelect value={setKey} hasIdPhoto={hasPhoto} onChange={setChosenSet} disabled={working} />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* A saved draft is not cleared from here: it stays in the Log, where Delete removes it. */}
+          {linked ? (
+            <Link href={`${adminBasePath}/buy-receipts/log`} className="outline-button text-xs">Back to the log</Link>
+          ) : (
+            <button type="button" className="outline-button text-xs" disabled={working} onClick={startOver}>
+              Clear
+            </button>
+          )}
+          <span className="flex-1" />
+          <button type="button" className="outline-button text-xs" disabled={working} onClick={() => void submit('print')}>
             {busy === 'print' ? 'Saving…' : 'Print here'}
           </button>
-          <button type="button" className="outline-button text-xs" disabled={busy !== null} onClick={() => void submit('save')}>
+          <button type="button" className="outline-button text-xs" disabled={working} onClick={() => void submit('save')}>
             {busy === 'save' ? 'Saving…' : 'Save'}
           </button>
-          <button type="button" className="gold-button text-xs" disabled={busy !== null} onClick={() => void submit('send')}>
+          <button type="button" className="gold-button text-xs" disabled={working} onClick={() => void submit('send')}>
             {busy === 'send' ? 'Saving…' : 'Save and send to desktop printer'}
           </button>
         </div>
         <p className="text-xs" style={hintStyle}>
-          The number is assigned when the receipt is saved. The buttons and the ID photo and thumbprint strips are not printed; the thumbprint itself prints on the shop copy only.
+          {linked ? 'This draft keeps its number when it is finished.' : 'The number is assigned when the receipt is saved.'} The buttons and the ID photo and thumbprint strips are not printed; the thumbprint itself prints on the shop copy only.
         </p>
       </div>
     </form>

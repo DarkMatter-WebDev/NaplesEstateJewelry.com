@@ -654,7 +654,9 @@ describe('customer input mode: the mailing list', () => {
     const screen = component('BuyReceiptCustomerMode.tsx');
     expect(screen).toContain("if (field === 'sellerEmail' && !next.trim() && (emailCopy || mailingList)) onAsk({ emailCopy: false, mailingList: false });");
     const form = component('BuyReceiptForm.tsx');
-    expect(form).toContain('const [mailingList, setMailingList] = useState(false);');
+    // Unticked on a new receipt; a saved DRAFT (2026-10-09) brings back the ticks it was saved with.
+    expect(form).toContain('const [mailingList, setMailingList] = useState(draftForm?.mailingList ?? false);');
+    expect(form).toContain('const [emailCopy, setEmailCopy] = useState(draftForm?.emailCopy ?? false);');
     // The same two ticks on the owner's form and in the seller's view: one state, in the form.
     expect(form).toContain('mailingList={mailingList}\n      onMailingListChange={setMailingList}');
     expect(form).toContain('emailCopy={emailCopy}\n      onEmailCopyChange={setEmailCopy}');

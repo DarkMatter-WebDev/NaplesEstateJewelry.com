@@ -21,8 +21,12 @@ export async function POST(req: Request, context: Context) {
   const requested = Number(body?.copies ?? 1);
   const copies = Number.isInteger(requested) ? Math.min(Math.max(requested, 1), 5) : 1;
 
-  const { data: current } = await admin.supabase.from('buy_receipts').select('id, print_count').eq('id', id).maybeSingle();
+  const { data: current } = await admin.supabase.from('buy_receipts').select('id, status, print_count').eq('id', id).maybeSingle();
   if (!current) return NextResponse.json({ error: 'Receipt not found.' }, { status: 404 });
+  // A draft is never printed (2026-10-09), so it has no print to record.
+  if (current.status === 'draft') {
+    return NextResponse.json({ error: 'Finish the draft before printing it.' }, { status: 409 });
+  }
 
   const { data, error } = await admin.supabase
     .from('buy_receipts')

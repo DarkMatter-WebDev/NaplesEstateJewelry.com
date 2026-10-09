@@ -13,6 +13,11 @@ import { prepareIdPhoto } from './buy-receipt-client';
  * It only hands the picture to its parent. Whether that means "hold it until
  * the receipt is saved" (new receipt) or "upload now" (saved receipt) is the
  * parent's business.
+ *
+ * "Fill form from ID" (owner, 2026-10-09) is the small box the New receipt
+ * form adds through `autoFill`: ticked, the parent has the AI read the photo
+ * and fill the seller boxes that are still empty. Without the prop (a saved
+ * receipt's page) there is no box and nothing is ever sent.
  */
 export default function IdPhotoField({
   previewUrl,
@@ -20,6 +25,7 @@ export default function IdPhotoField({
   note,
   onPick,
   onRemove,
+  autoFill,
 }: {
   /** What to show: an object URL for a photo not uploaded yet, or a signed link. */
   previewUrl: string | null;
@@ -28,6 +34,8 @@ export default function IdPhotoField({
   note?: { text: string; ok: boolean } | null;
   onPick: (photo: Blob) => void;
   onRemove: () => void;
+  /** The "Fill form from ID" box, and whether a photo is being read right now. */
+  autoFill?: { checked: boolean; onChange: (checked: boolean) => void; reading: boolean };
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [capturing, setCapturing] = useState(false);
@@ -71,12 +79,23 @@ export default function IdPhotoField({
       )}
       <div className="min-w-[150px] flex-1">
         <div className="text-[13px]" style={{ color: '#1a1c1c' }}>
-          {working ? 'Working on the photo…' : has ? 'Seller ID photo attached' : 'Seller ID photo (optional)'}
+          {working ? 'Working on the photo…' : autoFill?.reading ? 'Reading the ID…' : has ? 'Seller ID photo attached' : 'Seller ID photo (optional)'}
         </div>
         <div className="text-[11.5px]" style={{ color: note && !note.ok ? '#a32d2d' : '#746b5b' }}>
           {note?.text ?? "Kept with this receipt. Not printed on the seller's copy."}
         </div>
       </div>
+      {autoFill && (
+        <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-[11.5px]" style={{ color: '#1a1c1c' }}>
+          <input
+            type="checkbox"
+            checked={autoFill.checked}
+            onChange={(event) => autoFill.onChange(event.target.checked)}
+            style={{ width: 14, height: 14, accentColor: '#735c00' }}
+          />
+          Fill form from ID
+        </label>
+      )}
       <button type="button" className={buttonClass} style={buttonStyle} disabled={working} onClick={() => setCapturing(true)}>
         {has ? 'Retake' : 'Use webcam'}
       </button>
