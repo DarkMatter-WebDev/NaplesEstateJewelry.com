@@ -110,6 +110,11 @@ label: `www.googleadservices.com/pagead/conversion/<id>/` (the count),
 
 - Cookie notice (`CookieNotice.tsx`): **Okay** leaves measurement on,
   **Essential only** turns it off and keeps it off; both dismiss the notice.
+  Since 2026-10-12 the notice is SHORT on phones (below `md`): no title,
+  Privacy · Preferences as links inside the sentence, one row of the two
+  choices — 113 px instead of 192 px, so an ad click's first screen keeps the
+  hero call button, the notice and the Call · Text · Directions bar together.
+  Desktop unchanged (`DECISIONS.md` 2026-10-12).
 - `/cookie-preferences` → "Google Ads Measurement" block: Turn off / Turn on
   (`CookiePreferencesClient.tsx`). Off removes the remembered click and
   Google's `_gcl_*` / `_gac_*` cookies at once; the script already in memory

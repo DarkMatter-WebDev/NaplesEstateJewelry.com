@@ -1,9 +1,20 @@
 # Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-10-09** (three new blocks, first
-> below: buy receipt drafts — ⛔ one SQL step —, "Fill form from ID" and the
-> seller-ID webcam window, all staged and awaiting ONE push). Before
+> in `CHANGELOG.md`. Last reconciled: **2026-10-12** (one new block, first
+> below: the next Google Ads read ~10-19 + a real lead to answer; the 10-10
+> asset block is closed — all five Eligible on 10-12; the "Google Ad" chip
+> count was 0 — `CHANGELOG.md` 2026-10-12 (1)). Before that, 10-10 (one block:
+> the Google Ads asset re-read ~10-11 after the 10-10 account changes;
+> session of 10-09/10 closed — `CHANGELOG.md` 2026-10-10 (2); nothing to
+> push, no SQL, no env vars). Before that, 10-09 (three blocks, first
+> below: buy receipt drafts, "Fill form from ID" and the seller-ID webcam
+> window — all DEPLOYED 10-09 ~6:30 PM, SQL run; each still wants the owner's
+> first real use; session closed — `CHANGELOG.md` 2026-10-09 (5)). **What is
+> actually open after the 10-09 session:** those three first uses; the D&B
+> profile re-read (~10-09); the ~10-12 "Google Ad" chip count; one real read of
+> the Google Ads account; the first real sale through each Text Deals mark-sold
+> button. Before
 > that: session of 10-07 closed —
 > `CHANGELOG.md` 2026-10-08 (1). **What is actually open after that session:**
 > the first real sale through each new Text Deals mark-sold button (first block
@@ -14,7 +25,39 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-10-09 (3) — Buy receipt DRAFTS (save in progress, finish on another device) — **BUILT + STAGED** → ◻ SQL → ◻ push (one push with (2) and (1) below) → ◻ the owner's first draft
+### 🟡 2026-10-12 (2) — Cookie notice SHORT on phones — **BUILT + STAGED, not pushed** (one file; no SQL, no env vars)
+
+Record: `CHANGELOG.md` 2026-10-12 (2); ruling `DECISIONS.md` top entry; mockup `sticky-call-bar-v1.html` (scratchpad, shown in the app's preview pane).
+
+1. ◻ **Owner: push + deploy** (`components/legal/CookieNotice.tsx` only). Gate on the staged code: `tsc` 0 · lint 0 errors · 163/163 test files · build 0.
+2. ◻ **Owner: look at one ad landing page on a real phone as a first-time visitor** (private window): the notice should be a short card — sentence with Privacy · Preferences links, then Essential only · Okay — with the hero's call button above it and the Call · Text · Directions bar under it. Desktop unchanged.
+3. ⛔ Not built, on purpose: no new call bar — all seven ad landing pages already have one (`lib/contact-bar-paths.ts`, approved 09-20).
+
+**Staging (10-12):** synced after `CHANGELOG.md` 2026-10-12 (2) — follow-up dry run 0 (see the close line there).
+
+### ◻ 2026-10-12 (1) — Google Ads: next real read ~10-19, once "Bid strategy learning" has cleared; a real lead to answer today (account only; no code, no SQL, no env vars)
+
+Record: `CHANGELOG.md` 2026-10-12 (1); figures in memory `google-ads-lean-2026-09`; rulings `DECISIONS.md` 2026-10-10 entry.
+
+1. ✅ **The Free Evaluation lead of 10-12 (Philip O'Connor, Bonita Springs, gold/silver, prefers TEXT) — the owner replied by text the same day** (owner, 10-12: *"i replied to philip O'conner today via text"*). Not from an ad. The row may still show NEW in Admin → Inquiries until "Mark replied" is clicked — cosmetic.
+2. ◻ **~10-19 read:** NEJ Sellers was "Eligible (Learning) — bid strategy learning" on 10-12 after the 10-10 edits. Judge the 10-10 changes on the week of Oct 12 vs the week of Oct 5 (69 clicks / $153.55 / 3 conv), on taps + directions. ⛔ Don't touch bids or the cap while it says Learning.
+3. ◻ **Watch, don't act yet:** `"sell jewelry"` ($46.96 / 22 clicks / 0 conv on 10-12) — act only past ~40 clicks with 0 conversions; the brand search "naples estate jewelry" (11 clicks / $18.52 lifetime, 5 of 16 visible clicks Oct 9–11) — the owner's call (10-09: leave it).
+4. ⛔ DECLINED by the owner 10-12 (*"dont add the snippets to the coins campaign, leave it"*): no structured snippet on NEJ Coins; Google's recommendation card for it stays unapplied. Owner's standing word the same day: leave the account alone until the ~10-19 read; Maximize conversions declined (6 real signals, below the ~15/month floor; the $6 cap would go).
+5. ⛔ Not to be re-raised: pausing Diamond Jewelry or NEJ Coins, diamond negatives, `comprar` / buy-wording negatives, a $3 cap, Maximize conversions, dynamic images, a form test on production, a manual tally (owner rulings 10-10, 10-06, 10-02, 09-24, 09-23).
+
+**Staging (10-12):** docs-only — see the close line in `CHANGELOG.md` 2026-10-12 (1).
+
+### ✅ 2026-10-10 (1) — Google Ads: five assets "Pending / Under review" after the 10-10 changes — **READ 10-12: all Eligible** (account only; no code)
+
+Record: `CHANGELOG.md` 2026-10-10 (1); read `2026-10-12 (1)`; ruling `DECISIONS.md` 2026-10-10 entry.
+
+1. ✅ 10-12: **Sell Your Watch** sitelink (already 4 clicks), **Sell Silver**, **Sell Gold**, the **Types** structured snippet — all Eligible; every one of the 60 asset rows is Eligible.
+2. ✅ 10-12: the Conversions column = 6 taps + 2 old "Calls from ads" (recorded before 10-10, still counted) + 1 website Get directions since 10-10 — read by the Conversion action segment.
+3. ⛔ Not to be re-raised: pausing Diamond Jewelry or NEJ Coins, diamond negatives, `comprar` / buy-wording negatives, a $3 cap, a form test on production, a manual tally (owner rulings 10-10, 10-06, 10-02, 09-23).
+
+### 🟢 2026-10-09 (3) — Buy receipt DRAFTS (save in progress, finish on another device) — **DEPLOYED, SQL run** (owner, 10-09 ~6:30 PM ET: *"sql ran, pushed and deployed"*) — ✅ SQL → ✅ pushed → ◻ the owner's first draft is still the test
+
+**10-09 ~6:30 PM — SQL RUN + DEPLOYED** (`CHANGELOG.md` 2026-10-09 (4)). Items 1 and 2 below are done on the owner's word (the SQL's last result was not shown to Claude); nothing was said about trying it and Claude did not check production (not asked to), so item 3 stays open.
 
 Record: `CHANGELOG.md` 2026-10-09 (3). Rules: `DECISIONS.md` top entry. Runbook: `features/buy-receipts.md` → *Drafts*.
 
@@ -41,7 +84,9 @@ Gate: `tsc` 0 · lint 0 errors · **1796/1796** · build 0. Browser checks on th
 
 **Staging (10-09 (3)):** ✅ synced 2026-10-09 12:02 PM ET — dry run listed exactly the 24 touched files (3 new: `next-app/src/lib/buy-receipt-drafts.ts`, `src/lib/__tests__/buy-receipt-drafts.test.ts`, `supabase/buy-receipts-drafts-2026-10.sql`; 13 changed in the app: `api/admin/buy-receipts/route.ts`, `[id]/route.ts`, `[id]/email/route.ts`, `[id]/print-request/route.ts`, `[id]/printed/route.ts`, `[locale]/admin/buy-receipts/page.tsx`, `[id]/page.tsx`, `components/admin/buy-receipts/BuyReceiptForm.tsx`, `BuyReceiptLog.tsx`, `buy-receipt-client.ts`, `lib/buy-receipts.ts`, `lib/__tests__/buy-receipt-customer-mode.test.ts`, `buy-receipt-thumbprint.test.ts`; 8 docs: ARCHITECTURE, CHANGELOG, CURRENT_STATUS, DECISIONS, INTEGRITY, STRUCTURE, TASKS, `features/buy-receipts.md`), 0 Extras, 1229 total (1226 + the 3 new); real run copied 24 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0, exit 0; leak check 0 `.env*` / `.log` / `.tmp-*` / `tsbuildinfo` / `zz-*`, no node_modules / .next / .git, launch.json present; no `zz-*` file or page in source or staging; positive control 242 = 242 `.tsx`, 495 = 495 `.ts` under `next-app/src`, 92 = 92 `.sql` under `supabase`; SHA-256 MATCH on 24 of 24; the staged form carries "Save draft", the staged SQL carries `buy_receipts_draft_guard`. Staging holds (1) + (2) + (3): one push. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 
-### 🟡 2026-10-09 (2) — Buy receipt: "Fill form from ID" (the AI reads the seller's ID photo and fills the empty seller boxes) — **BUILT + STAGED** → ◻ push (one push with (1) below) → ◻ the owner's first real ID
+### 🟢 2026-10-09 (2) — Buy receipt: "Fill form from ID" (the AI reads the seller's ID photo and fills the empty seller boxes) — **DEPLOYED** (owner, 10-09 ~6:30 PM ET) — ✅ pushed → ◻ the owner's first real ID is still the test
+
+**10-09 ~6:30 PM — DEPLOYED** (`CHANGELOG.md` 2026-10-09 (4)). Item 1 below is done; item 2 (the first real ID) stays open.
 
 Record: `CHANGELOG.md` 2026-10-09 (2). Rules: `DECISIONS.md` top entry. Runbook: `features/buy-receipts.md` → *Seller ID photo*.
 
@@ -61,7 +106,9 @@ Gate: `tsc` 0 · lint 0 errors · **1772/1772** · build 0. A real read of a mad
 
 **Staging (10-09 (2)):** ✅ synced 2026-10-09 ~11:40 AM ET — dry run listed exactly the 16 touched files (4 new: `next-app/src/app/api/admin/buy-receipts/id-read/route.ts`, `src/lib/buy-receipt-id-read.ts`, `src/lib/buy-receipt-id-read-provider.ts`, `src/lib/__tests__/buy-receipt-id-read.test.ts`; 4 changed in the app: `components/admin/buy-receipts/BuyReceiptForm.tsx`, `IdPhotoField.tsx`, `buy-receipt-client.ts`, `lib/__tests__/buy-receipts.test.ts`; 8 docs: ARCHITECTURE, CHANGELOG, CURRENT_STATUS, DECISIONS, INTEGRITY, STRUCTURE, TASKS, `features/buy-receipts.md`), 0 Extras, 1226 total (1222 + the 4 new); real run copied 16 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0, exit 0; leak check 0 `.env*` / `.log` / `.tmp-*` / `tsbuildinfo` / `zz-*`, no node_modules / .next / .git, launch.json present; no `zz-*` file or page in source or staging; positive control 242 = 242 `.tsx`, 493 = 493 `.ts` under `next-app/src`; SHA-256 MATCH on 16 of 16; the staged strip carries "Fill form from ID", the staged form starts the box ticked, the staged webcam window has no `dashed`. Staging holds (1) + (2): one push. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 
-### 🟡 2026-10-09 (1) — Buy receipt: the seller-ID webcam window has no dashed frame; the ID fills the whole picture — **BUILT + STAGED** → ◻ push → ◻ the owner's try with the real camera
+### 🟢 2026-10-09 (1) — Buy receipt: the seller-ID webcam window has no dashed frame; the ID fills the whole picture — **DEPLOYED** (owner, 10-09 ~6:30 PM ET) — ✅ pushed → ◻ the owner's try with the real camera is still open
+
+**10-09 ~6:30 PM — DEPLOYED** (`CHANGELOG.md` 2026-10-09 (4)). Item 1 below is done; item 2 (is the license sharp when held close?) stays open.
 
 Record: `CHANGELOG.md` 2026-10-09 (1). Rule: `DECISIONS.md` top entry.
 

@@ -96,7 +96,7 @@ export default function CookieNotice({ locale }: { locale: string }) {
   return (
     <div
       data-cookie-notice
-      className="fixed bottom-3 left-3 right-3 z-[70] mx-auto max-w-4xl rounded-2xl border p-3.5 shadow-[0_18px_64px_rgba(38,28,6,0.18)] backdrop-blur md:bottom-5 md:flex md:items-center md:justify-between md:gap-5 md:p-5"
+      className="fixed bottom-3 left-3 right-3 z-[70] mx-auto max-w-4xl rounded-2xl border px-3 py-2.5 shadow-[0_18px_64px_rgba(38,28,6,0.18)] backdrop-blur md:bottom-5 md:flex md:items-center md:justify-between md:gap-5 md:p-5"
       style={{
         background: 'rgba(255,255,255,0.94)',
         borderColor: 'rgba(115, 92, 0, 0.16)',
@@ -105,29 +105,53 @@ export default function CookieNotice({ locale }: { locale: string }) {
       role="region"
       aria-label={isEs ? 'Aviso de cookies' : 'Cookie notice'}
     >
-      <div className="min-w-0 text-xs leading-snug md:text-sm md:leading-relaxed">
-        <p className="text-[0.78rem] font-bold md:text-sm" style={{ fontFamily: 'var(--font-label)', color: 'var(--color-primary)' }}>
+      {/* Phones (owner, 2026-10-12, from a before/after of the ad landing
+          pages): the notice is SHORT — no title, smaller sentence, Privacy and
+          Preferences as links inside the sentence, so the two choice buttons
+          are its only row and the hero's second button and the hours line stay
+          visible above it. 113px instead of 192px on a 390px screen. The
+          sentence (owner, 2026-10-02) and the four choices are unchanged; from
+          `md` up the notice is exactly as before. The two phone-hidden Links
+          sit in a `hidden md:contents` span rather than carrying `hidden`
+          themselves: an unlayered `display` in globals.css can beat a Tailwind
+          utility on the element (see `.mobile-contact-bar`), a wrapper cannot
+          be out-voted. */}
+      <div className="min-w-0 text-[0.7rem] leading-[1.35] md:text-sm md:leading-relaxed">
+        <p className="hidden text-[0.78rem] font-bold md:block md:text-sm" style={{ fontFamily: 'var(--font-label)', color: 'var(--color-primary)' }}>
           {isEs ? 'Cookies y almacenamiento' : 'Cookies and Storage'}
         </p>
         <p style={{ color: 'var(--color-on-surface-variant)' }}>
           {isEs
             ? 'Usamos cookies esenciales y almacenamiento del navegador para inicio de sesión, carrito, favoritos, idioma y seguridad. Las visitas desde nuestros anuncios de Google también son medidas por Google.'
             : 'We use essential cookies and browser storage for sign-in, cart, favorites, language routing, and security. Visits from our Google ads are also measured by Google.'}
+          <span className="md:hidden">
+            {' '}
+            <Link href={`${prefix}/privacy`} prefetch={false} className="font-bold underline" style={{ color: 'var(--color-primary)' }}>
+              {isEs ? 'Privacidad' : 'Privacy'}
+            </Link>
+            {' · '}
+            <Link href={`${prefix}/cookie-preferences`} prefetch={false} className="font-bold underline" style={{ color: 'var(--color-primary)' }}>
+              {isEs ? 'Preferencias' : 'Preferences'}
+            </Link>
+          </span>
         </p>
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-2 md:mt-0 md:flex md:flex-shrink-0 md:flex-nowrap md:items-center">
+      <div className="mt-2 grid grid-cols-2 gap-2 md:mt-0 md:flex md:flex-shrink-0 md:flex-nowrap md:items-center">
         {/* ⚠️ These two do NOT prefetch, and this banner is the worst possible
             place to do so: it renders for FIRST-TIME visitors specifically —
             exactly the people already waiting on a cold, uncached page — and
             points at two legal pages almost nobody opens. Measured 2026-08-14,
             /cookie-preferences was the single most-prefetched route on the site
-            (6x) with /privacy close behind. */}
-        <Link href={`${prefix}/privacy`} prefetch={false} className="outline-button justify-center px-3 py-1.5 text-[0.62rem] md:px-4 md:py-2 md:text-[0.68rem]">
-          {isEs ? 'Privacidad' : 'Privacy'}
-        </Link>
-        <Link href={`${prefix}/cookie-preferences`} prefetch={false} className="outline-button justify-center px-3 py-1.5 text-[0.62rem] md:px-4 md:py-2 md:text-[0.68rem]">
-          {isEs ? 'Preferencias' : 'Preferences'}
-        </Link>
+            (6x) with /privacy close behind. From `md` up only; on phones the
+            same two links are inside the sentence above. */}
+        <span className="hidden md:contents">
+          <Link href={`${prefix}/privacy`} prefetch={false} className="outline-button justify-center px-3 py-1.5 text-[0.62rem] md:px-4 md:py-2 md:text-[0.68rem]">
+            {isEs ? 'Privacidad' : 'Privacy'}
+          </Link>
+          <Link href={`${prefix}/cookie-preferences`} prefetch={false} className="outline-button justify-center px-3 py-1.5 text-[0.62rem] md:px-4 md:py-2 md:text-[0.68rem]">
+            {isEs ? 'Preferencias' : 'Preferences'}
+          </Link>
+        </span>
         {/* The real choice (owner, 2026-10-02): this button actually blocks the
             Google tag — see DECISIONS.md → "Cookie banner". */}
         <button type="button" onClick={essentialOnly} className="outline-button justify-center px-3 py-1.5 text-[0.62rem] md:px-4 md:py-2 md:text-[0.68rem]">
