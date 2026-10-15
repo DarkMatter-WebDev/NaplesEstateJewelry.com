@@ -17,6 +17,16 @@ import {
 } from '@/lib/marketplace-drift-repair';
 import { ensureFreshAccessToken } from './auth';
 import {
+  BEST_OFFER_SQL_MISSING_MESSAGE,
+  bestOfferFromOffer,
+  bestOfferPushedMessage,
+  bestOfferSavedMessage,
+  bestOfferTerms,
+  bestOfferUnchangedMessage,
+  isMissingBestOfferColumn,
+  planBestOfferChange,
+} from './best-offer';
+import {
   buildMappedPayload,
   buildPreflightChecks,
   computeContentHash,
@@ -196,6 +206,9 @@ export function offerBody(payload: MappedEbayPayload) {
       fulfillmentPolicyId: payload.fulfillmentPolicyId,
       paymentPolicyId: payload.paymentPolicyId,
       returnPolicyId: payload.returnPolicyId,
+      // Per item, on or off, always explicit (2026-10-14): updateOffer is a
+      // full replace, so leaving this out would silently switch Best Offer off.
+      bestOfferTerms: bestOfferTerms(payload.bestOfferEnabled),
     },
     pricingSummary: { price: { value: String(payload.price ?? 0), currency: 'USD' } },
     merchantLocationKey: payload.merchantLocationKey,
@@ -286,6 +299,8 @@ interface GetOfferResponse {
   // (isPublished = Boolean(listingId)) wrongly reported it as live.
   status?: string;
   listing?: { listingId?: string; listingStatus?: string; soldQuantity?: number };
+  /** Returned only while Best Offer is on (read back by setEbayBestOffer). */
+  listingPolicies?: { bestOfferTerms?: { bestOfferEnabled?: boolean } };
 }
 
 async function getOfferCall(accessToken: string, offerId: string): Promise<GetOfferResponse> {
@@ -927,6 +942,127 @@ export async function runUnstage(productId: string): Promise<SyncStepResult> {
   } catch (err) {
     return handleSyncError(service, productId, listing, err, 'unstage');
   }
+}
+
+export interface BestOfferChangeResult {
+  ok: boolean;
+  /** The choice now stored (the old one again when the eBay update failed). */
+  enabled: boolean;
+  /** True when the item's eBay offer was updated in this call. */
+  pushed: boolean;
+  syncState: EbaySyncState | null;
+  /** getOffer read-back after a push; null = not pushed, or the read failed. */
+  confirmedOnEbay: boolean | null;
+  /** Bulk run only (`skipIfUnchanged`): the item already had this choice — nothing was sent. */
+  unchanged?: boolean;
+  message: string;
+  error?: { code: string; message: string };
+}
+
+/**
+ * The "Allow offers" box (2026-10-14): store the item's Best Offer choice on
+ * the product, then — for a live or prepared offer — send it to eBay through
+ * the ordinary update path (`runSyncStep(…, 'update')`: preflight, relist and
+ * write-block guards, full-replace PUTs). Every other state only saves; the
+ * choice rides along with that item's next sync, publish or restore, because
+ * offerBody always carries it. A failed eBay update puts the stored choice
+ * back, so the box keeps telling the truth about the listing.
+ */
+export async function setEbayBestOffer(
+  productId: string,
+  enabled: boolean,
+  options: { skipIfUnchanged?: boolean } = {},
+): Promise<BestOfferChangeResult> {
+  const service = createServiceClient();
+  const failed = (code: string, message: string, stored: boolean, syncState: EbaySyncState | null = null): BestOfferChangeResult => ({
+    ok: false,
+    enabled: stored,
+    pushed: false,
+    syncState,
+    confirmedOnEbay: null,
+    message,
+    error: { code, message },
+  });
+
+  const { data: row, error: readError } = await service.from('products').select('id, ebay_best_offer').eq('id', productId).maybeSingle();
+  if (readError) {
+    return isMissingBestOfferColumn(readError)
+      ? failed('sql_missing', BEST_OFFER_SQL_MISSING_MESSAGE, false)
+      : failed('read_failed', readError.message, false);
+  }
+  if (!row) return failed('product_not_found', 'Product not found.', false);
+  const previous = (row as { ebay_best_offer?: boolean | null }).ebay_best_offer === true;
+  // The bulk "Best Offer on / off" run skips items that already have the
+  // choice, so it never sends a needless full update to a live listing.
+  if (options.skipIfUnchanged && previous === enabled) {
+    return {
+      ok: true,
+      enabled,
+      pushed: false,
+      syncState: null,
+      confirmedOnEbay: null,
+      unchanged: true,
+      message: bestOfferUnchangedMessage(enabled),
+    };
+  }
+
+  const { error: writeError } = await service.from('products').update({ ebay_best_offer: enabled }).eq('id', productId);
+  if (writeError) {
+    return isMissingBestOfferColumn(writeError)
+      ? failed('sql_missing', BEST_OFFER_SQL_MISSING_MESSAGE, previous)
+      : failed('save_failed', writeError.message, previous);
+  }
+
+  const listing = await getListing(service, productId);
+  if (planBestOfferChange(listing) === 'save') {
+    await insertSyncLog(service, {
+      product_id: productId,
+      listing_id: listing?.ebay_listing_id ?? null,
+      action: 'best_offer',
+      outcome: 'ok',
+      message: `${enabled ? 'on' : 'off'} — saved only (state ${listing?.sync_state ?? 'not listed'})`,
+    });
+    return {
+      ok: true,
+      enabled,
+      pushed: false,
+      syncState: listing?.sync_state ?? null,
+      confirmedOnEbay: null,
+      message: bestOfferSavedMessage(enabled, listing?.sync_state ?? null),
+    };
+  }
+
+  const result = await runSyncStep(productId, 'update');
+  if (result.error) {
+    if (previous !== enabled) {
+      await service.from('products').update({ ebay_best_offer: previous }).eq('id', productId);
+    }
+    return failed(result.error.code, `eBay was not updated, so the box was put back: ${result.error.message}`, previous, result.syncState);
+  }
+
+  let confirmed: boolean | null = null;
+  try {
+    const { accessToken } = await ensureFreshAccessToken(service);
+    confirmed = bestOfferFromOffer(await getOfferCall(accessToken, listing!.ebay_offer_id!));
+  } catch {
+    confirmed = null;
+  }
+  const mismatch = confirmed !== null && confirmed !== enabled;
+  await insertSyncLog(service, {
+    product_id: productId,
+    listing_id: result.listingId ?? listing?.ebay_listing_id ?? null,
+    action: 'best_offer',
+    outcome: mismatch ? 'warning' : 'ok',
+    message: `${enabled ? 'on' : 'off'} — offer updated; eBay reads ${confirmed === null ? 'unknown' : confirmed ? 'on' : 'off'}`,
+  });
+  return {
+    ok: true,
+    enabled,
+    pushed: true,
+    syncState: result.syncState,
+    confirmedOnEbay: confirmed,
+    message: bestOfferPushedMessage(enabled, result.syncState, confirmed),
+  };
 }
 
 // ---------------------------------------------------------------------------

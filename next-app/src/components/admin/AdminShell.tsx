@@ -60,6 +60,7 @@ import InstagramProductPanel from './InstagramProductPanel';
 import FacebookProductPanel from './FacebookProductPanel';
 import EbayBulkSyncModal from './EbayBulkSyncModal';
 import EbayBulkPublishModal from './EbayBulkPublishModal';
+import EbayBestOfferBulkModal from './EbayBestOfferBulkModal';
 import SelectedProductsActionsModal, { type SelectedMarketplaceAction } from './SelectedProductsActionsModal';
 import SelectedProductsStatusModal from './SelectedProductsStatusModal';
 import type { Marketplace } from '@/lib/selected-marketplace-status';
@@ -1304,6 +1305,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   const [ebayListingsByProduct, setEbayListingsByProduct] = useState<Record<string, MarketplaceChipRow>>({});
   const [showEbayBulkModal, setShowEbayBulkModal] = useState(false);
   const [showEbayPublishModal, setShowEbayPublishModal] = useState(false);
+  // Bulk eBay Best Offer for the selected items: true = on, false = off, null = closed.
+  const [ebayBestOfferBulk, setEbayBestOfferBulk] = useState<boolean | null>(null);
   const refreshEbayChips = useCallback(async () => {
     try {
       const res = await fetch('/api/admin/ebay/listings');
@@ -3606,6 +3609,10 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       return;
     }
     if (selectedProductIds.length === 0) return;
+    if (action === 'ebay-best-offer-on' || action === 'ebay-best-offer-off') {
+      setEbayBestOfferBulk(action === 'ebay-best-offer-on');
+      return;
+    }
     setSelectedStatusPostTarget(null);
     if (action === 'check-etsy' || action === 'check-ebay') {
       setSelectedStatusCheck(action === 'check-etsy' ? 'etsy' : 'ebay');
@@ -6730,6 +6737,18 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
           productIds={selectedStatusPostTarget ? [selectedStatusPostTarget.productId] : selectedBulkRun ? selectedProductIds : undefined}
           onClose={handleEbayBulkClose}
           onProductEdited={mergeReviewEdit}
+        />
+      )}
+
+      {/* eBay Best Offer on / off for the selected items (2026-10-14) */}
+      {ebayBestOfferBulk !== null && (
+        <EbayBestOfferBulkModal
+          items={selectedProducts.map((product) => ({ id: product.id, title: product.title }))}
+          enabled={ebayBestOfferBulk}
+          onClose={() => {
+            setEbayBestOfferBulk(null);
+            void refreshEbayChips(); // live items were updated on eBay
+          }}
         />
       )}
 

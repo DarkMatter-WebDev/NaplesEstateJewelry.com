@@ -133,6 +133,8 @@ export interface Product {
   internal_notes: string | null;
   public_notes: string | null;
   public_notes_es: string | null;
+  /** eBay listing allows Best Offer — admin-only, set from the eBay drawer section (supabase/ebay-best-offer-2026-10.sql). Absent until that SQL runs. */
+  ebay_best_offer?: boolean | null;
   featured: boolean | null;
   sort_order: number;
   created_at: string;

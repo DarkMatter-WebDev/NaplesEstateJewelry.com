@@ -809,6 +809,9 @@ export interface MappedEbayPayload {
   returnPolicyId: string | null;
   merchantLocationKey: string | null;
   marketplaceId: string;
+  /** The item's own Best Offer choice (`products.ebay_best_offer`) — sent on every offer
+   *  write, since eBay's updateOffer replaces the whole offer. NOT in the content hash. */
+  bestOfferEnabled: boolean;
 }
 
 export function buildMappedPayload(
@@ -843,6 +846,7 @@ export function buildMappedPayload(
     returnPolicyId: connection?.return_policy_id ?? null,
     merchantLocationKey: connection?.merchant_location_key ?? null,
     marketplaceId: connection?.marketplace_id ?? 'EBAY_US',
+    bestOfferEnabled: product.ebay_best_offer === true,
   };
 }
 
@@ -862,6 +866,11 @@ export function buildMappedPayload(
 // the high-value shipping threshold changes which shipping policy applies —
 // that's a structural listing change, not mere price drift, so it should
 // still trigger an update push despite price itself being excluded.
+//
+// `bestOfferEnabled` is deliberately EXCLUDED (2026-10-14): the "Allow offers"
+// box pushes its own change to a live listing the moment it is ticked (see
+// setEbayBestOffer in sync.ts), and adding it here would have flagged every
+// existing listing "Content stale" the day it shipped.
 // ---------------------------------------------------------------------------
 export function computeContentHash(payload: MappedEbayPayload): string {
   const stable = {

@@ -1,7 +1,8 @@
 # Structure And Build Integrity
 
 > Canonical project map and single sources of truth. Last reconciled:
-> **2026-10-09** (buy receipt drafts and "Fill form from ID": two new rows; before that,
+> **2026-10-14** (eBay Best Offer per item: one new row; before that,
+> 2026-10-09, buy receipt drafts and "Fill form from ID": two new rows; before that,
 > 10-07, text-deal photos: `deal-photos.ts` added to the text-alerts row).
 
 ## Runtime Shape
@@ -114,6 +115,7 @@ let additional loose app assets accumulate at root.
 | Shipping methods and fees | `next-app/src/lib/checkout-shipping.ts` |
 | U.S. address normalization | `next-app/src/lib/us-address.ts` |
 | PayPal integration | `src/lib/paypal*.ts`, PayPal API routes, and `features/paypal-checkout.md` |
+| eBay Best Offer per item (2026-10-14: the "Allow offers" box; no auto-accept / auto-decline) | Column `products.ebay_best_offer` (`supabase/ebay-best-offer-2026-10.sql`; `ebay_best_offer?` in `types/product.ts`); payload `bestOfferEnabled` in `lib/ebay/mapping.ts` (⛔ not in `computeContentHash`); sent by `offerBody` in `lib/ebay/sync.ts` as `listingPolicies.bestOfferTerms` on EVERY offer write; `setEbayBestOffer` (same file, `skipIfUnchanged` for bulk) behind `app/api/admin/ebay/best-offer/route.ts`; pure rules + wording + bulk outcome/summary `lib/ebay/best-offer.ts`; UI `components/admin/EbayProductPanel.tsx` (the box) and, in bulk, `SelectedProductsActionsModal.tsx` ("eBay Best Offer" section) → `AdminShell.tsx` → `EbayBestOfferBulkModal.tsx` (one item at a time); guard `lib/ebay/__tests__/best-offer.test.ts`. ⛔ Never on `ebay_listings` (a `pending` row is a queued publish). Retired: `ebay_connection.best_offer_enabled`. Rule `DECISIONS.md` → *"eBay Best Offer is chosen per item"* |
 | Etsy integration | `src/lib/etsy/`, Etsy API routes, and `features/etsy-sync.md` |
 | eBay integration | `src/lib/ebay/`, eBay API routes, and `features/ebay-sync.md` |
 | Instagram posting | `src/lib/instagram/`, `/api/admin/instagram/*`, and `features/instagram-posting.md` |

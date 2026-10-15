@@ -2,7 +2,17 @@
 
 import { AppIcon } from '@/components/AppIcon';
 
-type SelectedMarketplaceAction = 'etsy' | 'ebay' | 'both' | 'check-etsy' | 'check-ebay' | 'repair-etsy' | 'publish-etsy-ready' | 'publish-ready';
+type SelectedMarketplaceAction =
+  | 'etsy'
+  | 'ebay'
+  | 'both'
+  | 'check-etsy'
+  | 'check-ebay'
+  | 'repair-etsy'
+  | 'publish-etsy-ready'
+  | 'publish-ready'
+  | 'ebay-best-offer-on'
+  | 'ebay-best-offer-off';
 
 interface Props {
   count: number;
@@ -86,7 +96,7 @@ export default function SelectedProductsActionsModal({ count, onClose, onChoose 
         </div>
 
         <p className="mt-3 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
-          Sync selected products, compare their marketplace status, or publish completed marketplace drafts that are ready to go live.
+          Sync selected products, compare their marketplace status, turn eBay Best Offer on or off, or publish completed marketplace drafts that are ready to go live.
         </p>
 
         <p className="mt-5 text-[0.62rem] font-bold uppercase tracking-widest" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
@@ -144,6 +154,26 @@ export default function SelectedProductsActionsModal({ count, onClose, onChoose 
             title="Check eBay status"
             description="Reconcile the selected products with eBay without pushing content."
             onClick={() => onChoose('check-ebay')}
+            disabled={count === 0}
+          />
+        </div>
+
+        <p className="mt-5 text-[0.62rem] font-bold uppercase tracking-widest" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
+          eBay Best Offer
+        </p>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          <ActionButton
+            icon="sell"
+            title="Allow offers on eBay"
+            description="Turn Best Offer on for the selected items. Live listings show Make Offer right away."
+            onClick={() => onChoose('ebay-best-offer-on')}
+            disabled={count === 0}
+          />
+          <ActionButton
+            icon="remove"
+            title="Turn offers off on eBay"
+            description="Turn Best Offer off for the selected items. Live listings go back to Buy It Now only."
+            onClick={() => onChoose('ebay-best-offer-off')}
             disabled={count === 0}
           />
         </div>

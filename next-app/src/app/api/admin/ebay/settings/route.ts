@@ -48,7 +48,8 @@ export async function PUT(req: Request) {
     }
     patch.sold_handling = body.soldHandling;
   }
-  if ('bestOfferEnabled' in body) patch.best_offer_enabled = Boolean(body.bestOfferEnabled);
+  // 'bestOfferEnabled' (account-wide) is retired 2026-10-14 — Best Offer is per
+  // item (products.ebay_best_offer, /api/admin/ebay/best-offer); it was never sent to eBay.
   if ('pricePushEnabled' in body) patch.price_push_enabled = Boolean(body.pricePushEnabled);
   if ('autoMarkSold' in body) patch.auto_mark_sold = Boolean(body.autoMarkSold);
   if ('pricePushThresholdPct' in body) {

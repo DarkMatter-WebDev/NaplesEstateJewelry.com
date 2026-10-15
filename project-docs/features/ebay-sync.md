@@ -1,5 +1,28 @@
 # Feature: eBay Sync
 
+> **Best Offer per item (built 2026-10-14):** each item's eBay section
+> (`EbayProductPanel.tsx`) has a **Best Offer · Allow offers** box, stored as
+> `products.ebay_best_offer` (`supabase/ebay-best-offer-2026-10.sql`, default off). `offerBody`
+> always sends `listingPolicies.bestOfferTerms.bestOfferEnabled` on or off —
+> `updateOffer` replaces the whole offer, so omitting it would switch Best
+> Offer off. Never `autoAcceptPrice` / `autoDeclinePrice` (owner answers
+> offers on eBay). Changing the box calls `POST /api/admin/ebay/best-offer` →
+> `setEbayBestOffer` (`sync.ts`): live (`published` / `out_of_date`) and
+> prepared (`review` / `offer_created`) offers are updated at once through
+> `runSyncStep(…, 'update')` and read back with `getOffer`; a failed update
+> puts the stored choice back. `hidden_oos` / `ended` / `error` / no offer:
+> saved only, applied at the next sync / restore (hidden: Restore, then Sync
+> Updates). Not in the content hash. Pure rules: `lib/ebay/best-offer.ts`;
+> guard `lib/ebay/__tests__/best-offer.test.ts`. **In bulk** (10-14 (2)):
+> Products → select → Actions → "Allow offers on eBay" / "Turn offers off
+> on eBay" → `EbayBestOfferBulkModal.tsx` calls the same route ONE ITEM AT A
+> TIME with `skipIfUnchanged: true` (an item already in that state is not
+> touched), with Stop between items and a counted summary. eBay's Metadata API
+> (`getNegotiatedPricePolicies`, 10-14) reports Best Offer supported in all
+> 28 pinned categories. The old account-wide `best_offer_enabled` (Q9) was
+> never sent to eBay and is retired. Rule: `DECISIONS.md` → *"eBay Best
+> Offer is chosen per item"*.
+
 > **Account-change reset (built 2026-07-30):** Settings → eBay Sync has a
 > "Reset listing state (account change)…" action for switching to a different
 > eBay seller account. It is dry-run-first (shows a count-by-state summary
@@ -271,7 +294,7 @@ above):
   `high_value_shipping_threshold`, `payment_policy_id`, `return_policy_id`,
   `merchant_location_key`), selling-limit snapshot (informational, Q14),
   sync policy (`auto_publish` Q1, `sold_handling` Q7, `best_offer_enabled`
-  Q9, `price_push_enabled`/`price_push_threshold_pct` Q3,
+  Q9 — retired 2026-10-14, never sent to eBay; Best Offer is per item, `price_push_enabled`/`price_push_threshold_pct` Q3,
   `price_markup_pct` Q2), and `orders_cursor` (column exists for the Phase 3
   seam; unused — no route reads/writes it).
 - **`ebay_oauth_states`** — transient CSRF state, 10-minute TTL by
@@ -343,7 +366,7 @@ place).
   shipping (Q16, new — no Etsy precedent)**, **high-value threshold $
   (Q16)**, payment, return — plus a read-only inventory-location display,
   selling-limit readout, sync-policy toggles (auto-publish, sold-handling,
-  best-offer, price-push), and the markup field with the **exact same**
+  price-push; the account-wide best-offer box was removed 2026-10-14), and the markup field with the **exact same**
   explicit-Save / `pricesStale` callout / gold "Push prices to eBay now"
   button interaction the Etsy panel settled on (Q2 explicitly required
   this).

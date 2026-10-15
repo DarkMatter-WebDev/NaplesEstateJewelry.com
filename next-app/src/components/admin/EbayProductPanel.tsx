@@ -33,6 +33,8 @@ interface MappedEbayPayload {
   returnPolicyId: string | null;
   merchantLocationKey: string | null;
   marketplaceId: string;
+  /** This item's own Best Offer choice (products.ebay_best_offer). */
+  bestOfferEnabled: boolean;
 }
 
 interface EbayListingSummary {
@@ -50,6 +52,16 @@ interface PreviewResponse {
   fees: unknown;
   /** The stored product values behind the editable rows — prefills the pencil editors. */
   productFields?: ReviewProductFields;
+}
+
+interface BestOfferChangeResult {
+  ok: boolean;
+  enabled: boolean;
+  pushed: boolean;
+  syncState: string | null;
+  confirmedOnEbay: boolean | null;
+  message: string;
+  error?: { code: string; message: string };
 }
 
 interface SyncStepResult {
@@ -110,6 +122,7 @@ export default function EbayProductPanel({
   const [busyAction, setBusyAction] = useState<'delist' | 'restore' | 'check-status' | 'unstage' | null>(null);
   const [pushingPrice, setPushingPrice] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [savingBestOffer, setSavingBestOffer] = useState(false);
   const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null);
 
   const showNotice = (text: string, ok = true) => {
@@ -292,6 +305,31 @@ export default function EbayProductPanel({
     }
   };
 
+  // The item's Best Offer choice (2026-10-14). A live or prepared offer is
+  // updated on eBay in the same call; otherwise the choice is saved and rides
+  // along with the next sync. No auto-accept / auto-decline — offers are
+  // answered on eBay (owner's choice).
+  const changeBestOffer = async (enabled: boolean) => {
+    setSavingBestOffer(true);
+    try {
+      const res = await fetch('/api/admin/ebay/best-offer', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ productId, enabled }),
+      });
+      const data = (await res.json().catch(() => null)) as BestOfferChangeResult | null;
+      if (!res.ok || !data) throw new Error(errorMessage(data, 'Could not change Best Offer.'));
+      const mismatch = data.confirmedOnEbay !== null && data.confirmedOnEbay !== data.enabled;
+      showNotice(data.message, data.ok && !mismatch);
+    } catch (err) {
+      showNotice(err instanceof Error ? err.message : 'Could not change Best Offer.', false);
+    } finally {
+      setSavingBestOffer(false);
+      await loadPreview();
+      onSynced?.();
+    }
+  };
+
   const runDelistAction = async (action: 'hide' | 'withdraw' | 'restore' | 'unstage') => {
     setBusyAction(action === 'restore' ? 'restore' : action === 'unstage' ? 'unstage' : 'delist');
     try {
@@ -339,6 +377,15 @@ export default function EbayProductPanel({
   const canUnstage =
     hasOffer && (listing?.syncState === 'review' || listing?.syncState === 'ended' || listing?.syncState === 'offer_created');
   const fields = preview.productFields ?? null;
+  const offerIsLive = listing?.syncState === 'published' || listing?.syncState === 'out_of_date';
+  const offerIsPrepared = hasOffer && (listing?.syncState === 'review' || listing?.syncState === 'offer_created');
+  const bestOfferHint = offerIsLive
+    ? 'Changes the live eBay listing right away. Offers are answered on eBay; nothing is accepted or declined automatically.'
+    : offerIsPrepared
+      ? 'Updates the prepared listing right away; it carries this choice when you publish.'
+      : listing?.syncState === 'hidden_oos'
+        ? 'Saved now; eBay gets it after Restore, then Sync Updates.'
+        : 'Saved now; included when this item is synced to eBay.';
 
   // A product-backed value with its pencil; the cell spans both columns while
   // its editor is open so the inputs have room.
@@ -462,6 +509,20 @@ export default function EbayProductPanel({
                 : 'standard'}
           </p>
         </div>
+        <div className="md:col-span-2">
+          <span className="form-label">Best Offer</span>
+          <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--color-on-surface-variant)' }}>
+            <input
+              type="checkbox"
+              checked={preview.payload.bestOfferEnabled}
+              disabled={savingBestOffer || syncing || publishing || pushingPrice || busyAction !== null || fieldEditor.saving}
+              onChange={(e) => void changeBestOffer(e.target.checked)}
+              style={{ accentColor: 'var(--color-primary)' }}
+            />
+            {savingBestOffer ? 'Saving…' : 'Allow offers'}
+          </label>
+          <p className="text-[0.7rem] italic opacity-75">{bestOfferHint}</p>
+        </div>
       </div>
 
       {progress && (
@@ -482,7 +543,7 @@ export default function EbayProductPanel({
         <button
           type="button"
           onClick={() => void runSyncLoop(alreadySynced ? 'update' : 'publish')}
-          disabled={!preview.eligible || syncing || fieldEditor.saving}
+          disabled={!preview.eligible || syncing || savingBestOffer || fieldEditor.saving}
           className="gold-button text-sm disabled:opacity-50"
         >
           {syncing ? 'Syncing…' : alreadySynced ? 'Sync Updates' : 'Sync to eBay'}
@@ -491,7 +552,7 @@ export default function EbayProductPanel({
           <button
             type="button"
             onClick={() => void publishLive()}
-            disabled={publishing || syncing || !preview.eligible || fieldEditor.saving}
+            disabled={publishing || syncing || savingBestOffer || !preview.eligible || fieldEditor.saving}
             className="gold-button text-sm disabled:opacity-50"
             title="eBay has no private draft — this makes the listing live immediately."
           >
@@ -502,7 +563,7 @@ export default function EbayProductPanel({
           <button
             type="button"
             onClick={() => void pushPriceOnly()}
-            disabled={pushingPrice || syncing || busyAction !== null}
+            disabled={pushingPrice || syncing || savingBestOffer || busyAction !== null}
             className="outline-button text-sm"
             title="Push just the current price to eBay (no photos or details)"
           >

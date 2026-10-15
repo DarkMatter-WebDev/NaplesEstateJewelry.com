@@ -29,6 +29,7 @@ export interface EbayConnectionRow {
   selling_limit_checked_at: string | null;
   auto_publish: boolean;
   sold_handling: 'quantity_zero' | 'withdraw';
+  /** Retired 2026-10-14 (never sent to eBay): Best Offer is per item — `products.ebay_best_offer`. */
   best_offer_enabled: boolean;
   price_push_enabled: boolean;
   price_push_threshold_pct: number;

@@ -63,7 +63,6 @@ export async function GET() {
     policy: {
       autoPublish: connection?.auto_publish ?? false,
       soldHandling: connection?.sold_handling ?? 'quantity_zero',
-      bestOfferEnabled: connection?.best_offer_enabled ?? false,
       pricePushEnabled: connection?.price_push_enabled ?? false,
       pricePushThresholdPct: connection?.price_push_threshold_pct ?? 1,
       priceMarkupPct: connection?.price_markup_pct ?? 15,

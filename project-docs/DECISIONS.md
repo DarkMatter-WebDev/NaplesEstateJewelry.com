@@ -4,7 +4,18 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-10-09**.
+> compaction. Last reconciled: **2026-10-14**.
+
+## eBay Best Offer is chosen per item, with NO auto-accept or auto-decline price; ticking the box changes a live listing at once (2026-10-14)
+
+- **Owner, 2026-10-14 (verbatim):** *"best offer chosen per item, no auto prices- ill deal with offers directly on ebay.. yes, current listings can get best offer... maybe add an option to turn best offer on or off even after an item has been posted"*.
+- **The rule:** one box per item, "Allow offers", in the item's eBay section (`components/admin/EbayProductPanel.tsx`), stored as `products.ebay_best_offer` (default off). Every offer the site writes carries `bestOfferTerms.bestOfferEnabled` EXPLICITLY, on or off (`lib/ebay/sync.ts` → `offerBody`) — eBay's `updateOffer` replaces the whole offer, so leaving the field out would switch Best Offer off without anyone asking.
+- ⛔ **Never** `autoAcceptPrice` / `autoDeclinePrice`: the owner answers every offer on eBay, and fixed-dollar thresholds would go stale as spot moves the price. Guarded by `lib/ebay/__tests__/best-offer.test.ts`.
+- **When the box changes:** a live (`published` / `out_of_date`) or prepared (`review` / `offer_created`) offer is updated at once through the ordinary update path and read back from eBay; a failed update puts the box back. ⛔ A hidden (`hidden_oos`), ended or errored listing is NOT pushed — saved only, it rides with that item's next sync / restore — because a full update could re-show a sold piece or move the item to "Ready to publish".
+- ⛔ **Not in the content hash** (`computeContentHash`): adding it would have marked every live listing "Content stale" on the day it shipped; the box pushes its own change instead.
+- ⛔ **On `products`, never on `ebay_listings`:** a `pending` `ebay_listings` row is what the publish queue claims — a row created just to hold the choice would stage the item for eBay.
+- **In bulk (owner, 10-14: *"yes add the bulk best offer button"*):** Products → select → Actions → **Allow offers on eBay** / **Turn offers off on eBay** runs the SAME per-item rule, one item at a time from the browser (`EbayBestOfferBulkModal.tsx`), with `skipIfUnchanged` so an item already in that state is never sent a needless full update. ⛔ Never in parallel and never one server call for the whole list (each live item is a full eBay update; the 60 s function cap).
+- The account-wide "Allow Best Offer" setting (`ebay_connection.best_offer_enabled`, July) was never sent to eBay; its checkbox is removed and the column is unused. Record: `CHANGELOG.md` 2026-10-14 (1).
 
 ## The cookie notice is SHORT on phones — no title, Privacy · Preferences as links inside the sentence, one row of two buttons — because on an ad click it is the first thing between the visitor and the call buttons; the ad landing pages get no new call bar, they already have one (2026-10-12)
 

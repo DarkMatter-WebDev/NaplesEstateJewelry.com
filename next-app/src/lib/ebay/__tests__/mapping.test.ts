@@ -708,3 +708,19 @@ describe('site shipping-tier fulfillment policies (2026-07-30)', () => {
     expect(options[0].shippingServices[0].additionalShippingCost.value).toBe('59.00');
   });
 });
+
+describe('Best Offer per item (2026-10-14)', () => {
+  it('maps products.ebay_best_offer onto the payload; missing or null means off', () => {
+    expect(buildMappedPayload(makeProduct({ ebay_best_offer: true }), makeConnection(), null).bestOfferEnabled).toBe(true);
+    expect(buildMappedPayload(makeProduct({ ebay_best_offer: false }), makeConnection(), null).bestOfferEnabled).toBe(false);
+    expect(buildMappedPayload(makeProduct({ ebay_best_offer: null }), makeConnection(), null).bestOfferEnabled).toBe(false);
+    // Before the SQL runs the column is simply absent from select('*').
+    expect(buildMappedPayload(makeProduct(), makeConnection(), null).bestOfferEnabled).toBe(false);
+  });
+
+  it('does NOT change the content hash — the box pushes its own change, and every live listing must not turn "Content stale"', () => {
+    const off = buildMappedPayload(makeProduct({ ebay_best_offer: false }), makeConnection(), null);
+    const on = buildMappedPayload(makeProduct({ ebay_best_offer: true }), makeConnection(), null);
+    expect(computeContentHash(off)).toBe(computeContentHash(on));
+  });
+});

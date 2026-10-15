@@ -1,8 +1,11 @@
 # Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-10-12** (one new block, first
-> below: the next Google Ads read ~10-19 + a real lead to answer; the 10-10
+> in `CHANGELOG.md`. Last reconciled: **2026-10-14** (eBay Best Offer per
+> item + in bulk BUILT + STAGED; SQL RUN by the owner; only the push left — first block below). Before that, **2026-10-12** (session CLOSED —
+> `CHANGELOG.md` 2026-10-12 (3); two new blocks, first below: the short phone
+> cookie notice DEPLOYED + verified in production, and the next Google Ads
+> read ~10-19; the Philip O'Connor lead was answered by the owner; the 10-10
 > asset block is closed — all five Eligible on 10-12; the "Google Ad" chip
 > count was 0 — `CHANGELOG.md` 2026-10-12 (1)). Before that, 10-10 (one block:
 > the Google Ads asset re-read ~10-11 after the 10-10 account changes;
@@ -25,15 +28,38 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-10-12 (2) — Cookie notice SHORT on phones — **BUILT + STAGED, not pushed** (one file; no SQL, no env vars)
+### 🟡 2026-10-14 (1) + (2) — eBay Best Offer, chosen per item ("Allow offers" in the item's eBay section) + IN BULK (Products → select → Actions) — **BUILT + STAGED, not pushed** — ✅ SQL (owner, 10-14) → ◻ push → ◻ the first real box ticked / first bulk run
 
-Record: `CHANGELOG.md` 2026-10-12 (2); ruling `DECISIONS.md` top entry; mockup `sticky-call-bar-v1.html` (scratchpad, shown in the app's preview pane).
+Record: `CHANGELOG.md` 2026-10-14 (1), (2). Rule: `DECISIONS.md` top entry. Runbook: `features/ebay-sync.md` → *Best Offer per item*.
 
-1. ◻ **Owner: push + deploy** (`components/legal/CookieNotice.tsx` only). Gate on the staged code: `tsc` 0 · lint 0 errors · 163/163 test files · build 0.
-2. ◻ **Owner: look at one ad landing page on a real phone as a first-time visitor** (private window): the notice should be a short card — sentence with Privacy · Preferences links, then Essential only · Okay — with the hero's call button above it and the Call · Text · Directions bar under it. Desktop unchanged.
+**Owner's words (10-14):** *"Build it: best offer chosen per item, no auto prices- ill deal with offers directly on ebay.. yes, current listings can get best offer... maybe add an option to turn best offer on or off even after an item has been posted..."*
+
+Gate (final, both): `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1821/1821** tests (164 files) · build 0 · 88 prerendered = 41 EN + 41 ES + 6. Real components in headless Chrome with stand-in routes: drawer box 18/18, bulk 22/22.
+
+1. ✅ **Owner — run the SQL** — DONE 10-14 (*"ran the sql successfully, didnt deploy yet"*). Was: Supabase → SQL editor → paste all of [`supabase/ebay-best-offer-2026-10.sql`](../supabase/ebay-best-offer-2026-10.sql) → Run. Expect ONE row: `ebay_best_offer` · `boolean` · default `false` · `is_nullable` NO · `anon_can_read` false. Safe to re-run; either order with the push.
+2. ◻ **Owner — push + deploy.**
+3. ◻ **Owner — the first real one:** Admin → Products → open a LIVE eBay item → its eBay section → **Best Offer · Allow offers** → tick it. Within a few seconds a gold line should say *"Best Offer on — the live eBay listing now shows Make Offer."* Then open **View on eBay** — the listing should show **Make Offer**. Un-tick → *"Buy It Now only again"*.
+   - A red *"eBay accepted the update but does not show Best Offer…"* = eBay took the update but did not turn it on — tell Claude.
+   - A red *"…the box was put back: …"* = eBay was not updated; the reason follows the colon.
+   - *"Run supabase/ebay-best-offer-2026-10.sql…"* = step 1 not done.
+4. ℹ️ **How it behaves:** live or "Ready to publish" items update at once (a full update — any other stale detail on that item goes too, like Sync Updates). Hidden (sold-out), ended or errored items only save; they get it with their next sync / restore (hidden: Restore, then Sync Updates). Items not on eBay yet get it when first synced. No auto-accept, no auto-decline.
+5. ℹ️ If Best Offer was ever turned on for a listing directly in Seller Hub, the next update from the site sets it to that item's box (off unless ticked).
+6. ✅ **Bulk — BUILT (10-14 (2), owner: *"yes add the bulk best offer button"*).** ◻ **Owner — the first bulk run:** Products → tick a few items → **Actions** → **Allow offers on eBay** → read the confirm screen → **Turn on for N**. It goes one item at a time ("N of M done · now: …"; **Stop after current item** works between items), then one summary line, e.g. *"Done — Best Offer on: 3 updated on eBay · 1 saved for their next sync · 2 already on."* Anything refused is listed under it with eBay's reason. Spot-check one listing on eBay for **Make Offer**. Leave the window open until it says Done (~a few seconds per live item).
+7. ℹ️ Never verified by Claude: the SQL, the sign-in, a real eBay write.
+
+**Staging (10-14 (1)):** ✅ synced 2026-10-14 ~12:45 PM ET — dry run listed exactly the 22 touched files (4 new: `next-app/src/app/api/admin/ebay/best-offer/route.ts`, `src/lib/ebay/best-offer.ts`, `src/lib/ebay/__tests__/best-offer.test.ts`, `supabase/ebay-best-offer-2026-10.sql`; 10 changed in the app: `api/admin/ebay/settings/route.ts`, `status/route.ts`, `components/admin/EbayProductPanel.tsx`, `EbaySettingsPanel.tsx`, `lib/ebay/mapping.ts`, `store.ts`, `sync.ts`, `__tests__/mapping.test.ts`, `__tests__/sync.test.ts`, `types/product.ts`; 8 docs: ARCHITECTURE, CHANGELOG, CURRENT_STATUS, DECISIONS, INTEGRITY, STRUCTURE, TASKS, `features/ebay-sync.md`), 0 Extras, 1233 total (1229 + the 4 new); real run copied 22 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0, exit 0; leak check 0 `.env*` / `.log` / `.tmp-*` / `tsbuildinfo` / `zz-*`, no node_modules / .next / .git; no `zz-*` page in source or staging; positive control 242 = 242 `.tsx`, 498 = 498 `.ts` under `next-app/src`, 93 = 93 `.sql`; SHA-256 MATCH on 22 of 22; the staged `offerBody` carries `bestOfferTerms`, the staged Settings panel has no "Allow Best Offer". Docs-only re-sync after this line.
+
+**Staging (10-14 (2), bulk):** ✅ synced 2026-10-14 ~1:15 PM ET — dry run listed exactly the 15 touched files (1 new: `next-app/src/components/admin/EbayBestOfferBulkModal.tsx`; 6 changed in the app: `api/admin/ebay/best-offer/route.ts`, `components/admin/AdminShell.tsx`, `SelectedProductsActionsModal.tsx`, `lib/ebay/best-offer.ts`, `sync.ts`, `__tests__/best-offer.test.ts`; 8 docs: ARCHITECTURE, CHANGELOG, CURRENT_STATUS, DECISIONS, INTEGRITY, STRUCTURE, TASKS, `features/ebay-sync.md`), 0 Extras, 1234 total; real run copied 15 / 0 FAILED; follow-up dry run 0, exit 0; leak check 0, no node_modules / .next / .git, no `zz-*`; positive control 243 = 243 `.tsx`, 498 = 498 `.ts`; SHA-256 MATCH on 15 of 15; the staged actions window carries "Allow offers on eBay", the staged `sync.ts` the skip. Staging holds (1) + (2): ONE push. Docs-only re-sync after this line.
+
+### ✅ 2026-10-12 (2) — Cookie notice SHORT on phones — **DEPLOYED (owner, 10-12 evening: *"pushed and deployed"*) and VERIFIED in production by Claude** (one file; no SQL, no env vars)
+
+Record: `CHANGELOG.md` 2026-10-12 (2) build, (3) verification; ruling `DECISIONS.md` top entry; mockup `sticky-call-bar-v1.html` (scratchpad, shown in the app's preview pane).
+
+1. ✅ Pushed + deployed by the owner. Production checked: new markup served on `/estate-jewelry` and `/es/gold-services`; at 390 px the notice is 113 px (EN) / 128 px (ES), title hidden, inline Privacy · Preferences, Essential only · Okay, contact bar shown.
+2. ◻ **Owner, whenever handy: one ad landing page on a real phone as a first-time visitor** (private window) — the notice should be a short card with the hero's call button above it and the Call · Text · Directions bar under it. Claude's check was headless Chrome, not a phone.
 3. ⛔ Not built, on purpose: no new call bar — all seven ad landing pages already have one (`lib/contact-bar-paths.ts`, approved 09-20).
 
-**Staging (10-12):** synced after `CHANGELOG.md` 2026-10-12 (2) — follow-up dry run 0 (see the close line there).
+**Staging (10-12):** docs-only re-sync after `CHANGELOG.md` 2026-10-12 (3) — follow-up dry run 0.
 
 ### ◻ 2026-10-12 (1) — Google Ads: next real read ~10-19, once "Bid strategy learning" has cleared; a real lead to answer today (account only; no code, no SQL, no env vars)
 

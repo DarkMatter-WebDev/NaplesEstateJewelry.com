@@ -42,6 +42,7 @@ describe('offer contract hardening', () => {
       returnPolicyId: 'return',
       merchantLocationKey: 'location',
       marketplaceId: 'EBAY_US',
+      bestOfferEnabled: false,
     };
     expect(offerBody(payload).listingDuration).toBe('GTC');
   });

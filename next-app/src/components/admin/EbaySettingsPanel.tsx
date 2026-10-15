@@ -33,7 +33,6 @@ interface EbayStatusResponse {
   policy: {
     autoPublish: boolean;
     soldHandling: 'quantity_zero' | 'withdraw';
-    bestOfferEnabled: boolean;
     pricePushEnabled: boolean;
     pricePushThresholdPct: number;
     priceMarkupPct: number;
@@ -643,16 +642,6 @@ export default function EbaySettingsPanel() {
                   <option value="withdraw">End the listing</option>
                 </select>
               </div>
-              <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--color-on-surface-variant)' }}>
-                <input
-                  type="checkbox"
-                  checked={status.policy.bestOfferEnabled}
-                  disabled={saving}
-                  onChange={(e) => void saveSettings({ bestOfferEnabled: e.target.checked })}
-                  style={{ accentColor: 'var(--color-primary)' }}
-                />
-                Allow Best Offer
-              </label>
               <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--color-on-surface-variant)' }}>
                 <input
                   type="checkbox"

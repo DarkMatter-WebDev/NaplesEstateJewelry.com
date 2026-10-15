@@ -565,6 +565,14 @@ channel), deliberately mirroring the Etsy Sync shape above. The current
 technical contract, operator setup, and verification limits live in
 `project-docs/features/ebay-sync.md`.
 
+- **Best Offer (2026-10-14):** per item, `products.ebay_best_offer`; every
+  offer write sends `listingPolicies.bestOfferTerms` explicitly (updateOffer
+  is a full replace); no auto-accept / auto-decline. The box in the eBay
+  drawer section posts to `/api/admin/ebay/best-offer` → `setEbayBestOffer`,
+  which updates a live or prepared offer at once and reads it back. In bulk
+  (Products → select → Actions) `EbayBestOfferBulkModal.tsx` calls the same
+  route one item at a time with `skipIfUnchanged`. Pure rules in
+  `lib/ebay/best-offer.ts`. See `features/ebay-sync.md`.
 - **Module:** `next-app/src/lib/ebay/` — `client.ts` (fetch wrapper: Bearer
   auth, throttle, 429/5xx backoff, typed `EbayApiError`, cached
   client-credentials application token for Taxonomy/Metadata-class calls),
