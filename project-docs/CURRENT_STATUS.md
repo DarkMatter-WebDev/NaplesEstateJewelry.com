@@ -4,6 +4,15 @@
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
 > in `DECISIONS.md`. Last reconciled: **2026-10-14**.
 
+## Start Here (2026-10-15 (6) — bulk "Set all accept offers" / "Set all no offers" BUILT + STAGED, not pushed)
+
+- 🟡 **BUILT + STAGED, awaiting the owner's push — Products → Actions → Site offers → "Set all accept offers" / "Set all no offers"** for the selected items (`CHANGELOG.md` 2026-10-15 (6); `TASKS.md` top). One write via `POST /api/admin/offers/accepts`; the Offers column follows at once; open offers are left alone. No SQL, no env vars. Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1855/1855** tests (165 files) · build 0 · 88 prerendered = 41 EN + 41 ES + 6; real window 7/7. ⛔ Not run for real (behind the sign-in).
+- ℹ️ The 10-15 (5) block below still applies (Make an Offer deployed; the real test offer is next).
+
+## Start Here (2026-10-15 (5) — **Make an Offer** + the "Live + Offer" chip DEPLOYED, SQL run (owner's word); the one real test offer is next)
+
+- 🟢 **DEPLOYED (owner, 10-15: *"Ran the SQL and pushed + deployed"*) — `CHANGELOG.md` 2026-10-15 (5).** Nothing tried yet; Claude did not check production (not asked to). Next: the real test offer, `TASKS.md` top item 3. Nothing is staged-but-unpushed except docs; no SQL or env vars pending. **Where the block below says "STAGED" / "not pushed" / "SQL to run", read "deployed" / "run".**
+
 ## Start Here (2026-10-15 (4) — **Make an Offer** BUILT + STAGED, not pushed; ⛔ SQL `supabase/make-offer-2026-10.sql` to run; the push also carries the waiting "Live + Offer" chip)
 
 - 🟡 **BUILT + STAGED, awaiting the SQL + the owner's push — Make an Offer on the site shop** (`CHANGELOG.md` 2026-10-15 (4); rules `DECISIONS.md` top entry; `TASKS.md` top; runbook `features/make-offer.md`). Per-item **Accept offers** box (new or edit; the AI ticks it only on the owner's words); a full-width **Make an Offer** under the four product buttons; the buyer's payment is **held** through PayPal and **charged automatically on Accept**; 72 hours to answer; no floor; **Counter** releases the hold and emails a private Buy-now link at the agreed price (72 h); email to info@ + a text to the owner's cell; **Offers** column after Price; Admin → **Offers** page.

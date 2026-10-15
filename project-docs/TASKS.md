@@ -28,21 +28,34 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-10-15 (4) — **Make an Offer** on the site shop — **BUILT + STAGED, not pushed**; ⛔ SQL to run; the push also carries the waiting "Live + Offer" chip (10-15 (2))
+### 🟡 2026-10-15 (6) — Products → Actions → **"Set all accept offers" / "Set all no offers"** — **BUILT + STAGED, not pushed** (no SQL, no env vars)
+
+Record: `CHANGELOG.md` 2026-10-15 (6). Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1855/1855** tests (165 files) · build 0 · 88 prerendered = 41 EN + 41 ES + 6; the real actions window 7/7.
+
+1. ◻ **Owner — push + deploy.**
+2. ◻ **Owner — the first run:** Products → tick a few items → **Actions** → **Site offers** → **Set all accept offers**. A green line says *"Accept offers is on for N items…"* and their Offers column reads **On** at once; one of those items' pages shows **Make an Offer**. Then the same items → **Set all no offers** → the column reads "–" and the button is gone.
+3. ℹ️ No confirm screen (one reversible write). Turning offers off leaves offers already open alone — answer them in Offers.
+
+**Staging (10-15 (6)):** ✅ synced 2026-10-15 ~1:40 PM ET — dry run listed exactly the 11 touched files (1 new: `api/admin/offers/accepts/route.ts`; 4 changed in the app: `SelectedProductsActionsModal.tsx`, `AdminShell.tsx`, `lib/offers.ts`, `lib/__tests__/offers.test.ts`; 6 docs), 0 Extras, 1254 total; real run copied 11 / 0 FAILED; follow-up dry run 0, exit 0; leak check 0, no `zz-*`; 251 = 251 `.tsx`; SHA-256 MATCH on the 5 app files. Docs-only re-sync after this line.
+
+### 🟢 2026-10-15 (4) — **Make an Offer** on the site shop — **SQL RUN + DEPLOYED** (owner, 10-15: *"Ran the SQL and pushed + deployed"*) — ✅ SQL → ✅ push → ◻ the one real test offer
+
+**10-15 — DEPLOYED with the "Live + Offer" chip** (`CHANGELOG.md` 2026-10-15 (5)). Items 1 and 2 below are done on the owner's word; item 3 is next.
 
 Record: `CHANGELOG.md` 2026-10-15 (4). Rules: `DECISIONS.md` top entry. Runbook: `features/make-offer.md`.
 
 Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1854/1854** tests (165 files) · build 0 · 88 prerendered = 41 EN + 41 ES + 6 (the new pages render per visit). Browser checks on the real components with stand-in data: 39/39.
 
-1. ◻ **Owner — run the SQL.** Supabase → SQL editor → paste all of [`supabase/make-offer-2026-10.sql`](../supabase/make-offer-2026-10.sql) → Run. The editor shows the LAST result: **one row, every column `true`** — `products_accepts_offers`, `anon_can_read_accepts_offers`, `offers_table`, `offers_private`, `orders_offer_id`, `sweep_scheduled`. Safe to re-run. Either order with the push; until it runs, no item shows Make an Offer and the box says to run it.
+1. ✅ **Owner — run the SQL** — DONE 10-15 (result row not shown to Claude). Was: Supabase → SQL editor → paste all of [`supabase/make-offer-2026-10.sql`](../supabase/make-offer-2026-10.sql) → Run. The editor shows the LAST result: **one row, every column `true`** — `products_accepts_offers`, `anon_can_read_accepts_offers`, `offers_table`, `offers_private`, `orders_offer_id`, `sweep_scheduled`. Safe to re-run. Either order with the push; until it runs, no item shows Make an Offer and the box says to run it.
    - ⚠️ Never run before — written and read, not executed. If the editor shows an error, paste it to Claude.
    - It uses the TEXT_ALERTS_CRON_SECRET already in Vault — no new secret, no new Netlify variable.
-2. ◻ **Owner — push + deploy** (one push: this + the "Live + Offer" chip).
+2. ✅ **Owner — push + deploy** — DONE 10-15 (one push: this + the "Live + Offer" chip).
 3. ◻ **Owner — the one real test** (the only proof your live PayPal account allows hold-now-charge-later):
    - Admin → Products → open a cheap item → tick **Accept offers** (beside Featured) → Save. The Offers column (after Price) reads **On**; the item page shows **Make an Offer** under the four buttons.
+   - ⚠️ Pay with a PERSONAL PayPal login or the "Debit or Credit Card" button — PayPal refuses a payment from the business account to itself. Type a personal email (not info@) so the buyer copy and the owner copy arrive separately.
    - From your phone: Make an Offer → an amount below the price → your details → tick the binding box → PayPal. It should say **Offer sent** with the held amount and the deadline. Expect the info@ email AND a text to your cell; the buyer copy goes to the email you typed.
    - Admin → **Offers** (menu, with a count) → the offer is there → **Decline** → PayPal shows the hold released (your bank may take days to drop it).
-   - Optional: a second offer → **Accept & charge** → a paid order under Orders, the item SOLD, the receipt email. Refund it from the order page if it was only a test.
+   - Optional: a second offer → **Accept & charge** → a paid order under Orders, the item SOLD, the receipt email. Refund it from the order page if it was only a test. ⚠️ Accept marks the item SOLD and delists it from eBay/Etsy — use an item that is NOT on either marketplace, then set it back to Available.
    - Red *"PayPal did not approve the payment hold"* every time = the account may not allow authorizations — tell Claude.
 4. ◻ **Owner — the first counter** when one comes up: Counter → a price between their offer and today's → their hold is released and they get a Buy-now link. If the email fails the page shows the link to send yourself.
 5. ℹ️ Never verified by Claude: the SQL, real PayPal holds/charges/releases, real email and text sends, the admin pages behind the sign-in.

@@ -328,6 +328,34 @@ export function ownerOfferTextBody(input: {
   return `NEJ offer: ${formatCheckoutCurrency(input.amount)} on ${item}${listed}. ${input.customerName}, ${delivery}. Answer by ${formatOfferDeadline(input.expiresAt)}: ${input.adminUrl}`;
 }
 
+/** At most this many items per "Set all accept offers / no offers" run. */
+export const BULK_ACCEPTS_OFFERS_MAX = 1000;
+
+/**
+ * The body of the bulk "Set all accept offers" / "Set all no offers" action
+ * (Products → select → Actions, owner 2026-10-15): unique, non-empty product
+ * ids and an explicit on/off.
+ */
+export function parseBulkAcceptsOffers(body: unknown): { productIds: string[]; enabled: boolean } | { error: string } {
+  const input = body && typeof body === 'object' ? body as Record<string, unknown> : {};
+  if (typeof input.enabled !== 'boolean') return { error: 'Say whether offers go on or off.' };
+  const raw = Array.isArray(input.productIds) ? input.productIds : [];
+  const productIds = Array.from(new Set(raw.filter((id): id is string => typeof id === 'string' && id.trim() !== '').map((id) => id.trim())));
+  if (productIds.length === 0) return { error: 'Select at least one item.' };
+  if (productIds.length > BULK_ACCEPTS_OFFERS_MAX) return { error: `Select at most ${BULK_ACCEPTS_OFFERS_MAX} items at a time.` };
+  return { productIds, enabled: input.enabled };
+}
+
+/** The one line the Products page shows after the bulk action. */
+export function bulkAcceptsOffersMessage(enabled: boolean, updated: number, openOffersLeft: number): string {
+  const items = `${updated} ${updated === 1 ? 'item' : 'items'}`;
+  if (enabled) return `Accept offers is on for ${items} — each shows Make an Offer on its page.`;
+  const open = openOffersLeft > 0
+    ? ` ${openOffersLeft} open ${openOffersLeft === 1 ? 'offer stays' : 'offers stay'} open until you answer ${openOffersLeft === 1 ? 'it' : 'them'} in Offers.`
+    : '';
+  return `Accept offers is off for ${items} — no Make an Offer button.${open}`;
+}
+
 /** Bounded, single-spaced free text (the buyer's message, the owner's counter note). */
 export function cleanOfferText(value: unknown, max: number): string | null {
   if (typeof value !== 'string') return null;

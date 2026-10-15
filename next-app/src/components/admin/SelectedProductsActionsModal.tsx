@@ -12,7 +12,9 @@ type SelectedMarketplaceAction =
   | 'publish-etsy-ready'
   | 'publish-ready'
   | 'ebay-best-offer-on'
-  | 'ebay-best-offer-off';
+  | 'ebay-best-offer-off'
+  | 'site-offers-on'
+  | 'site-offers-off';
 
 interface Props {
   count: number;
@@ -96,7 +98,7 @@ export default function SelectedProductsActionsModal({ count, onClose, onChoose 
         </div>
 
         <p className="mt-3 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
-          Sync selected products, compare their marketplace status, turn eBay Best Offer on or off, or publish completed marketplace drafts that are ready to go live.
+          Sync selected products, compare their marketplace status, turn site offers or eBay Best Offer on or off, or publish completed marketplace drafts that are ready to go live.
         </p>
 
         <p className="mt-5 text-[0.62rem] font-bold uppercase tracking-widest" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
@@ -154,6 +156,28 @@ export default function SelectedProductsActionsModal({ count, onClose, onChoose 
             title="Check eBay status"
             description="Reconcile the selected products with eBay without pushing content."
             onClick={() => onChoose('check-ebay')}
+            disabled={count === 0}
+          />
+        </div>
+
+        {/* The site shop's own "Accept offers" box, for many items at once
+            (owner, 2026-10-15). Separate from eBay Best Offer below. */}
+        <p className="mt-5 text-[0.62rem] font-bold uppercase tracking-widest" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
+          Site offers
+        </p>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          <ActionButton
+            icon="sell"
+            title="Set all accept offers"
+            description="Tick Accept offers on the selected items. Each shows Make an Offer on its page."
+            onClick={() => onChoose('site-offers-on')}
+            disabled={count === 0}
+          />
+          <ActionButton
+            icon="remove"
+            title="Set all no offers"
+            description="Untick Accept offers on the selected items. Offers already open stay until you answer them."
+            onClick={() => onChoose('site-offers-off')}
             disabled={count === 0}
           />
         </div>

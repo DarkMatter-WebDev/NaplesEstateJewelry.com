@@ -62,6 +62,7 @@ import EbayBulkSyncModal from './EbayBulkSyncModal';
 import EbayBulkPublishModal from './EbayBulkPublishModal';
 import EbayBestOfferBulkModal from './EbayBestOfferBulkModal';
 import { ebayChipLabelWithOffer } from '@/lib/ebay/best-offer';
+import { bulkAcceptsOffersMessage } from '@/lib/offers';
 import SelectedProductsActionsModal, { type SelectedMarketplaceAction } from './SelectedProductsActionsModal';
 import SelectedProductsStatusModal from './SelectedProductsStatusModal';
 import type { Marketplace } from '@/lib/selected-marketplace-status';
@@ -3670,6 +3671,10 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       setEbayBestOfferBulk(action === 'ebay-best-offer-on');
       return;
     }
+    if (action === 'site-offers-on' || action === 'site-offers-off') {
+      void setSiteOffersForSelected(action === 'site-offers-on');
+      return;
+    }
     setSelectedStatusPostTarget(null);
     if (action === 'check-etsy' || action === 'check-ebay') {
       setSelectedStatusCheck(action === 'check-etsy' ? 'etsy' : 'ebay');
@@ -3678,6 +3683,30 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setSelectedBulkRun(action);
     if (action === 'ebay') setShowEbayBulkModal(true);
     else setShowEtsyBulkModal(true);
+  }
+
+  // Products -> select -> Actions -> "Set all accept offers" / "Set all no offers"
+  // (owner, 2026-10-15): one write for every selected item, then the table's
+  // Offers column follows at once. Open offers are left alone either way.
+  async function setSiteOffersForSelected(enabled: boolean) {
+    const productIds = [...selectedProductIds];
+    try {
+      const res = await fetch('/api/admin/offers/accepts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productIds, enabled }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) throw new Error(data?.error ?? 'Could not change the items.');
+      const changed = new Set<string>((data.productIds as string[] | undefined) ?? productIds);
+      setProducts((current) => current.map((product) => (
+        changed.has(product.id) ? { ...product, accepts_offers: enabled } : product
+      )));
+      const openLeft = enabled ? 0 : [...changed].reduce((sum, id) => sum + (openOffersByProduct[id] ?? 0), 0);
+      flash(bulkAcceptsOffersMessage(enabled, Number(data.updated ?? changed.size), openLeft));
+    } catch (error) {
+      flash(error instanceof Error ? error.message : 'Could not change the items.', false);
+    }
   }
 
   function postSelectedStatusProduct(productId: string, marketplace: 'etsy' | 'ebay') {

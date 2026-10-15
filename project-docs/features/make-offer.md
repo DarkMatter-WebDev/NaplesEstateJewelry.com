@@ -26,6 +26,9 @@ hold — they are never charged.
    tick **Accept offers** (next to Featured in shop) → Save. Or tell the AI
    assistant "allow offers" / "accept offers" / "turn on make offer" — it ticks
    the box only when your words say so.
+   **Many at once:** Products → tick the items → **Actions** → **Site offers** →
+   **Set all accept offers** or **Set all no offers** (one step, no confirm; open
+   offers are left alone when you turn it off).
 2. **See which items have it:** the **Offers** column after Price — **On** in
    gold, "–" when off, and a gold **N open** when offers are waiting. The
    Featured filter has **Offers on / Offers off**.

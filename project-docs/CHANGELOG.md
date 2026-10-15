@@ -1,6 +1,22 @@
 
 # Changelog
 
+## 2026-10-15 (6) — Products → Actions: **"Set all accept offers" / "Set all no offers"** for the selected items — BUILT + STAGED, not pushed; no SQL, no env vars
+
+- **Owner, 10-15 (verbatim):** *"add \"set all accept offers\" / \"set all no offers\" to the actions button on the main product table, so i can toggle it on or off for multiple items at once."*
+- **What changed:** the "Choose an action" window (`components/admin/SelectedProductsActionsModal.tsx`) has a new **Site offers** section just above eBay Best Offer, with the owner's two labels (actions `site-offers-on` / `site-offers-off`; both disabled with nothing selected). `AdminShell.tsx` → `setSiteOffersForSelected` posts the selected ids to NEW `POST /api/admin/offers/accepts` (`requireAdmin()`, one `update({ accepts_offers })` for all ids, refreshes the shop and each item's page in both languages), then sets the table's Offers column at once and shows one line (`bulkAcceptsOffersMessage`, e.g. *"Accept offers is off for 4 items — no Make an Offer button. 2 open offers stay open until you answer them in Offers."*). Pure body check `parseBulkAcceptsOffers` (unique ids, explicit on/off, ≤ 1000) in `lib/offers.ts`.
+- **Claude's calls (told to the owner):** no confirm screen — one reversible write, unlike eBay's bulk (which changes live listings one by one). Turning offers OFF does not close offers already open — they hold a buyer's money and wait for an answer, same as unticking the box on one item.
+- **Built without a mockup:** two entries in an existing window, drawn exactly like the eBay Best Offer pair beside them.
+- **Verification:** `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1855/1855** tests (165 files) · build 0 · 88 prerendered = 41 EN + 41 ES + 6. 1 new test (the body rules, the message, the route's `requireAdmin` first, the window's two choices and the wiring). The REAL actions window on a temporary page, headless Chrome, real clicks: **7/7** — Site offers sits just above eBay Best Offer, each choice sends its action, both are disabled with nothing selected, no sideways scroll at 390 px and the phone tap works. Temporary page deleted; `tsc` 0 after.
+- ⛔ **Not verified by Claude:** the route behind the sign-in, the real write. The first bulk run is the test (`TASKS.md` top).
+- **Staging:** synced — see `TASKS.md` 2026-10-15 (6).
+
+## 2026-10-15 (5) — Make an Offer: SQL RUN + DEPLOYED by the owner — docs only
+
+- **Owner, 10-15 (verbatim):** *"Ran the SQL and pushed + deployed. Walk me through the test offer."* One push carried 2026-10-15 (2) (the eBay "Live + Offer" chip) and (4) (Make an Offer); `supabase/make-offer-2026-10.sql` run (the result row was not shown to Claude).
+- ⛔ Deployed is the owner's word; nothing has been tried yet. Claude did not check production (not asked to). The walkthrough for the one real test offer was given in chat and is in `TASKS.md` top, item 3.
+- **Staging:** docs-only re-sync after this entry.
+
 ## 2026-10-15 (4) — **Make an Offer** on the site shop: per-item "Accept offers", the buyer's payment is HELD and charged automatically on Accept, Counter = a private Buy-now link — BUILT + STAGED, not pushed; ⛔ one SQL step (`supabase/make-offer-2026-10.sql`)
 
 - **Owner, 10-15 (verbatim):** *"i want to add a \"make offer\" feature to our site shop... turn it on for certain items... during the creation of the item, on the new item page, or on the edit item page... allow the ai listing agent to turn it on for me... a new column in the main product table that shows which items have it turned on"* → *"can we do it in a way that requires the customer to input payment details before making the offer, and then if accepted, the payment goes through? similar to ebay"* → *"payment automatically goes through if accepted.. so they cant make offer and then change mind if accepted.."* → mockup v1 → *"on the product table, move the offers column next to price.. descisions: 1: 3, 2: 1, 3: 2 (but make the counter offer sent by admin to the buyer able to be purchased right away at agreed price.. 4: 1, 5: 2"* → mockup v2 → *"Yes, build it as drawn in v2."*

@@ -7,7 +7,9 @@ import {
   OFFER_STATUSES,
   OFFER_WINDOW_HOURS,
   buyerEmailForStatus,
+  bulkAcceptsOffersMessage,
   cleanOfferText,
+  parseBulkAcceptsOffers,
   computeOfferTotals,
   counterAmountProblem,
   counterExpiresAt,
@@ -359,6 +361,31 @@ describe('source guards', () => {
       expect(source.indexOf('await requireAdmin()')).toBeLessThan(source.indexOf('createServiceClient()', source.indexOf('await requireAdmin()')));
     }
     expect(read('src', 'app', '[locale]', 'admin', 'offers', 'page.tsx')).toContain('<AdminHeader');
+  });
+
+  it('bulk "Set all accept offers / no offers": the body, the message, the route, the window', () => {
+    expect(parseBulkAcceptsOffers({ productIds: ['a', 'b', 'a', ' ', 7], enabled: true })).toEqual({ productIds: ['a', 'b'], enabled: true });
+    expect(parseBulkAcceptsOffers({ productIds: ['a'] })).toEqual({ error: 'Say whether offers go on or off.' });
+    expect(parseBulkAcceptsOffers({ productIds: [], enabled: false })).toEqual({ error: 'Select at least one item.' });
+    expect('error' in parseBulkAcceptsOffers({ productIds: Array.from({ length: 1001 }, (_, i) => `p${i}`), enabled: true })).toBe(true);
+    expect(bulkAcceptsOffersMessage(true, 3, 0)).toBe('Accept offers is on for 3 items — each shows Make an Offer on its page.');
+    expect(bulkAcceptsOffersMessage(false, 1, 0)).toBe('Accept offers is off for 1 item — no Make an Offer button.');
+    expect(bulkAcceptsOffersMessage(false, 4, 2)).toBe('Accept offers is off for 4 items — no Make an Offer button. 2 open offers stay open until you answer them in Offers.');
+
+    const route = read('src', 'app', 'api', 'admin', 'offers', 'accepts', 'route.ts');
+    expect(route.indexOf('await requireAdmin()')).toBeGreaterThan(0);
+    expect(route.indexOf('await requireAdmin()')).toBeLessThan(route.indexOf('createServiceClient()'));
+    expect(route).toContain('.update({ accepts_offers: parsed.enabled })');
+    expect(route).toContain("revalidatePath(`/es/shop/${id}`);");
+
+    const modal = read('src', 'components', 'admin', 'SelectedProductsActionsModal.tsx');
+    expect(modal).toContain('title="Set all accept offers"');
+    expect(modal).toContain('title="Set all no offers"');
+    expect(modal).toContain("onChoose('site-offers-on')");
+    expect(modal).toContain("onChoose('site-offers-off')");
+    const shell = read('src', 'components', 'admin', 'AdminShell.tsx');
+    expect(shell).toContain("void setSiteOffersForSelected(action === 'site-offers-on');");
+    expect(shell).toContain("fetch('/api/admin/offers/accepts'");
   });
 
   it('the sweep is guarded by the cron secret', () => {
