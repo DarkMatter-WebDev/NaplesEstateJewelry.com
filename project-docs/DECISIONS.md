@@ -4,7 +4,22 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-10-14**.
+> compaction. Last reconciled: **2026-10-15**.
+
+## Make an Offer on the site shop: the offer HOLDS the buyer's money and Accept charges it at once; 72 hours, no floor, counters by private Buy-now link, the AI ticks the box only on the owner's words (2026-10-15)
+
+- **Binding, like eBay** (owner: *"payment automatically goes through if accepted.. so they cant make offer and then change mind"*). An offer is a PayPal **AUTHORIZE** order; the owner's Accept captures it with no buyer step. Never an "offer by email then invoice" flow.
+- **72 hours** to answer (owner's answer 1 = PayPal's full 3-day guaranteed hold, counted from the authorization). An offer past its deadline cannot be accepted; the sweep expires it and releases the hold.
+- **No floor, no auto-accept, no auto-decline** (answer 2; same as eBay Best Offer 2026-10-14). The only checks: a real amount ≥ $1 and **below today's checkout price**.
+- **Counter = release + private Buy-now link** (answer 3: *"able to be purchased right away at agreed price"*). The original hold is released because PayPal cannot capture more than it held. The link is a random token (only its sha256 is stored), one unit of one product, the agreed price, 72 hours, single use, no discount code; it goes through the NORMAL checkout route. **No reservation:** until someone pays, the item stays for sale (the 2026-07-03 "whoever pays first" rule).
+- **Accept writes the order through the checkout's own RPCs** (`create_paypal_order` → capture → `capture_paypal_order` → `finalizePaidOrder`) so stock, SOLD, sold_price, receipt, invoice, owner email and marketplace delist never fork. ⛔ Never a second order-writing path for offers.
+- **Any sale closes the item's other offers** (`settleOffersAfterPaidOrder` from `finalizePaidOrder`, sweep as backstop). ⛔ A failed product read closes nothing.
+- **PayPal reference `offer-<uuid>`, never a bare uuid** — the webhook reads a uuid custom_id as an order id.
+- **The offer SDK is its own copy** (`intent=authorize`, `data-namespace=paypalOffer`); the checkout's `window.paypal` must never be an authorize SDK.
+- **Button:** full width UNDER the four product buttons (answer 4); the row above is unchanged. **Alerts:** email to info@ + a plain text to the owner's cell (answer 5). The buyer is only emailed — never texted (no SMS consent). A failed charge sends the buyer no email ("not accepted" would be untrue) — the owner calls.
+- **Table:** the Offers column sits right after Price (owner, mockup v2).
+- **AI:** `accepts_offers` is in the assistant's field set but moves ONLY on the admin's own words — the prompt says so and the route drops the value unless the latest input mentions offers (`mentionsOffers`). This is the one operational-style field the AI may touch; status and location stay out.
+- Runbook `features/make-offer.md`. Record `CHANGELOG.md` 2026-10-15 (4).
 
 ## eBay Best Offer is chosen per item, with NO auto-accept or auto-decline price; ticking the box changes a live listing at once (2026-10-14)
 
@@ -15,6 +30,7 @@
 - ⛔ **Not in the content hash** (`computeContentHash`): adding it would have marked every live listing "Content stale" on the day it shipped; the box pushes its own change instead.
 - ⛔ **On `products`, never on `ebay_listings`:** a `pending` `ebay_listings` row is what the publish queue claims — a row created just to hold the choice would stage the item for eBay.
 - **In bulk (owner, 10-14: *"yes add the bulk best offer button"*):** Products → select → Actions → **Allow offers on eBay** / **Turn offers off on eBay** runs the SAME per-item rule, one item at a time from the browser (`EbayBestOfferBulkModal.tsx`), with `skipIfUnchanged` so an item already in that state is never sent a needless full update. ⛔ Never in parallel and never one server call for the whole list (each live item is a full eBay update; the 60 s function cap).
+- **Seen in the product table (owner, 10-15):** the eBay chip reads **"Live + Offer"** for a LIVE listing that allows Best Offer (`ebayChipLabelWithOffer`; the flag rides on `/api/admin/ebay/listings`). Other states keep their own label — the `+ Offer` is only added to "Live".
 - The account-wide "Allow Best Offer" setting (`ebay_connection.best_offer_enabled`, July) was never sent to eBay; its checkbox is removed and the column is unused. Record: `CHANGELOG.md` 2026-10-14 (1).
 
 ## The cookie notice is SHORT on phones — no title, Privacy · Preferences as links inside the sentence, one row of two buttons — because on an ad click it is the first thing between the visitor and the call buttons; the ad landing pages get no new call bar, they already have one (2026-10-12)

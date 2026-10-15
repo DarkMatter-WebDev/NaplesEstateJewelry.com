@@ -9,6 +9,7 @@ import {
   quotedTotalHasDrifted,
   toOrderQuote,
   type OrderDraft,
+  type OrderDraftOptions,
   type OrderLine,
 } from '@/lib/checkout-pricing';
 import { normalizeDiscountCode } from '@/lib/discount-codes';
@@ -28,6 +29,7 @@ import {
 } from '@/lib/us-address';
 import { normalizePhoneNumber } from '@/lib/phone';
 import { normalizePersonName } from '@/lib/person-name';
+import { findCounterByToken } from '@/lib/offers-server';
 
 export const runtime = 'nodejs';
 
@@ -186,7 +188,35 @@ export async function POST(req: Request) {
   // Service client: discount_codes is admin-only under RLS, so the request-scoped
   // client cannot read it. Null when no code was submitted, which keeps an
   // ordinary order free of any discount lookup.
-  const discountResolver = makeDiscountResolver(service, discountCode, customer.email);
+  // ---- Counter-offer checkout (lib/offers.ts): the buyer's private Buy-now
+  // link. The token proves the agreed price; it covers exactly ONE unit of ONE
+  // product, and no discount code stacks on an agreed price.
+  const counterToken = typeof body.counterToken === 'string' && body.counterToken ? body.counterToken : null;
+  let draftOptions: OrderDraftOptions = {};
+  let counterOfferId: string | null = null;
+  if (counterToken) {
+    const lookup = await findCounterByToken(service, counterToken);
+    if (lookup.state !== 'live') {
+      const isEs = body.locale === 'es';
+      const message = lookup.state === 'sold'
+        ? (isEs ? 'Lo sentimos, esta pieza se vendió.' : 'Sorry, this piece has sold.')
+        : lookup.state === 'used'
+          ? (isEs ? 'Esta contraoferta ya se pagó.' : 'This counter-offer has already been paid.')
+          : (isEs ? 'Esta contraoferta venció.' : 'This counter-offer has expired.');
+      return NextResponse.json({ error: message, code: 'counter_unavailable' }, { status: 409 });
+    }
+    const { offer } = lookup.counter;
+    const onlyThatItem = orderLines.length === 1
+      && orderLines[0].productId === offer.product_id
+      && orderLines[0].quantity === 1;
+    if (!onlyThatItem || !offer.counter_amount) {
+      return NextResponse.json({ error: 'This link covers one piece at the agreed price.' }, { status: 400 });
+    }
+    draftOptions = { unitPriceOverride: { productId: offer.product_id, unitPrice: offer.counter_amount } };
+    counterOfferId = offer.id;
+  }
+
+  const discountResolver = counterOfferId ? null : makeDiscountResolver(service, discountCode, customer.email);
 
   // ---- Retry path: reuse an existing unpaid order, re-create its PayPal order.
   // Only reuse when the stored order still matches what the buyer is paying for
@@ -237,6 +267,7 @@ export async function POST(req: Request) {
         shippingMethod,
         normalizedShippingAddress?.state ?? customer.state,
         discountResolver,
+        draftOptions,
       );
       if (!isOrderDraftError(draft)) reuseDraft = draft;
       // The discount is part of "same totals" — the buyer may have added,
@@ -289,6 +320,7 @@ export async function POST(req: Request) {
             customer_email: String(customer.email).trim(),
             customer_phone: normalizedPhone,
             shipping_address: orderShippingAddress,
+            ...(counterOfferId ? { offer_id: counterOfferId } : {}),
           })
           .eq('id', order.id)
           .select('id')
@@ -314,6 +346,7 @@ export async function POST(req: Request) {
     shippingMethod,
     normalizedShippingAddress?.state ?? customer.state,
     discountResolver,
+    draftOptions,
   );
   if (isOrderDraftError(draft)) {
     // `code` lets the checkout client show precise bilingual guidance instead
@@ -395,7 +428,7 @@ export async function POST(req: Request) {
 
     const { data: associatedOrder, error: associationError } = await service
       .from('orders')
-      .update({ paypal_order_id: paypalOrder.id })
+      .update({ paypal_order_id: paypalOrder.id, ...(counterOfferId ? { offer_id: counterOfferId } : {}) })
       .eq('id', orderId)
       .select('id')
       .maybeSingle();

@@ -28,7 +28,40 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-10-14 (1) + (2) — eBay Best Offer, chosen per item ("Allow offers" in the item's eBay section) + IN BULK (Products → select → Actions) — **BUILT + STAGED, not pushed** — ✅ SQL (owner, 10-14) → ◻ push → ◻ the first real box ticked / first bulk run
+### 🟡 2026-10-15 (4) — **Make an Offer** on the site shop — **BUILT + STAGED, not pushed**; ⛔ SQL to run; the push also carries the waiting "Live + Offer" chip (10-15 (2))
+
+Record: `CHANGELOG.md` 2026-10-15 (4). Rules: `DECISIONS.md` top entry. Runbook: `features/make-offer.md`.
+
+Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1854/1854** tests (165 files) · build 0 · 88 prerendered = 41 EN + 41 ES + 6 (the new pages render per visit). Browser checks on the real components with stand-in data: 39/39.
+
+1. ◻ **Owner — run the SQL.** Supabase → SQL editor → paste all of [`supabase/make-offer-2026-10.sql`](../supabase/make-offer-2026-10.sql) → Run. The editor shows the LAST result: **one row, every column `true`** — `products_accepts_offers`, `anon_can_read_accepts_offers`, `offers_table`, `offers_private`, `orders_offer_id`, `sweep_scheduled`. Safe to re-run. Either order with the push; until it runs, no item shows Make an Offer and the box says to run it.
+   - ⚠️ Never run before — written and read, not executed. If the editor shows an error, paste it to Claude.
+   - It uses the TEXT_ALERTS_CRON_SECRET already in Vault — no new secret, no new Netlify variable.
+2. ◻ **Owner — push + deploy** (one push: this + the "Live + Offer" chip).
+3. ◻ **Owner — the one real test** (the only proof your live PayPal account allows hold-now-charge-later):
+   - Admin → Products → open a cheap item → tick **Accept offers** (beside Featured) → Save. The Offers column (after Price) reads **On**; the item page shows **Make an Offer** under the four buttons.
+   - From your phone: Make an Offer → an amount below the price → your details → tick the binding box → PayPal. It should say **Offer sent** with the held amount and the deadline. Expect the info@ email AND a text to your cell; the buyer copy goes to the email you typed.
+   - Admin → **Offers** (menu, with a count) → the offer is there → **Decline** → PayPal shows the hold released (your bank may take days to drop it).
+   - Optional: a second offer → **Accept & charge** → a paid order under Orders, the item SOLD, the receipt email. Refund it from the order page if it was only a test.
+   - Red *"PayPal did not approve the payment hold"* every time = the account may not allow authorizations — tell Claude.
+4. ◻ **Owner — the first counter** when one comes up: Counter → a price between their offer and today's → their hold is released and they get a Buy-now link. If the email fails the page shows the link to send yourself.
+5. ℹ️ Never verified by Claude: the SQL, real PayPal holds/charges/releases, real email and text sends, the admin pages behind the sign-in.
+
+**Staging (10-15 (4)):** ✅ synced 2026-10-15 ~1:25 PM ET — dry run listed exactly the 41 touched files (19 new: `api/offers/route.ts`, `api/offers/authorize/route.ts`, `api/admin/offers/route.ts`, `[id]/route.ts`, `sweep/route.ts`, `[locale]/offer/[id]/page.tsx`, `[locale]/offer/counter/[token]/page.tsx`, `[locale]/admin/offers/page.tsx`, `components/offers/OfferCheckoutClient.tsx`, `PayPalOfferButton.tsx`, `OfferUnavailable.tsx`, `components/admin/OffersPanel.tsx`, `AdminOffersLink.tsx`, `lib/offers.ts`, `offers-server.ts`, `offer-emails.ts`, `lib/__tests__/offers.test.ts`, `features/make-offer.md`, `supabase/make-offer-2026-10.sql`; 13 changed in the app; 9 docs), 0 Extras, 1253 total (1234 + 19); real run copied 41 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0, exit 0; leak check 0 `.env*` / `.log` / `.tmp-*` / `tsbuildinfo` / `zz-*`, no node_modules / .next / .git; positive control 251 = 251 `.tsx`, 507 = 507 `.ts` under `next-app/src`, 94 = 94 `.sql`; SHA-256 MATCH on 41 of 41; the staged product page carries "Make an Offer", the staged table the Offers column, and the 10-15 (2) "Live + Offer" chip is still staged. Staging holds 10-15 (2) + (4): ONE push. Docs-only re-sync after this line.
+
+### 🟡 2026-10-15 (2) — Product table: eBay chip reads "LIVE + OFFER" for a live listing that allows Best Offer — **BUILT + STAGED, not pushed** (no SQL, no env vars)
+
+Record: `CHANGELOG.md` 2026-10-15 (2). Rule: `DECISIONS.md` → *"eBay Best Offer is chosen per item"* (the "Seen in the product table" bullet).
+
+**Owner's words (10-15):** *"on items with best offer enabled, make it display "live + offer" where it currently just says "live" in the "ebay" column.."*
+
+1. ◻ **Owner — push + deploy — deferred by the owner (10-15: *"i'll push and deploy after next feature"*).** Staging holds it; it ships with the next feature's push.
+2. ◻ **Owner — look at Products:** the eBay column reads **LIVE + OFFER** on items with Best Offer on, **LIVE** on the others. Tick or untick an item's box (or run the bulk) and the chip should change without a page reload.
+3. ℹ️ Only "Live" gets "+ Offer"; a hidden, ended or "Ready to publish" item keeps its own label even with Best Offer on.
+
+**Staging (10-15 (2)):** ✅ synced 2026-10-15 — dry run listed exactly the 12 touched files (5 in the app: `api/admin/ebay/listings/route.ts`, `components/admin/AdminShell.tsx`, `lib/ebay/best-offer.ts`, `lib/ebay/store.ts`, `lib/ebay/__tests__/best-offer.test.ts`; 7 docs: CHANGELOG, CURRENT_STATUS, DECISIONS, INTEGRITY, STRUCTURE, TASKS, `features/ebay-sync.md`), 0 Extras, 1234 total; real run copied 12; follow-up dry run 0, exit 0; leak check 0; 243 = 243 `.tsx`; SHA-256 MATCH on 12 of 12; the staged listings route carries `best_offer: true`. Docs-only re-sync after this line.
+
+### 🟢 2026-10-14 (1) + (2) — eBay Best Offer, chosen per item ("Allow offers" in the item's eBay section) + IN BULK (Products → select → Actions) — **DEPLOYED** (owner, 10-15: *"pushed and deployed"*) and **CONFIRMED: Make Offer shows on eBay** (owner, 10-15: *"tested it, make offer shows on ebay"*) — ✅ SQL → ✅ push → ✅ tested (bulk run not reported separately)
 
 Record: `CHANGELOG.md` 2026-10-14 (1), (2). Rule: `DECISIONS.md` top entry. Runbook: `features/ebay-sync.md` → *Best Offer per item*.
 
@@ -37,7 +70,7 @@ Record: `CHANGELOG.md` 2026-10-14 (1), (2). Rule: `DECISIONS.md` top entry. Runb
 Gate (final, both): `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1821/1821** tests (164 files) · build 0 · 88 prerendered = 41 EN + 41 ES + 6. Real components in headless Chrome with stand-in routes: drawer box 18/18, bulk 22/22.
 
 1. ✅ **Owner — run the SQL** — DONE 10-14 (*"ran the sql successfully, didnt deploy yet"*). Was: Supabase → SQL editor → paste all of [`supabase/ebay-best-offer-2026-10.sql`](../supabase/ebay-best-offer-2026-10.sql) → Run. Expect ONE row: `ebay_best_offer` · `boolean` · default `false` · `is_nullable` NO · `anon_can_read` false. Safe to re-run; either order with the push.
-2. ◻ **Owner — push + deploy.**
+2. ✅ **Owner — push + deploy** — DONE 10-15 (`CHANGELOG.md` 2026-10-15 (1)). Claude did not check production (not asked to).
 3. ◻ **Owner — the first real one:** Admin → Products → open a LIVE eBay item → its eBay section → **Best Offer · Allow offers** → tick it. Within a few seconds a gold line should say *"Best Offer on — the live eBay listing now shows Make Offer."* Then open **View on eBay** — the listing should show **Make Offer**. Un-tick → *"Buy It Now only again"*.
    - A red *"eBay accepted the update but does not show Best Offer…"* = eBay took the update but did not turn it on — tell Claude.
    - A red *"…the box was put back: …"* = eBay was not updated; the reason follows the colon.

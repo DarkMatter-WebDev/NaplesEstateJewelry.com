@@ -22,7 +22,7 @@ same-form customer view; 1704 after the first customer input mode build ~5 PM,
 1651 / 156 files after the buy-receipt delete + payment methods that afternoon,
 1647 after the storefront-photo swap, 1643 after the print-station shortcut fix
 that morning):
-**1821/1821 tests across 164 files** (measured 2026-10-14, eBay Best Offer per item + in bulk; 1815 earlier that day before the bulk button; 1796 / 163 on 2026-10-09 ~11:58 AM ET, buy receipt drafts; 1772 / 162 at ~11:31 AM after "Fill form from ID"; 1748 / 161 earlier that morning after the webcam frame was removed; 1747 / 161 on 2026-10-07, 1743 that morning, before the photo counter and the mark-sold buttons), TypeScript clean, lint clean (4 `<img>`
+**1854/1854 tests across 165 files** (measured 2026-10-15, Make an Offer on the site shop; 1823 / 164 earlier that day, the "Live + Offer" chip; 1821 on 2026-10-14, eBay Best Offer per item + in bulk; 1815 earlier that day before the bulk button; 1796 / 163 on 2026-10-09 ~11:58 AM ET, buy receipt drafts; 1772 / 162 at ~11:31 AM after "Fill form from ID"; 1748 / 161 earlier that morning after the webcam frame was removed; 1747 / 161 on 2026-10-07, 1743 that morning, before the photo counter and the mark-sold buttons), TypeScript clean, lint clean (4 `<img>`
 warnings in `TextDealsManager.tsx`), and a build that exits 0 with **88
 prerendered routes = 41 EN + 41 ES + 6 non-locale** (`/_global-error`,
 `/_not-found`, `/favicon.ico`, `/icon.png`, `/robots.txt`, `/sitemap.xml`).
@@ -83,6 +83,20 @@ shop's product-inquiry form breaks an owner decision (`DECISIONS.md` →
 *"Google Ads conversion tracking…"*). The security policy must list exactly
 Google's documented Ads hosts in BOTH `next.config.ts` and root
 `netlify.toml`; `lib/__tests__/ads-tracking.test.ts` guards all of it.
+
+### Keep site offers on the checkout's money path
+
+"Make an Offer" (2026-10-15, `lib/offers*.ts`) holds a buyer's money and charges it on the owner's Accept. Any change that breaks one of these breaks an owner requirement (`DECISIONS.md` → *"Make an Offer on the site shop"*):
+
+- an accepted offer's order is written by anything other than `create_paypal_order` → capture → `capture_paypal_order` → `finalizePaidOrder`;
+- an offer can be accepted after its 72-hour `expires_at`, or a path ends an offer without releasing its hold (`voidPayPalAuthorization`);
+- the PayPal reference becomes a bare uuid (the webhook reads it as an order id);
+- the offer page loads its authorize SDK into `window.paypal`;
+- a counter token covers more than one unit of one product, takes a discount code, or is stored in plain text;
+- a failed product read closes offers (it must close nothing);
+- the AI can change `accepts_offers` without the admin's words mentioning offers.
+
+`lib/__tests__/offers.test.ts` guards all of it.
 
 ### Keep customer input mode locked on the server
 

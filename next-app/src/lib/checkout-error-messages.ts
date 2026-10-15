@@ -51,6 +51,12 @@ export function checkoutErrorMessageForCode(
       return isEs
         ? 'El código de descuento de este pedido ya no es válido — puede haber expirado o alcanzado su límite de usos. Quítelo con “Quitar” en su resumen e intente de nuevo.'
         : 'The discount code on this order is no longer valid — it may have expired or reached its usage limit. Remove it with “Remove” in your order summary and try again.';
+    // A counter-offer's Buy-now link (lib/offers.ts) that ran out, was used, or
+    // whose piece sold. Nothing was charged.
+    case 'counter_unavailable':
+      return isEs
+        ? 'Esta contraoferta ya no está disponible (venció, ya se pagó o la pieza se vendió). No se le ha cobrado. Llámenos al (239) 404-8505 si tiene preguntas.'
+        : 'This counter-offer is no longer available (it expired, was already paid, or the piece sold). You have not been charged. Call (239) 404-8505 with any questions.';
     default:
       return null;
   }

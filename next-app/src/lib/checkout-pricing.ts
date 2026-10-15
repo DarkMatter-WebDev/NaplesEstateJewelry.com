@@ -77,7 +77,7 @@ export function formatCheckoutCurrency(value: number): string {
   }).format(value);
 }
 
-const CHECKOUT_PRODUCT_COLUMNS = [
+export const CHECKOUT_PRODUCT_COLUMNS = [
   'id',
   'category',
   'metal_type',
@@ -254,13 +254,28 @@ export function isOrderDraftError(value: OrderDraft | OrderDraftError): value is
  * the order item snapshots + authoritative totals. Returns an error shape (with
  * an HTTP status) instead of throwing so route handlers can respond directly.
  */
+export type OrderDraftOptions = {
+  /**
+   * An agreed price that replaces the live price of ONE product — a site offer
+   * the owner accepted, or a counter-offer the buyer is paying (lib/offers.ts).
+   * The caller has already proved the buyer is entitled to it; this function
+   * only applies it. Everything else (availability, stock, shipping tier, tax)
+   * runs exactly as for any order, keyed off the agreed price.
+   */
+  unitPriceOverride?: { productId: string; unitPrice: number } | null;
+};
+
 export async function buildOrderDraft(
   supabase: SupabaseClient,
   lines: string[] | OrderLine[],
   shippingMethod: string,
   shippingState?: string | null,
   resolveDiscount?: DiscountResolver | null,
+  options: OrderDraftOptions = {},
 ): Promise<OrderDraft | OrderDraftError> {
+  const override = options.unitPriceOverride && options.unitPriceOverride.unitPrice > 0
+    ? options.unitPriceOverride
+    : null;
   const orderLines = normalizeOrderLines(lines);
   if (orderLines.length === 0) {
     return { error: 'Cart is empty', status: 400 };
@@ -337,8 +352,10 @@ export async function buildOrderDraft(
   // outage. Manual fixed-price items are unaffected because their chargeable
   // amount comes from the saved Price Label.
   if (spotData.source === 'fallback') {
+    // An agreed (offer) price does not come from the feed, so an outage does
+    // not stop it.
     const spotLinked = typedProducts.filter(
-      (product) => product.price_mode !== 'manual',
+      (product) => product.price_mode !== 'manual' && product.id !== override?.productId,
     );
     if (spotLinked.length > 0) {
       return {
@@ -363,7 +380,9 @@ export async function buildOrderDraft(
     // Round each unit price to cents so the snapshot, the order total, and the
     // PayPal amount breakdown all reconcile exactly (PayPal rejects a breakdown
     // whose parts don't sum to the total).
-    price_snapshot: round2(getSnapshotPrice(product, spotData)),
+    price_snapshot: round2(
+      product.id === override?.productId ? override.unitPrice : getSnapshotPrice(product, spotData),
+    ),
     quantity: quantityByProductId.get(product.id) ?? 1,
     image_snapshot: getProductImages(product)[0] ?? null,
   }));

@@ -104,6 +104,7 @@ const PRODUCT_DETAIL_COLUMNS = [
   'special_price_override_percent',
   'sold_price',
   'quantity',
+  'accepts_offers',
 ].join(', ');
 
 // Columns introduced by later migrations that may not exist yet on an
@@ -120,6 +121,7 @@ const OPTIONAL_PRODUCT_DETAIL_COLUMNS = [
   'quantity',
   'sold_price',
   'width_mm',
+  'accepts_offers',
 ];
 
 const PRODUCT_DETAIL_COLUMNS_REQUIRED = PRODUCT_DETAIL_COLUMNS
@@ -163,6 +165,7 @@ const fetchPublicProduct = cache(async (id: string) => {
             sold_price: null,
             quantity: 1,
             width_mm: null,
+            accepts_offers: false,
           } as Product
         : null,
       error: fallback.error,
@@ -775,6 +778,29 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                     <a href="tel:2394048505" className="outline-button">
                       {isEs ? 'Llamar' : 'Call'}
                     </a>
+                  </div>
+                )}
+                {/* Make an Offer (owner, 2026-10-15): only on items whose
+                    "Accept offers" box is ticked, full width UNDER the four
+                    buttons so the row above is unchanged. lib/offers.ts. */}
+                {isPurchasable && p.accepts_offers === true && (
+                  <div className="product-offer-row mt-2">
+                    <Link
+                      href={`${localePrefix}/offer/${encodeURIComponent(p.id)}`}
+                      rel="nofollow"
+                      className="outline-button"
+                      style={{ width: '100%' }}
+                    >
+                      {isEs ? 'Hacer una oferta' : 'Make an Offer'}
+                    </Link>
+                    <p
+                      className="mt-1 text-center text-[0.6875rem] leading-snug"
+                      style={{ color: 'var(--color-on-surface-variant)' }}
+                    >
+                      {isEs
+                        ? 'Su pago queda retenido y solo se cobra si aceptamos · Respuesta en 72 horas'
+                        : 'Your payment is held and only charged if we accept · Answered within 72 hours'}
+                    </p>
                   </div>
                 )}
                 {isPurchasable && (

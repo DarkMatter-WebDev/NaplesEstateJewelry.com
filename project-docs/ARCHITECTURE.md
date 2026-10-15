@@ -973,6 +973,13 @@ Visitor lands with ?gclid=… (auto-tagging)      Visitor lands without one
   Ads hosts in both header files; the cookie notice has two buttons and one
   more sentence; Privacy + Cookie Preferences were rewritten.
 
+## Site Shop Offers — "Make an Offer" (2026-10-15)
+
+- **Data:** `products.accepts_offers` (per item; anon/authenticated column grant so the shop page can read it); `product_offers` (service-role only: amount, the order snapshot to write on Accept, totals, contact, PayPal order/authorization ids, `hold_status`, 72-h `expires_at`, counter amount/note/token hash/expiry, `order_id`, notification markers); `orders.offer_id`.
+- **Flow:** `/offer/[id]` → `POST /api/offers` (validate, `buildOrderDraft` with the offer as the price, PayPal Orders v2 **AUTHORIZE**) → PayPal approval → `POST /api/offers/authorize` (the hold; owner email + text, buyer email) → Admin → Offers → `accept` (order via `create_paypal_order`, `capturePayPalAuthorization`, `capture_paypal_order`, `finalizePaidOrder`) / `decline` / `counter` (void + private token link) → the counter is paid through the normal `/api/paypal/create-order` (`counterToken`, `unitPriceOverride`).
+- **Reconciliation:** `finalizePaidOrder` (client capture + webhook) runs `settleOffersAfterPaidOrder`; pg_cron `nej-offers-sweep` (15 min, TEXT_ALERTS_CRON_SECRET) expires offers/counters, closes offers on sold items, retries refused releases and missed emails. PayPal reference `offer-<uuid>` keeps the webhook's uuid-custom_id order lookup from misfiring.
+- Runbook `features/make-offer.md`.
+
 ## Public-shop cache invalidation (2026-07-02)
 
 `/shop` is server-cached (`unstable_cache`, tag `shop-catalog`, `revalidate: 300`).

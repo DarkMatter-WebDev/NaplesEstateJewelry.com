@@ -51,6 +51,12 @@ export function toAdminProductSummary(product: Partial<Product>): Product {
   if (Object.prototype.hasOwnProperty.call(product, 'sold_price')) {
     summary.sold_price = product.sold_price ?? null;
   }
+  // Not a selected column (the Products page loads the same before
+  // make-offer-2026-10.sql runs); kept when present so a save does not blank
+  // the table's Offers column until the next counts refresh.
+  if (Object.prototype.hasOwnProperty.call(product, 'accepts_offers')) {
+    summary.accepts_offers = product.accepts_offers === true;
+  }
 
   const imageUrls = product.image_urls?.length ? product.image_urls : product.images ?? [];
   // Keep one URL-array copy for reference-safe image cleanup, but avoid shipping

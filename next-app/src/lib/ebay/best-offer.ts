@@ -146,3 +146,12 @@ export function bestOfferBulkSummary(wanted: boolean, counts: Record<BestOfferBu
   const body = parts.length ? parts.join(' · ') : 'nothing to do';
   return `${stopped ? 'Stopped' : 'Done'} — Best Offer ${wanted ? 'on' : 'off'}: ${body}.`;
 }
+
+/**
+ * The product table's eBay chip (2026-10-15, owner: *"display 'live + offer'
+ * where it currently just says 'live'"*): a LIVE listing that allows Best
+ * Offer reads "Live + Offer". Every other state keeps its own label.
+ */
+export function ebayChipLabelWithOffer(label: string, state: string | undefined, bestOffer: boolean | undefined): string {
+  return state === 'published' && bestOffer === true ? `${label} + Offer` : label;
+}

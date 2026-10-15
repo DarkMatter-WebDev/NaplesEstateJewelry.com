@@ -3,17 +3,19 @@ import Link from 'next/link';
 import { type ReactNode, useEffect, useState } from 'react';
 import AdminMessagesLink from './AdminMessagesLink';
 import AdminOrdersLink from './AdminOrdersLink';
+import AdminOffersLink from './AdminOffersLink';
 import { useCustomerModeTabGuard } from './buy-receipts/CustomerModeTabGuard';
 import { AppIcon } from '@/components/AppIcon';
 
 const GOLD = '#735c00';
 
-export type AdminSection = 'products' | 'social-queues' | 'orders' | 'in-store-sale' | 'buy-receipts' | 'buyers' | 'messages' | 'subscribers' | 'text-deals' | 'marketing' | 'discount-codes' | 'users' | 'settings';
+export type AdminSection = 'products' | 'social-queues' | 'orders' | 'offers' | 'in-store-sale' | 'buy-receipts' | 'buyers' | 'messages' | 'subscribers' | 'text-deals' | 'marketing' | 'discount-codes' | 'users' | 'settings';
 
 const SECTION_LABELS: Record<AdminSection, string> = {
   products: 'Products',
   'social-queues': 'Social Queues',
   orders: 'Orders',
+  offers: 'Offers',
   'in-store-sale': 'In-Store Sale',
   'buy-receipts': 'Buy Receipts',
   buyers: 'Buyers',
@@ -250,6 +252,11 @@ export default function AdminHeader({
         active={active === 'orders'}
         userEmail={userEmail}
         style={active === 'orders' ? activeStyle : linkStyle}
+      />
+      <AdminOffersLink
+        href={`${adminBasePath}/offers`}
+        active={active === 'offers'}
+        style={active === 'offers' ? activeStyle : linkStyle}
       />
       <AdminNavItem href={`${adminBasePath}/in-store-sale`} active={active === 'in-store-sale'}>
         In-Store Sale

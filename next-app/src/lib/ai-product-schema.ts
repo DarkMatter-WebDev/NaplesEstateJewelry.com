@@ -34,6 +34,12 @@ export type ProductAutofillFields = {
   quantity: number | null;
   description: string | null;
   public_notes: string | null;
+  /**
+   * The editor's "Accept offers" box (site shop Make an Offer, 2026-10-15).
+   * Set ONLY when the admin's own words ask for it — the route drops any value
+   * when the latest input does not mention offers (lib/offers.ts mentionsOffers).
+   */
+  accepts_offers: boolean | null;
 };
 
 /**
@@ -79,6 +85,7 @@ export const PRODUCT_AUTOFILL_FIELD_KEYS = [
   'quantity',
   'description',
   'public_notes',
+  'accepts_offers',
 ] as const satisfies readonly (keyof ProductAutofillFields)[];
 
 export const EMPTY_PRODUCT_AUTOFILL_FIELDS: ProductAutofillFields = {
@@ -102,6 +109,7 @@ export const EMPTY_PRODUCT_AUTOFILL_FIELDS: ProductAutofillFields = {
   quantity: null,
   description: null,
   public_notes: null,
+  accepts_offers: null,
 };
 
 export const PRODUCT_AUTOFILL_FIELD_LABELS: Record<keyof ProductAutofillFields, string> = {
@@ -125,6 +133,7 @@ export const PRODUCT_AUTOFILL_FIELD_LABELS: Record<keyof ProductAutofillFields, 
   quantity: 'Quantity',
   description: 'Description (English)',
   public_notes: 'Notes (English)',
+  accepts_offers: 'Accept offers',
 };
 
 export const PRODUCT_AUTOFILL_SCHEMA = {
@@ -389,6 +398,7 @@ export function coerceProductAutofill(input: ProductAutofillProviderResult): Pro
     quantity: cleanQuantity(rawFields.quantity),
     description: cleanBuyerField(cleanString(rawFields.description)),
     public_notes: cleanBuyerField(cleanString(rawFields.public_notes)),
+    accepts_offers: cleanBoolean(rawFields.accepts_offers),
   };
 
   if (fields.product_type && fields.product_type !== 'Necklace' && fields.product_type !== 'Bracelet') {

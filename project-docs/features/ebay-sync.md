@@ -17,7 +17,10 @@
 > Products → select → Actions → "Allow offers on eBay" / "Turn offers off
 > on eBay" → `EbayBestOfferBulkModal.tsx` calls the same route ONE ITEM AT A
 > TIME with `skipIfUnchanged: true` (an item already in that state is not
-> touched), with Stop between items and a counted summary. eBay's Metadata API
+> touched), with Stop between items and a counted summary. **Product table**
+> (10-15): `/api/admin/ebay/listings` adds `best_offer: true` per row, and a
+> Live listing with Best Offer reads "Live + Offer" (`ebayChipLabelWithOffer`).
+> ✅ Owner-confirmed 10-15: Make Offer shows on eBay. eBay's Metadata API
 > (`getNegotiatedPricePolicies`, 10-14) reports Best Offer supported in all
 > 28 pinned categories. The old account-wide `best_offer_enabled` (Q9) was
 > never sent to eBay and is retired. Rule: `DECISIONS.md` → *"eBay Best

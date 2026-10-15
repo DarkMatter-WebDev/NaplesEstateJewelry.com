@@ -8,6 +8,7 @@ import {
   bestOfferFromOffer,
   bestOfferUnchangedMessage,
   countBestOfferBulk,
+  ebayChipLabelWithOffer,
   bestOfferPushedMessage,
   bestOfferSavedMessage,
   bestOfferTerms,
@@ -225,5 +226,25 @@ describe('bulk "Best Offer on / off" (Products list, 2026-10-14)', () => {
     const shell = read('src', 'components', 'admin', 'AdminShell.tsx');
     expect(shell).toMatch(/setEbayBestOfferBulk\(action === 'ebay-best-offer-on'\)/);
     expect(shell).toMatch(/<EbayBestOfferBulkModal/);
+  });
+});
+
+describe('product table: "Live + Offer" (2026-10-15)', () => {
+  it('only a LIVE listing that allows Best Offer reads "Live + Offer"', () => {
+    expect(ebayChipLabelWithOffer('Live', 'published', true)).toBe('Live + Offer');
+    expect(ebayChipLabelWithOffer('Live', 'published', false)).toBe('Live');
+    expect(ebayChipLabelWithOffer('Live', 'published', undefined)).toBe('Live');
+    expect(ebayChipLabelWithOffer('Hidden (sold)', 'hidden_oos', true)).toBe('Hidden (sold)');
+    expect(ebayChipLabelWithOffer('Ready to publish', 'review', true)).toBe('Ready to publish');
+    expect(ebayChipLabelWithOffer('Not listed', undefined, true)).toBe('Not listed');
+  });
+
+  it('the listings route marks Best Offer items, and both eBay chips in the admin use the rule', () => {
+    const route = read('src', 'app', 'api', 'admin', 'ebay', 'listings', 'route.ts');
+    expect(route).toMatch(/getBestOfferProductIds/);
+    expect(route).toMatch(/best_offer: true/);
+    const shell = read('src', 'components', 'admin', 'AdminShell.tsx');
+    expect(shell.match(/ebayChipLabelWithOffer\(/g)?.length).toBe(2);
+    expect(shell).not.toMatch(/\{EBAY_CHIP_LABELS\[[^\]]+\] \?\? 'Not listed'\}/);
   });
 });

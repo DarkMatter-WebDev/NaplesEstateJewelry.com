@@ -74,6 +74,17 @@ export async function finalizePaidOrder(service: SupabaseClient, orderId: string
     }
   }
 
+  // Site offers (lib/offers-server.ts): mark the offer this order came from as
+  // accepted / bought at counter, and close every other open offer on an item
+  // that just sold — releasing its PayPal hold. Best-effort and never part of
+  // `complete`: the 15-minute offers sweep reconciles anything missed here.
+  try {
+    const { settleOffersAfterPaidOrder } = await import('@/lib/offers-server');
+    await settleOffersAfterPaidOrder(service, order.id);
+  } catch (err) {
+    console.error('Offer settlement error:', err);
+  }
+
   return complete;
 }
 

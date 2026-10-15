@@ -112,6 +112,10 @@ the remaining owner-run live recovery/refund/race test matrix in `TASKS.md`.
    landed; the same-cart recovery lock is a do-not-pay-again guard, not a
    return-to-review flow.
 
+## Site offers use PayPal AUTHORIZE, not CAPTURE (2026-10-15)
+
+"Make an Offer" holds the buyer's money with an Orders v2 **AUTHORIZE** order and charges it when the owner accepts (`capturePayPalAuthorization`), or releases it (`voidPayPalAuthorization`). Its own SDK copy (`intent=authorize`, `data-namespace=paypalOffer`) never touches the checkout's `window.paypal`. An accepted offer's order is written through `create_paypal_order` / `capture_paypal_order` like any checkout; a counter-offer is paid through `/api/paypal/create-order` with a `counterToken`. Everything else: `features/make-offer.md`.
+
 ## Routes (`src/app/api/paypal/*`)
 
 - **`create-order`** (server/cookie client): builds the authoritative order via

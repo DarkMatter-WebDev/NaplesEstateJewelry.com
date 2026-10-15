@@ -6,6 +6,7 @@ import {
   PRODUCT_AUTOFILL_SCHEMA,
   coerceProductAutofill,
 } from '@/lib/ai-product-schema';
+import { mentionsOffers } from '@/lib/offers';
 
 const MAX_TRANSCRIPT_LENGTH = 8000;
 const MAX_PRIOR_INPUTS = 8;
@@ -123,6 +124,10 @@ export async function POST(req: Request) {
       systemPrompt: storedSystemPrompt ?? undefined,
     });
     const draft = coerceProductAutofill(result.draft);
+    // "Accept offers" moves only on the admin's own words (owner, 2026-10-15):
+    // without an offers word in what they just said, the model's value is
+    // dropped and the box keeps whatever the form already has.
+    if (!mentionsOffers(transcript)) draft.fields.accepts_offers = null;
     recordUsage(user.id);
     const populatedFields = Object.entries(draft.fields)
       .filter(([, value]) => value !== null && value !== '')

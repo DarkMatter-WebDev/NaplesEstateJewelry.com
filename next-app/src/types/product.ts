@@ -135,6 +135,8 @@ export interface Product {
   public_notes_es: string | null;
   /** eBay listing allows Best Offer — admin-only, set from the eBay drawer section (supabase/ebay-best-offer-2026-10.sql). Absent until that SQL runs. */
   ebay_best_offer?: boolean | null;
+  /** Site shop "Make an Offer" is on for this item — the editor's "Accept offers" box (supabase/make-offer-2026-10.sql, lib/offers.ts). Absent until that SQL runs. */
+  accepts_offers?: boolean | null;
   featured: boolean | null;
   sort_order: number;
   created_at: string;

@@ -79,6 +79,9 @@ export type PayPalPayload = {
   customer: Record<string, unknown>;
   shippingMethod: string;
   orderId: string | null;
+  /** A counter-offer's private Buy-now token (lib/offers.ts) — the agreed price for its one item. */
+  counterToken?: string | null;
+  locale?: string;
 };
 
 // Count of consecutive *unknown* PayPal errors (the SDK's onError with no reason

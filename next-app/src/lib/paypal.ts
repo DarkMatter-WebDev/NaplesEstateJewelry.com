@@ -91,6 +91,13 @@ export type CreatePayPalOrderInput = {
   shippingAddress?: PayPalShippingAddress | null;
   invoiceId?: string;
   brandName?: string;
+  /**
+   * CAPTURE (default) = the checkout: money taken when the buyer approves.
+   * AUTHORIZE = a site offer (lib/offers.ts): the buyer's approval only HOLDS
+   * the amount; `capturePayPalAuthorization` charges it when the owner accepts
+   * and `voidPayPalAuthorization` releases it otherwise.
+   */
+  intent?: 'CAPTURE' | 'AUTHORIZE';
 };
 
 function round2(value: number) {
@@ -183,7 +190,9 @@ export function buildPayPalOrderRequest(input: CreatePayPalOrderInput): Record<s
   }
 
   return {
-    intent: 'CAPTURE',
+    // An unchanged 'CAPTURE' keeps every existing checkout request — and so its
+    // payPalCreateRequestId idempotency key — byte-for-byte the same.
+    intent: input.intent ?? 'CAPTURE',
     purchase_units: [purchaseUnit],
     application_context: {
       brand_name: input.brandName ?? 'Naples Estate Jewelry',
@@ -342,6 +351,135 @@ export async function capturePayPalOrder(paypalOrderId: string): Promise<PayPalC
   }
 
   return parsePayPalCaptureResponse(data);
+}
+
+// ---------------------------------------------------------------------------
+// Authorize → capture / void (site offers, lib/offers.ts). PayPal guarantees an
+// authorization's funds for a 3-day honor period; the offer window is 72 hours
+// so an accepted offer is always charged inside it.
+// ---------------------------------------------------------------------------
+
+export type PayPalAuthorizationResult = {
+  status: string;
+  authorizationId: string | null;
+  amount: number | null;
+  currency: string | null;
+  createTime: string | null;
+  raw: unknown;
+};
+
+export function parsePayPalAuthorizeResponse(raw: unknown): PayPalAuthorizationResult {
+  const data = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
+  const purchaseUnits = (data.purchase_units as Array<Record<string, unknown>> | undefined) ?? [];
+  const payments = (purchaseUnits[0]?.payments as Record<string, unknown> | undefined) ?? {};
+  const authorizations = (payments.authorizations as Array<Record<string, unknown>> | undefined) ?? [];
+  const authorization = authorizations[0];
+  const amount = authorization?.amount as { value?: string; currency_code?: string } | undefined;
+  return {
+    status: String(authorization?.status ?? data.status ?? 'UNKNOWN'),
+    authorizationId: authorization?.id ? String(authorization.id) : null,
+    amount: amount?.value != null ? Number(amount.value) : null,
+    currency: amount?.currency_code ?? null,
+    createTime: typeof authorization?.create_time === 'string' ? authorization.create_time : null,
+    raw,
+  };
+}
+
+function payPalError(prefix: string, status: number, data: Record<string, unknown> | null) {
+  const details = Array.isArray(data?.details) ? data.details as Array<{ issue?: string }> : [];
+  const issue = details[0]?.issue ?? (typeof data?.name === 'string' ? data.name : '');
+  const message = typeof data?.message === 'string' ? data.message : `status ${status}`;
+  return Object.assign(new Error(`${prefix}: ${message}${issue ? ` (${issue})` : ''}`), {
+    paypalStatus: status,
+    paypalIssue: issue,
+    raw: data,
+  });
+}
+
+/** Turn an approved AUTHORIZE order into an authorization (the hold). Idempotent. */
+export async function authorizePayPalOrder(paypalOrderId: string): Promise<PayPalAuthorizationResult> {
+  const token = await getAccessToken();
+  const res = await fetch(`${paypalApiBase()}/v2/checkout/orders/${encodeURIComponent(paypalOrderId)}/authorize`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'PayPal-Request-Id': `authorize-${paypalOrderId}`.slice(0, 108),
+    },
+    cache: 'no-store',
+  });
+  const data = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!res.ok || !data) throw payPalError('PayPal authorize failed', res.status, data);
+  return parsePayPalAuthorizeResponse(data);
+}
+
+/** Read an order's authorization back (recovery after an ambiguous authorize). */
+export async function getPayPalOrderAuthorization(paypalOrderId: string): Promise<PayPalAuthorizationResult> {
+  const token = await getAccessToken();
+  const res = await fetch(`${paypalApiBase()}/v2/checkout/orders/${encodeURIComponent(paypalOrderId)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  const data = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!res.ok || !data) throw payPalError('PayPal order lookup failed', res.status, data);
+  return parsePayPalAuthorizeResponse(data);
+}
+
+/** Charge a held authorization in full (the owner accepted the offer). Idempotent. */
+export async function capturePayPalAuthorization(authorizationId: string, invoiceId?: string): Promise<PayPalCaptureResult> {
+  const token = await getAccessToken();
+  const res = await fetch(
+    `${paypalApiBase()}/v2/payments/authorizations/${encodeURIComponent(authorizationId)}/capture`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'PayPal-Request-Id': `capture-auth-${authorizationId}`.slice(0, 108),
+      },
+      cache: 'no-store',
+      body: JSON.stringify({ final_capture: true, ...(invoiceId ? { invoice_id: invoiceId.slice(0, 127) } : {}) }),
+    },
+  );
+  const data = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!res.ok || !data) throw payPalError('PayPal capture failed', res.status, data);
+  const amount = data.amount as { value?: string; currency_code?: string } | undefined;
+  return {
+    status: String(data.status ?? 'UNKNOWN'),
+    captureId: data.id ? String(data.id) : null,
+    capturedAmount: amount?.value != null ? Number(amount.value) : null,
+    capturedCurrency: amount?.currency_code ?? null,
+    raw: data,
+  };
+}
+
+export type PayPalVoidResult = { released: true } | { released: false; captured: boolean; error: string };
+
+/**
+ * Release a held authorization. An authorization PayPal already voided (or that
+ * expired) counts as released; one that was already captured cannot be voided
+ * and is reported as such so the caller never thinks a charge was undone.
+ */
+export async function voidPayPalAuthorization(authorizationId: string): Promise<PayPalVoidResult> {
+  const token = await getAccessToken();
+  const res = await fetch(
+    `${paypalApiBase()}/v2/payments/authorizations/${encodeURIComponent(authorizationId)}/void`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'PayPal-Request-Id': `void-${authorizationId}`.slice(0, 108),
+      },
+      cache: 'no-store',
+    },
+  );
+  if (res.ok) return { released: true };
+  const data = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+  const error = payPalError('PayPal void failed', res.status, data);
+  const issue = String(error.paypalIssue ?? '').toUpperCase();
+  if (/VOIDED|EXPIRED/.test(issue)) return { released: true };
+  return { released: false, captured: /CAPTURED/.test(issue), error: error.message };
 }
 
 /**

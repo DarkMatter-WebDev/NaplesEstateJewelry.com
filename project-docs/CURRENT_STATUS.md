@@ -4,7 +4,23 @@
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
 > in `DECISIONS.md`. Last reconciled: **2026-10-14**.
 
-## Start Here (2026-10-14 — eBay Best Offer per item + in bulk BUILT + STAGED, not pushed; ✅ SQL RUN by the owner; the 10-12 block below still applies)
+## Start Here (2026-10-15 (4) — **Make an Offer** BUILT + STAGED, not pushed; ⛔ SQL `supabase/make-offer-2026-10.sql` to run; the push also carries the waiting "Live + Offer" chip)
+
+- 🟡 **BUILT + STAGED, awaiting the SQL + the owner's push — Make an Offer on the site shop** (`CHANGELOG.md` 2026-10-15 (4); rules `DECISIONS.md` top entry; `TASKS.md` top; runbook `features/make-offer.md`). Per-item **Accept offers** box (new or edit; the AI ticks it only on the owner's words); a full-width **Make an Offer** under the four product buttons; the buyer's payment is **held** through PayPal and **charged automatically on Accept**; 72 hours to answer; no floor; **Counter** releases the hold and emails a private Buy-now link at the agreed price (72 h); email to info@ + a text to the owner's cell; **Offers** column after Price; Admin → **Offers** page.
+  - Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1854/1854** tests (165 files) · build 0 · 88 prerendered = 41 EN + 41 ES + 6 (the new pages render per visit). Browser 39/39 on the real components with stand-in data.
+  - ⛔ **Not verified by Claude:** the SQL, any real PayPal hold/charge/release (the live account's authorize permission is the open question), real emails/texts, the admin pages behind the sign-in. The owner's one test offer is the proof.
+- ℹ️ The 10-15 block below still applies (the "Live + Offer" chip is staged and rides this push).
+
+## Start Here (2026-10-15 — session CLOSED; ⛔ the "Live + Offer" chip is STAGED and NOT pushed — it ships with the owner's next feature; Best Offer CONFIRMED working on eBay; the 10-12 block below still applies)
+
+- 🟢 **Session closed 2026-10-15** (`CHANGELOG.md` 2026-10-15 (3)). The owner will push the staged chip *"after next feature"*: **staging already holds it, so the next feature's push carries both** — re-verify staging with a fresh dry run before asking for that push. No SQL, no env vars pending.
+
+- ✅ **Best Offer works on a real listing** (owner, 10-15: *"tested it, make offer shows on ebay"*).
+- 🟡 **BUILT + STAGED, awaiting the owner's push — the product table's eBay chip reads "LIVE + OFFER"** for a live listing that allows Best Offer (`CHANGELOG.md` 2026-10-15 (2)). Only "Live" changes; other states keep their labels. No SQL, no env vars. Gate: `tsc` 0 · lint 0 errors · **1823/1823** · build 0. ⛔ Not seen in the real table (behind the sign-in).
+
+
+- 🟢 **DEPLOYED (owner, 10-15: *"pushed and deployed"*) — `CHANGELOG.md` 2026-10-15 (1).** The per-item "Allow offers" box and the bulk Best Offer on / off; SQL run 10-14. ✅ Make Offer confirmed on eBay by the owner (10-15). Claude did not check production (not asked to). **Where the bullets below say "STAGED" / "not pushed" / "only the push is left", read "deployed".**
+
 
 - 🟡 **BUILT + STAGED, awaiting the owner's push — eBay Best Offer, chosen per item** (`CHANGELOG.md` 2026-10-14 (1); rule `DECISIONS.md` top entry; `TASKS.md` top; runbook `features/ebay-sync.md` → *Best Offer per item*). Each item's eBay section has a **"Allow offers"** box. Ticked on a live listing, the eBay listing gets "Make Offer" at once (and the box un-ticked takes it away); on an item not yet on eBay it is included when the item is synced. No auto-accept / auto-decline — offers are answered on eBay.
   - ✅ **SQL RUN by the owner 10-14** (`supabase/ebay-best-offer-2026-10.sql`, adds `products.ebay_best_offer`, default off — *"ran the sql successfully, didnt deploy yet"*). **Only the push is left.**

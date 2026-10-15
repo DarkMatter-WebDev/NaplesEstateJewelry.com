@@ -61,6 +61,7 @@ import FacebookProductPanel from './FacebookProductPanel';
 import EbayBulkSyncModal from './EbayBulkSyncModal';
 import EbayBulkPublishModal from './EbayBulkPublishModal';
 import EbayBestOfferBulkModal from './EbayBestOfferBulkModal';
+import { ebayChipLabelWithOffer } from '@/lib/ebay/best-offer';
 import SelectedProductsActionsModal, { type SelectedMarketplaceAction } from './SelectedProductsActionsModal';
 import SelectedProductsStatusModal from './SelectedProductsStatusModal';
 import type { Marketplace } from '@/lib/selected-marketplace-status';
@@ -179,6 +180,7 @@ const OPTIONAL_PRODUCT_COLUMNS = [
   'sold_price',
   'quantity',
   'width_mm',
+  'accepts_offers',
 ] as const;
 
 function isMissingOptionalColumnError(error: { message?: string | null } | null | undefined) {
@@ -190,6 +192,10 @@ function withoutOptionalColumns<T extends Record<string, unknown>>(payload: T): 
   const rest: Record<string, unknown> = { ...payload };
   for (const column of OPTIONAL_PRODUCT_COLUMNS) delete rest[column];
   return rest as T;
+}
+
+function isMissingAcceptsOffersColumnError(error: { message?: string | null } | null | undefined) {
+  return Boolean(error?.message?.toLowerCase().includes('accepts_offers'));
 }
 
 function isMissingWidthColumnError(error: { message?: string | null } | null | undefined) {
@@ -460,6 +466,7 @@ type SortKey =
   | 'itemYear'
   | 'location'
   | 'featured'
+  | 'offers'
   | 'purity'
   | 'weight'
   | 'melt'
@@ -594,6 +601,8 @@ const PRODUCT_TABLE_COLUMNS: { label: string; sortKey: SortKey | null; widthClas
   { label: 'Melt', sortKey: 'melt', widthClass: 'w-[84px]' },
   { label: 'Mode', sortKey: 'mode', widthClass: 'w-[94px]' },
   { label: 'Price', sortKey: 'currentPrice', widthClass: 'w-[92px]' },
+  // Site shop "Make an Offer" (2026-10-15): On / – plus the open offers waiting.
+  { label: 'Offers', sortKey: 'offers', widthClass: 'w-[96px]' },
   { label: 'Status', sortKey: 'status', widthClass: 'w-[92px]' },
   { label: 'Qty', sortKey: 'quantity', widthClass: 'w-[56px]' },
   { label: 'Etsy', sortKey: null, widthClass: 'w-[110px]' },
@@ -647,7 +656,11 @@ const EBAY_CHIP_LABELS: Record<string, string> = {
  * the state for the freshness chip, plus the price-push counters for the chip
  * beside it. Both providers' rows are structurally compatible.
  */
-type MarketplaceChipRow = PriceChipInput & { sync_state: string };
+type MarketplaceChipRow = PriceChipInput & {
+  sync_state: string;
+  /** eBay only: the item allows Best Offer (from /api/admin/ebay/listings) → "Live + Offer". */
+  best_offer?: boolean;
+};
 
 /**
  * Second, independent chip: did the money actually move?
@@ -777,6 +790,7 @@ function emptyProduct(): Omit<Product, 'created_at' | 'updated_at'> {
     public_notes: null,
     public_notes_es: null,
     featured: false,
+    accepts_offers: false,
     sort_order: 0,
   };
 }
@@ -818,6 +832,7 @@ function getCurrentAiListingFields(
     quantity: normalizeProductQuantity(product.quantity),
     description: product.description?.trim() || null,
     public_notes: product.public_notes?.trim() || null,
+    accepts_offers: product.accepts_offers === true,
   };
 }
 
@@ -863,6 +878,8 @@ function getSortValue(
       return product.location ?? 'showcase';
     case 'featured':
       return product.featured ? 1 : 0;
+    case 'offers':
+      return product.accepts_offers ? 1 : 0;
     case 'purity':
       return product.purity;
     case 'weight':
@@ -1002,6 +1019,31 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   const router = useRouter();
   const adminBasePath = locale === 'es' ? '/es/admin' : '/admin';
   const [products, setProducts] = useState<Product[]>(initialProducts);
+  // Site offers (2026-10-15): open offers per product for the table's "N open",
+  // and which products have "Accept offers" on. The flags come from the offers
+  // route rather than the summary query, so the table loads the same before
+  // supabase/make-offer-2026-10.sql has run.
+  const [openOffersByProduct, setOpenOffersByProduct] = useState<Record<string, number>>({});
+  const refreshOfferCounts = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/offers?counts=1');
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data) return;
+      setOpenOffersByProduct((data.byProduct ?? {}) as Record<string, number>);
+      if (Array.isArray(data.acceptsOffers)) {
+        const on = new Set((data.acceptsOffers as unknown[]).map(String));
+        setProducts((current) => current.map((product) => (
+          (product.accepts_offers === true) === on.has(product.id) ? product : { ...product, accepts_offers: on.has(product.id) }
+        )));
+      }
+    } catch {
+      // Best-effort - the column just shows what it last knew.
+    }
+  }, []);
+  useEffect(() => {
+    const run = async () => { await refreshOfferCounts(); };
+    void run();
+  }, [refreshOfferCounts]);
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<ReturnType<typeof emptyProduct> | null>(null);
   const [isNew, setIsNew] = useState(false);
@@ -2530,6 +2572,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     });
     setField('show_spot_price', 'Show Spot/Melt Value', (value) => { nextEditing.show_spot_price = value; });
     setField('quantity', 'Quantity', (value) => { nextEditing.quantity = value; });
+    // Only ever non-null when the admin's own words were about offers - the
+    // route drops it otherwise (lib/offers.ts -> mentionsOffers).
+    setField('accepts_offers', 'Accept offers', (value) => { nextEditing.accepts_offers = value; });
     setField('metal_type', 'Metal Type', (value) => {
       const nextCategory = getLegacyCategoryForMetalType(value, nextEditing.category);
       nextEditing.metal_type = value;
@@ -3347,6 +3392,11 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       // full row reloads via the service role on the next page load). (CODE-D04)
       let { error } = await supabase.from('products').insert(payload);
       if (isMissingOptionalColumnError(error)) {
+        if (isMissingAcceptsOffersColumnError(error) && payload.accepts_offers === true) {
+          flash('Run supabase/make-offer-2026-10.sql in Supabase before turning on offers.', false);
+          setSaving(false);
+          return;
+        }
         if (isMissingWidthColumnError(error) && payload.width_mm != null) {
           flash('Run supabase/product-width-mm-2026-07.sql before saving a product width.', false);
           setSaving(false);
@@ -3371,6 +3421,11 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       if (productChanged) {
         let { error } = await supabase.from('products').update(payload).eq('id', originalProductId);
         if (isMissingOptionalColumnError(error)) {
+          if (isMissingAcceptsOffersColumnError(error) && payload.accepts_offers === true) {
+            flash('Run supabase/make-offer-2026-10.sql in Supabase before turning on offers.', false);
+            setSaving(false);
+            return;
+          }
           if (isMissingWidthColumnError(error) && payload.width_mm != null) {
             flash('Run supabase/product-width-mm-2026-07.sql before saving a product width.', false);
             setSaving(false);
@@ -3520,6 +3575,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     if (filterLocation && (p.location ?? 'showcase') !== filterLocation) return false;
     if (filterFeatured === 'featured' && !p.featured) return false;
     if (filterFeatured === 'not-featured' && p.featured) return false;
+    if (filterFeatured === 'offers-on' && p.accepts_offers !== true) return false;
+    if (filterFeatured === 'offers-off' && p.accepts_offers === true) return false;
     if (filterJewelryType && getProductJewelryType(p) !== filterJewelryType) return false;
     if (filterChainType) {
       const kws = CHAIN_KEYWORDS[filterChainType];
@@ -4202,7 +4259,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               },
               {
                 label: 'Featured', value: filterFeatured, set: setFilterFeatured,
-                options: [['', 'All Items'], ['featured', 'Featured'], ['not-featured', 'Not Featured']],
+                options: [['', 'All Items'], ['featured', 'Featured'], ['not-featured', 'Not Featured'], ['offers-on', 'Offers on'], ['offers-off', 'Offers off']],
               },
             ]
               // Status is the everyday filter and stays visible; the rest are
@@ -4611,6 +4668,23 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     <td className="px-2 py-3 whitespace-nowrap font-semibold" style={{ color: 'var(--color-primary)' }}>
                       {getDisplayPrice(p, spotData)}
                     </td>
+                    <td className="px-2 py-3 whitespace-nowrap text-xs">
+                      {p.accepts_offers === true ? (
+                        <span className="font-extrabold" style={{ color: 'var(--color-primary)' }}>On</span>
+                      ) : (
+                        <span style={{ color: 'var(--color-on-surface-variant)' }}>–</span>
+                      )}
+                      {(openOffersByProduct[p.id] ?? 0) > 0 && (
+                        <a
+                          href={`${adminBasePath}/offers`}
+                          className="ml-1.5 inline-flex rounded-full px-1.5 py-px text-[0.6rem] font-extrabold"
+                          style={{ background: '#b5890c', color: '#fff' }}
+                          title="Open offers waiting for an answer"
+                        >
+                          {openOffersByProduct[p.id]} open
+                        </a>
+                      )}
+                    </td>
                     <td className="px-2 py-3 whitespace-nowrap">
                       <span
                         className="inline-flex text-[0.6rem] font-bold uppercase tracking-widest px-2 py-0.5"
@@ -4639,7 +4713,11 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                         className="inline-flex text-[0.6rem] font-bold uppercase tracking-widest px-2 py-0.5"
                         style={{ background: ebayChipTone(ebayListingsByProduct[p.id]?.sync_state).bg, color: ebayChipTone(ebayListingsByProduct[p.id]?.sync_state).fg }}
                       >
-                        {EBAY_CHIP_LABELS[ebayListingsByProduct[p.id]?.sync_state ?? 'pending'] ?? 'Not listed'}
+                        {ebayChipLabelWithOffer(
+                          EBAY_CHIP_LABELS[ebayListingsByProduct[p.id]?.sync_state ?? 'pending'] ?? 'Not listed',
+                          ebayListingsByProduct[p.id]?.sync_state,
+                          ebayListingsByProduct[p.id]?.best_offer,
+                        )}
                       </span>
                       <MarketplacePriceChip listing={ebayListingsByProduct[p.id]} />
                     </td>
@@ -4944,7 +5022,11 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                           className="inline-flex text-[0.6rem] font-bold uppercase tracking-widest px-2 py-0.5"
                           style={{ background: ebayChipTone(ebayState).bg, color: ebayChipTone(ebayState).fg }}
                         >
-                          {EBAY_CHIP_LABELS[ebayState] ?? 'Not listed'}
+                          {ebayChipLabelWithOffer(
+                            EBAY_CHIP_LABELS[ebayState] ?? 'Not listed',
+                            ebayState,
+                            ebayListingsByProduct[productActionTarget.id]?.best_offer,
+                          )}
                         </span>
                         <AppIcon name="chevron_right"  style={marketplaceIconStyle} aria-hidden="true" />
                       </span>
@@ -5996,6 +6078,30 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   />
                   Featured in shop
                 </label>
+                {/* Site shop "Make an Offer" (owner, 2026-10-15): off unless
+                    ticked. The AI assistant ticks it only when told to. */}
+                <div className="md:col-start-4 flex flex-col gap-1">
+                  <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+                    <input
+                      type="checkbox"
+                      checked={editing.accepts_offers === true}
+                      onChange={(e) => setEditing({ ...editing, accepts_offers: e.target.checked })}
+                      style={{ accentColor: 'var(--color-primary)' }}
+                    />
+                    Accept offers
+                  </label>
+                  {editing.accepts_offers === true && (
+                    <p className="text-[0.7rem] leading-snug" style={{ color: 'var(--color-on-surface-variant)' }}>
+                      Shows Make an Offer on this item&apos;s page.
+                      {editing.id && (openOffersByProduct[editing.id] ?? 0) > 0 && (
+                        <>
+                          {' '}{openOffersByProduct[editing.id]} open {openOffersByProduct[editing.id] === 1 ? 'offer' : 'offers'} —{' '}
+                          <a href={`${adminBasePath}/offers`} className="underline" style={{ color: 'var(--color-primary)' }}>see Offers</a>.
+                        </>
+                      )}
+                    </p>
+                  )}
+                </div>
               </div>
 
               {/* Description */}

@@ -147,6 +147,17 @@ export async function getListingsMap(service: SupabaseClient): Promise<Record<st
   return Object.fromEntries(rows.map((row) => [row.product_id, row]));
 }
 
+/**
+ * Products whose eBay listing allows Best Offer (`products.ebay_best_offer`,
+ * 2026-10-14) — for the product table's "Live + Offer" chip. Best-effort like
+ * getListingsMap: any read error (e.g. before the column existed) = none.
+ */
+export async function getBestOfferProductIds(service: SupabaseClient): Promise<Set<string>> {
+  const { data, error } = await service.from('products').select('id').eq('ebay_best_offer', true);
+  if (error) return new Set();
+  return new Set(((data ?? []) as { id: string }[]).map((row) => row.id));
+}
+
 // Deliberately NOT a single .upsert(...): Postgres validates NOT NULL
 // constraints against the row `INSERT ... ON CONFLICT DO UPDATE` WOULD have
 // inserted before it even checks for a conflict — so a one-shot upsert with
