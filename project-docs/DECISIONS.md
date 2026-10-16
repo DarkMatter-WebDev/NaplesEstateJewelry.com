@@ -18,6 +18,8 @@
 - **The offer SDK is its own copy** (`intent=authorize`, `data-namespace=paypalOffer`); the checkout's `window.paypal` must never be an authorize SDK.
 - **Button:** full width UNDER the four product buttons (answer 4); the row above is unchanged. **Alerts:** email to info@ + a plain text to the owner's cell (answer 5). The buyer is only emailed — never texted (no SMS consent). A failed charge sends the buyer no email ("not accepted" would be untrue) — the owner calls.
 - **Table:** the Offers column sits right after Price (owner, mockup v2).
+- **The owner's message to a buyer (2026-10-15 (9)):** optional on BOTH Decline and Counter, the same box, ≤ 300 characters, quoted and signed "— Chris" in the email, shown on the card as "Your message". One column holds it for either answer: `product_offers.counter_note`. The admin card shows a typed-lowercase buyer name with capitals (display only). On a phone the card is one column (what → how much → how long → who → buttons) and the amount never wraps.
+- **Deleting old offers (2026-10-15 (11)):** by hand only (no automatic clean-up). ONE rule, `offerDeleteBlock`, for the page and the server: never an open offer (money held — Decline first), never a counter whose link is live, never a hold PayPal has not released; everything finished may go, and an accepted offer's paid order stays. The server re-checks every id.
 - **AI:** `accepts_offers` is in the assistant's field set but moves ONLY on the admin's own words — the prompt says so and the route drops the value unless the latest input mentions offers (`mentionsOffers`). This is the one operational-style field the AI may touch; status and location stay out.
 - Runbook `features/make-offer.md`. Record `CHANGELOG.md` 2026-10-15 (4).
 

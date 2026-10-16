@@ -73,9 +73,14 @@ export function buildOrderEmailFooterHtml(orderNumber?: string | null) {
         <a href="${escapeHtml(lookupUrl)}" style="color:#735c00;font-weight:700;text-decoration:underline;">${escapeHtml(SITE_DOMAIN_LABEL)}/order-lookup</a>
         &mdash; enter your order number and the email or phone on the order. No account needed.
       </p>
-      <p style="margin:0;font-size:12px;line-height:1.5;color:#9a8f7a;">
-        <a href="${escapeHtml(siteUrl)}" style="color:#735c00;font-weight:600;text-decoration:underline;">${escapeHtml(SITE_DOMAIN_LABEL)}</a> &middot; ${escapeHtml(addressOneLine())} &middot; <span style="white-space:nowrap;">${escapeHtml(BUSINESS_PHONE)}</span>
-      </p>
+      <!-- One line each, centred (owner, 2026-10-15): the website, the address,
+           the phone. Run together as "site · address · phone" the address wrapped
+           part-way on a phone. nowrap keeps the address and the number whole. -->
+      <div style="margin:12px 0 0;font-size:12px;line-height:1.6;color:#9a8f7a;text-align:center;">
+        <div><a href="${escapeHtml(siteUrl)}" style="color:#735c00;font-weight:600;text-decoration:underline;">${escapeHtml(SITE_DOMAIN_LABEL)}</a></div>
+        <div style="white-space:nowrap;">${escapeHtml(addressOneLine())}</div>
+        <div><span style="white-space:nowrap;">${escapeHtml(BUSINESS_PHONE)}</span></div>
+      </div>
     </div>
   `;
 }

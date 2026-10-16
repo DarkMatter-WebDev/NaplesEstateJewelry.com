@@ -4,6 +4,19 @@
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
 > in `DECISIONS.md`. Last reconciled: **2026-10-14**.
 
+## Start Here (2026-10-15 (9) — Offers phone card + decline/counter message + email footer BUILT + STAGED, not pushed)
+
+- 🟡 **BUILT + STAGED, awaiting the owner's push** (`CHANGELOG.md` 2026-10-15 (9); `TASKS.md` top): Admin → Offers redrawn for a phone (mockup v3), an optional message to the buyer on Decline and on Counter (stored in `counter_note`, shown as "Your message"), and the offer emails' footer centred on two lines; **plus (10)** the order receipt / fulfillment emails' footer (website, address, phone — each centred on its own line) and the buy-receipt email's; **plus (11)** delete old offers by hand (trash-can + Delete all; open offers and live counters protected). No SQL, no env vars. Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1860/1860** tests (165 files) · build 0 · 88 prerendered = 41 EN + 41 ES + 6; 29/29 in the browser. ⛔ Not seen on a real iPhone or mail client.
+
+## Start Here (2026-10-15 (8) — Make an Offer TESTED in production; phone-card layout + decline message next (mockup first))
+
+- ✅ **Tested by the owner (10-15):** a real offer held money, the owner's text and email arrived, Decline released it (`CHANGELOG.md` 2026-10-15 (8)). The live PayPal account allows authorizations. Accept and Counter not used for real yet.
+- ◻ **Next (owner's asks):** the Admin → Offers card on a phone (the amount wraps) laid out more gracefully, and a message to the buyer on Decline — mockup first.
+
+## Start Here (2026-10-15 (7) — everything from 10-15 is DEPLOYED (owner's word); nothing staged-but-unpushed except docs)
+
+- 🟢 **DEPLOYED (owner, 10-15: *"Pushed and deployed the bulk offers buttons."*) — `CHANGELOG.md` 2026-10-15 (7).** Live now (owner's word, not checked by Claude): Make an Offer, the "Live + Offer" chip, and Actions → Site offers bulk on/off. No SQL or env vars pending. **Open, all on the owner's side:** the one real test offer (`TASKS.md` 2026-10-15 (4) item 3 — the only proof the live PayPal account allows holds) and the first bulk run (2026-10-15 (6) item 2). Where the block below says "STAGED", read "deployed".
+
 ## Start Here (2026-10-15 (6) — bulk "Set all accept offers" / "Set all no offers" BUILT + STAGED, not pushed)
 
 - 🟡 **BUILT + STAGED, awaiting the owner's push — Products → Actions → Site offers → "Set all accept offers" / "Set all no offers"** for the selected items (`CHANGELOG.md` 2026-10-15 (6); `TASKS.md` top). One write via `POST /api/admin/offers/accepts`; the Offers column follows at once; open offers are left alone. No SQL, no env vars. Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1855/1855** tests (165 files) · build 0 · 88 prerendered = 41 EN + 41 ES + 6; real window 7/7. ⛔ Not run for real (behind the sign-in).

@@ -9,6 +9,7 @@ import {
   buyerEmailForStatus,
   bulkAcceptsOffersMessage,
   cleanOfferText,
+  displayBuyerName,
   parseBulkAcceptsOffers,
   computeOfferTotals,
   counterAmountProblem,
@@ -18,6 +19,7 @@ import {
   isCounterLive,
   isOfferLive,
   mentionsOffers,
+  offerDeleteBlock,
   offerAmountMessage,
   offerAmountProblem,
   offerExpiresAt,
@@ -200,12 +202,40 @@ describe('statuses, filters, emails', () => {
     }
   });
 
+  it('a decline carries the owner’s message, quoted and signed; without one it is the plain email', () => {
+    const withNote = buildOfferBuyerEmail({ ...base, kind: 'declined', ownerNote: 'The lowest I can go is $45.' });
+    expect(withNote.text).toContain('"The lowest I can go is $45." — Chris');
+    expect(withNote.html).toContain('&ldquo;The lowest I can go is $45.&rdquo; — Chris');
+    expect(withNote.text.indexOf('— Chris')).toBeLessThan(withNote.text.indexOf('hold has been released'));
+    const plain = buildOfferBuyerEmail({ ...base, kind: 'declined' });
+    expect(plain.text).not.toContain('— Chris');
+    // Only a decline shows the note: an expired or sold email never does.
+    expect(buildOfferBuyerEmail({ ...base, kind: 'expired', ownerNote: 'x note' }).text).not.toContain('x note');
+    const escaped = buildOfferBuyerEmail({ ...base, kind: 'declined', ownerNote: '<b>hi</b>' });
+    expect(escaped.html).toContain('&lt;b&gt;hi&lt;/b&gt;');
+  });
+
+  it('the email footer: the website, then the address on its own unbroken line, both centred', () => {
+    const { html } = buildOfferBuyerEmail({ ...base, kind: 'declined' });
+    const footer = html.slice(html.lastIndexOf('border-top:1px solid #eadfbd'));
+    expect(footer).toContain('text-align:center;');
+    expect(footer).toMatch(/<div><a href="[^"]+"[^>]*>NaplesEstateJewelry\.com<\/a><\/div>\s*<div style="white-space:nowrap;">6240 Shirley St/);
+    expect(footer).not.toContain('&middot;');
+  });
+
+  it('the card shows a typed-lowercase name with capitals and leaves real capitals alone', () => {
+    expect(displayBuyerName('christopher surette')).toBe('Christopher Surette');
+    expect(displayBuyerName('  mary   smith ')).toBe('Mary Smith');
+    expect(displayBuyerName('Tom McDonald')).toBe('Tom McDonald');
+    expect(displayBuyerName('ANNA deLuca')).toBe('ANNA deLuca');
+  });
+
   it('the counter email carries the private Buy-now link and the price', () => {
     const email = buildOfferBuyerEmail({
       ...base,
       kind: 'countered',
       counterAmount: 1175,
-      counterNote: 'I can do $1,175.',
+      ownerNote: 'I can do $1,175.',
       counterUrl: 'https://naplesestatejewelry.com/offer/counter/TOKEN',
       counterExpiresAt: '2026-10-18T20:05:00Z',
     });
@@ -386,6 +416,62 @@ describe('source guards', () => {
     const shell = read('src', 'components', 'admin', 'AdminShell.tsx');
     expect(shell).toContain("void setSiteOffersForSelected(action === 'site-offers-on');");
     expect(shell).toContain("fetch('/api/admin/offers/accepts'");
+  });
+
+  it('Decline and Counter take the same optional message, kept on the offer (counter_note)', () => {
+    const action = read('src', 'app', 'api', 'admin', 'offers', '[id]', 'route.ts');
+    expect(action).toContain('await declineOffer(service, id, { note: body?.note })');
+    expect(action).toContain('await counterOffer(service, id, { amount: body?.amount, note: body?.note })');
+    const server = read('src', 'lib', 'offers-server.ts');
+    const decline = server.slice(server.indexOf('export async function declineOffer('));
+    expect(decline.slice(0, 900)).toContain("counter_note: cleanOfferText(input.note, OWNER_NOTE_MAX),");
+    expect(server).toContain('ownerNote: offer.counter_note,');
+    const panel = read('src', 'components', 'admin', 'OffersPanel.tsx');
+    expect(panel).toContain('<MessageBox id={`counter-note-${offer.id}`}');
+    expect(panel).toContain('<MessageBox id={`decline-note-${offer.id}`}');
+    expect(panel).toContain('Message to {first} (optional)');
+    expect(panel).toContain('Yes, decline and send');
+    expect(panel).toContain('<strong>Your message:</strong> {offer.counter_note}');
+  });
+
+  it('the phone card: one column in the mockup’s order, the amount never in the photo column', () => {
+    const panel = read('src', 'components', 'admin', 'OffersPanel.tsx');
+    expect(panel).toContain("'thumb title'\n              'money money'\n              'clock clock'\n              'buyer buyer'\n              'actions actions';");
+    expect(panel).toContain('.offer-amount { font-size: 1.5rem; font-weight: 700; white-space: nowrap;');
+    expect(panel).toContain('Accept &amp; charge<span className="offer-phone-only">');
+    expect(panel).toContain('const name = displayBuyerName(offer.customer_name);');
+  });
+
+  it('delete: open offers, live counters and unreleased holds are protected; finished ones can go', () => {
+    const now = new Date('2026-10-15T20:00:00Z');
+    const later = '2026-10-17T20:00:00Z';
+    const past = '2026-10-14T20:00:00Z';
+    expect(offerDeleteBlock({ status: 'open', hold_status: 'held' }, now)).toMatch(/holding the buyer's money/);
+    expect(offerDeleteBlock({ status: 'pending', hold_status: 'none' }, now)).not.toBeNull();
+    expect(offerDeleteBlock({ status: 'countered', hold_status: 'released', counter_expires_at: later }, now)).toMatch(/link is still live/);
+    expect(offerDeleteBlock({ status: 'countered', hold_status: 'released', counter_expires_at: past }, now)).toBeNull();
+    expect(offerDeleteBlock({ status: 'declined', hold_status: 'release_failed' }, now)).toMatch(/not released this hold/);
+    for (const status of ['accepted', 'counter_bought', 'declined', 'expired', 'counter_expired', 'item_sold', 'failed', 'abandoned']) {
+      const hold = status === 'accepted' ? 'captured' : 'released';
+      expect(offerDeleteBlock({ status, hold_status: hold }, now)).toBeNull();
+    }
+  });
+
+  it('delete: the server re-checks every row, the route is admin-only, the page uses the same rule', () => {
+    const server = read('src', 'lib', 'offers-server.ts');
+    const del = server.slice(server.indexOf('export async function deleteOffers('));
+    expect(del.slice(0, 2000)).toContain('const reason = offerDeleteBlock(');
+    expect(del.slice(0, 2000)).toContain(".not('status', 'in', '(open,pending)')");
+    const route = read('src', 'app', 'api', 'admin', 'offers', 'route.ts');
+    const handler = route.slice(route.indexOf('export async function DELETE('));
+    expect(handler.indexOf('await requireAdmin()')).toBeGreaterThan(0);
+    expect(handler.indexOf('await requireAdmin()')).toBeLessThan(handler.indexOf('createServiceClient()'));
+    const panel = read('src', 'components', 'admin', 'OffersPanel.tsx');
+    expect(panel).toContain('{!offerDeleteBlock(offer) && (');
+    expect(panel).toContain('const deletable = offers.filter((offer) => !offerDeleteBlock(offer));');
+    expect(panel).toContain("method: 'DELETE'");
+    expect(panel).toContain("{deleting.ids.length === 1 ? 'Keep it' : 'Keep them'}");
+    expect(panel).toContain("Open offers can&apos;t be deleted");
   });
 
   it('the sweep is guarded by the cron secret', () => {

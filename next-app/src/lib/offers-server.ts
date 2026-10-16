@@ -28,7 +28,7 @@ import { getSiteUrl } from '@/lib/order-email-branding';
 import { ownerNotificationRecipient } from '@/lib/order-owner-notification';
 import { buildOfferBuyerEmail, buildOwnerOfferEmail } from '@/lib/offer-emails';
 import {
-  COUNTER_NOTE_MAX,
+  OWNER_NOTE_MAX,
   OFFER_ABANDON_AFTER_MINUTES,
   OFFER_MESSAGE_MAX,
   buyerEmailForStatus,
@@ -40,8 +40,10 @@ import {
   isCounterLive,
   isOfferLive,
   isOfferStatus,
+  OFFER_DELETE_MAX,
   offerAmountMessage,
   offerAmountProblem,
+  offerDeleteBlock,
   offerExpiresAt,
   offerPayPalReference,
   ownerOfferTextBody,
@@ -606,7 +608,7 @@ async function sendBuyerEmailForStatus(
     total: offer.total,
     expiresAt: offer.expires_at,
     counterAmount: offer.counter_amount,
-    counterNote: offer.counter_note,
+    ownerNote: offer.counter_note,
     counterUrl: counterToken ? counterUrl(counterToken, isEs) : null,
     counterExpiresAt: offer.counter_expires_at,
   });
@@ -675,11 +677,23 @@ async function closeWithRelease(
 // Admin: accept, decline, counter
 // ---------------------------------------------------------------------------
 
-export async function declineOffer(service: SupabaseClient, offerId: string): Promise<OfferResult<{ offer: OfferRow }>> {
+/**
+ * Decline, with an optional message to the buyer (owner, 2026-10-15: "similar
+ * to how ebay works"). The message lives in `counter_note` — the one column for
+ * the owner's message on an offer, whether it was countered or declined — so a
+ * retried email (the sweep) still carries it.
+ */
+export async function declineOffer(
+  service: SupabaseClient,
+  offerId: string,
+  input: { note?: unknown } = {},
+): Promise<OfferResult<{ offer: OfferRow }>> {
   const offer = await loadOffer(service, 'id', offerId);
   if (!offer) return fail(404, 'Offer not found.');
   if (offer.status !== 'open') return fail(409, `This offer is ${offer.status.replace('_', ' ')}, not open.`);
-  const closed = await closeWithRelease(service, offer, 'declined');
+  const closed = await closeWithRelease(service, offer, 'declined', {
+    counter_note: cleanOfferText(input.note, OWNER_NOTE_MAX),
+  });
   if (!closed) return fail(409, 'The offer changed while declining. Reload the page.');
   const product = await loadOfferProduct(service, offer.product_id);
   await sendBuyerEmailForStatus(service, closed, product?.product.title ?? 'your item', product?.product.title_es ?? null);
@@ -705,7 +719,7 @@ export async function counterOffer(
   const sentAt = new Date();
   const countered = await closeWithRelease(service, offer, 'countered', {
     counter_amount: amount,
-    counter_note: cleanOfferText(input.note, COUNTER_NOTE_MAX),
+    counter_note: cleanOfferText(input.note, OWNER_NOTE_MAX),
     counter_token_hash: hashCounterToken(token),
     counter_sent_at: sentAt.toISOString(),
     counter_expires_at: counterExpiresAt(sentAt).toISOString(),
@@ -1095,6 +1109,45 @@ export async function listOffersForAdmin(service: SupabaseClient, filter: OfferF
       order_number: offer.order_id ? orderNumbers.get(offer.order_id) ?? null : null,
     };
   });
+}
+
+/**
+ * Delete old offers by hand (owner mockup v4, 2026-10-15) — one, or every
+ * finished offer on a tab. The server re-checks each row with
+ * `offerDeleteBlock` (the page's buttons are convenience, not enforcement):
+ * open offers, live counters and holds not yet released are skipped and named.
+ * An accepted offer's paid order stays (orders.offer_id → null by the FK).
+ */
+export async function deleteOffers(
+  service: SupabaseClient,
+  offerIds: string[],
+): Promise<OfferResult<{ deleted: number; skipped: { id: string; reason: string }[] }>> {
+  const ids = Array.from(new Set(offerIds.filter((id) => typeof id === 'string' && id.trim() !== '')));
+  if (ids.length === 0) return fail(400, 'Choose at least one offer.');
+  if (ids.length > OFFER_DELETE_MAX) return fail(400, `Delete at most ${OFFER_DELETE_MAX} offers at a time.`);
+  const { data, error } = await service
+    .from('product_offers')
+    .select('id, status, hold_status, counter_expires_at')
+    .in('id', ids);
+  if (error) throw error;
+  const now = new Date();
+  const skipped: { id: string; reason: string }[] = [];
+  const deletable: string[] = [];
+  for (const row of data ?? []) {
+    const reason = offerDeleteBlock(row as { status: string; hold_status: string | null; counter_expires_at: string | null }, now);
+    if (reason) skipped.push({ id: String(row.id), reason });
+    else deletable.push(String(row.id));
+  }
+  if (deletable.length === 0) return { ok: true, deleted: 0, skipped };
+  const { data: removed, error: deleteError } = await service
+    .from('product_offers')
+    .delete()
+    .in('id', deletable)
+    // Re-checked in the same statement: a row that turned open in between stays.
+    .not('status', 'in', '(open,pending)')
+    .select('id');
+  if (deleteError) throw deleteError;
+  return { ok: true, deleted: removed?.length ?? 0, skipped };
 }
 
 /** Open offers per product (the product table's "2 open") and in total (the menu). */

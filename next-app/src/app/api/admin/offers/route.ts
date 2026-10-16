@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { createServiceClient } from '@/lib/supabase/service';
 import { OFFER_FILTERS, type OfferFilter } from '@/lib/offers';
-import { OFFERS_SQL_HINT, countOpenOffers, isMissingOffersSchemaError, listOffersForAdmin } from '@/lib/offers-server';
+import { OFFERS_SQL_HINT, countOpenOffers, deleteOffers, isMissingOffersSchemaError, listOffersForAdmin } from '@/lib/offers-server';
 
 export const runtime = 'nodejs';
 
@@ -35,5 +35,26 @@ export async function GET(req: Request) {
     }
     console.error('Admin offers read error:', error);
     return NextResponse.json({ error: 'Could not load offers.' }, { status: 500 });
+  }
+}
+
+/**
+ * Delete old offers by hand (owner mockup v4, 2026-10-15): `{ ids }` — one
+ * offer, or every finished offer on a tab. Open offers, live counters and holds
+ * PayPal has not released are skipped and listed (lib/offers.ts →
+ * offerDeleteBlock). Paid orders are never touched.
+ */
+export async function DELETE(req: Request) {
+  const auth = await requireAdmin();
+  if ('error' in auth) return auth.error;
+  const body = await req.json().catch(() => null);
+  const ids = Array.isArray(body?.ids) ? (body.ids as unknown[]).filter((id): id is string => typeof id === 'string') : [];
+  try {
+    const result = await deleteOffers(createServiceClient(), ids);
+    if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error('Admin offers delete error:', error);
+    return NextResponse.json({ error: 'Could not delete the offers.' }, { status: 500 });
   }
 }

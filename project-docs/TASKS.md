@@ -28,17 +28,31 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-10-15 (6) — Products → Actions → **"Set all accept offers" / "Set all no offers"** — **BUILT + STAGED, not pushed** (no SQL, no env vars)
+### 🟡 2026-10-15 (9) + (10) + (11) — Offers card on a phone + a message on Decline and Counter + email footers centred + **delete old offers** — **BUILT + STAGED, not pushed** (no SQL, no env vars)
+
+**(11), added after this block was written:** Admin → Offers — a trash-can on every finished offer and "Delete all N" on Accepted / Declined / Expired / All, each with a pop-up; open offers and live counters can't be deleted (notes say why). Owner check after the push: Declined tab → trash-can → **Delete this offer**; then **Delete all**. `CHANGELOG.md` 2026-10-15 (11).
+
+Record: `CHANGELOG.md` 2026-10-15 (9). Gate (with (10) + (11)): `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1863/1863** tests (165 files) · build 0 · 88 prerendered = 41 EN + 41 ES + 6; delete 21/21. Earlier gate (with (10)): `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1861/1861** tests (165 files) · build 0 · 88 prerendered = 41 EN + 41 ES + 6; real panel + email 29/29; receipt footer at phone width 3 centred one-line rows.
+
+1. ◻ **Owner — push + deploy.**
+2. ◻ **Owner — on the iPhone:** Admin → Offers — the amount on one line, the info top to bottom, **Accept & charge $…** full width. Make a test offer → **Decline** → type a message → **Yes, decline and send** → the buyer email shows your message signed "— Chris", and the footer reads the website, then the address on its own line, centred. The **Declined** tab shows "Your message: …".
+3. ✅ **Answered 10-15: yes** — built as 2026-10-15 (10): the order receipt / invoice / fulfillment emails end with the website, the address and the phone each on a centred line; the buy-receipt email too (Claude's call). Same push. Check it on the next real receipt.
+
+**Staging (10-15 (9)):** ✅ synced 2026-10-15 — dry run listed exactly the 11 touched files (6 in the app: `OffersPanel.tsx`, `lib/offer-emails.ts`, `lib/offers.ts`, `lib/offers-server.ts`, `api/admin/offers/[id]/route.ts`, `lib/__tests__/offers.test.ts`; 5 docs), 0 Extras, 1254 total; real run copied 11 / 0 FAILED; follow-up dry run 0, exit 0; leak check 0, no `zz-*`; 251 = 251 `.tsx`; SHA-256 MATCH on the 6 app files. Docs-only re-sync after this line.
+
+### 🟢 2026-10-15 (6) — Products → Actions → **"Set all accept offers" / "Set all no offers"** — **DEPLOYED** (owner, 10-15: *"Pushed and deployed the bulk offers buttons."*) — ◻ the first run is the test
 
 Record: `CHANGELOG.md` 2026-10-15 (6). Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1855/1855** tests (165 files) · build 0 · 88 prerendered = 41 EN + 41 ES + 6; the real actions window 7/7.
 
-1. ◻ **Owner — push + deploy.**
+1. ✅ **Owner — push + deploy** — DONE 10-15 (`CHANGELOG.md` 2026-10-15 (7)).
 2. ◻ **Owner — the first run:** Products → tick a few items → **Actions** → **Site offers** → **Set all accept offers**. A green line says *"Accept offers is on for N items…"* and their Offers column reads **On** at once; one of those items' pages shows **Make an Offer**. Then the same items → **Set all no offers** → the column reads "–" and the button is gone.
 3. ℹ️ No confirm screen (one reversible write). Turning offers off leaves offers already open alone — answer them in Offers.
 
 **Staging (10-15 (6)):** ✅ synced 2026-10-15 ~1:40 PM ET — dry run listed exactly the 11 touched files (1 new: `api/admin/offers/accepts/route.ts`; 4 changed in the app: `SelectedProductsActionsModal.tsx`, `AdminShell.tsx`, `lib/offers.ts`, `lib/__tests__/offers.test.ts`; 6 docs), 0 Extras, 1254 total; real run copied 11 / 0 FAILED; follow-up dry run 0, exit 0; leak check 0, no `zz-*`; 251 = 251 `.tsx`; SHA-256 MATCH on the 5 app files. Docs-only re-sync after this line.
 
-### 🟢 2026-10-15 (4) — **Make an Offer** on the site shop — **SQL RUN + DEPLOYED** (owner, 10-15: *"Ran the SQL and pushed + deployed"*) — ✅ SQL → ✅ push → ◻ the one real test offer
+### 🟢 2026-10-15 (4) — **Make an Offer** on the site shop — **SQL RUN + DEPLOYED + TESTED** (owner, 10-15: *"tested successfully… txt and email came thru.. declined it successfully"*) — ✅ SQL → ✅ push → ✅ real offer + decline
+
+**10-15 evening — TESTED** (`CHANGELOG.md` 2026-10-15 (8)): the live PayPal account allows holds; the owner's email + text arrived; Decline released it. Not yet used for real: Accept, Counter.
 
 **10-15 — DEPLOYED with the "Live + Offer" chip** (`CHANGELOG.md` 2026-10-15 (5)). Items 1 and 2 below are done on the owner's word; item 3 is next.
 

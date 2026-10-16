@@ -89,6 +89,15 @@ describe('order emails point guests at the lookup, with the brand-cased domain',
     expect(lines).toContain('NaplesEstateJewelry.com');
     expect(SITE_DOMAIN_LABEL).toBe('NaplesEstateJewelry.com');
   });
+  it('footer: the website, the address and the phone each on their own centred line (owner, 2026-10-15)', () => {
+    const html = buildOrderEmailFooterHtml('NEJ-20260917-ZIZCI');
+    const block = html.slice(html.indexOf('text-align:center;'));
+    expect(block).toMatch(/<div><a href="[^"]+"[^>]*>NaplesEstateJewelry\.com<\/a><\/div>\s*<div style="white-space:nowrap;">6240 Shirley St[^<]*<\/div>\s*<div><span style="white-space:nowrap;">\(239\) 404-8505<\/span><\/div>/);
+    expect(block).not.toContain('&middot;');
+    const buyReceipt = read('src', 'lib', 'buy-receipt-email.ts');
+    expect(buyReceipt).toContain('<p style="${tiny}margin:0;text-align:center;white-space:nowrap;">${escapeHtml(addressOneLine())}</p>');
+    expect(buyReceipt).not.toContain('</a> &middot; ${escapeHtml(addressOneLine())}');
+  });
   it('both order emails pass the order number through', () => {
     expect(read('src', 'lib', 'order-invoice-email.ts')).toContain('buildOrderEmailFooterHtml(orderNumber)');
     expect(read('src', 'lib', 'order-invoice-email.ts')).toContain('buildOrderEmailFooterTextLines(order.order_number)');

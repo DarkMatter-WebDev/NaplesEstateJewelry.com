@@ -24,7 +24,7 @@ export async function POST(req: Request, context: Context) {
     const result = action === 'accept'
       ? await acceptOffer(service, id)
       : action === 'decline'
-        ? await declineOffer(service, id)
+        ? await declineOffer(service, id, { note: body?.note })
         : action === 'counter'
           ? await counterOffer(service, id, { amount: body?.amount, note: body?.note })
           : action === 'resend-counter'

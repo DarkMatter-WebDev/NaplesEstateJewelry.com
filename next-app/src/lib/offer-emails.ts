@@ -29,7 +29,8 @@ export type OfferEmailInput = {
   total: number;
   expiresAt: string | null;
   counterAmount?: number | null;
-  counterNote?: string | null;
+  /** The owner's message (counter or decline), quoted and signed "— Chris". */
+  ownerNote?: string | null;
   counterUrl?: string | null;
   counterExpiresAt?: string | null;
 };
@@ -54,9 +55,13 @@ function frame(eyebrow: string, heading: string, bodyHtml: string, isEs: boolean
             <tr><td style="padding:20px 28px 24px;font-size:15px;line-height:1.55;color:#1d1a14;">
               ${bodyHtml}
               <p style="margin:20px 0 0;font-size:13px;color:#746b5b;">${footer}</p>
-              <p style="margin:16px 0 0;padding-top:14px;border-top:1px solid #eadfbd;font-size:12px;line-height:1.5;color:#9a8f7a;">
-                <a href="${escapeHtml(getSiteUrl())}" style="color:#735c00;font-weight:600;text-decoration:underline;">${escapeHtml(SITE_DOMAIN_LABEL)}</a> &middot; ${escapeHtml(addressOneLine())}
-              </p>
+              <!-- Website, then the address on its OWN line, both centred (owner,
+                   2026-10-15): side by side the address ran on after the link and
+                   its end wrapped onto a new line on a phone. nowrap keeps it whole. -->
+              <div style="margin:16px 0 0;padding-top:14px;border-top:1px solid #eadfbd;font-size:12px;line-height:1.6;color:#9a8f7a;text-align:center;">
+                <div><a href="${escapeHtml(getSiteUrl())}" style="color:#735c00;font-weight:600;text-decoration:underline;">${escapeHtml(SITE_DOMAIN_LABEL)}</a></div>
+                <div style="white-space:nowrap;">${escapeHtml(addressOneLine())}</div>
+              </div>
             </td></tr>
           </table>
         </td></tr>
@@ -123,7 +128,10 @@ export function buildOfferBuyerEmail(input: OfferEmailInput): BuiltEmail {
       const released = isEs
         ? '<strong>La retención de PayPal se liberó — no se le cobró nada.</strong> Su banco puede tardar unos días en mostrarlo.'
         : "<strong>PayPal's hold has been released — you were not charged.</strong> Your bank may take a few days to show it.";
-      const lines = [isEs ? `Hola ${name},` : `Hi ${name},`, why, released];
+      // The owner's own words on a decline (owner, 2026-10-15: like eBay),
+      // between the reason and the release line. Expired / sold have none.
+      const note = input.kind === 'declined' && input.ownerNote ? [ownerNoteLine(input.ownerNote)] : [];
+      const lines = [isEs ? `Hola ${name},` : `Hi ${name},`, why, ...note, released];
       const cta = input.kind === 'item_sold'
         ? button(`${getSiteUrl()}${isEs ? '/es' : ''}/shop`, isEs ? 'Ver la tienda' : 'Browse the shop')
         : button(input.productUrl, isEs ? 'Ver la pieza' : 'View the piece');
@@ -140,7 +148,7 @@ export function buildOfferBuyerEmail(input: OfferEmailInput): BuiltEmail {
         isEs
           ? `Hola ${name}, gracias por su oferta de <strong>${escapeHtml(amount)}</strong>. Liberamos la retención de su pago. Esta es nuestra contraoferta:`
           : `Hi ${name}, thanks for your offer of <strong>${escapeHtml(amount)}</strong>. We've released the hold on your payment. Here is our counter-offer:`,
-        ...(input.counterNote ? [`<em>&ldquo;${escapeHtml(input.counterNote)}&rdquo; — Chris</em>`] : []),
+        ...(input.ownerNote ? [ownerNoteLine(input.ownerNote)] : []),
         isEs
           ? `Este precio es solo para usted hasta el <strong>${escapeHtml(until)}</strong>. Es una pieza única, así que es para quien pague primero.`
           : `This price is just for you until <strong>${escapeHtml(until)}</strong>. It's one of a kind, so it goes to whoever pays first.`,
@@ -197,6 +205,10 @@ export function buildOwnerOfferEmail(input: OwnerOfferEmailInput): BuiltEmail {
     `Open Offers: ${input.adminUrl}`,
   ].filter(Boolean).join('\n');
   return { subject, html, text };
+}
+
+function ownerNoteLine(note: string): string {
+  return `<em>&ldquo;${escapeHtml(note)}&rdquo; — Chris</em>`;
 }
 
 function stripTags(html: string): string {

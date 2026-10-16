@@ -31,7 +31,10 @@ export const COUNTER_WINDOW_HOURS = 72;
 /** A pending offer whose PayPal window was never approved is closed after this. */
 export const OFFER_ABANDON_AFTER_MINUTES = 180;
 export const OFFER_MESSAGE_MAX = 500;
-export const COUNTER_NOTE_MAX = 300;
+/** The owner's message to a buyer on a counter or a decline (both live in `counter_note`). */
+export const OWNER_NOTE_MAX = 300;
+/** @deprecated name kept for older imports — the same limit as OWNER_NOTE_MAX. */
+export const COUNTER_NOTE_MAX = OWNER_NOTE_MAX;
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -328,6 +331,38 @@ export function ownerOfferTextBody(input: {
   return `NEJ offer: ${formatCheckoutCurrency(input.amount)} on ${item}${listed}. ${input.customerName}, ${delivery}. Answer by ${formatOfferDeadline(input.expiresAt)}: ${input.adminUrl}`;
 }
 
+/**
+ * Deleting an old offer (owner mockup v4, 2026-10-15) — the ONE rule, used by
+ * the page (which buttons show) and the server (which rows really go).
+ *  - Open: never — PayPal is holding the buyer's money; Decline releases it.
+ *  - Countered with a live link: never — the buyer's Buy-now link would die
+ *    with no word to them. Once the 72 hours pass it can go.
+ *  - A hold still held or whose release PayPal refused (`release_failed`, the
+ *    sweep is retrying): not yet — the row is how the retry finds it.
+ *  - Everything else (accepted, bought at counter, declined, expired, counter
+ *    expired, item sold, payment failed, abandoned): yes. An accepted offer's
+ *    order stays under Orders (`orders.offer_id` goes to null).
+ * Null = deletable; otherwise the reason, in the owner's words.
+ */
+export function offerDeleteBlock(
+  offer: { status: string; hold_status?: string | null; counter_expires_at?: string | null },
+  now: Date = new Date(),
+): string | null {
+  if (offer.status === 'open' || offer.status === 'pending') {
+    return "Open offers can't be deleted — PayPal is holding the buyer's money. Decline releases it.";
+  }
+  if (offer.status === 'countered' && isCounterLive({ status: offer.status, counter_expires_at: offer.counter_expires_at ?? null }, now)) {
+    return "This counter's Buy-now link is still live. It can be deleted once the 72 hours pass.";
+  }
+  if (offer.hold_status === 'held' || offer.hold_status === 'release_failed') {
+    return 'PayPal has not released this hold yet — it can be deleted once the release goes through.';
+  }
+  return null;
+}
+
+/** At most this many offers per delete. */
+export const OFFER_DELETE_MAX = 500;
+
 /** At most this many items per "Set all accept offers / no offers" run. */
 export const BULK_ACCEPTS_OFFERS_MAX = 1000;
 
@@ -354,6 +389,20 @@ export function bulkAcceptsOffersMessage(enabled: boolean, updated: number, open
     ? ` ${openOffersLeft} open ${openOffersLeft === 1 ? 'offer stays' : 'offers stay'} open until you answer ${openOffersLeft === 1 ? 'it' : 'them'} in Offers.`
     : '';
   return `Accept offers is off for ${items} — no Make an Offer button.${open}`;
+}
+
+/**
+ * The buyer's name for the admin card: a word typed all in lower case gets a
+ * capital first letter ("christopher surette" → "Christopher Surette"); a word
+ * with any capital ("McDonald", "DeLuca") is left exactly as typed. Display
+ * only — emails and orders keep what the buyer typed (owner, 2026-10-15).
+ */
+export function displayBuyerName(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .map((word) => (word === word.toLowerCase() ? word.charAt(0).toUpperCase() + word.slice(1) : word))
+    .join(' ');
 }
 
 /** Bounded, single-spaced free text (the buyer's message, the owner's counter note). */

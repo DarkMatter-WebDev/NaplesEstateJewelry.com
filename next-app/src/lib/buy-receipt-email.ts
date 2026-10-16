@@ -144,7 +144,8 @@ export function buildBuyReceiptEmail(row: BuyReceiptRow): BuyReceiptEmail {
 
                   <p style="${tiny}margin:14px 0 0;text-align:center;">Thank you for choosing ${escapeHtml(BUSINESS_NAME)}.</p>
                   <p style="${tiny}margin:2px 0 0;text-align:center;">Questions? Reply to this email or call <span style="white-space:nowrap;">${escapeHtml(BUSINESS_PHONE)}</span>.</p>
-                  <p style="${tiny}margin:2px 0 0;text-align:center;"><a href="${escapeHtml(siteUrl)}" style="color:${GOLD};text-decoration:underline;">${escapeHtml(SITE_DOMAIN_LABEL)}</a> &middot; ${escapeHtml(addressOneLine())}</p>
+                  <p style="${tiny}margin:2px 0 0;text-align:center;"><a href="${escapeHtml(siteUrl)}" style="color:${GOLD};text-decoration:underline;">${escapeHtml(SITE_DOMAIN_LABEL)}</a></p>
+                  <p style="${tiny}margin:0;text-align:center;white-space:nowrap;">${escapeHtml(addressOneLine())}</p>
                 </td>
               </tr>
             </table>

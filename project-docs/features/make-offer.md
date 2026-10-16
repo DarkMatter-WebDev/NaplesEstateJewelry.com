@@ -47,8 +47,14 @@ hold — they are never charged.
      the sale completes by itself. Until someone pays, the item stays for sale to
      everyone (first to pay gets it). If the email fails, the page shows the link
      to send yourself; **Send the link again** makes a fresh one.
-   - **Decline** → asks first → hold released, polite email.
+   - **Decline** → asks first, with an optional **Message to <name>** (same box as
+     Counter's) → hold released, polite email with your message signed "— Chris".
+     The Declined / Countered tabs show "Your message: …".
 5. Do nothing → after 72 hours the offer expires and releases by itself.
+6. **Clear out old offers:** a red trash-can on each finished offer, or **Delete all N**
+   on Accepted / Declined / Expired / All. Open offers (money held) and live
+   counters (working link) can't be deleted — Decline or wait for the link to
+   expire. Deleting an accepted offer keeps its paid order under Orders.
 
 ## The buyer's side
 
