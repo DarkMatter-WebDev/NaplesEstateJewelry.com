@@ -1,7 +1,7 @@
 # Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-10-14** (eBay Best Offer per
+> in `CHANGELOG.md`. Last reconciled: **2026-10-15** (session CLOSED — `CHANGELOG.md` 2026-10-15 (13): Make an Offer built, tested and deployed with bulk on/off, the phone card, decline/counter messages, centred email footers and delete; nothing to push, no SQL). Before that, **2026-10-14** (eBay Best Offer per
 > item + in bulk BUILT + STAGED; SQL RUN by the owner; only the push left — first block below). Before that, **2026-10-12** (session CLOSED —
 > `CHANGELOG.md` 2026-10-12 (3); two new blocks, first below: the short phone
 > cookie notice DEPLOYED + verified in production, and the next Google Ads
@@ -28,13 +28,27 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-10-15 (9) + (10) + (11) — Offers card on a phone + a message on Decline and Counter + email footers centred + **delete old offers** — **BUILT + STAGED, not pushed** (no SQL, no env vars)
+### 🔴 2026-10-17 (1) — HOMEPAGE 404 in production (`/` and `/es`, cached since ~Oct 15 7:26 PM ET) — fix **BUILT + STAGED, not pushed** (no SQL, no env vars)
+
+Record: `CHANGELOG.md` 2026-10-17 (1). Rule: `DECISIONS.md` top entry. Files: `src/app/[locale]/(home)/page.tsx`, `src/app/[locale]/sell/[city]/page.tsx`, NEW `src/lib/__tests__/static-param-routes.test.ts`.
+
+Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1866/1866** tests (166 files) · build 0 · 88 prerendered = 41 EN + 41 ES + 6. `next start` with the built home / city cache files removed (= Netlify's miss after a carousel save): `/`, `/es`, `/sell/naples` → 200 (before the fix: `/`, `/es` → 404, the production page). `/money.jpg`, `/nonexistent-xyz.png`, `/sell/nowhere-xyz`, `/es/sell/nowhere-xyz` → 404, no 500.
+
+1. ◻ **Owner — push + deploy.** The deploy itself clears the stuck 404. ⛔ Do not expect a carousel re-save to fix it before the deploy.
+2. ◻ **After the deploy:** open `naplesestatejewelry.com` and `/es` — the homepage, not "Page Not Found". Then one carousel save in Admin and the homepage again — still the homepage (that save is what broke it).
+3. ℹ️ Not verified by Claude: Netlify's own runtime after a real carousel save (reproduced with the equivalent local cache miss).
+
+**Staging (10-17 (1)):** ✅ synced 2026-10-17 ~7:45 AM ET — dry run listed exactly the 8 touched files (3 in the app: `(home)/page.tsx`, `sell/[city]/page.tsx`, NEW `lib/__tests__/static-param-routes.test.ts`; 5 docs: CHANGELOG, CURRENT_STATUS, DECISIONS, INTEGRITY, TASKS), 0 Extras, 1255 total; real run copied 8 / 0 FAILED; follow-up dry run 0, exit 0; leak check 0, no node_modules / .next; 251 = 251 `.tsx`; SHA-256 MATCH on the 3 app files. Docs-only re-sync after this line.
+
+### 🟢 2026-10-15 (9) + (10) + (11) — Offers card on a phone + a message on Decline and Counter + email footers centred + **delete old offers** — **DEPLOYED** (owner, 10-15: *"Pushed and deployed the offers batch"*) — ◻ the owner's first looks are the test
+
+**10-15 — DEPLOYED** (`CHANGELOG.md` 2026-10-15 (12)). Item 1 below is done; items 2 onward are the owner's first real looks.
 
 **(11), added after this block was written:** Admin → Offers — a trash-can on every finished offer and "Delete all N" on Accepted / Declined / Expired / All, each with a pop-up; open offers and live counters can't be deleted (notes say why). Owner check after the push: Declined tab → trash-can → **Delete this offer**; then **Delete all**. `CHANGELOG.md` 2026-10-15 (11).
 
 Record: `CHANGELOG.md` 2026-10-15 (9). Gate (with (10) + (11)): `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1863/1863** tests (165 files) · build 0 · 88 prerendered = 41 EN + 41 ES + 6; delete 21/21. Earlier gate (with (10)): `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1861/1861** tests (165 files) · build 0 · 88 prerendered = 41 EN + 41 ES + 6; real panel + email 29/29; receipt footer at phone width 3 centred one-line rows.
 
-1. ◻ **Owner — push + deploy.**
+1. ✅ **Owner — push + deploy** — DONE 10-15.
 2. ◻ **Owner — on the iPhone:** Admin → Offers — the amount on one line, the info top to bottom, **Accept & charge $…** full width. Make a test offer → **Decline** → type a message → **Yes, decline and send** → the buyer email shows your message signed "— Chris", and the footer reads the website, then the address on its own line, centred. The **Declined** tab shows "Your message: …".
 3. ✅ **Answered 10-15: yes** — built as 2026-10-15 (10): the order receipt / invoice / fulfillment emails end with the website, the address and the phone each on a centred line; the buy-receipt email too (Claude's call). Same push. Check it on the next real receipt.
 
@@ -76,7 +90,7 @@ Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1854/1854** tes
 
 **Staging (10-15 (4)):** ✅ synced 2026-10-15 ~1:25 PM ET — dry run listed exactly the 41 touched files (19 new: `api/offers/route.ts`, `api/offers/authorize/route.ts`, `api/admin/offers/route.ts`, `[id]/route.ts`, `sweep/route.ts`, `[locale]/offer/[id]/page.tsx`, `[locale]/offer/counter/[token]/page.tsx`, `[locale]/admin/offers/page.tsx`, `components/offers/OfferCheckoutClient.tsx`, `PayPalOfferButton.tsx`, `OfferUnavailable.tsx`, `components/admin/OffersPanel.tsx`, `AdminOffersLink.tsx`, `lib/offers.ts`, `offers-server.ts`, `offer-emails.ts`, `lib/__tests__/offers.test.ts`, `features/make-offer.md`, `supabase/make-offer-2026-10.sql`; 13 changed in the app; 9 docs), 0 Extras, 1253 total (1234 + 19); real run copied 41 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0, exit 0; leak check 0 `.env*` / `.log` / `.tmp-*` / `tsbuildinfo` / `zz-*`, no node_modules / .next / .git; positive control 251 = 251 `.tsx`, 507 = 507 `.ts` under `next-app/src`, 94 = 94 `.sql`; SHA-256 MATCH on 41 of 41; the staged product page carries "Make an Offer", the staged table the Offers column, and the 10-15 (2) "Live + Offer" chip is still staged. Staging holds 10-15 (2) + (4): ONE push. Docs-only re-sync after this line.
 
-### 🟡 2026-10-15 (2) — Product table: eBay chip reads "LIVE + OFFER" for a live listing that allows Best Offer — **BUILT + STAGED, not pushed** (no SQL, no env vars)
+### 🟢 2026-10-15 (2) — Product table: eBay chip reads "LIVE + OFFER" for a live listing that allows Best Offer — **DEPLOYED** with Make an Offer (`CHANGELOG.md` 2026-10-15 (5); item 1 below is done) — ◻ the owner's look at Products is still open (no SQL, no env vars)
 
 Record: `CHANGELOG.md` 2026-10-15 (2). Rule: `DECISIONS.md` → *"eBay Best Offer is chosen per item"* (the "Seen in the product table" bullet).
 

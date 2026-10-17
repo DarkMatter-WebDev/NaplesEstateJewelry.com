@@ -4,7 +4,13 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-10-15**.
+> compaction. Last reconciled: **2026-10-17**.
+
+## Never `dynamicParams = false` on a prerendered route: an unknown param is turned away by `force-static` + an explicit `notFound()` (2026-10-17)
+
+- **Why:** the homepage served a cached "Page Not Found" on `/` and `/es` for ~34 hours (stored ~Oct 15 7:26 PM ET, found by the owner Oct 17, right after updating the hero carousel in Admin). With `dynamicParams = false`, production Next (`next/dist/build/templates/app-page-runtime.js` ~705–715) answers ANY cache MISS on the route with its "no fallback" 404 — even for the prerendered `/en` and `/es` — and caches that 404. Netlify's cache handler reports a miss whenever a tag the page carries is expired (`@netlify/plugin-nextjs` `dist/run/handlers/cache.cjs` ~207–214), and a carousel save does exactly that (`revalidateTag('home-carousel', { expire: 0 })`; banner and hours saves too). Reproduced locally by removing the built `en.*` / `es.*` cache files from a production build: `/` and `/es` → the same 404; after the fix → 200, re-rendered.
+- **The rule:** a route whose params are fully enumerated (`[locale]/(home)`, `[locale]/sell/[city]`) exports `dynamic = 'force-static'` and calls `notFound()` itself for an unknown param, BEFORE reading any data. `force-static` makes the request-time APIs inert during an on-demand render, which is what kept the old 500 away (`/money.jpg`, `/sell/nowhere-xyz` → 404, measured on `next start`).
+- Supersedes the 2026-09-03 entry *"Static `[param]` routes… must set `dynamicParams = false"* and the 2026-09-07 home-route fix. Guard: `lib/__tests__/static-param-routes.test.ts` fails on any `dynamicParams = false` under `src/app`.
 
 ## Make an Offer on the site shop: the offer HOLDS the buyer's money and Accept charges it at once; 72 hours, no floor, counters by private Buy-now link, the AI ticks the box only on the owner's words (2026-10-15)
 
@@ -2615,7 +2621,9 @@ triad for pages it has simply not selected yet on a young property. Rules:
   setter + `input` event). Deep link:
   `urlinspection?siteUrl=…&urlToInspect=<double-URL-encoded>`.
 
-### Static `[param]` routes with `generateStaticParams` must set `dynamicParams = false` (2026-09-03)
+### ~~Static `[param]` routes with `generateStaticParams` must set `dynamicParams = false`~~ (2026-09-03) — ⛔ SUPERSEDED 2026-10-17
+
+⛔ **Superseded by the 2026-10-17 entry at the top ("Never `dynamicParams = false`…")** — the flag 404'd the homepage on a cache miss. Use `dynamic = 'force-static'` + `notFound()` instead. Kept for the history of the 500:
 
 `/sell/nowhere-xyz` returned a plain-text **500** in production even though
 the page calls `notFound()` for an unknown slug: the route is fully static,

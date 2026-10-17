@@ -4,6 +4,21 @@
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
 > in `DECISIONS.md`. Last reconciled: **2026-10-14**.
 
+## Start Here (2026-10-17 — 🔴 HOMEPAGE DOWN in production (cached 404 on `/` and `/es`); fix BUILT + STAGED — the owner's push + deploy brings it back)
+
+- 🔴 **Production, read 10-17 ~7:20 AM ET (curl):** `/` and `/es` → **404 "Page Not Found"**, served from Next's cache (`Age` ≈ 122,000 s → stored ~Oct 15 7:26 PM ET); every other page 200. The owner found it after updating the hero carousel in Admin.
+- **Cause:** `dynamicParams = false` on the home route (added 09-07 against old-image-URL 500s). With it, Next answers any cache MISS on the route with a cached "no fallback" 404, even for `/en` / `/es`; Netlify reports a miss whenever a tag the page uses is expired — a carousel save (`revalidateTag('home-carousel', { expire: 0 })`) does that. Reproduced locally; rule `DECISIONS.md` top entry; record `CHANGELOG.md` 2026-10-17 (1).
+- 🟡 **BUILT + STAGED, not pushed:** the home route and `sell/[city]` (same flag, same exposure) now use `dynamic = 'force-static'` + an explicit `notFound()`; new guard test. No SQL, no env vars. Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1866/1866** (166 files) · build 0 · 88 = 41 + 41 + 6. On `next start`: cache-miss `/`, `/es`, `/sell/naples` → 200 re-rendered (were 404); `/money.jpg`, `/sell/nowhere-xyz` → 404 (no 500).
+- ◻ **Owner: push + deploy** — a deploy replaces the stuck 404 (Netlify's page cache is per deploy). Re-saving the carousel BEFORE the deploy will not help (it would regenerate the same 404). Then a carousel save is safe again.
+
+## Start Here (2026-10-15 (13) — session CLOSED; everything DEPLOYED; nothing staged-but-unpushed except docs)
+
+- 🟢 **Session closed 2026-10-15** (`CHANGELOG.md` 2026-10-15 (13)). No SQL, no env vars, nothing to push. Last gate on the deployed code: `tsc` 0 · lint 0 errors · **1863/1863** · build 0 · 88 = 41 + 41 + 6. Open items are the owner's first real uses — see the block below and `TASKS.md` top.
+
+## Start Here (2026-10-15 (12) — everything from 10-15 is DEPLOYED (owner's word); nothing staged-but-unpushed except docs)
+
+- 🟢 **DEPLOYED (owner, 10-15: *"Pushed and deployed the offers batch (phone card, messages, footers, delete)"*) — `CHANGELOG.md` 2026-10-15 (12).** Live (owner's word, not checked by Claude): Make an Offer (tested by the owner), bulk Site offers, the phone Offers card, the Decline/Counter message, the centred email footers, delete old offers. No SQL or env vars pending. **Open, all on the owner's side:** a look on the iPhone, the first decline with a message, the next real receipt's footer, the first delete; Accept and Counter never used for real yet. Where blocks below say "STAGED", read "deployed".
+
 ## Start Here (2026-10-15 (9) — Offers phone card + decline/counter message + email footer BUILT + STAGED, not pushed)
 
 - 🟡 **BUILT + STAGED, awaiting the owner's push** (`CHANGELOG.md` 2026-10-15 (9); `TASKS.md` top): Admin → Offers redrawn for a phone (mockup v3), an optional message to the buyer on Decline and on Counter (stored in `counter_note`, shown as "Your message"), and the offer emails' footer centred on two lines; **plus (10)** the order receipt / fulfillment emails' footer (website, address, phone — each centred on its own line) and the buy-receipt email's; **plus (11)** delete old offers by hand (trash-can + Delete all; open offers and live counters protected). No SQL, no env vars. Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1860/1860** tests (165 files) · build 0 · 88 prerendered = 41 EN + 41 ES + 6; 29/29 in the browser. ⛔ Not seen on a real iPhone or mail client.

@@ -1,6 +1,38 @@
 
 # Changelog
 
+## 2026-10-17 (1) — 🔴 Homepage 404 in production (`/`, `/es`): `dynamicParams = false` turned a cache miss into a cached 404 — FIX BUILT + STAGED, not pushed; no SQL, no env vars
+
+Owner: *"the homepage is 404ing… I recently updated the homepage carousel items in admin."*
+
+**Production (curl, 10-17 ~7:20 AM ET):** `/` and `/es` → 404, title "Page Not Found | Naples Estate Jewelry", `Cache-Status: "Next.js"; hit`, `X-Nextjs-Prerender: 1`, `Age` ≈ 122,100 s (stored ~Oct 15 7:26 PM ET); the `/es` copy is the ROOT not-found (`<html lang="en">`), i.e. the [locale] page never rendered. `/shop`, `/gold-services`, `/sell/naples`, `/es/sell/naples`, `/sell/cape-coral`, `/sell` → 200.
+
+**Cause.** The home route had `export const dynamicParams = false` (2026-09-07, so `/money.jpg`-style old image URLs 404 instead of 500) — its prerender entry is `fallback: false`. In production Next (`next/dist/build/templates/app-page-runtime.js` ~705–715), when a `fallback: false` route has NO cache entry and the request is not an on-demand revalidation with a previous entry, it throws `NoFallbackError` → 404 — even for the prerendered `/en` and `/es` — and that 404 is cached. Netlify's cache handler returns a miss when an entry is expired by tag (`@netlify/plugin-nextjs` 5.15.11 `dist/run/handlers/cache.cjs` ~207–214). The homepage's tags include `home-carousel` (built `en.meta`: `x-next-cache-tags … home-carousel,store-hours,home-banner`), and the carousel admin save calls `revalidateTag('home-carousel', { expire: 0 })` (`api/admin/carousel/revalidate/route.ts:12`). So the first visit after a carousel save got the 404, and it stayed.
+
+**Reproduced locally** on the 10-15 production build (`next start -p 3003`): baseline `/`, `/es` 200; with `.next/server/app/{en,es}.{html,meta,rsc,segments}` moved aside (= the miss) → `/`, `/es` 404 with the same title as production; `/gold-services`, `/sell/naples` 200.
+
+**Fix** (`[locale]/(home)/page.tsx`, `[locale]/sell/[city]/page.tsx` — the city route had the same flag since 2026-09-03 and the same exposure via hours/banner saves): `dynamicParams = false` → `export const dynamic = 'force-static'` (request-time APIs inert during an on-demand render, which is what kept the old 500 away); the home page and its metadata now check `hasLocale(routing.locales, locale)` and `notFound()` / `{}` before reading anything; the city page already called `notFound()` for an unknown slug. NEW guard `lib/__tests__/static-param-routes.test.ts` (no `dynamicParams = false` anywhere under `src/app`; both routes keep `force-static` + their `notFound()`). Prerender manifest after the build: `/en`, `/es`, `/en/sell/naples` still prerendered (revalidate 300); both dynamic routes now `fallback: null` (blocking).
+
+**Verified** (`next start` on the new build): `/`, `/es`, `/gold-services`, `/sell/naples`, `/es/sell/cape-coral`, `/shop` → 200; `/money.jpg`, `/nonexistent-xyz.png`, `/sell/nowhere-xyz`, `/es/sell/nowhere-xyz` → 404 (branded page, no 500). Cache-miss test again with `{en,es}.*` and `en/sell/naples.*` removed → `/`, `/es`, `/sell/naples` 200, re-rendered (`en.html` 368,015 B vs 368,060 B built — the random carousel draw), no server errors. Gate: `npx tsc --noEmit` 0 · `npm run lint` 0 errors (the 4 old `<img>` warnings) · `npm test -- --maxWorkers=4` **1866/1866** (166 files) · `npm run build` 0 · 88 prerendered = 41 EN + 41 ES + 6. ⛔ Not verified on Netlify's own runtime — the owner's deploy plus one carousel save is that test.
+
+**Owner:** push + deploy — the deploy replaces the stuck 404 (a carousel re-save before it would regenerate the same 404). Rule: `DECISIONS.md` top entry (supersedes the 2026-09-03 `dynamicParams = false` rule).
+
+## 2026-10-15 (13) — Session CLOSED (10-15: Make an Offer, end to end) — docs only
+
+- **Owner, 10-15 (verbatim):** *"update docs and end session"*.
+- **What the session did:** built Make an Offer on the site shop from mockups v1 → v2 (PayPal AUTHORIZE hold, Accept charges, 72 h, no floor, counter = private Buy-now link, email + text to the owner, per-item "Accept offers" box incl. the AI assistant, the Offers column after Price, Admin → Offers) — (4); the owner ran the SQL, deployed and TESTED it with a real offer (5), (8); bulk "Set all accept offers / no offers" (6), (7); the phone Offers card + a message on Decline and Counter from mockup v3 (9); centred email footers on offer, order-receipt and buy-receipt emails (9), (10); delete old offers from mockup v4 (11); all DEPLOYED (12). Also shipped in the first push: the eBay "Live + Offer" chip (2).
+- **Last gate (on the deployed code):** `npx tsc --noEmit` 0 · `npm run lint` 0 errors (the 4 old `<img>` warnings in `TextDealsManager.tsx`) · `npx vitest run --maxWorkers=4` **1863/1863** (165 files) · `npm run build` 0 · prerender manifest 88 = 41 EN + 41 ES + 6. Browser checks with headless Chrome on the real components (stand-in data / stand-in admin API): 39/39 (offer + counter pages, admin list), 7/7 (actions window), 29/29 (phone card, messages, email), 21/21 (delete), footer 3 centred rows; mockups v1 36/36, v2 44/44, v3 12/12, v4 12/12 under the preview pane's rules. Every temporary `zz-*` page deleted; `tsc` 0 after each.
+- **Nothing staged-but-unpushed except docs; no SQL, no env vars pending.** Claude checked nothing in production this session (not asked to).
+- **Still open (all the owner's first real uses):** the phone Offers card on the iPhone, a decline with a message, the next real receipt's footer, the first delete; Accept and Counter never used for real. Older open items unchanged: the Google Ads read ~10-19, the buy-receipt license / iPad-draft first uses, the Text Deals mark-sold first uses, the D&B re-read (Case #34898777).
+- **Tooling lessons recorded (memory):** heredoc patch scripts break in this shell — write them to the scratchpad; python `open()` without `newline=''` turns LF files CRLF on Windows; OneDrive can briefly lock `CHANGELOG.md` mid-sync (retry once).
+- **Staging:** docs-only re-sync after this entry.
+
+## 2026-10-15 (12) — The offers batch DEPLOYED by the owner (phone card, decline/counter messages, email footers, delete) — docs only
+
+- **Owner, 10-15 (verbatim):** *"Pushed and deployed the offers batch (phone card, messages, footers, delete)."* Carries 2026-10-15 (9), (10), (11). No SQL, no env vars.
+- ⛔ Deployed is the owner's word; not reported tried. Claude did not check production (not asked to). Open: the owner's look on the iPhone, a decline with a message, the next real receipt's footer, the first delete. Never used for real yet: Accept, Counter.
+- **Staging:** docs-only re-sync after this entry. Nothing staged-but-unpushed except docs.
+
 ## 2026-10-15 (11) — Admin → Offers: **delete old offers** (a trash-can on each finished offer + "Delete all N" per tab) — BUILT + STAGED with (9) + (10), not pushed; no SQL, no env vars
 
 - **Owner, 10-15 (verbatim):** *"add the ability for admin to delete old offers from each category… we dont need them existing there forever building up... unless deleting is risking breaking something?"* → mockup v4 → *"Yes, build delete as drawn in v4 with your picks: by hand only, and Delete all on the All tab skipping open offers and live counters."*

@@ -1,6 +1,6 @@
 # Integrity Rules And Pre-Publish Checklist
 
-> Current rules for the Next.js app. Last reconciled: **2026-10-14**.
+> Current rules for the Next.js app. Last reconciled: **2026-10-17**.
 
 ## Verification Commands
 
@@ -22,7 +22,7 @@ same-form customer view; 1704 after the first customer input mode build ~5 PM,
 1651 / 156 files after the buy-receipt delete + payment methods that afternoon,
 1647 after the storefront-photo swap, 1643 after the print-station shortcut fix
 that morning):
-**1855/1855 tests across 165 files** (measured 2026-10-15, bulk "Set all accept offers"; 1854 earlier that day, Make an Offer on the site shop; 1823 / 164 earlier that day, the "Live + Offer" chip; 1821 on 2026-10-14, eBay Best Offer per item + in bulk; 1815 earlier that day before the bulk button; 1796 / 163 on 2026-10-09 ~11:58 AM ET, buy receipt drafts; 1772 / 162 at ~11:31 AM after "Fill form from ID"; 1748 / 161 earlier that morning after the webcam frame was removed; 1747 / 161 on 2026-10-07, 1743 that morning, before the photo counter and the mark-sold buttons), TypeScript clean, lint clean (4 `<img>`
+**1866/1866 tests across 166 files** (measured 2026-10-17, the homepage-404 fix + its guard test; 1863 / 165 on 2026-10-15 at the session close, after the offers delete; 1855 earlier that day, bulk "Set all accept offers"; 1854 earlier that day, Make an Offer on the site shop; 1823 / 164 earlier that day, the "Live + Offer" chip; 1821 on 2026-10-14, eBay Best Offer per item + in bulk; 1815 earlier that day before the bulk button; 1796 / 163 on 2026-10-09 ~11:58 AM ET, buy receipt drafts; 1772 / 162 at ~11:31 AM after "Fill form from ID"; 1748 / 161 earlier that morning after the webcam frame was removed; 1747 / 161 on 2026-10-07, 1743 that morning, before the photo counter and the mark-sold buttons), TypeScript clean, lint clean (4 `<img>`
 warnings in `TextDealsManager.tsx`), and a build that exits 0 with **88
 prerendered routes = 41 EN + 41 ES + 6 non-locale** (`/_global-error`,
 `/_not-found`, `/favicon.ico`, `/icon.png`, `/robots.txt`, `/sitemap.xml`).
@@ -71,6 +71,17 @@ totals must reconcile exactly to cents.
 Current tax behavior is 6% on merchandise plus charged shipping for Florida
 taxable orders, and $0 Florida tax for non-Florida destinations. Do not add
 county or other-state tax rules without reviewed jurisdiction requirements.
+
+### Never `dynamicParams = false`
+
+It took the homepage down on 2026-10-15/17: with it, Next turns any cache
+miss on the route into a cached 404 — even for prerendered params — and
+Netlify reports a miss whenever a tag the page uses is expired (a carousel,
+banner or hours save). A route whose params are fully enumerated uses
+`export const dynamic = 'force-static'` plus its own `notFound()` for an
+unknown param (`[locale]/(home)`, `[locale]/sell/[city]`).
+`lib/__tests__/static-param-routes.test.ts` guards it (`DECISIONS.md` top
+entry).
 
 ### Keep the Google tag behind its gate
 

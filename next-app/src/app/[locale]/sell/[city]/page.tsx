@@ -19,13 +19,20 @@ interface Props {
   params: Promise<{ locale: string; city: string }>;
 }
 
-// Every city this route serves is enumerated below, so an unknown slug must
-// 404 without rendering. Without this, Netlify's Next runtime tried to render
-// the unlisted param on demand and the `notFound()` inside a fully static
-// route surfaced as a plain-text **500** in production (`/sell/nowhere-xyz`,
-// found 2026-09-03 while checking Bing's crawl verdicts). Add a city by adding
-// it to SERVICE_AREAS, never by loosening this.
-export const dynamicParams = false;
+// Every city this route serves is enumerated below, and an unknown slug must
+// 404. Rendered on demand without a guard, the `notFound()` inside this fully
+// static route surfaced as a plain-text **500** in production
+// (`/sell/nowhere-xyz`, found 2026-09-03 while checking Bing's crawl
+// verdicts). `force-static` makes the request-time APIs inert during that
+// render, so the `notFound()` below is a plain 404. Add a city by adding it to
+// SERVICE_AREAS.
+//
+// ⛔ NEVER `dynamicParams = false` here (2026-10-17). That was the 09-03 fix;
+// with it, Next answers ANY cache miss on this route with a cached "no
+// fallback" 404 — even for real cities — and Netlify reports a miss whenever
+// a tag the page uses is expired (an hours save, `revalidatePath('/',
+// 'layout')`). It took the homepage down for ~34 hours on 2026-10-15/17.
+export const dynamic = 'force-static';
 
 export function generateStaticParams() {
   return routing.locales.flatMap((locale) =>

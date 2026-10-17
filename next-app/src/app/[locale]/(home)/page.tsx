@@ -1,4 +1,7 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+import { hasLocale } from 'next-intl';
+import { routing } from '@/i18n/routing';
 import { pageMetadata } from '@/lib/seo';
 import { jsonLdHtml } from '@/lib/json-ld';
 import { buildWebSiteJsonLd } from '@/lib/site-ld';
@@ -29,15 +32,22 @@ import type { CarouselItem } from '../../../../carousel/lib/carouselData';
 // extensions so real static files are not rewritten) and lands here as
 // `/[locale]` with locale = "money.jpg". Rendering that on demand tripped
 // Next's "page changed from static to dynamic at runtime (headers)" error —
-// a 500 on production for every dead old-site image URL. With
-// `dynamicParams = false` the home route only serves the locales from the
-// layout's generateStaticParams (en, es) and 404s everything else without
-// rendering. Page-scoped on purpose: the same flag on the [locale] layout
-// would risk 404-ing product pages published after a build.
-export const dynamicParams = false;
+// a 500 on production for every dead old-site image URL.
+//
+// ⛔ NEVER `dynamicParams = false` here (2026-10-17). That was the 09-06 fix,
+// and it took the homepage down: with it, Next answers ANY cache miss on this
+// route with its "no fallback" 404 — even for /en and /es — and caches the
+// 404. Netlify's cache reports a miss whenever a tag the page uses is expired
+// (`revalidateTag(…, { expire: 0 })` on a carousel, banner or hours save), so
+// the next visitor after a carousel save got "Page Not Found" on `/` and `/es`
+// for ~34 hours. Instead: `force-static` makes the request-time APIs inert
+// during an on-demand render (so an unknown param cannot become the 500
+// above), and the explicit locale check 404s anything but en / es.
+export const dynamic = 'force-static';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
+  if (!hasLocale(routing.locales, locale)) return {};
   const isEs = locale === 'es';
   // Brand first, then the descriptor — see the note on SITE_TITLE in
   // app/layout.tsx for why the trailing-brand form was abandoned here and
@@ -72,6 +82,8 @@ const HOME_CAROUSEL_FALLBACK: CarouselItem[] = [
 
 export default async function HomePage({ params }: Props) {
   const { locale } = await params;
+  // Unknown "locales" (`/money.jpg`) 404 here, before any data is read.
+  if (!hasLocale(routing.locales, locale)) notFound();
   const isEs = locale === 'es';
   const storeHref = isEs ? '/es/shop' : '/shop';
   const evalHref = isEs ? '/es/free-evaluation' : '/free-evaluation';
