@@ -583,6 +583,16 @@ export default function HomeHeroOverlay({ locale, dark }: Props) {
              on phones too, just less visibly. */
           line-height: 1.15;
           margin: 0;
+          /* Room for the descender tails INSIDE the box, cancelled by the
+             margin so nothing moves. At 1.15 the font's tails (g, J, y) hang
+             about 0.04em below the last line box, and Safari crops the
+             entrance animation's blurred layer to the line boxes: on load the
+             tips were cut off, then popped in near the end of the fade (owner,
+             2026-10-18, seen on a phone; reproduced in WebKit). The padding
+             puts them inside the layer. Do not drop it, and keep the two
+             values equal or the headline shifts. */
+          padding-bottom: 0.15em;
+          margin-bottom: -0.15em;
           text-shadow: 0 2px 24px rgba(var(--hero-fade), 0.9);
         }
 

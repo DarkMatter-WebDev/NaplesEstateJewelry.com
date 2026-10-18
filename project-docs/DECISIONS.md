@@ -4,7 +4,13 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-10-17**.
+> compaction. Last reconciled: **2026-10-18**.
+
+## The hero headline keeps its letter tails inside its own box: `padding-bottom: 0.15em` + `margin-bottom: -0.15em` on `.home-hero-top h1` (2026-10-18)
+
+- **Why:** at the headline's `line-height: 1.15` (which must stay ≥ ~1.1 — see the comment there) Libre Caslon's g / J / y tails hang ~0.04 em below the last line box, outside the h1. The entrance animation (opacity + `blur(6px)` + slide) runs on its own layer, and Safari crops it to the boxes while it plays — the owner saw the tips cut off on load, then pop in. The padding puts the tails inside the box; the equal negative margin keeps every position unchanged (measured: identical line boxes).
+- **The rule:** keep both values, keep them equal. Any new animated text with a tight line-height gets the same net-zero padding rather than a looser line-height or a removed animation.
+- ⚠️ Desktop browsers here (Chromium, Playwright WebKit on Windows) do not reproduce the crop; judge such a fix on a real iPhone. Record `CHANGELOG.md` 2026-10-18 (1); guard `lib/__tests__/hero-short-screens.test.ts`.
 
 ## Never `dynamicParams = false` on a prerendered route: an unknown param is turned away by `force-static` + an explicit `notFound()` (2026-10-17)
 
@@ -26,6 +32,9 @@
 - **Table:** the Offers column sits right after Price (owner, mockup v2).
 - **The owner's message to a buyer (2026-10-15 (9)):** optional on BOTH Decline and Counter, the same box, ≤ 300 characters, quoted and signed "— Chris" in the email, shown on the card as "Your message". One column holds it for either answer: `product_offers.counter_note`. The admin card shows a typed-lowercase buyer name with capitals (display only). On a phone the card is one column (what → how much → how long → who → buttons) and the amount never wraps.
 - **Deleting old offers (2026-10-15 (11)):** by hand only (no automatic clean-up). ONE rule, `offerDeleteBlock`, for the page and the server: never an open offer (money held — Decline first), never a counter whose link is live, never a hold PayPal has not released; everything finished may go, and an accepted offer's paid order stays. The server re-checks every id.
+- **Item details on the card (owner, 2026-10-18, mockup 1):** an in-card dropdown, NOT a link to the item and a back link — the decision happens on the card. It shows specs, Listed today · Melt today · Your cost, the "× melt / over your cost" line, the description and "Open item page ↗" in a NEW TAB (so no back link is needed). Every card starts closed. Melt comes only from a live spot price (nulls, never a fallback number). ⛔ `cost_basis` is read only by the admin offers read (`OFFER_DETAIL_COLUMNS`) — never into a buyer email, a buyer page or the public offers route (guarded in `offers.test.ts`).
+- **Text-message updates to buyers: SHELVED (owner, 2026-10-18).** Explored (an opt-in box on the offer form, texts for counter / accepted / declined / closed) and dropped: the toll-free number's verification is "Marketing" only, so offer texts would mean editing the approval the text deals depend on; replies would also need routing away from deal claims; email alone already produced the first counter sale. ⛔ Do not re-propose unless counters start expiring unanswered. If it returns: a separate toll-free number just for offer notifications is the clean route. Record `CHANGELOG.md` 2026-10-18 (4).
+- **Email is the answer channel — the buyer is told so (owner, 2026-10-18, mockup 2):** a centred "Keep an eye on your email" note on the Offer sent screen (with the address they typed), a hint under the offer form's Email box, and a centred line in the "We received your offer" email — all saying **"we usually reply within an hour"** (the owner's words: *"we usually respond within an hour most times"*). Keep "usually"; never promise an exact time. The success screens start at the top of the page (a phone used to land on the footer). Record `CHANGELOG.md` 2026-10-18 (5).
 - **AI:** `accepts_offers` is in the assistant's field set but moves ONLY on the admin's own words — the prompt says so and the route drops the value unless the latest input mentions offers (`mentionsOffers`). This is the one operational-style field the AI may touch; status and location stay out.
 - Runbook `features/make-offer.md`. Record `CHANGELOG.md` 2026-10-15 (4).
 

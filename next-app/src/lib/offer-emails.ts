@@ -77,6 +77,15 @@ function p(text: string): string {
   return `<p style="margin:0 0 12px;">${text}</p>`;
 }
 
+/** A centred paragraph (the "keep an eye on your email" line). */
+function pCentered(text: string): string {
+  return `<p style="margin:0 0 12px;text-align:center;">${text}</p>`;
+}
+
+/** The "received" email's watch line — plain text, no markup (also used verbatim in the text part). */
+export const OFFER_EMAIL_WATCH_LINE_EN = 'We usually reply within an hour, and our answer comes to this email address — keep an eye on your inbox (and spam folder).';
+export const OFFER_EMAIL_WATCH_LINE_ES = 'Normalmente respondemos en menos de una hora, y nuestra respuesta llega a este correo electrónico — esté atento a su bandeja de entrada (y a la carpeta de spam).';
+
 export function buildOfferBuyerEmail(input: OfferEmailInput): BuiltEmail {
   const { isEs } = input;
   const name = escapeHtml(firstName(input.customerName));
@@ -101,8 +110,16 @@ export function buildOfferBuyerEmail(input: OfferEmailInput): BuiltEmail {
             `PayPal is holding <strong>${escapeHtml(total)}</strong> (offer + shipping + tax). <strong>You'll only be charged if we accept.</strong>`,
             `We'll answer by <strong>${escapeHtml(deadline)}</strong>. If we don't accept — or don't answer in time — the hold is released and you are not charged.`,
           ];
-      const html = frame(isEs ? 'Oferta recibida' : 'Offer received', heading, lines.map(p).join('') + button(input.productUrl, isEs ? 'Ver la pieza' : 'View the piece'), isEs);
-      const text = [heading, '', ...lines.map(stripTags), '', input.productUrl, '', ...textFooter].join('\n');
+      // Owner, 2026-10-18 (mockup 2, centred): email is the only channel for
+      // the answer (offer texts were shelved), so say so — and how fast.
+      const watch = isEs ? OFFER_EMAIL_WATCH_LINE_ES : OFFER_EMAIL_WATCH_LINE_EN;
+      const html = frame(
+        isEs ? 'Oferta recibida' : 'Offer received',
+        heading,
+        lines.map(p).join('') + pCentered(watch) + button(input.productUrl, isEs ? 'Ver la pieza' : 'View the piece'),
+        isEs,
+      );
+      const text = [heading, '', ...lines.map(stripTags), watch, '', input.productUrl, '', ...textFooter].join('\n');
       return { subject, html, text };
     }
     case 'declined':

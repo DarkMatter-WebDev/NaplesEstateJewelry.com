@@ -1,7 +1,7 @@
 # Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-10-15** (session CLOSED — `CHANGELOG.md` 2026-10-15 (13): Make an Offer built, tested and deployed with bulk on/off, the phone card, decline/counter messages, centred email footers and delete; nothing to push, no SQL). Before that, **2026-10-14** (eBay Best Offer per
+> in `CHANGELOG.md`. Last reconciled: **2026-10-18** (the homepage headline letter-tail fix BUILT + STAGED, not pushed — first block below). Before that, **2026-10-17** (session CLOSED — `CHANGELOG.md` 2026-10-17 (4): the homepage 404 fixed, deployed and confirmed — first block below, nothing open; no SQL, nothing to push). Before that, **2026-10-15** (session CLOSED — `CHANGELOG.md` 2026-10-15 (13): Make an Offer built, tested and deployed with bulk on/off, the phone card, decline/counter messages, centred email footers and delete; nothing to push, no SQL). Before that, **2026-10-14** (eBay Best Offer per
 > item + in bulk BUILT + STAGED; SQL RUN by the owner; only the push left — first block below). Before that, **2026-10-12** (session CLOSED —
 > `CHANGELOG.md` 2026-10-12 (3); two new blocks, first below: the short phone
 > cookie notice DEPLOYED + verified in production, and the next Google Ads
@@ -28,7 +28,43 @@
 
 ## ◻ OPEN — needs a human
 
-### 🔴 2026-10-17 (1) — HOMEPAGE 404 in production (`/` and `/es`, cached since ~Oct 15 7:26 PM ET) — fix **BUILT + STAGED, not pushed** (no SQL, no env vars)
+### 🟡 2026-10-18 (5) — Make an Offer, buyer's side: **"Keep an eye on your email"** + success screens start at the top — **BUILT + STAGED, not pushed** (same push as 10-18 (1) + (2))
+
+Record: `CHANGELOG.md` 2026-10-18 (5). Rule: `DECISIONS.md` → Make an Offer entry ("Email is the answer channel"). Files: `src/components/offers/OfferCheckoutClient.tsx`, `src/lib/offer-emails.ts`, `src/lib/__tests__/offers.test.ts`.
+
+Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1877/1877** tests (167 files) · build 0 · 88 prerendered = 41 EN + 41 ES + 6. Real offer page with a stand-in PayPal (1280 EN, 390 EN + ES): 39/39.
+
+1. ◻ **Owner — push + deploy** (one push with 10-18 (1) + (2), when the next features are ready). No SQL, no env vars.
+2. ◻ **Owner — first look after the deploy:** the next real offer's "We received your offer" email has the centred "We usually reply within an hour…" line. Optionally, on the iPhone: any item with offers on → Make an Offer → the hint under Email (no need to send).
+
+**Staging (10-18 (5)):** ✅ synced 2026-10-18 — dry run listed exactly the 8 touched files (3 in the app: `OfferCheckoutClient.tsx`, `offer-emails.ts`, `offers.test.ts`; 5 docs: CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS, `features/make-offer.md`), 0 Extras, 1256 total; real run copied 8 / 0 FAILED; follow-up dry run 0, exit 0; leak check 0; 252 = 252 `.tsx`; SHA-256 MATCH on the 3 app files. Staging holds 10-18 (1) + (2) + (5). Docs-only re-sync after this line.
+
+### 🟡 2026-10-18 (2) — Admin → Offers: **"Item details" dropdown** on the offer card — **BUILT + STAGED, not pushed** (rides the same push as 10-18 (1))
+
+Record: `CHANGELOG.md` 2026-10-18 (2). Rule: `DECISIONS.md` → Make an Offer entry ("Item details on the card"). Runbook: `features/make-offer.md` step 3. Files: `src/lib/offers.ts`, `src/lib/offers-server.ts`, `src/components/admin/OffersPanel.tsx`, `src/lib/__tests__/offers.test.ts`, NEW `src/lib/__tests__/offer-item-details.test.ts`.
+
+Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1875/1875** tests (167 files) · build 0 · 88 prerendered = 41 EN + 41 ES + 6. Real panel with stand-in data, 1280 + 390 px: 42/42.
+
+1. ◻ **Owner — push + deploy** (one push with 10-18 (1)). No SQL, no env vars.
+2. ◻ **Owner — first look:** Admin → Offers (any tab) → **Item details** on a card → the chips, Listed / Melt / Your cost and the line under them, Show all, and **Open item page ↗** opens the shop page in a new tab. On the iPhone too. If "Your cost" reads "not entered" on an item that has a cost, tell Claude.
+
+**Staging (10-18 (2)):** ✅ synced 2026-10-18 — dry run listed exactly the 11 touched files (5 in the app: `OffersPanel.tsx`, `offers-server.ts`, `offers.ts`, `offers.test.ts`, NEW `offer-item-details.test.ts`; 6 docs: CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS, `features/make-offer.md`), 0 Extras, 1256 total; real run copied 11 / 0 FAILED; follow-up dry run 0, exit 0; leak check 0 (no `zz-*`); 252 = 252 `.tsx`; SHA-256 MATCH on the 5 app files. Staging also holds 10-18 (1). Docs-only re-sync after this line.
+
+### 🟡 2026-10-18 (1) — Homepage headline: letter tails cut off during the load-in — **BUILT + STAGED, not pushed**
+
+Record: `CHANGELOG.md` 2026-10-18 (1). Rule: `DECISIONS.md` top entry. Files: `src/components/home/HomeHeroOverlay.tsx` (`.home-hero-top h1`: `padding-bottom: 0.15em; margin-bottom: -0.15em;`), `src/lib/__tests__/hero-short-screens.test.ts`.
+
+Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1867/1867** tests (166 files) · build 0 · 88 prerendered = 41 EN + 41 ES + 6. Tails inside the headline box 36/36 (2 engines × EN/ES × 9 sizes); layout identical with and without the fix.
+
+1. ◻ **Owner — on the iPhone (optional before the push):** with the dev server up, open `http://10.0.0.208.nip.io:3007` and reload 3–4 times — the g, J and y tails should be whole from the first frame of the fade. Same on the laptop.
+2. ◻ **Owner — push + deploy.** No SQL, no env vars.
+3. ◻ **After the deploy:** the same few reloads on `naplesestatejewelry.com` (phone). ⛔ Not reproducible in desktop browsers here — your phone is the only proof; if the tips still pop in, tell Claude.
+
+**Staging (10-18 (1)):** ✅ synced 2026-10-18 — dry run listed exactly the 6 touched files (2 in the app: `HomeHeroOverlay.tsx`, `hero-short-screens.test.ts`; 4 docs: CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS), 0 Extras, 1255 total; real run copied 6 / 0 FAILED; follow-up dry run 0, exit 0; leak check 0; 252 = 252 `.tsx`; SHA-256 MATCH on the 2 app files. Docs-only re-sync after this line.
+
+### ✅ 2026-10-17 (1) — HOMEPAGE 404 in production (`/` and `/es`, cached since ~Oct 15 7:26 PM ET) — fix **DEPLOYED** (owner), **VERIFIED LIVE by Claude** (`CHANGELOG.md` 2026-10-17 (2)) and **CONFIRMED after a real carousel save** (owner, 10-17: *"added a photo to the carousel and saved... and homepage still works"* — `CHANGELOG.md` 2026-10-17 (3)) — nothing open
+
+**10-17 ~7:48 AM ET — live:** `/` and `/es` → 200 with the real homepage (`lang="en"` / `lang="es"`, full hero), still 200 on a second fetch ~40 s later; `/gold-services`, `/sell/naples`, `/es/sell/cape-coral`, `/shop` → 200; `/money.jpg`, `/sell/nowhere-xyz` → 404 (no 500). Item 1 is done.
 
 Record: `CHANGELOG.md` 2026-10-17 (1). Rule: `DECISIONS.md` top entry. Files: `src/app/[locale]/(home)/page.tsx`, `src/app/[locale]/sell/[city]/page.tsx`, NEW `src/lib/__tests__/static-param-routes.test.ts`.
 
@@ -85,7 +121,7 @@ Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1854/1854** tes
    - Admin → **Offers** (menu, with a count) → the offer is there → **Decline** → PayPal shows the hold released (your bank may take days to drop it).
    - Optional: a second offer → **Accept & charge** → a paid order under Orders, the item SOLD, the receipt email. Refund it from the order page if it was only a test. ⚠️ Accept marks the item SOLD and delists it from eBay/Etsy — use an item that is NOT on either marketplace, then set it back to Available.
    - Red *"PayPal did not approve the payment hold"* every time = the account may not allow authorizations — tell Claude.
-4. ◻ **Owner — the first counter** when one comes up: Counter → a price between their offer and today's → their hold is released and they get a Buy-now link. If the email fails the page shows the link to send yourself.
+4. ✅ **DONE 10-18 (owner): the first real sale through a counter-offer** (`CHANGELOG.md` 2026-10-18 (3)). Was: ◻ **Owner — the first counter** when one comes up: Counter → a price between their offer and today's → their hold is released and they get a Buy-now link. If the email fails the page shows the link to send yourself.
 5. ℹ️ Never verified by Claude: the SQL, real PayPal holds/charges/releases, real email and text sends, the admin pages behind the sign-in.
 
 **Staging (10-15 (4)):** ✅ synced 2026-10-15 ~1:25 PM ET — dry run listed exactly the 41 touched files (19 new: `api/offers/route.ts`, `api/offers/authorize/route.ts`, `api/admin/offers/route.ts`, `[id]/route.ts`, `sweep/route.ts`, `[locale]/offer/[id]/page.tsx`, `[locale]/offer/counter/[token]/page.tsx`, `[locale]/admin/offers/page.tsx`, `components/offers/OfferCheckoutClient.tsx`, `PayPalOfferButton.tsx`, `OfferUnavailable.tsx`, `components/admin/OffersPanel.tsx`, `AdminOffersLink.tsx`, `lib/offers.ts`, `offers-server.ts`, `offer-emails.ts`, `lib/__tests__/offers.test.ts`, `features/make-offer.md`, `supabase/make-offer-2026-10.sql`; 13 changed in the app; 9 docs), 0 Extras, 1253 total (1234 + 19); real run copied 41 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0, exit 0; leak check 0 `.env*` / `.log` / `.tmp-*` / `tsbuildinfo` / `zz-*`, no node_modules / .next / .git; positive control 251 = 251 `.tsx`, 507 = 507 `.ts` under `next-app/src`, 94 = 94 `.sql`; SHA-256 MATCH on 41 of 41; the staged product page carries "Make an Offer", the staged table the Offers column, and the 10-15 (2) "Live + Offer" chip is still staged. Staging holds 10-15 (2) + (4): ONE push. Docs-only re-sync after this line.

@@ -9,6 +9,8 @@ import {
   getCheckoutShippingOption,
   isCheckoutShippingMethod,
 } from '@/lib/checkout-shipping';
+import { formatLengthChip, formatWeight } from '@/lib/product-spec-chips';
+import { formatProductPurityLabel } from '@/types/product';
 
 /**
  * "Make an Offer" on the site shop — the pure rules (owner, 2026-10-15,
@@ -411,3 +413,81 @@ export function cleanOfferText(value: unknown, max: number): string | null {
   const cleaned = value.replace(/\u0000/g, '').replace(/\s+/g, ' ').trim();
   return cleaned ? cleaned.slice(0, max) : null;
 }
+
+// ---------------------------------------------------------------------------
+// Item details on the admin offer card (owner mockup 1, 2026-10-18): a small
+// "Item details" button opens the item's specs, today's numbers and its
+// description inside the card, so an offer can be judged without leaving it.
+// ---------------------------------------------------------------------------
+
+/** What the admin offers read sends per item for the "Item details" dropdown. */
+export type OfferItemDetails = {
+  category: 'Gold' | 'Silver' | string;
+  purity: number | null;
+  grams: number | null;
+  /** Wearable length / ring size as the product page shows it (`7.75 in`, `Size: 7`). */
+  length: string | null;
+  /** Width as the product page shows it (`16.6 mm`), only for chains and bracelets. */
+  width: string | null;
+  /** "Bracelet", or "Bracelet · Charm" with the link / chain style. */
+  type: string | null;
+  year: number | null;
+  description: string | null;
+  /** Today's melt value; null without weight + purity, or while the spot feed is down. */
+  melt: number | null;
+  /** The spot price the melt was worked out from (per troy ounce), when it was. */
+  spotPerOz: number | null;
+  /** The owner's cost (products.cost_basis) — admin only. */
+  cost: number | null;
+  /** The ×N multiplier for a spot-priced item; null when priced by hand. */
+  multiplier: number | null;
+  /** The public product page, opened in a new tab. */
+  productPath: string;
+};
+
+export type OfferItemChip = { label: string; tone: 'purity' | 'neutral' | 'measure' };
+
+/** The spec chips, in the shop's order: purity · weight · length · width · type · year. */
+export function offerItemChips(details: OfferItemDetails): OfferItemChip[] {
+  const chips: OfferItemChip[] = [];
+  // The shop's own chip formatters (lib/product-spec-chips.ts), so a chip here
+  // reads exactly like the same item's chip on the shop card.
+  const purity = formatProductPurityLabel(details.purity);
+  if (purity) chips.push({ label: purity, tone: 'purity' });
+  if (details.grams != null && details.grams > 0) chips.push({ label: formatWeight(details.grams), tone: 'neutral' });
+  const length = formatLengthChip(details.length, false);
+  if (length) chips.push({ label: length, tone: 'measure' });
+  if (details.width) chips.push({ label: `${details.width.trim()} wide`, tone: 'measure' });
+  if (details.type) chips.push({ label: details.type, tone: 'neutral' });
+  if (details.year != null && details.year > 0) chips.push({ label: `ca. ${details.year}`, tone: 'neutral' });
+  return chips;
+}
+
+/** "1.68" — the offer as a multiple of melt, two decimals, trailing zero dropped. */
+export function formatMeltMultiple(amount: number, melt: number | null): string | null {
+  if (melt == null || !(melt > 0) || !(amount > 0)) return null;
+  return String(Number((amount / melt).toFixed(2)));
+}
+
+/**
+ * The line under the three numbers: "This offer is 1.68× melt and $2,600 over
+ * your cost." Either half drops out when its number is missing; null when both
+ * are. Under cost reads "under your cost" (the card colours it red).
+ */
+export function offerValueLine(amount: number, melt: number | null, cost: number | null): {
+  multiple: string | null;
+  costDelta: number | null;
+} | null {
+  const multiple = formatMeltMultiple(amount, melt);
+  const costDelta = cost != null && cost > 0 ? Math.round(amount - cost) : null;
+  if (multiple == null && costDelta == null) return null;
+  return { multiple, costDelta };
+}
+
+/** Whole dollars for the three number boxes ("$2,675"). */
+export function formatWholeDollars(value: number): string {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(Math.round(value));
+}
+
+/** Long descriptions start clamped with "Show all"; short ones show whole. */
+export const OFFER_DESCRIPTION_CLAMP_CHARS = 220;

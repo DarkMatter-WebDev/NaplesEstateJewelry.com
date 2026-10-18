@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { AppIcon } from '@/components/AppIcon';
 import PayPalOfferButton, { type OfferHeld } from '@/components/offers/PayPalOfferButton';
@@ -116,6 +116,14 @@ export default function OfferCheckoutClient({
   const [agreed, setAgreed] = useState(false);
   const [held, setHeld] = useState<OfferHeld | null>(null);
   const [paidOrder, setPaidOrder] = useState<string | null>(null);
+
+  // The short success screen replaces a long form while the page is still
+  // scrolled to the PayPal button: on a phone the buyer landed on the footer
+  // with "Offer sent" and the watch-your-email note above the screen
+  // (measured 2026-10-18: heading 574 px above the top). Start them at the top.
+  useEffect(() => {
+    if (held || paidOrder) window.scrollTo({ top: 0, behavior: 'auto' });
+  }, [held, paidOrder]);
   const orderIdRef = useRef<string | null>(null);
 
   const amount = mode === 'counter' ? counter?.amount ?? null : parseOfferAmount(amountText);
@@ -173,10 +181,31 @@ export default function OfferCheckoutClient({
             ? `Le responderemos antes del ${held.deadline}. Retuvimos ${formatCheckoutCurrency(held.total)} — solo se le cobrará si aceptamos.`
             : `We'll answer by ${held.deadline}. We've held ${formatCheckoutCurrency(held.total)} — you'll only be charged if we accept.`}
         </p>
-        <p className="mb-8 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
-          {isEs ? 'Le enviamos una copia por correo electrónico.' : 'A copy is in your email.'}
-        </p>
+        {/* Owner, 2026-10-18 (mockup 2): email is where the answer arrives
+            (offer texts were shelved) — say so, centred, with the address. */}
+        <div className="offer-watch-note">
+          <AppIcon name="mail" style={{ fontSize: '22px', color: GOLD }} aria-hidden="true" />
+          <p className="font-bold">{isEs ? 'Esté atento a su correo electrónico.' : 'Keep an eye on your email.'}</p>
+          <p>
+            {isEs ? 'Nuestra respuesta llegará a ' : 'Our answer goes to '}
+            <strong className="offer-watch-email">{customer.email.trim()}</strong>
+            {isEs ? ' — normalmente respondemos en menos de una hora.' : ' — we usually reply within an hour.'}
+          </p>
+          <p className="offer-watch-spam">
+            {isEs ? '¿No la ve? Revise la carpeta de spam o correo no deseado.' : 'Not there? Check your spam or junk folder.'}
+          </p>
+        </div>
         <a href={`${prefix}/shop`} className="gold-button">{isEs ? 'Volver a la tienda' : 'Back to Shop'}</a>
+        <style jsx>{`
+          .offer-watch-note {
+            display: flex; flex-direction: column; align-items: center; gap: 0.35rem;
+            max-width: 30rem; margin: 1.1rem auto 2rem; padding: 0.85rem 1rem;
+            background: #fff7dd; border: 1px solid #ecd58a; text-align: center;
+            font-size: 0.9rem; line-height: 1.5; color: var(--color-on-surface);
+          }
+          .offer-watch-email { overflow-wrap: anywhere; }
+          .offer-watch-spam { margin-top: 0.25rem; font-size: 0.8rem; color: var(--color-on-surface-variant); }
+        `}</style>
       </div>
     );
   }
@@ -325,7 +354,13 @@ export default function OfferCheckoutClient({
               <div className="responsive-form-grid">
                 <div>
                   <label className="form-label" htmlFor="offer-email">{isEs ? 'Correo electrónico' : 'Email'} *</label>
-                  <input id="offer-email" type="email" className="form-field" autoComplete="email" value={customer.email} onChange={setField('email')} />
+                  <input id="offer-email" type="email" className="form-field" autoComplete="email" value={customer.email} onChange={setField('email')} aria-describedby={mode === 'offer' ? 'offer-email-hint' : undefined} />
+                  {mode === 'offer' && (
+                    <p id="offer-email-hint" className="offer-email-hint">
+                      <AppIcon name="mail" style={{ fontSize: '14px', color: GOLD, flexShrink: 0, marginTop: '0.1rem' }} aria-hidden="true" />
+                      <span>{isEs ? 'Le respondemos por correo electrónico — normalmente en menos de una hora.' : 'Our answer comes by email — usually within an hour.'}</span>
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="form-label" htmlFor="offer-phone">{isEs ? 'Teléfono' : 'Phone'} *</label>
@@ -550,6 +585,15 @@ export default function OfferCheckoutClient({
           font-family: var(--font-headline);
           font-size: 1.3rem;
           color: var(--color-on-surface);
+        }
+        .offer-email-hint {
+          display: flex;
+          gap: 0.35rem;
+          align-items: flex-start;
+          margin-top: 0.35rem;
+          font-size: 0.75rem;
+          line-height: 1.4;
+          color: var(--color-on-surface-variant);
         }
         .offer-item {
           display: flex;

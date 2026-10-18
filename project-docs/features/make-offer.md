@@ -36,6 +36,15 @@ hold — they are never charged.
    to your cell. Admin → **Offers** (menu, with a count) lists it: the amount,
    the % of today's price, what PayPal is holding, the buyer's phone/email/note,
    and the hours left (red under 12).
+   **Item details** (2026-10-18): the small button under the item name opens,
+   inside the card, the spec chips (karat · weight · length · width · type ·
+   year — the shop card's own formatting), three numbers — **Listed today**
+   (with its ×N), **Melt today** (from the live spot price; "—" with no weight,
+   or while the spot feed is down), **Your cost** (the item's cost field; "not
+   entered" when empty; admin only) — the line "This offer is 1.68× melt and
+   $2,600 over your cost" (red when under cost), the description (first lines
+   + Show all) and **Open item page ↗** (the shop page, new tab). Every card
+   starts closed. On a phone it opens under the name, above the amount.
 4. **Answer it:**
    - **Accept & charge** → asks first → PayPal charges the hold at once; a normal
      **paid order** is created (Orders), the item turns **SOLD**, the buyer gets
@@ -57,6 +66,8 @@ hold — they are never charged.
    expire. Deleting an accepted offer keeps its paid order under Orders.
 
 ## The buyer's side
+
+> **Watch your email (2026-10-18):** the offer form has "Our answer comes by email — usually within an hour." under the Email box; after sending, the Offer sent screen (which now opens at the top of the page) shows a centred gold "Keep an eye on your email" note with the address they typed and a spam-folder hint; the "We received your offer" email carries the same message as a centred line. Buyers are never texted (offer texts shelved — `DECISIONS.md`).
 
 - `/offer/<item id>` (and `/es/…`): the amount (must be below today's price),
   an optional message, pickup or shipping (the checkout's own fees), contact

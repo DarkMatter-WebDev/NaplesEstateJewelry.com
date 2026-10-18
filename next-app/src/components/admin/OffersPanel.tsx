@@ -2,19 +2,26 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
+  OFFER_DESCRIPTION_CLAMP_CHARS,
   OFFER_FILTERS,
   OFFER_FILTER_LABELS,
   OFFER_STATUS_LABELS,
   OWNER_NOTE_MAX,
   displayBuyerName,
   formatOfferDeadline,
+  formatWholeDollars,
   offerDeleteBlock,
+  offerItemChips,
+  offerValueLine,
   hoursLeft,
   percentOfListed,
   shippingMethodLabel,
   type OfferFilter,
+  type OfferItemDetails,
   type OfferStatus,
 } from '@/lib/offers';
+import { MEASUREMENT_CHIP_STYLE, NEUTRAL_CHIP_STYLE, getPurityChipStyle } from '@/lib/product-spec-chips';
+import type { Product } from '@/types/product';
 import { formatCheckoutCurrency } from '@/lib/checkout-pricing';
 import AdminModal from '@/components/admin/AdminModal';
 import { AppIcon } from '@/components/AppIcon';
@@ -35,6 +42,12 @@ import { AppIcon } from '@/components/AppIcon';
  * and "Delete all N" on a finished tab, each with a pop-up — the Buy Receipts
  * log's pattern. Open offers and live counters never get one; the server
  * re-checks with the same rule (lib/offers.ts → offerDeleteBlock).
+ *
+ * Item details (owner mockup 1, 2026-10-18): a small "Item details" button
+ * under the item name opens the specs, Listed today · Melt today · Your cost,
+ * the "× melt / over your cost" line, the description (clamped, Show all) and
+ * "Open item page ↗" (new tab) INSIDE the card — under the name on a phone, a
+ * strip across the bottom on a computer. Every card starts closed.
  */
 
 type AdminOffer = {
@@ -64,6 +77,7 @@ type AdminOffer = {
   product_listed_price: number | null;
   product_available: boolean;
   order_number: string | null;
+  product_details: OfferItemDetails | null;
 };
 
 type Panel = { id: string; kind: 'accept' | 'counter' | 'decline' } | null;
@@ -99,6 +113,18 @@ function MessageBox({ id, first, value, onChange }: { id: string; first: string;
   );
 }
 
+const CARET = (
+  <svg className="offer-caret" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+    <path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+/** The shop card's chip colours: karat-tinted purity, neutral weight/type, brown measurements. */
+function chipStyle(tone: 'purity' | 'neutral' | 'measure', details: OfferItemDetails) {
+  if (tone === 'purity') return getPurityChipStyle({ category: details.category, purity: details.purity } as Product);
+  return tone === 'measure' ? MEASUREMENT_CHIP_STYLE : NEUTRAL_CHIP_STYLE;
+}
+
 export default function OffersPanel({ adminBasePath }: { adminBasePath: string }) {
   const [filter, setFilter] = useState<OfferFilter>('open');
   const [offers, setOffers] = useState<AdminOffer[]>([]);
@@ -112,6 +138,18 @@ export default function OffersPanel({ adminBasePath }: { adminBasePath: string }
   const [deleting, setDeleting] = useState<Deleting>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  // Which cards have "Item details" open, and which descriptions are shown whole.
+  const [openDetails, setOpenDetails] = useState<Set<string>>(() => new Set());
+  const [fullDescription, setFullDescription] = useState<Set<string>>(() => new Set());
+
+  function toggleIn(setter: typeof setOpenDetails, id: string) {
+    setter((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   const load = useCallback(async (which: OfferFilter) => {
     setLoading(true);
@@ -343,9 +381,10 @@ export default function OffersPanel({ adminBasePath }: { adminBasePath: string }
             const name = displayBuyerName(offer.customer_name);
             const first = name.split(' ')[0];
             const panelOpen = panel?.id === offer.id;
+            const detailsOpen = openDetails.has(offer.id);
             const clockTone = open ? (urgent ? 'urgent' : 'open') : countered ? 'countered' : 'closed';
             return (
-              <div key={offer.id} className="offer-card border bg-white" style={{ borderColor: BORDER }} data-panel={panelOpen ? 'open' : 'closed'} data-deletable={offerDeleteBlock(offer) ? 'false' : 'true'}>
+              <div key={offer.id} className="offer-card border bg-white" style={{ borderColor: BORDER }} data-panel={panelOpen ? 'open' : 'closed'} data-details={detailsOpen ? 'open' : 'closed'} data-deletable={offerDeleteBlock(offer) ? 'false' : 'true'}>
                 <div className="offer-grid">
                   {offer.product_image ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -359,7 +398,89 @@ export default function OffersPanel({ adminBasePath }: { adminBasePath: string }
                     {offer.product_inventory_number && (
                       <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>#{offer.product_inventory_number}</p>
                     )}
+                    {offer.product_details && (
+                      <button
+                        type="button"
+                        className="offer-details-toggle"
+                        aria-expanded={detailsOpen}
+                        aria-controls={`offer-details-${offer.id}`}
+                        onClick={() => toggleIn(setOpenDetails, offer.id)}
+                      >
+                        {CARET}
+                        <span>Item details</span>
+                      </button>
+                    )}
                   </div>
+
+                  {detailsOpen && offer.product_details && (() => {
+                    const details = offer.product_details;
+                    const chips = offerItemChips(details);
+                    const value = offerValueLine(offer.amount, details.melt, details.cost);
+                    const metal = details.category === 'Silver' ? 'silver' : 'gold';
+                    const longText = (details.description?.length ?? 0) > OFFER_DESCRIPTION_CLAMP_CHARS;
+                    const whole = fullDescription.has(offer.id);
+                    return (
+                      <div className="offer-details" id={`offer-details-${offer.id}`}>
+                        {chips.length > 0 && (
+                          <div className="offer-chips">
+                            {chips.map((chip) => (
+                              <span key={chip.label} className="offer-chip" style={chipStyle(chip.tone, details)}>{chip.label}</span>
+                            ))}
+                          </div>
+                        )}
+                        <div className="offer-nums">
+                          <div>
+                            <span className="offer-num-k">Listed today</span>
+                            <span className="offer-num-v">{listed != null ? formatWholeDollars(listed) : '—'}</span>
+                            <span className="offer-num-s">{details.multiplier ? `${details.multiplier}× melt` : 'priced by hand'}</span>
+                          </div>
+                          <div>
+                            <span className="offer-num-k">Melt today</span>
+                            <span className="offer-num-v">{details.melt != null ? formatWholeDollars(details.melt) : '—'}</span>
+                            <span className="offer-num-s">
+                              {details.melt != null && details.spotPerOz != null
+                                ? `${metal} ${formatWholeDollars(details.spotPerOz)}/oz`
+                                : details.grams && details.purity ? 'spot price unavailable' : 'no weight on file'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="offer-num-k">Your cost</span>
+                            <span className="offer-num-v">{details.cost != null ? formatWholeDollars(details.cost) : '—'}</span>
+                            <span className="offer-num-s">{details.cost != null ? 'admin only' : 'not entered'}</span>
+                          </div>
+                        </div>
+                        {value && (
+                          <p className="offer-value-line">
+                            This offer is{' '}
+                            {value.multiple && <strong>{value.multiple}× melt</strong>}
+                            {value.multiple && value.costDelta != null && ' and '}
+                            {value.costDelta != null && (
+                              <strong data-tone={value.costDelta < 0 ? 'under' : 'over'}>
+                                {formatWholeDollars(Math.abs(value.costDelta))} {value.costDelta < 0 ? 'under' : 'over'} your cost
+                              </strong>
+                            )}
+                            .
+                          </p>
+                        )}
+                        {details.description && (
+                          <div className="offer-desc-wrap">
+                            <p className="offer-desc" data-clamped={longText && !whole ? 'true' : 'false'}>{details.description}</p>
+                            {longText && (
+                              <button type="button" className="offer-more" onClick={() => toggleIn(setFullDescription, offer.id)}>
+                                {whole ? 'Show less' : 'Show all'}
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        <div className="offer-open-row">
+                          <a className="outline-button offer-open-item" href={details.productPath} target="_blank" rel="noopener noreferrer">
+                            Open item page ↗
+                          </a>
+                          <span className="offer-open-note">Opens in a new tab — every photo, the full page.</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <div className="offer-money text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
                     <div className="offer-money-top">
@@ -544,7 +665,8 @@ export default function OffersPanel({ adminBasePath }: { adminBasePath: string }
           grid-template-columns: 64px minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr) auto;
           grid-template-areas:
             'thumb title money clock actions'
-            'thumb buyer money clock actions';
+            'thumb buyer money clock actions'
+            'details details details details details';
           column-gap: 1rem;
           row-gap: 0.25rem;
           align-items: center;
@@ -575,6 +697,41 @@ export default function OffersPanel({ adminBasePath }: { adminBasePath: string }
         .offer-panel-buttons { margin-top: 0.75rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
         .offer-panel :global(.offer-message-box) { width: 100%; min-height: 5rem; resize: vertical; }
 
+        /* Item details (mockup 1, 2026-10-18): a strip across the card's foot. */
+        .offer-details-toggle {
+          display: inline-flex; align-items: center; gap: 0.3rem; margin-top: 0.35rem;
+          padding: 0.3rem 0.55rem 0.3rem 0.4rem; border-radius: 999px; cursor: pointer;
+          border: 1px solid color-mix(in srgb, var(--color-primary) 35%, transparent);
+          background: #fffdf6; color: var(--color-primary);
+          font-family: var(--font-label); font-size: 0.62rem; font-weight: 700; line-height: 1;
+          letter-spacing: 0.14em; text-transform: uppercase;
+        }
+        .offer-details-toggle:hover,
+        .offer-details-toggle[aria-expanded='true'] { background: #fff7dd; border-color: #ecd58a; }
+        .offer-details-toggle :global(.offer-caret) { transition: transform 0.15s; }
+        .offer-details-toggle[aria-expanded='true'] :global(.offer-caret) { transform: rotate(90deg); }
+        .offer-details { grid-area: details; margin-top: 0.75rem; background: #fbfaf6; border: 1px solid #ece6d6; padding: 0.85rem 1rem; }
+        .offer-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; font-family: var(--font-label); font-size: 0.68rem; font-weight: 700; line-height: 1; }
+        .offer-chip { display: inline-flex; align-items: center; white-space: nowrap; border: 1px solid; border-radius: 999px; padding: 0.3rem 0.55rem; }
+        .offer-nums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; margin-top: 0.75rem; max-width: 640px; }
+        .offer-nums > div { background: #fff; border: 1px solid #ece6d6; padding: 0.5rem 0.65rem; display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+        .offer-num-k { font-family: var(--font-label); font-size: 0.58rem; font-weight: 700; line-height: 1.2; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-primary); }
+        .offer-num-v { font-family: var(--font-headline); font-size: 1.1rem; font-weight: 700; color: var(--color-on-surface); white-space: nowrap; }
+        .offer-num-s { font-size: 0.7rem; color: var(--color-on-surface-variant); }
+        .offer-value-line { margin-top: 0.55rem; font-size: 0.8rem; color: var(--color-on-surface-variant); }
+        .offer-value-line strong { color: #16653c; }
+        .offer-value-line strong[data-tone='under'] { color: var(--color-error); }
+        .offer-desc-wrap { margin-top: 0.7rem; border-top: 1px solid #ece6d6; padding-top: 0.65rem; }
+        .offer-desc { font-size: 0.82rem; line-height: 1.55; color: var(--color-on-surface); white-space: pre-line; }
+        .offer-desc[data-clamped='true'] { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+        .offer-more {
+          margin-top: 0.3rem; font-family: var(--font-label); font-size: 0.62rem; font-weight: 700; letter-spacing: 0.14em;
+          text-transform: uppercase; color: var(--color-primary); text-decoration: underline; text-underline-offset: 3px;
+        }
+        .offer-open-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin-top: 0.8rem; }
+        .offer-open-row :global(.offer-open-item) { padding: 0.5rem 1.1rem; }
+        .offer-open-note { font-size: 0.72rem; color: var(--color-on-surface-variant); }
+
         /* Phone (mockup v3): one column — what, how much, how long, who — then
            the buttons. The amount gets the full width, so it never wraps. */
         @media (max-width: 860px) {
@@ -583,6 +740,7 @@ export default function OffersPanel({ adminBasePath }: { adminBasePath: string }
             grid-template-columns: 56px minmax(0, 1fr);
             grid-template-areas:
               'thumb title'
+              'details details'
               'money money'
               'clock clock'
               'buyer buyer'
@@ -630,6 +788,18 @@ export default function OffersPanel({ adminBasePath }: { adminBasePath: string }
           /* An open message box takes the buttons' place, as drawn. */
           .offer-card[data-panel='open'] .offer-actions { display: none; }
           .offer-panel { margin: 0 0.875rem 0.875rem; padding: 0.75rem; }
+          /* Item details open right under the item name, above the amount. */
+          .offer-details-toggle { padding: 0.45rem 0.7rem 0.45rem 0.5rem; font-size: 0.64rem; margin-top: 0.45rem; }
+          .offer-details { margin: 0 0.875rem 0.75rem; padding: 0.75rem; }
+          .offer-nums { gap: 0.35rem; max-width: none; }
+          .offer-nums > div { padding: 0.45rem 0.5rem; }
+          .offer-num-k { letter-spacing: 0.08em; font-size: 0.55rem; white-space: nowrap; }
+          .offer-num-v { font-size: 0.98rem; }
+          .offer-num-s { font-size: 0.64rem; }
+          .offer-desc { font-size: 0.84rem; }
+          .offer-desc[data-clamped='true'] { -webkit-line-clamp: 5; }
+          .offer-open-row { display: grid; gap: 0.35rem; }
+          .offer-open-row :global(.offer-open-item) { width: 100%; }
           .offer-panel-buttons { display: grid; }
           /* The trash-can sits in the card's top-right corner (mockup v4). */
           .offer-trash { position: absolute; top: 0.75rem; right: 0.75rem; width: 2.2rem; height: 2.2rem; padding: 0; }

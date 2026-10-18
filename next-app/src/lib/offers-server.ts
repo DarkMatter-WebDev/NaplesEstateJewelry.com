@@ -20,7 +20,17 @@ import {
 } from '@/lib/paypal';
 import { fetchSpotData } from '@/lib/spot-price';
 import { buildAddressObject, generateOrderNumber, getSnapshotPrice } from '@/lib/sales';
-import { isProductPurchasable, type Product } from '@/types/product';
+import {
+  inferProductJewelryType,
+  isProductPurchasable,
+  normalizeProductLinkType,
+  productJewelryTypeLabel,
+  productLengthSizeDisplay,
+  productWidthDisplay,
+  type Product,
+  type SpotData,
+} from '@/types/product';
+import { calcSpotMeltValue } from '@/lib/pricing';
 import { normalizePersonName } from '@/lib/person-name';
 import { normalizePhoneNumber } from '@/lib/phone';
 import { validateUsShippingAddress } from '@/lib/us-address';
@@ -30,6 +40,7 @@ import { buildOfferBuyerEmail, buildOwnerOfferEmail } from '@/lib/offer-emails';
 import {
   OWNER_NOTE_MAX,
   OFFER_ABANDON_AFTER_MINUTES,
+  type OfferItemDetails,
   OFFER_MESSAGE_MAX,
   buyerEmailForStatus,
   cleanOfferText,
@@ -1077,7 +1088,42 @@ export type AdminOfferView = OfferRow & {
   product_listed_price: number | null;
   product_available: boolean;
   order_number: string | null;
+  /** The card's "Item details" dropdown (2026-10-18); null when the product is gone. */
+  product_details: OfferItemDetails | null;
 };
+
+// Only for the "Item details" dropdown: what the checkout columns leave out.
+// cost_basis is private — this read is admin-only (requireAdmin + service role).
+const OFFER_DETAIL_COLUMNS = 'id, description, length, width_mm, jewelry_type, product_type, chain_type, tags, tags_es, title_es, cost_basis';
+
+type OfferDetailRow = Pick<Product, 'id' | 'description' | 'length' | 'width_mm' | 'jewelry_type' | 'product_type' | 'chain_type' | 'tags' | 'tags_es' | 'title_es' | 'cost_basis'>;
+
+function offerItemDetails(product: Product, extra: OfferDetailRow | undefined, spotData: SpotData): OfferItemDetails {
+  const merged = { ...product, ...(extra ?? {}) } as Product;
+  // Nulls, never a fallback number: with the spot feed down there is no melt.
+  const melt = spotData.source === 'api' ? calcSpotMeltValue(merged, spotData) : null;
+  const spotPerOz = melt == null ? null : merged.category === 'Silver' ? spotData.silverPerTroyOz : spotData.goldPerTroyOz;
+  const typeLabel = merged.jewelry_type || merged.product_type ? productJewelryTypeLabel(inferProductJewelryType(merged)) : null;
+  const link = normalizeProductLinkType(merged.chain_type) ?? (merged.chain_type?.trim() || null);
+  const type = typeLabel && typeLabel !== 'Other' ? (link ? `${typeLabel} · ${link}` : typeLabel) : link;
+  const cost = Number(merged.cost_basis);
+  const multiplier = Number(merged.pricing_multiplier);
+  return {
+    category: merged.category,
+    purity: merged.purity ?? null,
+    grams: merged.gram_weight ?? merged.weight_grams ?? null,
+    length: extra ? productLengthSizeDisplay(merged) : null,
+    width: extra ? productWidthDisplay(merged) : null,
+    type,
+    year: merged.item_year ?? null,
+    description: extra?.description?.trim() || null,
+    melt: melt == null ? null : round2(melt),
+    spotPerOz: spotPerOz ?? null,
+    cost: Number.isFinite(cost) && cost > 0 ? cost : null,
+    multiplier: merged.price_mode === 'spot-multiplier' && Number.isFinite(multiplier) && multiplier > 0 ? multiplier : null,
+    productPath: `/shop/${encodeURIComponent(merged.id)}`,
+  };
+}
 
 export async function listOffersForAdmin(service: SupabaseClient, filter: OfferFilter): Promise<AdminOfferView[]> {
   const { data, error } = await service
@@ -1089,7 +1135,18 @@ export async function listOffersForAdmin(service: SupabaseClient, filter: OfferF
     .limit(200);
   if (error) throw error;
   const offers = (data ?? []).map((row) => normalizeOfferRow(row as unknown as Record<string, unknown>));
-  const products = await loadOfferProducts(service, offers.map((offer) => offer.product_id));
+  const productIds = Array.from(new Set(offers.map((offer) => offer.product_id)));
+  const [products, detailRead, spotData] = await Promise.all([
+    loadOfferProducts(service, productIds),
+    productIds.length > 0
+      ? service.from('products').select(OFFER_DETAIL_COLUMNS).in('id', productIds)
+      : Promise.resolve({ data: [], error: null }),
+    fetchSpotData(),
+  ]);
+  // The dropdown is extra: if its read fails, the cards still load (specs only).
+  if (detailRead.error) console.error('Offer item details read error:', detailRead.error.message);
+  const details = new Map<string, OfferDetailRow>();
+  for (const row of (detailRead.error ? [] : detailRead.data ?? []) as unknown as OfferDetailRow[]) details.set(row.id, row);
   const orderIds = offers.map((offer) => offer.order_id).filter((id): id is string => Boolean(id));
   const orderNumbers = new Map<string, string>();
   if (orderIds.length > 0) {
@@ -1107,6 +1164,7 @@ export async function listOffersForAdmin(service: SupabaseClient, filter: OfferF
       product_listed_price: product?.listedPrice ?? null,
       product_available: product?.purchasable ?? false,
       order_number: offer.order_id ? orderNumbers.get(offer.order_id) ?? null : null,
+      product_details: product ? offerItemDetails(product.product, details.get(offer.product_id), spotData) : null,
     };
   });
 }

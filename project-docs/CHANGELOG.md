@@ -1,6 +1,70 @@
 
 # Changelog
 
+## 2026-10-18 (5) — Make an Offer, buyer's side: "Keep an eye on your email" (usually within an hour) + the success screens start at the top — BUILT + STAGED, not pushed; no SQL, no env vars
+
+Owner (after offer texts were shelved, (4)): remind buyers to watch their email for the answer; *"we usually respond within an hour most times."* Mockup 1 → owner: centre the note (*"let me see before i approve"*) → mockup 2 approved (*"Build all three spots as shown in mockup 2, wording as written"*) → plus *"center it on the 'we received your offer' email too"*.
+
+**Built (`components/offers/OfferCheckoutClient.tsx`, `lib/offer-emails.ts`):**
+1. **"Offer sent" screen:** the small grey "A copy is in your email." line → a centred gold note (envelope on top): **Keep an eye on your email.** / Our answer goes to **<the email they typed>** — we usually reply within an hour. / Not there? Check your spam or junk folder. Spanish: *Esté atento a su correo electrónico… normalmente respondemos en menos de una hora… ¿No la ve? Revise la carpeta de spam o correo no deseado.*
+2. **Under the Email box** (Make an Offer form only, not the counter checkout): "Our answer comes by email — usually within an hour." (ES: "Le respondemos por correo electrónico — normalmente en menos de una hora."), tied to the box by `aria-describedby`.
+3. **"We received your offer" email:** one CENTRED sentence after the deadline line (`OFFER_EMAIL_WATCH_LINE_EN/ES`, also in the plain-text part): "We usually reply within an hour, and our answer comes to this email address — keep an eye on your inbox (and spam folder)." Only that email carries it.
+4. **Found while checking, fixed (not in the mockup — behaviour, no new look):** the short success screens replace the long form while the page is still scrolled to the PayPal button, so on a phone the buyer landed on the FOOTER with "Offer sent" 574 px above the screen. Both success screens ("Offer sent" and the counter's "Order Received") now start at the top (`window.scrollTo` when `held` / `paidOrder` is set).
+
+**Verified:** `npx tsc --noEmit` 0 · `npm run lint` 0 errors (the 4 old `<img>` warnings) · `npx vitest run` **1877/1877** (167 files; +2 in `offers.test.ts`) · `npm run build` 0 (dev stopped first) · 88 = 41 + 41 + 6. The REAL offer page on the dev server (item #130, which has offers on), with PayPal and `/api/offers` + `/api/offers/authorize` stood in inside the test browser — no real offer, no payment, nothing reached the server's offer routes — at 1280 px EN and 390 px EN + ES: **39/39** (hint under the box, 5.6 px gap; after sending: note with the typed address, centred box / lines / envelope to 0 px; heading + note on screen without scrolling — before the fix the phone was at the footer; old line gone; no page errors). Mockups 1–2: static, under the pane's snapshot policy.
+
+⛔ **Not verified:** a real email in a real inbox (the centred line), a real PayPal hold, the "Order Received" screen's scroll (same code path, not driven), a real iPhone. Housekeeping: the dev server's generated `.next/dev/types/routes.d.ts` was left corrupt after the 10-18 (2) temporary page was removed (tsc errors in that generated file only); that one file was deleted and the dev server regenerated it.
+
+## 2026-10-18 (4) — Offer text-message updates explored and SHELVED (owner) — docs only, nothing built
+
+Owner asked whether buyers could tick a box for text updates on their offer (counter etc.) through Twilio. Findings (code + records): the toll-free number's verification was approved for use case **Marketing** (CHANGELOG 2026-09-15 evening), so transactional offer texts would need that approval edited; `lib/text-alerts/inbound.ts` ties every non-keyword reply to the sender's last text deal (`sms_last_deal_id`), so a subscriber's reply to an offer text would read as a deal reply / `[1st]` claim; STOP on the shared number would also end that person's deals; plus one SQL run and a Terms sentence. Owner: *"sounds like we should just forget the idea"* — Claude agreed. Rule `DECISIONS.md` → Make an Offer entry. Optional, not requested: a "Text" link beside the buyer's phone on the offer card for the owner's own one-to-one texts.
+
+## 2026-10-18 (3) — First real sale through a COUNTER-OFFER (owner-reported) — docs only
+
+Owner, 10-18: *"we just had the first successful sale via a customer accepting my counteroffer."* The whole counter path has now worked with a real buyer: Counter → hold released → private Buy-now link → the buyer paid through the normal checkout → sale completed by itself (`counter_bought`). Claude did not check production (not asked to). `TASKS.md` 2026-10-15 (4) item 4 is done. Still never used for real: **Accept & charge** on an open offer. Also: the owner will push 10-18 (1) + (2) together with the next few features (*"ill push after the next few feature updates"*).
+
+## 2026-10-18 (2) — Admin → Offers: "Item details" dropdown on the offer card — BUILT + STAGED, not pushed; no SQL, no env vars
+
+Owner: when an offer comes in, see the item's description and specs right on the offer. Claude recommended an in-card dropdown over a link-and-back (the decision happens on the card; no page loads on the iPhone; a new-tab link covers the rare deep look). Mockup 1 (static, computer + iPhone, closed/open, 19/19 checks under the pane's snapshot policy) → owner: *"1: yes to the layout, 2: keep all, 3: as drawn, 4: open in new tab as drawn... build it"*.
+
+**What it does:** a small **Item details** button under the item name (`aria-expanded`, every card starts closed). Open: the spec chips (purity · weight · length · width · type · year, through the shop's `formatWeight` / `formatLengthChip` / `formatProductPurityLabel` and chip colours), **Listed today** (+ "2× melt" or "priced by hand"), **Melt today** (+ "gold $4,166/oz"; "—" + "no weight on file" / "spot price unavailable"), **Your cost** (+ "admin only"; "—" + "not entered"), the line "This offer is 1.68× melt and $2,600 over your cost." (halves drop out when missing; "under your cost" in red), the description (clamped 3 lines on a computer / 5 on a phone when over 220 characters, Show all / Show less) and **Open item page ↗** (`/shop/<id>`, `target="_blank" rel="noopener noreferrer"`). Computer: a strip across the card's foot; phone: under the item name, above the amount.
+
+**Files:** `lib/offers.ts` (`OfferItemDetails`, `offerItemChips`, `formatMeltMultiple`, `offerValueLine`, `formatWholeDollars`, `OFFER_DESCRIPTION_CLAMP_CHARS`); `lib/offers-server.ts` (`listOffersForAdmin` → `product_details`: a second, admin-only read of `OFFER_DETAIL_COLUMNS` incl. `cost_basis`, melt via `calcSpotMeltValue` ONLY when `spotData.source === 'api'`; a failed details read leaves the cards loading with the basic specs); `components/admin/OffersPanel.tsx` (button, panel, styles); tests `lib/__tests__/offers.test.ts` (+5, and the 10-15 phone-order guard now includes the details row) and NEW `lib/__tests__/offer-item-details.test.ts` (the server read end to end on a stand-in client with #143's real values: melt $2,674.51 at $4,166.10/oz, listed $5,349; spot down → no melt; details read failing → cards still load).
+
+**Verified:** `npx tsc --noEmit` 0 · `npm run lint` 0 errors (the 4 old `<img>` warnings) · `npx vitest run` **1875/1875** (167 files) · `npm run build` 0 (dev stopped first) · 88 prerendered = 41 EN + 41 ES + 6. The REAL `OffersPanel` on a temporary page (deleted; not in the build) with stand-in `/api/admin/offers` data, headless Chrome at 1280 and 390 px: **42/42** — closed by default, one card opens at a time per click, chips / numbers / notes / value line exact, Show all shows the whole text and Show less restores the clamp, the link's href/target/rel, placement (phone: between name and amount; computer: full-width strip), no sideways scroll, a hand-priced ring with no weight or cost (Melt —, Cost —, no value line, no Show all), Accept / Counter / Decline unchanged, no page errors.
+
+⛔ **Not verified by Claude:** the real `/api/admin/offers` behind the sign-in (real offers, real cost figures) and a real iPhone. The owner's next look at Admin → Offers is the test.
+
+## 2026-10-18 (1) — Homepage headline: letter tails no longer cut off during the entrance — BUILT + STAGED, not pushed; no SQL, no env vars
+
+Owner (seen on a phone): as the hero headline "Naples Premier Gold, Sterling & Jewelry Buyers" loads, the bottom tips of the g, J, y, y are cut off, then appear a split second later.
+
+**Cause.** At `line-height: 1.15` the Libre Caslon tails hang below the last line box: font box 0.97 / 0.26 em (= 1.23 em > 1.15, half-leading −0.04 em), glyph descent 0.26 em (canvas `measureText` at 100px: g/J/y 26, `fontBoundingBoxDescent` 26). Measured on the page at 375 px: last line box ends 295.5, the h1 box 294.6, the ink 296.4 — the tails sat 1.8 px OUTSIDE the h1's box. The entrance animation (`home-hero-top-fade-in`: opacity + `filter: blur(6px)` + translate, 720 ms) runs the headline block on its own layer, and Safari crops such a layer to the boxes while it animates; when it ends the overflow is drawn and the tips "pop in".
+
+**Fix** (`components/home/HomeHeroOverlay.tsx`, `.home-hero-top h1`): `padding-bottom: 0.15em; margin-bottom: -0.15em;` — the tails now sit inside the h1's own box; the negative margin cancels it so NOTHING moves. Entrance animation, size, wording, position: unchanged. Guard added to `lib/__tests__/hero-short-screens.test.ts` ("headline entrance").
+
+**Verified here:**
+- Tails inside the headline box after the fix — 36/36 (WebKit + Chromium × EN + ES × 320×640, 375×812, 390×844, 430×932, 768×1024, 1024×768, 1280×800, 1440×900, 1920×1080), headline-only render: room 2.1–9.5 px in WebKit, 1.6–6.2 px in Chromium (at 0.1em the WebKit phone room was only 0.8 px, hence 0.15em).
+- Layout unchanged: every line box at identical coordinates with and without the fix (375, 390, 768, 1440; WebKit), tail ink at identical positions.
+- Gate: `npx tsc --noEmit` 0 · `npm run lint` 0 errors (the 4 old `<img>` warnings) · `npx vitest run` **1867/1867** (166 files) · `npm run build` 0 (dev server stopped first) · 88 prerendered = 41 EN + 41 ES + 6; built `en.html` / `es.html` carry the rule; dev serves it on `/` and `/es`.
+
+⛔ **Not reproduced here, so not proven fixed:** Playwright's WebKit on Windows (`ms-playwright/webkit-2336`) and Chromium both drew the tails whole in every live, slowed capture, before and after — Windows WebKit does not composite like iOS Safari. (A first frame that looked cropped was a sub-pixel position artifact of the slide-up, identical with and without the fix.) The owner's iPhone is the test: a few reloads of the homepage, phone and laptop.
+
+## 2026-10-17 (4) — Session CLOSED (10-17: homepage 404 found, fixed, deployed, confirmed) — docs only
+
+- **The session:** orientation; the production homepage 404 (`/`, `/es`) traced to `dynamicParams = false` + a carousel save, fixed with `force-static` + `notFound()` on the home and city routes, deployed by the owner, verified live, and confirmed by the owner's own carousel save ((1)–(3)). Nothing open from it.
+- **Answered, nothing built:** how many photos a sync sends — all of them, up to the store's 20 per item, to BOTH eBay (cap 24) and Etsy (cap 20), in display order. Now written into `features/ebay-sync.md` and `features/etsy-sync.md` (*Field mapping highlights*).
+- Also: the `TASKS.md` heading for the "Live + Offer" chip (10-15 (2)) corrected from "not pushed" to deployed.
+- **State at close:** nothing staged-but-unpushed except docs; no SQL, no env vars. Last gate, on the deployed code: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1866/1866** (166 files) · build 0 · 88 = 41 + 41 + 6.
+
+## 2026-10-17 (3) — Homepage fix CONFIRMED after a real carousel save — docs only
+
+Owner: *"added a photo to the carousel and saved... and homepage still works."* That save is the exact trigger of the 10-15/17 outage (`revalidateTag('home-carousel', { expire: 0 })` → a cache miss on the home route), now on Netlify's own runtime with the `force-static` fix deployed. Incident closed; nothing open. Claude did not re-check production (not asked to).
+
+## 2026-10-17 (2) — Homepage fix DEPLOYED (owner) and VERIFIED LIVE — docs only
+
+Owner: *"Pushed and deployed the homepage fix. Verify the homepage is back live."* curl against production, ~7:48 AM ET: `/` → 200 "Naples Estate Jewelry - Sell Jewelry, Gold & Silver in Naples, FL" (`lang="en"`, full hero markup), `/es` → 200 "…Compramos Joyería, Oro y Plata…" (`lang="es"`); both still 200 on a second fetch ~40 s later (`Age` 44 / 40). `/gold-services`, `/sell/naples`, `/es/sell/cape-coral`, `/shop` → 200; `/money.jpg`, `/sell/nowhere-xyz` → 404 "Page Not Found" (no 500). Open: the owner's one carousel save in Admin followed by a homepage load — the test on Netlify's own runtime of the exact trigger.
+
 ## 2026-10-17 (1) — 🔴 Homepage 404 in production (`/`, `/es`): `dynamicParams = false` turned a cache miss into a cached 404 — FIX BUILT + STAGED, not pushed; no SQL, no env vars
 
 Owner: *"the homepage is 404ing… I recently updated the homepage carousel items in admin."*

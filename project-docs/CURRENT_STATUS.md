@@ -2,7 +2,39 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-10-14**.
+> in `DECISIONS.md`. Last reconciled: **2026-10-18**.
+
+## Start Here (2026-10-18 (5) — 🟡 THREE changes BUILT + STAGED, not pushed (one push carries all three, after the owner's next few features); no SQL, no env vars)
+
+- 🟡 **NEW (5): Make an Offer, buyer's side — "Keep an eye on your email… we usually reply within an hour"** on the Offer sent screen (centred note), under the form's Email box, and centred in the "We received your offer" email; plus the success screens now open at the top (a phone used to land on the footer). `CHANGELOG.md` 2026-10-18 (5); `TASKS.md` top. Gate: `tsc` 0 · lint 0 errors · **1877/1877** · build 0 · 88 = 41 + 41 + 6; the real offer page 39/39 with a stand-in PayPal. ⛔ No real email / hold / iPhone seen.
+- ℹ️ Offer text updates were explored and **shelved** (4) — `DECISIONS.md` Make an Offer entry.
+- The two blocks below ((2) Offers item details, (1) headline tails) ride the same push.
+
+## Start Here (2026-10-18 (2) — 🟡 TWO changes BUILT + STAGED, not pushed (one push carries both); no SQL, no env vars)
+
+- ✅ **First real sale through a counter-offer** (owner, 10-18 — `CHANGELOG.md` 2026-10-18 (3)). The owner will push the staged work after the next few features.
+
+- 🟡 **Admin → Offers "Item details" dropdown** (`CHANGELOG.md` 2026-10-18 (2); rule `DECISIONS.md` → Make an Offer entry; runbook `features/make-offer.md` step 3; `TASKS.md` top). A small button under the item name opens the specs, Listed today · Melt today · Your cost, the "× melt / over your cost" line, the description and "Open item page ↗" (new tab) inside the card — as mockup 1, approved. Gate: `tsc` 0 · lint 0 errors · **1875/1875** · build 0 · 88 = 41 + 41 + 6; the real panel 42/42 in headless Chrome with stand-in data. ⛔ Not seen behind the sign-in or on a real iPhone.
+- 🟡 **Homepage headline tails** — the block below (`CHANGELOG.md` 2026-10-18 (1)).
+
+## Start Here (2026-10-18 — 🟡 homepage headline fix BUILT + STAGED, not pushed; no SQL, no env vars)
+
+- 🟡 **BUILT + STAGED, awaiting the owner's push — the hero headline's letter tails (g, J, y) no longer cut off during the load-in** (`CHANGELOG.md` 2026-10-18 (1); rule `DECISIONS.md` top entry; `TASKS.md` top). One CSS rule in `components/home/HomeHeroOverlay.tsx` (net-zero padding on the h1) + one test. Nothing moves; the entrance animation is unchanged. Gate: `tsc` 0 · lint 0 errors · **1867/1867** · build 0 · 88 = 41 + 41 + 6.
+- ⛔ **Not proven fixed:** the crop does not reproduce in desktop browsers here (Chromium, Windows WebKit). The owner's iPhone (dev LAN `http://10.0.0.208.nip.io:3007` before the push, or production after it) is the test.
+- The 10-17 (4) block below otherwise still applies (Offers first uses, Google Ads read ~10-19, buy-receipt draft / ID fill, Text Deals mark-sold).
+
+## Start Here (2026-10-17 (4) — session CLOSED; nothing staged-but-unpushed except docs; no SQL, no env vars)
+
+- 🟢 **Session closed** (`CHANGELOG.md` 2026-10-17 (4)). The homepage outage is fixed, deployed and confirmed (block below). Answered, nothing built: a sync sends every photo (store cap 20) to both eBay and Etsy — now in both runbooks. Last gate: `tsc` 0 · lint 0 errors · **1866/1866** · build 0 · 88 = 41 + 41 + 6.
+- **Still open, unchanged from 10-15 / 10-12** (`TASKS.md` top): the owner's first real uses of the Offers features (iPhone look, Accept, Counter, delete) and the bulk Best Offer / Site offers runs; the Google Ads read ~10-19 (don't touch bids while "Learning"); the buy-receipt draft and "Fill form from ID" first uses; the first real sale through each Text Deals mark-sold button.
+
+## Start Here (2026-10-17 — ✅ HOMEPAGE 404 CLOSED: fix deployed, verified live, and the owner's real carousel save left the homepage working; nothing staged-but-unpushed except docs; no SQL, no env vars)
+
+- ✅ Owner, 10-17: *"added a photo to the carousel and saved... and homepage still works"* — the exact trigger, on Netlify's own runtime (`CHANGELOG.md` 2026-10-17 (3)). Nothing open from this incident. The ◻ in the block below is done.
+
+## Start Here (2026-10-17 ~7:50 AM — 🟢 HOMEPAGE BACK: the fix is DEPLOYED (owner) and VERIFIED LIVE (Claude); nothing staged-but-unpushed except docs)
+
+- 🟢 Production after the owner's deploy: `/` and `/es` → 200 with the real homepage, still 200 on a second fetch; city pages, `/gold-services`, `/shop` 200; `/money.jpg`, `/sell/nowhere-xyz` → 404, no 500 (`CHANGELOG.md` 2026-10-17 (2)). ◻ Owner: one carousel save in Admin, then the homepage again — the real-runtime test of the cause. Where the block below says "BUILT + STAGED" / "DOWN", read "deployed" / "back".
 
 ## Start Here (2026-10-17 — 🔴 HOMEPAGE DOWN in production (cached 404 on `/` and `/es`); fix BUILT + STAGED — the owner's push + deploy brings it back)
 

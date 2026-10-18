@@ -530,6 +530,14 @@ is batched"*; `lib/__tests__/marketplace-price-push-batching.test.ts` guards it.
   unit test.
 - **Eligibility (Q7):** everything `available` syncs, including Coin/Bullion;
   a per-item Etsy rejection is a warning, never a batch-blocking failure.
+- **Photos (confirmed from code 2026-10-17):** every photo on the item is
+  uploaded, in the editor's display order (the first is the main picture).
+  `ETSY_MAX_IMAGES = 20` (`lib/etsy/mapping.ts:790`, Etsy's own per-listing
+  cap) equals the store's cap of 20 per item (`MAX_PRODUCT_IMAGE_COUNT`,
+  `components/admin/AdminShell.tsx:112`), so nothing is cut; the preflight
+  warns if an item ever has more. A re-sync uploads only the difference
+  (`planImageDiff`, `lib/etsy/images.ts:234`: removed photos deleted first,
+  new ones uploaded, order fixed). No photos = preflight blocks the sync.
 
 ## Current constraints and verification
 

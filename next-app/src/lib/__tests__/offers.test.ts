@@ -28,6 +28,11 @@ import {
   parseOfferAmount,
   percentOfListed,
   statusesForFilter,
+  formatMeltMultiple,
+  formatWholeDollars,
+  offerItemChips,
+  offerValueLine,
+  type OfferItemDetails,
 } from '../offers';
 import { buildOfferBuyerEmail, buildOwnerOfferEmail } from '../offer-emails';
 import { coerceProductAutofill, PRODUCT_AUTOFILL_FIELD_KEYS } from '../ai-product-schema';
@@ -194,6 +199,29 @@ describe('statuses, filters, emails', () => {
     expect(email.html).not.toMatch(/reply to this/i);
     const es = buildOfferBuyerEmail({ ...base, kind: 'received', isEs: true });
     expect(es.subject).toBe('Recibimos su oferta de $1,100.00');
+  });
+
+  it('the received email says to watch the inbox — usually within an hour — centred (2026-10-18)', () => {
+    const email = buildOfferBuyerEmail({ ...base, kind: 'received' });
+    const line = 'We usually reply within an hour, and our answer comes to this email address — keep an eye on your inbox (and spam folder).';
+    expect(email.html).toContain(`<p style="margin:0 0 12px;text-align:center;">${line}</p>`);
+    expect(email.text).toContain(line);
+    const es = buildOfferBuyerEmail({ ...base, kind: 'received', isEs: true });
+    expect(es.html).toContain('text-align:center;">Normalmente respondemos en menos de una hora');
+    // Only the received email carries it.
+    expect(buildOfferBuyerEmail({ ...base, kind: 'declined' }).text).not.toContain('within an hour');
+  });
+
+  it('the buyer pages point at email: a centred note after sending, a hint under the Email box (offer form only)', () => {
+    const client = read('src', 'components', 'offers', 'OfferCheckoutClient.tsx');
+    expect(client).toContain("'Keep an eye on your email.'");
+    expect(client).toContain("' — we usually reply within an hour.'");
+    expect(client).toContain('<strong className="offer-watch-email">{customer.email.trim()}</strong>');
+    expect(client).toMatch(/\.offer-watch-note \{[^}]*align-items: center;[^}]*text-align: center;/);
+    expect(client).toContain("{mode === 'offer' && (\n                    <p id=\"offer-email-hint\"");
+    expect(client).not.toContain("'A copy is in your email.'");
+    // The success screens start at the top (a phone was left on the footer, 2026-10-18).
+    expect(client).toContain("if (held || paidOrder) window.scrollTo({ top: 0, behavior: 'auto' });");
   });
 
   it('declined / expired / sold emails all say the hold was released', () => {
@@ -436,7 +464,8 @@ describe('source guards', () => {
 
   it('the phone card: one column in the mockup’s order, the amount never in the photo column', () => {
     const panel = read('src', 'components', 'admin', 'OffersPanel.tsx');
-    expect(panel).toContain("'thumb title'\n              'money money'\n              'clock clock'\n              'buyer buyer'\n              'actions actions';");
+    // 'details details' = the Item details dropdown (2026-10-18), empty unless opened.
+    expect(panel).toContain("'thumb title'\n              'details details'\n              'money money'\n              'clock clock'\n              'buyer buyer'\n              'actions actions';");
     expect(panel).toContain('.offer-amount { font-size: 1.5rem; font-weight: 700; white-space: nowrap;');
     expect(panel).toContain('Accept &amp; charge<span className="offer-phone-only">');
     expect(panel).toContain('const name = displayBuyerName(offer.customer_name);');
@@ -477,5 +506,64 @@ describe('source guards', () => {
   it('the sweep is guarded by the cron secret', () => {
     const sweep = read('src', 'app', 'api', 'admin', 'offers', 'sweep', 'route.ts');
     expect(sweep).toContain("req.headers.get('x-cron-secret') !== secret");
+  });
+});
+
+describe('item details on the admin offer card (2026-10-18)', () => {
+  const bracelet: OfferItemDetails = {
+    category: 'Gold', purity: 14, grams: 34.23, length: '7.75 in', width: '16.6 mm', type: 'Bracelet · Charm',
+    year: 1880, description: 'Victorian slide bracelet.', melt: 2674.52, spotPerOz: 4166.1, cost: 1900,
+    multiplier: 2, productPath: '/shop/bracelet-143',
+  };
+
+  it('builds the chips with the shop card formatters, in the shop order', () => {
+    expect(offerItemChips(bracelet)).toEqual([
+      { label: '14K', tone: 'purity' },
+      { label: '34.2g', tone: 'neutral' },
+      { label: '7.8in', tone: 'measure' },
+      { label: '16.6 mm wide', tone: 'measure' },
+      { label: 'Bracelet · Charm', tone: 'neutral' },
+      { label: 'ca. 1880', tone: 'neutral' },
+    ]);
+  });
+
+  it('leaves out what the item does not have; a ring size reads "Sz"', () => {
+    const ring = { ...bracelet, grams: null, length: 'Size: 7', width: null, type: 'Ring', year: null, purity: 18 };
+    expect(offerItemChips(ring).map((chip) => chip.label)).toEqual(['18K', 'Sz 7', 'Ring']);
+    expect(offerItemChips({ ...bracelet, purity: 925, category: 'Silver', grams: null, length: null, width: null, type: null, year: null }))
+      .toEqual([{ label: '925', tone: 'purity' }]);
+  });
+
+  it('works out the × melt and over/under cost line, dropping missing halves', () => {
+    expect(formatMeltMultiple(4500, 2674.52)).toBe('1.68');
+    expect(formatMeltMultiple(4000, 2000)).toBe('2');
+    expect(formatMeltMultiple(4500, null)).toBeNull();
+    expect(offerValueLine(4500, 2674.52, 1900)).toEqual({ multiple: '1.68', costDelta: 2600 });
+    expect(offerValueLine(1500, 2674.52, 1900)).toEqual({ multiple: '0.56', costDelta: -400 });
+    expect(offerValueLine(4500, null, 1900)).toEqual({ multiple: null, costDelta: 2600 });
+    expect(offerValueLine(4500, 2674.52, null)).toEqual({ multiple: '1.68', costDelta: null });
+    expect(offerValueLine(4500, null, null)).toBeNull();
+    expect(formatWholeDollars(2674.52)).toBe('$2,675');
+  });
+
+  it('the admin read sends melt only from a live spot price, and cost only to the admin read', () => {
+    const server = read('src', 'lib', 'offers-server.ts');
+    expect(server).toContain("const melt = spotData.source === 'api' ? calcSpotMeltValue(merged, spotData) : null;");
+    // cost_basis lives only beside the admin dropdown's columns (comment, columns, row type, read).
+    expect(server.match(/cost_basis/g)?.length).toBe(4);
+    expect(server).toContain("const OFFER_DETAIL_COLUMNS = 'id, description, length, width_mm, jewelry_type, product_type, chain_type, tags, tags_es, title_es, cost_basis';");
+    for (const file of [['src', 'lib', 'offer-emails.ts'], ['src', 'app', 'api', 'offers', 'route.ts']]) {
+      expect(read(...file)).not.toContain('cost_basis');
+    }
+  });
+
+  it('the card: every dropdown starts closed and the item page opens in a new tab', () => {
+    const panel = read('src', 'components', 'admin', 'OffersPanel.tsx');
+    expect(panel).toContain('useState<Set<string>>(() => new Set())');
+    expect(panel).toContain('target="_blank" rel="noopener noreferrer"');
+    expect(panel).toContain('aria-expanded={detailsOpen}');
+    // Phone: under the item name, above the amount. Computer: a strip across the foot.
+    expect(panel).toMatch(/'thumb title'\s*'details details'\s*'money money'/);
+    expect(panel).toContain("'details details details details details'");
   });
 });

@@ -452,6 +452,14 @@ keywords live in title + aspects); `cost_basis`/`minimum_price`/
 Condition is fixed: `USED_EXCELLENT` (id `3000`, "Pre-owned") + one standard
 `conditionDescription` template for every item (Q5) — no per-item authoring.
 
+**Photos (confirmed from code 2026-10-17):** every photo on the item goes to
+eBay, in the editor's display order (the first is the gallery picture).
+`EBAY_MAX_IMAGES = 24` (`lib/ebay/mapping.ts:638`, applied in
+`resolveImageUrls`), but the store caps an item at 20
+(`MAX_PRODUCT_IMAGE_COUNT`, `components/admin/AdminShell.tsx:112`), so in
+practice nothing is ever cut. URLs only — eBay fetches them; each write sends
+the full list. No photos = preflight blocks the sync.
+
 ## Shipping-tier campaign — COMPLETE (2026-08-11)
 
 **85 of 86 available listings carry the correct tier.** The exception is #82

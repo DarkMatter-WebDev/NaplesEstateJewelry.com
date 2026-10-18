@@ -41,6 +41,16 @@ describe('hero minimum height (option 2)', () => {
   });
 });
 
+describe('headline entrance (2026-10-18)', () => {
+  it('keeps room for the descender tails inside the headline box, net zero', () => {
+    // Safari crops the blurred entrance layer to the line boxes; the tails of
+    // g / J / y hang below the last one at line-height 1.15. The padding holds
+    // them in, the equal negative margin keeps every position unchanged.
+    expect(overlay).toMatch(/padding-bottom: 0\.15em;\s*margin-bottom: -0\.15em;/);
+    expect(overlay).toContain('filter: blur(6px);');
+  });
+});
+
 describe('compact hero', () => {
   it('queries the overlay height, never the live window height', () => {
     // A mobile toolbar changes the window height mid-scroll; the overlay height
