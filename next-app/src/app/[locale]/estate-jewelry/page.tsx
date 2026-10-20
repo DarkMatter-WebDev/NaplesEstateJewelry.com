@@ -13,12 +13,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
   const isEs = locale === 'es';
   return pageMetadata({
+    // 2026-10-19 (owner, mockup v1): plural "Buyers" — still the buyer-noun
+    // slot of the 08-30 title split (home = "Sell…", /sell/naples = "Jewelry
+    // Buyers…", this page = estate jewelry buyers). ≤ ~60 characters with the
+    // suffix; the description keeps the phone last (DECISIONS 2026-09-08).
     title: isEs
-      ? 'Comprador de Joyería de Patrimonio en Naples'
-      : 'Estate Jewelry Buyer in Naples, FL',
+      ? 'Compradores de Joyería de Patrimonio en Naples'
+      : 'Estate Jewelry Buyers in Naples, FL',
     description: isEs
-      ? 'Venda joyería heredada en Naples, FL — anillos, cadenas, pulseras y colecciones. Evaluación gratis, pago al aceptar. Llame al (239) 404-8505.'
-      : 'Sell estate jewelry in Naples, FL — gold rings, chains, bracelets and inherited collections. Free evaluation, paid on agreement. Call (239) 404-8505.',
+      ? 'Venda joyería heredada en Naples, FL — oro, diamantes, piezas antiguas y colecciones. Evaluación gratis, pago al aceptar. Llame al (239) 404-8505.'
+      : 'Sell estate jewelry in Naples, FL — gold, diamonds, vintage pieces and inherited collections. Free evaluation, paid on agreement. Call (239) 404-8505.',
     path: '/estate-jewelry',
     locale,
   });
@@ -60,24 +64,28 @@ export default async function EstateJewelryPage({ params }: Props) {
           <div className="container mx-auto px-6 md:px-12 relative z-10 py-16">
             <div className="max-w-2xl">
               <BreadcrumbTrail locale={locale} crumbs={crumbs} tone="dark" />
+              {/* Non-breaking spaces keep the last word, the dot and "Naples, FL"
+                  together, so a phone never starts a line with "·" (ES wraps). */}
               <span
                 className="text-xs font-bold uppercase tracking-[0.2em] mb-4 block"
                 style={{ color: '#f2ca50', fontFamily: 'var(--font-label)' }}
               >
-                {isEs ? 'Joyería de Oro, Antigua y Heredada' : 'Gold, Vintage & Inherited Jewelry'}
+                {isEs ? 'Compradores de Joyería de Patrimonio\u00a0·\u00a0Naples,\u00a0FL' : 'Estate Jewelry Buyers\u00a0·\u00a0Naples,\u00a0FL'}
               </span>
+              {/* Non-breaking space + `text-balance`: a phone used to strand
+                  "FL" alone on the last line (2026-10-19, mockup v1). */}
               <h1
-                className="text-4xl md:text-6xl text-white font-bold mb-6 leading-tight"
+                className="text-4xl md:text-6xl text-white font-bold mb-6 leading-tight text-balance"
                 style={{ fontFamily: 'var(--font-headline)' }}
               >
                 {isEs
-                  ? 'Venda Joyería de Patrimonio en Naples, FL'
-                  : 'Sell Estate Jewelry in Naples, FL'}
+                  ? 'Venda Joyería de Patrimonio en Naples,\u00a0FL'
+                  : 'Sell Estate Jewelry in Naples,\u00a0FL'}
               </h1>
               <p className="text-lg leading-relaxed mb-10" style={{ color: '#d0c9bc' }}>
                 {isEs
-                  ? 'Compramos anillos de oro, cadenas, pulseras y joyería heredada — una pieza o todo un joyero. Evaluamos el metal, el fabricante, las gemas y la época, explicamos la oferta y pagamos al aceptarla.'
-                  : 'Gold rings, chains, bracelets, and inherited jewelry — one piece or a whole jewelry box. We evaluate the metal, maker, gemstones, and era, explain our offer, and pay when you accept.'}
+                  ? '¿Quiere vender joyería de oro, antigua o heredada? Somos compradores de joyería de patrimonio en Naples — una pieza o todo un joyero, con evaluación gratuita. Evaluamos el metal, el fabricante, las gemas y la época, explicamos la oferta y pagamos al aceptarla.'
+                  : "Looking to sell gold, vintage, or inherited jewelry? We're Naples estate jewelry buyers — one piece or a whole jewelry box, with a free evaluation. We examine the metal, maker, gemstones, and era, explain our offer, and pay when you accept."}
               </p>
               <div className="flex flex-wrap gap-4">
                 <a

@@ -29,7 +29,7 @@ describe('buy-side lander meta descriptions — phone last, short enough to surv
   // DECISIONS.md 2026-09-08: Google cuts descriptions at ~155–160 characters
   // on phones and the number is the LAST thing in the string. Extract the
   // EN and ES literals from each page's description ternary.
-  const LANDERS = ['gold-services', 'silver-services', 'diamond-buyers', 'watch-buyers', 'jewelry-appraisal', 'free-evaluation'];
+  const LANDERS = ['gold-services', 'silver-services', 'diamond-buyers', 'watch-buyers', 'jewelry-appraisal', 'free-evaluation', 'estate-jewelry'];
   for (const lander of LANDERS) {
     it(`${lander}: both languages end with the phone and stay ≤ 160 characters`, () => {
       const src = read('src', 'app', '[locale]', lander, 'page.tsx');
@@ -42,6 +42,33 @@ describe('buy-side lander meta descriptions — phone last, short enough to surv
       }
     });
   }
+});
+
+describe('/free-evaluation vs /jewelry-appraisal — one search phrase per page (2026-10-19)', () => {
+  // /jewelry-appraisal owns "Free Jewelry Appraisal in Naples, FL" (title + H1).
+  // /free-evaluation takes the ESTATE angle so the two never compete for one
+  // search; its H1 carries the phrase, the old headline sits under it.
+  const FREE_EVAL = read('src', 'app', '[locale]', 'free-evaluation', 'page.tsx');
+  const h1 = (src: string) => src.slice(src.indexOf('<h1'), src.indexOf('</h1>'));
+
+  it('/free-evaluation has one H1, with the estate phrase and "Naples, FL" kept together', () => {
+    expect(FREE_EVAL.match(/<h1\b/g)?.length).toBe(1);
+    expect(h1(FREE_EVAL)).toContain('Free Estate Jewelry Appraisal in Naples,\\u00a0FL');
+    expect(h1(FREE_EVAL)).toContain('Tasación Gratuita de Joyas de Herencia en Naples,\\u00a0FL');
+    expect(FREE_EVAL).not.toMatch(/Free Jewelry Appraisals? in Naples/);
+  });
+
+  it('writes the non-breaking spaces as a visible \\u00a0 escape, never the raw character', () => {
+    for (const page of ['free-evaluation', 'estate-jewelry']) {
+      expect(read('src', 'app', '[locale]', page, 'page.tsx')).not.toContain(' ');
+    }
+  });
+
+  it('keeps the old headline as a paragraph under the H1, never a second H1', () => {
+    const after = FREE_EVAL.slice(FREE_EVAL.indexOf('</h1>'), FREE_EVAL.indexOf('fe-hero-lede'));
+    expect(after).toContain("Bring Whatever You Have. I'll Tell You Exactly What It Is.");
+    expect(after).toMatch(/<p\b/);
+  });
 });
 
 describe('/gold-services + /silver-services parity (2026-09-08)', () => {

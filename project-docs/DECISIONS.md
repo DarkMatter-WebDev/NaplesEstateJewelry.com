@@ -4,7 +4,19 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-10-18**.
+> compaction. Last reconciled: **2026-10-19**.
+
+## `/free-evaluation` H1 = "Free Estate Jewelry Appraisal in Naples, FL" (the old headline sits under it as a `<p>`); `/estate-jewelry` = "Estate Jewelry Buyers in Naples, FL" title + eyebrow; "Naples, FL" never splits (2026-10-19)
+
+- **Why:** the `/free-evaluation` H1 ("Bring Whatever You Have…") carried no search phrase. An outside SEO plan proposed "Free Jewelry Appraisals in Naples, FL". That is `/jewelry-appraisal`'s title and H1, so the two pages would compete for one search; the 09-11 entry below already gave this page the ESTATE angle. The owner approved mockup v1 (the estate wording) for EN + ES.
+- **The rules:**
+  - `/free-evaluation` never uses "Free Jewelry Appraisal(s) in Naples". Its title stays "Free Estate Jewelry Appraisal — Home or Showroom". Its copy keeps "appraising" (the searched word; "evaluat…" had 0 searches).
+  - The old headline is a styled `<p>`, never a second heading.
+  - `/estate-jewelry` is the plural "Buyers", still the buyer-noun slot of the 08-30 title split.
+  - Both descriptions keep the phone last (2026-09-08 rule) — an outside plan that drops it is not followed.
+  - No internal link from `/free-evaluation` to `/estate-jewelry`: it is the call page.
+- **Wrapping:** "Naples,\u00a0FL" (and the eyebrow's "·") use a non-breaking space written as the visible `\u00a0` escape, never the raw character. H1s that wrap get `text-balance`.
+- Guard `lib/__tests__/service-landers-faq.test.ts`. Record `CHANGELOG.md` 2026-10-19 (1).
 
 ## The hero headline keeps its letter tails inside its own box: `padding-bottom: 0.15em` + `margin-bottom: -0.15em` on `.home-hero-top h1` (2026-10-18)
 

@@ -1,6 +1,59 @@
 
 # Changelog
 
+## 2026-10-19 (1) — SEO: `/free-evaluation` H1 + `/estate-jewelry` eyebrow, intro, title, descriptions (EN + ES) — BUILT + STAGED, not pushed; no SQL, no env vars
+
+The owner pasted an outside SEO plan ("Website SEO Optimization Prompt") for the two heroes and asked for a review, then a mockup. It was checked against the code and `DECISIONS.md` first. Items that would reverse a ruling or were already done were left out or changed. Mockup v1 (real dev-page stills, Now vs Proposed, phone + desktop, Google result text, line-by-line table) → owner: *"build it as shown in the mockup, English and Spanish, keeping the second headline."*
+
+**What the plan asked for, and what happened:**
+- `/free-evaluation` H1 "Free Jewelry Appraisals in Naples, FL" and the same title → **changed to "Free Estate Jewelry Appraisal in Naples, FL"; title left as is.** `/jewelry-appraisal` already owns "Free Jewelry Appraisal in Naples, FL" (title + H1), and the 09-11 ruling gave this page the estate angle so the two do not compete. The plan's title would also have shown the business name twice (the suffix is automatic).
+- Old headline kept under the H1 → **done, as a `<p>`** (Caslon, `#ecdcb0`, `text-xl md:text-[1.7rem]`), not a heading.
+- New intro → **done, keeping "appraising"** (GSC 09-11: 94 "apprais…" searches, 0 "evaluat…"), with the plan's item list (gold, silver, diamonds, watches, coins).
+- Eyebrow "Free Appraisals" → **not changed** (singular kept).
+- Descriptions without the phone → **not taken**. Both pages keep "Call (239) 404-8505" last (rule 2026-09-08); the plan's item lists were folded in.
+- Insurance-appraisal note → **already on the page** (under "Come to Us, or We Come to You").
+- `/estate-jewelry` eyebrow "Estate Jewelry Buyers · Naples, FL" → **done**. H1 unchanged in wording. Intro → **done in the same spirit** (keeps "one piece or a whole jewelry box"; drops "competitive offers"). Title "Estate Jewelry Buyers Naples, FL | Sell Estate Jewelry" (78 with the suffix) → **"Estate Jewelry Buyers in Naples, FL"** (59 with the suffix; keeps the 08-30 title split).
+- Links between the two pages → **none added**. `/estate-jewelry` already links Free Appraisal twice; `/free-evaluation` is the call page and gets no exit link.
+
+**Built:**
+- `src/app/[locale]/free-evaluation/page.tsx`: H1 EN "Free Estate Jewelry Appraisal in Naples, FL" / ES "Tasación Gratuita de Joyas de Herencia en Naples, FL", with `text-balance` and `mb-3` (was `mb-5`). The old headline is now the `<p>` under it. New intro EN + ES. Description EN "Free, no-obligation appraisal of gold, silver, diamonds, watches and whole estates — at our Naples showroom or your home. Call (239) 404-8505." (142) / ES (148).
+- `src/app/[locale]/estate-jewelry/page.tsx`:
+  - Title "Estate Jewelry Buyers in Naples, FL" / "Compradores de Joyería de Patrimonio en Naples".
+  - Description "Sell estate jewelry in Naples, FL — gold, diamonds, vintage pieces and inherited collections. Free evaluation, paid on agreement. Call (239) 404-8505." (150) / ES (146).
+  - Eyebrow "Estate Jewelry Buyers · Naples, FL" / "Compradores de Joyería de Patrimonio · Naples, FL".
+  - New intro EN + ES. H1 gets `text-balance`.
+- **Headline wraps:** "Naples,\u00a0FL" is kept together in all four H1s. The appraisal H1 orphaned "FL" in the first draft, and the live `/estate-jewelry` H1 already stranded "FL" on phones. Found while checking the real ES page, not in the mockup: the ES eyebrow broke before the "·" on a phone. Non-breaking spaces around the dot fix it in both languages.
+- `src/lib/__tests__/service-landers-faq.test.ts`:
+  - `estate-jewelry` added to the phone-last / ≤ 160 description guard.
+  - New block: `/free-evaluation` has one H1 with the estate phrase, never "Free Jewelry Appraisal(s) in Naples", and the old headline stays a `<p>` under it.
+  - Both pages must write `\u00a0` as a visible escape, never the raw character.
+
+**Verified:**
+- `npx tsc --noEmit` 0 · `npx eslint` 0 errors (the 4 old `<img>` warnings) · `npx vitest run` **1881/1881** (167 files) · `npm run build` 0 (dev server stopped first; 551/551 static pages) · 88 prerendered (`.meta` files), unchanged.
+- Built HTML for `/estate-jewelry` and `/es/estate-jewelry`, plus the dev server for all four URLs: 200, exactly 1 `<h1>`, the new title and description, canonicals unchanged (`…/free-evaluation`, `…/es/free-evaluation`, `…/estate-jewelry`, `…/es/estate-jewelry`).
+- Headless Chrome on the real pages (EN + ES, 1280 + 390 px): one H1, page width = viewport (no sideways scroll), "Naples, FL" never split. EN hero heights equal the approved mockup (815 / 621 / 680 / 722 px); 0.2–1.1 % of pixels differ (the mockup used curly apostrophes).
+- ⛔ Not seen on a real phone. Google's reaction takes weeks.
+
+**Tooling trap (memory `session-tooling-gotchas`):** typing `\u00a0` through the Edit tool, or a Python `r"…"` string in a Bash heredoc, wrote the RAW invisible character into the file. It works, but nobody can see it. Fixed by writing `chr(92) + 'u00a0'`; the new test guards it.
+
+**After the owner's push:** `npm run indexnow -- --urls=/free-evaluation,/es/free-evaluation,/estate-jewelry,/es/estate-jewelry` from `next-app/` in PowerShell. Optional: GSC Request Indexing for the same four.
+
+## 2026-10-18 (7) — Session CLOSED (10-18) — docs only
+
+- **Built, deployed (owner) and verified live where visible signed out:** (1) the hero headline's letter tails no longer cut off during the load-in (net-zero `padding-bottom` / `margin-bottom: 0.15em` on the h1); (2) Admin → Offers **Item details** dropdown (specs, Listed / Melt / Your cost, the × melt / over-cost line, description, Open item page ↗ in a new tab) — mockup 1 approved; (5) the buyer's "Keep an eye on your email — we usually reply within an hour" in three spots (centred note on Offer sent, hint under the Email box, centred line in the received email) + the success screens now open at the top — mockup 2 approved. Verification: (6).
+- **Recorded, no code:** the first real sale through a counter-offer (3); offer text-message updates explored and SHELVED (4).
+- **Last gate (on the deployed code):** `npx tsc --noEmit` 0 · `npm run lint` 0 errors (the 4 old `<img>` warnings) · `npx vitest run` **1877/1877** (167 files) · `npm run build` 0 · 88 prerendered = 41 EN + 41 ES + 6.
+- **Learned (memory `playwright-webkit-not-ios`):** Playwright's WebKit build is on this PC and launches, but it does not reproduce iOS Safari layer cropping, and a sliding frame can fake a crop — compare with/without in the same run.
+- **State at close:** nothing staged-but-unpushed except docs; no SQL, no env vars. Open (all the owner's looks): Item details on a real offer, the received-email line, the headline load-in on the iPhone — plus the older items in `TASKS.md` (Accept & charge never used for real; Google Ads read ~10-19; buy-receipt draft / ID fill; Text Deals mark-sold).
+
+## 2026-10-18 (6) — 10-18 (1) + (2) + (5) DEPLOYED (owner) and VERIFIED LIVE — docs only
+
+Owner: *"pushed and deployed.. verify"*. Checked against production (`https://naplesestatejewelry.com`):
+- **(1) Headline tails:** `/` and `/es` → 200, real headline (EN "Naples Premier Gold, Sterling & Jewelry Buyers" / ES "Compradores de Oro, Plata y Joyería en Naples"), the served page carries `padding-bottom: 0.15em` (fresh: `Age` 64 / 59 s). The iPhone load-in itself is the owner's eye only.
+- **(5) Watch your email:** `/offer/<#130>` and `/es/offer/<#130>` → 200 with the Email hint (EN / ES text). The "Offer sent" screen with PayPal and EVERY `/api/offers*` request answered inside the test browser (no offer created, nothing held, nothing reached the server's offer routes — checked): **16/16** at 1280 EN, 390 EN, 390 ES — the note shows the typed address, box / lines / envelope centred to 0 px, the page opens at the top (scrollY 0; heading 180–196 px, note bottom 474–518 px on 844–900 px screens), no page errors.
+- **(2) Offers item details:** behind the sign-in, not viewable here. Signed out: `/api/admin/offers?filter=open` and `?counts=1` → **401 "Sign in required."** (no offer or cost data); `/admin/offers` → 307 to `/account/sign-in`. That the dropdown itself is live is inferred from the same push.
+- ⛔ Still the owner's: the Item details dropdown on a real offer (computer + iPhone), the centred line in the next real "We received your offer" email, the headline load-in on the iPhone.
+
 ## 2026-10-18 (5) — Make an Offer, buyer's side: "Keep an eye on your email" (usually within an hour) + the success screens start at the top — BUILT + STAGED, not pushed; no SQL, no env vars
 
 Owner (after offer texts were shelved, (4)): remind buyers to watch their email for the answer; *"we usually respond within an hour most times."* Mockup 1 → owner: centre the note (*"let me see before i approve"*) → mockup 2 approved (*"Build all three spots as shown in mockup 2, wording as written"*) → plus *"center it on the 'we received your offer' email too"*.

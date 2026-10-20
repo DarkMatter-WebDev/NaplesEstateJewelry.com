@@ -1,7 +1,7 @@
 # Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-10-18** (the homepage headline letter-tail fix BUILT + STAGED, not pushed — first block below). Before that, **2026-10-17** (session CLOSED — `CHANGELOG.md` 2026-10-17 (4): the homepage 404 fixed, deployed and confirmed — first block below, nothing open; no SQL, nothing to push). Before that, **2026-10-15** (session CLOSED — `CHANGELOG.md` 2026-10-15 (13): Make an Offer built, tested and deployed with bulk on/off, the phone card, decline/counter messages, centred email footers and delete; nothing to push, no SQL). Before that, **2026-10-14** (eBay Best Offer per
+> in `CHANGELOG.md`. Last reconciled: **2026-10-19** (SEO heroes on `/free-evaluation` + `/estate-jewelry` BUILT + STAGED, not pushed — first block below; `CHANGELOG.md` 2026-10-19 (1)). Before that, **2026-10-18** (session CLOSED — `CHANGELOG.md` 2026-10-18 (7): three changes DEPLOYED + verified live — the first three blocks below, each with only the owner's own look left; offer texts shelved; nothing to push, no SQL). Earlier the same day: the homepage headline letter-tail fix BUILT + STAGED. Before that, **2026-10-17** (session CLOSED — `CHANGELOG.md` 2026-10-17 (4): the homepage 404 fixed, deployed and confirmed — first block below, nothing open; no SQL, nothing to push). Before that, **2026-10-15** (session CLOSED — `CHANGELOG.md` 2026-10-15 (13): Make an Offer built, tested and deployed with bulk on/off, the phone card, decline/counter messages, centred email footers and delete; nothing to push, no SQL). Before that, **2026-10-14** (eBay Best Offer per
 > item + in bulk BUILT + STAGED; SQL RUN by the owner; only the push left — first block below). Before that, **2026-10-12** (session CLOSED —
 > `CHANGELOG.md` 2026-10-12 (3); two new blocks, first below: the short phone
 > cookie notice DEPLOYED + verified in production, and the next Google Ads
@@ -28,36 +28,53 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-10-18 (5) — Make an Offer, buyer's side: **"Keep an eye on your email"** + success screens start at the top — **BUILT + STAGED, not pushed** (same push as 10-18 (1) + (2))
+### 🟡 2026-10-19 (1) — SEO: `/free-evaluation` H1 + `/estate-jewelry` eyebrow / intro / title / descriptions (EN + ES) — **BUILT + STAGED, not pushed** — ◻ push, then IndexNow
+
+Record: `CHANGELOG.md` 2026-10-19 (1). Rule: `DECISIONS.md` top entry. Files: `src/app/[locale]/free-evaluation/page.tsx`, `src/app/[locale]/estate-jewelry/page.tsx`, `src/lib/__tests__/service-landers-faq.test.ts`.
+
+Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1881/1881** tests (167 files) · build 0 · 88 prerendered (unchanged). Real pages EN + ES at 1280 + 390 px: 1 H1 each, no sideways scroll, "Naples, FL" never split; EN hero heights equal mockup v1.
+
+1. ◻ **Owner — push + deploy.** No SQL, no env vars.
+2. ◻ **Claude, after the owner says it is deployed:** `npm run indexnow -- --urls=/free-evaluation,/es/free-evaluation,/estate-jewelry,/es/estate-jewelry` from `next-app/` in PowerShell (Git Bash mangles the `/` paths). Optional: GSC Request Indexing for the same four (~10 a day).
+3. ◻ **Owner — optional look on the iPhone:** `/free-evaluation` — the new headline on three lines, the old one in soft gold under it; `/es/estate-jewelry` — the eyebrow on two clean lines.
+4. ℹ️ Judge in Search Console after ~3–4 weeks: queries containing "estate jewelry appraisal" / "estate jewelry buyers" for these two pages. Don't change the wording before then.
+
+**Staging (10-19 (1)):** ✅ synced 2026-10-19 ~7:52 PM ET.
+- The dry run listed exactly the 7 touched files: 3 in the app (`estate-jewelry/page.tsx`, `free-evaluation/page.tsx`, `service-landers-faq.test.ts`) and 4 docs (CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS). 0 Extras, 1256 total.
+- The real run copied 7, 0 FAILED. The follow-up dry run copied 0, exit 0.
+- Checks: leak check 0; `.tsx` under `next-app/src` 251 = 251; SHA-256 MATCH on the 3 app files.
+- Docs-only re-sync after this line.
+
+### 🟢 2026-10-18 (5) — Make an Offer, buyer's side: **"Keep an eye on your email"** + success screens start at the top — **DEPLOYED (owner) + VERIFIED LIVE** (`CHANGELOG.md` 2026-10-18 (6): hint EN/ES on the live offer page; the Offer sent note 16/16 with a stand-in PayPal) — ◻ item 2 is the owner's
 
 Record: `CHANGELOG.md` 2026-10-18 (5). Rule: `DECISIONS.md` → Make an Offer entry ("Email is the answer channel"). Files: `src/components/offers/OfferCheckoutClient.tsx`, `src/lib/offer-emails.ts`, `src/lib/__tests__/offers.test.ts`.
 
 Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1877/1877** tests (167 files) · build 0 · 88 prerendered = 41 EN + 41 ES + 6. Real offer page with a stand-in PayPal (1280 EN, 390 EN + ES): 39/39.
 
-1. ◻ **Owner — push + deploy** (one push with 10-18 (1) + (2), when the next features are ready). No SQL, no env vars.
+1. ✅ **Owner — push + deploy** — DONE 10-18 (one push with (1) + (2)).
 2. ◻ **Owner — first look after the deploy:** the next real offer's "We received your offer" email has the centred "We usually reply within an hour…" line. Optionally, on the iPhone: any item with offers on → Make an Offer → the hint under Email (no need to send).
 
 **Staging (10-18 (5)):** ✅ synced 2026-10-18 — dry run listed exactly the 8 touched files (3 in the app: `OfferCheckoutClient.tsx`, `offer-emails.ts`, `offers.test.ts`; 5 docs: CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS, `features/make-offer.md`), 0 Extras, 1256 total; real run copied 8 / 0 FAILED; follow-up dry run 0, exit 0; leak check 0; 252 = 252 `.tsx`; SHA-256 MATCH on the 3 app files. Staging holds 10-18 (1) + (2) + (5). Docs-only re-sync after this line.
 
-### 🟡 2026-10-18 (2) — Admin → Offers: **"Item details" dropdown** on the offer card — **BUILT + STAGED, not pushed** (rides the same push as 10-18 (1))
+### 🟢 2026-10-18 (2) — Admin → Offers: **"Item details" dropdown** on the offer card — **DEPLOYED (owner)**; signed-out data lock verified live (401) — ◻ the dropdown itself is the owner's look (item 2)
 
 Record: `CHANGELOG.md` 2026-10-18 (2). Rule: `DECISIONS.md` → Make an Offer entry ("Item details on the card"). Runbook: `features/make-offer.md` step 3. Files: `src/lib/offers.ts`, `src/lib/offers-server.ts`, `src/components/admin/OffersPanel.tsx`, `src/lib/__tests__/offers.test.ts`, NEW `src/lib/__tests__/offer-item-details.test.ts`.
 
 Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1875/1875** tests (167 files) · build 0 · 88 prerendered = 41 EN + 41 ES + 6. Real panel with stand-in data, 1280 + 390 px: 42/42.
 
-1. ◻ **Owner — push + deploy** (one push with 10-18 (1)). No SQL, no env vars.
+1. ✅ **Owner — push + deploy** — DONE 10-18.
 2. ◻ **Owner — first look:** Admin → Offers (any tab) → **Item details** on a card → the chips, Listed / Melt / Your cost and the line under them, Show all, and **Open item page ↗** opens the shop page in a new tab. On the iPhone too. If "Your cost" reads "not entered" on an item that has a cost, tell Claude.
 
 **Staging (10-18 (2)):** ✅ synced 2026-10-18 — dry run listed exactly the 11 touched files (5 in the app: `OffersPanel.tsx`, `offers-server.ts`, `offers.ts`, `offers.test.ts`, NEW `offer-item-details.test.ts`; 6 docs: CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS, `features/make-offer.md`), 0 Extras, 1256 total; real run copied 11 / 0 FAILED; follow-up dry run 0, exit 0; leak check 0 (no `zz-*`); 252 = 252 `.tsx`; SHA-256 MATCH on the 5 app files. Staging also holds 10-18 (1). Docs-only re-sync after this line.
 
-### 🟡 2026-10-18 (1) — Homepage headline: letter tails cut off during the load-in — **BUILT + STAGED, not pushed**
+### 🟢 2026-10-18 (1) — Homepage headline: letter tails cut off during the load-in — **DEPLOYED (owner) + live** (the rule is served on `/` and `/es`) — ◻ the iPhone load-in is the owner's eye (item 3)
 
 Record: `CHANGELOG.md` 2026-10-18 (1). Rule: `DECISIONS.md` top entry. Files: `src/components/home/HomeHeroOverlay.tsx` (`.home-hero-top h1`: `padding-bottom: 0.15em; margin-bottom: -0.15em;`), `src/lib/__tests__/hero-short-screens.test.ts`.
 
 Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1867/1867** tests (166 files) · build 0 · 88 prerendered = 41 EN + 41 ES + 6. Tails inside the headline box 36/36 (2 engines × EN/ES × 9 sizes); layout identical with and without the fix.
 
 1. ◻ **Owner — on the iPhone (optional before the push):** with the dev server up, open `http://10.0.0.208.nip.io:3007` and reload 3–4 times — the g, J and y tails should be whole from the first frame of the fade. Same on the laptop.
-2. ◻ **Owner — push + deploy.** No SQL, no env vars.
+2. ✅ **Owner — push + deploy** — DONE 10-18.
 3. ◻ **After the deploy:** the same few reloads on `naplesestatejewelry.com` (phone). ⛔ Not reproducible in desktop browsers here — your phone is the only proof; if the tips still pop in, tell Claude.
 
 **Staging (10-18 (1)):** ✅ synced 2026-10-18 — dry run listed exactly the 6 touched files (2 in the app: `HomeHeroOverlay.tsx`, `hero-short-screens.test.ts`; 4 docs: CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS), 0 Extras, 1255 total; real run copied 6 / 0 FAILED; follow-up dry run 0, exit 0; leak check 0; 252 = 252 `.tsx`; SHA-256 MATCH on the 2 app files. Docs-only re-sync after this line.

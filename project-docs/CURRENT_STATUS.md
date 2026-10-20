@@ -2,7 +2,28 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-10-18**.
+> in `DECISIONS.md`. Last reconciled: **2026-10-19**.
+
+## Start Here (2026-10-19 — 🟡 SEO heroes BUILT + STAGED, not pushed; no SQL, no env vars)
+
+- 🟡 **BUILT + STAGED, awaiting the owner's push** (`CHANGELOG.md` 2026-10-19 (1); rule `DECISIONS.md` top entry; `TASKS.md` top):
+  - `/free-evaluation` H1 is now **"Free Estate Jewelry Appraisal in Naples, FL"**, with the old "Bring Whatever You Have…" under it as a soft-gold line. New intro; description lists the items. The title is unchanged.
+  - `/estate-jewelry`: eyebrow **"Estate Jewelry Buyers · Naples, FL"**, new intro, title **"Estate Jewelry Buyers in Naples, FL"**, description adds diamonds and vintage.
+  - All of it in EN + ES; "Naples, FL" never splits.
+  - Mockup v1 approved. Built from an outside SEO plan, minus the parts that would compete with `/jewelry-appraisal` or drop the phone from the descriptions.
+- Gate: `tsc` 0 · lint 0 errors · **1881/1881** · build 0 · 88 prerendered.
+- ◻ After the push: IndexNow for the four URLs (Claude runs it). ⛔ Not seen on a real phone.
+- The 10-18 (7) block below otherwise still applies (the owner's looks; Google Ads read ~10-19 — judge it, don't touch bids while "Learning").
+
+## Start Here (2026-10-18 (7) — session CLOSED; everything DEPLOYED; nothing staged-but-unpushed except docs; no SQL, no env vars)
+
+- 🟢 **Session closed** (`CHANGELOG.md` 2026-10-18 (7)). Three changes shipped today and verified live where they can be seen signed out: the headline letter tails, Admin → Offers **Item details**, and the buyer's "Keep an eye on your email" (+ success screens open at the top). Offer text updates were explored and **shelved**. First real counter-offer sale recorded. Last gate: `tsc` 0 · lint 0 errors · **1877/1877** · build 0 · 88 = 41 + 41 + 6.
+- ◻ **Open — the owner's looks** (`TASKS.md` top three blocks): Item details on a real offer (computer + iPhone); the centred line in the next real "We received your offer" email; the headline load-in on the iPhone. Older open items unchanged (block below the 10-18 ones): Accept & charge never used for real; Google Ads read ~10-19 (don't touch bids while "Learning"); buy-receipt draft / "Fill form from ID" first uses; the first sale through each Text Deals mark-sold button.
+
+## Start Here (2026-10-18 (6) — 🟢 everything from 10-18 is DEPLOYED (owner) and VERIFIED LIVE where it can be seen signed out; nothing staged-but-unpushed except docs; no SQL, no env vars)
+
+- 🟢 **Live** (`CHANGELOG.md` 2026-10-18 (6)): the headline letter-tail fix (`/`, `/es`), the offer form's Email hint, the centred "Keep an eye on your email" note with the page opening at the top (16/16 against production with a stand-in PayPal, no offer created), and the admin offers data locked when signed out (401).
+- ◻ **The owner's own looks:** Admin → Offers → **Item details** on a real offer (computer + iPhone); the centred line in the next real "We received your offer" email; the headline load-in on the iPhone. Where the blocks below say "STAGED" / "not pushed", read "deployed".
 
 ## Start Here (2026-10-18 (5) — 🟡 THREE changes BUILT + STAGED, not pushed (one push carries all three, after the owner's next few features); no SQL, no env vars)
 

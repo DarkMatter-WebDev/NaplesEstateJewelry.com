@@ -31,8 +31,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: isEs ? 'Tasación Gratuita de Joyas de Herencia — Casa o Salón' : 'Free Estate Jewelry Appraisal — Home or Showroom',
     // ≤ ~155 characters with the phone last (DECISIONS.md, 2026-09-08).
     description: isEs
-      ? 'Tasación gratuita y sin compromiso de piezas, colecciones completas y herencias — en nuestro salón de Naples o en su casa. Llame al (239) 404-8505.'
-      : 'Free, no-obligation appraisal of single pieces, whole collections and estates — at our Naples showroom or your home. Call (239) 404-8505.',
+      ? 'Tasación gratuita y sin compromiso de oro, plata, diamantes, relojes y herencias — en nuestro salón de Naples o en su casa. Llame al (239) 404-8505.'
+      : 'Free, no-obligation appraisal of gold, silver, diamonds, watches and whole estates — at our Naples showroom or your home. Call (239) 404-8505.',
     path: '/free-evaluation',
     locale,
   });
@@ -152,20 +152,34 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
                   {isEs ? 'Tasación Gratuita · Sin Obligación' : 'Free Appraisal · No Obligation'}
                 </span>
 
+                {/* 2026-10-19 (owner, mockup v1): the H1 carries the search
+                    phrase; the old headline stays as the line under it. The
+                    ESTATE angle is deliberate — /jewelry-appraisal owns "Free
+                    Jewelry Appraisal in Naples, FL" and the two must not
+                    compete. The non-breaking space keeps "Naples, FL" on one
+                    line; `text-balance` evens the three lines on a phone. */}
                 <h1
-                  className="text-3xl md:text-5xl font-bold mb-5 tracking-tight leading-[1.06]"
+                  className="text-3xl md:text-5xl font-bold mb-3 tracking-tight leading-[1.06] text-balance"
                   style={{ fontFamily: 'var(--font-headline)', color: '#f7f2e7' }}
+                >
+                  {isEs
+                    ? 'Tasación Gratuita de Joyas de Herencia en Naples,\u00a0FL'
+                    : 'Free Estate Jewelry Appraisal in Naples,\u00a0FL'}
+                </h1>
+                <p
+                  className="text-xl md:text-[1.7rem] font-bold leading-[1.25] mb-[1.4rem]"
+                  style={{ fontFamily: 'var(--font-headline)', color: '#ecdcb0' }}
                 >
                   {isEs
                     ? 'Traiga lo que tenga. Le diré exactamente qué es.'
                     : "Bring Whatever You Have. I'll Tell You Exactly What It Is."}
-                </h1>
+                </p>
 
                 <div className="text-base md:text-lg leading-relaxed" style={{ color: '#d8d1c2' }}>
                   <p className="fe-hero-lede">
                     {isEs
-                      ? 'Soy Chris. Llevo más de 15 años tasando joyería de patrimonio en el suroeste de Florida, y estoy encantado de revisar lo que tenga — sin ninguna obligación de vender.'
-                      : "I'm Chris. I've spent 15+ years appraising estate jewelry across Southwest Florida, and I'm happy to go through whatever you have — with no obligation to sell any of it."}
+                      ? 'Soy Chris. Llevo más de 15 años tasando joyería de patrimonio en el suroeste de Florida. Traiga su oro, plata, diamantes, relojes, monedas o una colección completa — le diré qué es cada pieza, sin ninguna obligación de vender.'
+                      : "I'm Chris. I've spent 15+ years appraising estate jewelry across Southwest Florida. Bring your gold, silver, diamonds, watches, coins, or a whole collection — I'll tell you what each piece is, with no obligation to sell any of it."}
                   </p>
                   <p className="mt-4">
                     {isEs
