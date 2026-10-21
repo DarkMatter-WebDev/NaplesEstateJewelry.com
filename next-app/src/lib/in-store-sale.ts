@@ -27,7 +27,9 @@ import { normalizePersonName } from '@/lib/person-name';
 import { normalizePhoneNumber } from '@/lib/phone';
 import { validateUsShippingAddress } from '@/lib/us-address';
 
-export const IN_STORE_PAYMENT_METHODS = ['zettle', 'cash', 'zelle', 'check'] as const;
+// Cash App, Venmo and store credit added 2026-10-20 (owner). Store credit is
+// recorded as paid like the rest: the credit was issued earlier, outside the site.
+export const IN_STORE_PAYMENT_METHODS = ['zettle', 'cash', 'zelle', 'check', 'cashapp', 'venmo', 'store_credit'] as const;
 export type InStorePaymentMethod = (typeof IN_STORE_PAYMENT_METHODS)[number];
 
 export const IN_STORE_PAYMENT_LABELS: Record<InStorePaymentMethod, string> = {
@@ -35,6 +37,9 @@ export const IN_STORE_PAYMENT_LABELS: Record<InStorePaymentMethod, string> = {
   cash: 'Cash',
   zelle: 'Zelle',
   check: 'Check',
+  cashapp: 'Cash App',
+  venmo: 'Venmo',
+  store_credit: 'Store credit',
 };
 
 /** orders.payment_method value for an in-store sale, e.g. `in_store_zettle`. */

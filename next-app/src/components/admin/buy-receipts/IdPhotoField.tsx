@@ -56,12 +56,12 @@ export default function IdPhotoField({
     }
   }
 
-  const buttonClass = 'border bg-white px-3 py-1.5 text-xs font-semibold';
+  const buttonClass = 'brs-strip-btn border bg-white px-3 py-1.5 text-xs font-semibold';
   const buttonStyle = { borderColor: '#d5c697', color: '#735c00' } as const;
 
   return (
     <div
-      className="no-print mt-3 flex flex-wrap items-center gap-3 px-3 py-2.5"
+      className="brs-strip no-print mt-3 flex flex-wrap items-center gap-3 px-3 py-2.5"
       style={{ border: '1px dashed #d5c697', background: '#fbf9f2' }}
     >
       {has ? (
@@ -77,7 +77,7 @@ export default function IdPhotoField({
           No photo
         </div>
       )}
-      <div className="min-w-[150px] flex-1">
+      <div className="brs-strip-text min-w-[150px] flex-1">
         <div className="text-[13px]" style={{ color: '#1a1c1c' }}>
           {working ? 'Working on the photo…' : autoFill?.reading ? 'Reading the ID…' : has ? 'Seller ID photo attached' : 'Seller ID photo (optional)'}
         </div>
@@ -86,7 +86,7 @@ export default function IdPhotoField({
         </div>
       </div>
       {autoFill && (
-        <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-[11.5px]" style={{ color: '#1a1c1c' }}>
+        <label className="brs-strip-check flex shrink-0 cursor-pointer items-center gap-1.5 text-[11.5px]" style={{ color: '#1a1c1c' }}>
           <input
             type="checkbox"
             checked={autoFill.checked}
@@ -103,7 +103,7 @@ export default function IdPhotoField({
         Choose a photo
       </button>
       {has && (
-        <button type="button" className="text-xs underline" style={{ color: '#746b5b' }} disabled={working} onClick={onRemove}>
+        <button type="button" className="brs-strip-remove text-xs underline" style={{ color: '#746b5b' }} disabled={working} onClick={onRemove}>
           Remove
         </button>
       )}

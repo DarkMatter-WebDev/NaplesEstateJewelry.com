@@ -48,8 +48,12 @@ edit it, duplicate it, void it, add or replace the ID photo.
 - Receipt number (`BUY-00042`, assigned on save) and the date/time in Eastern.
 - **Seller**: name, phone, email (optional), street, city, state, ZIP, ID type,
   ID last 4, date of birth.
-- **Items purchased**: quantity, description, amount. The form starts with one
-  row ("+ Add item" for more) and the paper prints only the rows entered. ⛔ The amount is the
+- **Items purchased**: description, amount. **No Qty box since 2026-10-20** (owner:
+  *"if theres a quantity i will add it in description"*); every new line saves as 1.
+  The printed paper and the seller's email show a Qty column ONLY for an older
+  receipt that really has a quantity other than 1 (`buyReceiptShowsQty`,
+  `lib/buy-receipts.ts`). The form starts with one row ("+ Add item" for more)
+  and the paper prints only the rows entered. ⛔ The amount is the
   **line total** as typed; there is no unit price. The total is the sum.
 - **Paid by**: Cash, Check (asks for the check number), Zelle, Venmo, Cash App,
   PayPal, Bank transfer, Store credit / trade (Cash App and PayPal added
@@ -108,10 +112,27 @@ not emailed. SQL: `supabase/buy-receipts-email-2026-09.sql` (`emailed_at`,
 ## On a tablet or a phone
 
 The form reflows: on a tablet the header stacks and fields go two per row; on
-a phone (under 520 px) one field per row, each item row becomes a small block
-(description, then qty / amount / remove), payments stack, and inputs are 16 px
-so iOS does not zoom. The webcam starts with the rear camera there. The print
-output is unchanged — every reflow rule is `@media screen`.
+a phone (under 520 px — owner mockup v1, 2026-10-20):
+- one field per row, except **State + ZIP** and **ID type + ID last 4**, which share a line;
+- each item is **one line**: number · description · amount · ×;
+- "Items purchased by Naples Estate Jewelry" never wraps — it shrinks with the screen
+  (`min(15px, 3.6vw)`, 13.5 px at 375);
+- the **ID photo and thumbprint strips**: picture + words on the top line, the
+  "Fill form from ID" tick box across, then the buttons as two equal halves
+  (one full-width "Choose a file" on an iPhone, which has no folder watching);
+- the **buttons under the paper**: print choice across, Save draft · Clear,
+  Print here · Save, then the gold Save and send across — all 44 px tall;
+- payments stack, and inputs are 16 px so iOS does not zoom.
+
+The webcam starts with the rear camera there. The print output is unchanged —
+every reflow rule is `@media screen`.
+
+⚠️ **Why the strips were squeezed** (fixed 2026-10-20): `globals.css` sets
+`div { min-width: 0 }` unlayered, which beats the strips' Tailwind
+`min-w-[150px]` — the words shrank to ~70 px (one letter a line in the
+thumbprint strip). The phone rules lay the strips out by their own classes
+(`brs-strip`, `brs-strip-text`, `brs-strip-check`, `brs-strip-btn`) instead.
+Guard: `lib/__tests__/buy-receipt-phone-layout.test.ts`.
 
 ## Customer input mode (2026-10-03)
 

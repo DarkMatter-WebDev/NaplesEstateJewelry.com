@@ -21,6 +21,7 @@ import {
   BUY_RECEIPT_PAYMENT_LABELS,
   BUY_RECEIPT_PAYMENT_METHODS,
   BUY_RECEIPT_SIGNER_NAME,
+  buyReceiptShowsQty,
   draftTotal,
   formatDob,
   formatReceiptDate,
@@ -316,12 +317,11 @@ function EditSheet({
       {idPhotoSlot}
       {thumbprintSlot}
 
-      <h2 className="sheet-section-title">Items purchased by {BUSINESS_NAME}</h2>
+      <h2 className="sheet-section-title brs-items-title">Items purchased by {BUSINESS_NAME}</h2>
       <table className="brs-items">
         <thead>
           <tr>
             <th className="brs-num">#</th>
-            <th className="brs-qty">Qty</th>
             <th>Description</th>
             <th className="brs-amount">Amount</th>
             <th className="brs-tools" aria-hidden="true" />
@@ -331,9 +331,6 @@ function EditSheet({
           {draft.items.map((item, index) => (
             <tr key={index}>
               <td className="brs-num">{index + 1}</td>
-              <td className="brs-qty">
-                <input className="sheet-input" value={item.qty} inputMode="numeric" placeholder="1" aria-label={`Row ${index + 1} quantity`} onChange={(e) => setItem(index, { qty: e.target.value })} />
-              </td>
               <td className="brs-desc">
                 <input className="sheet-input" value={item.description} placeholder="Description" aria-label={`Row ${index + 1} description`} onChange={(e) => setItem(index, { description: e.target.value })} />
               </td>
@@ -484,16 +481,16 @@ function EditSheet({
           <input className="sheet-input" value={draft.sellerCity} autoComplete="off" onChange={(e) => set({ sellerCity: e.target.value })} {...seat('sellerCity')} />
           <span className="brs-label">City{why('sellerCity')}</span>
         </label>
-        <label className="brs-c1">
+        <label className="brs-c1 brs-cell-state">
           <input className="sheet-input" value={draft.sellerState} maxLength={2} autoComplete="off" onChange={(e) => set({ sellerState: e.target.value.toUpperCase() })} {...seat('sellerState')} />
           <span className="brs-label">State</span>
         </label>
-        <label className="brs-c2">
+        <label className="brs-c2 brs-cell-zip">
           <input className="sheet-input" value={draft.sellerZip} inputMode="numeric" maxLength={10} autoComplete="off" onChange={(e) => set({ sellerZip: e.target.value })} {...seat('sellerZip')} />
           <span className="brs-label">ZIP{why('sellerZip')}</span>
         </label>
         {/* From here down the paper is the owner's: off (and faded) in the seller's view. */}
-        <label className={`brs-c4${offCell}`} inert={off}>
+        <label className={`brs-c4 brs-cell-idtype${offCell}`} inert={off}>
           <select className="sheet-input" value={draft.sellerIdType} disabled={off} onChange={(e) => set({ sellerIdType: e.target.value })}>
             <option value="">Choose…</option>
             {BUY_RECEIPT_ID_TYPES.map((type) => (
@@ -502,7 +499,7 @@ function EditSheet({
           </select>
           <span className="brs-label">ID type</span>
         </label>
-        <label className={`brs-c2${offCell}`} inert={off}>
+        <label className={`brs-c2 brs-cell-idlast4${offCell}`} inert={off}>
           <input className="sheet-input" value={draft.sellerIdLast4} maxLength={4} autoComplete="off" disabled={off} onChange={(e) => set({ sellerIdLast4: e.target.value })} />
           <span className="brs-label">ID last 4</span>
         </label>
@@ -537,6 +534,8 @@ function ThumbprintBlock({ url }: { url: string }) {
 
 function PrintSheet({ receipt, idPhotoUrl, showIdPhoto, thumbprintUrl, variant = 'shop' }: PrintProps) {
   const items = receipt.items ?? [];
+  // No Qty column unless an older receipt really has a quantity (the seller's email follows the same rule).
+  const showQty = buyReceiptShowsQty(items);
   const sellerCopy = variant === 'seller';
   const withId = !sellerCopy && Boolean(showIdPhoto && idPhotoUrl);
   // The seller's copy never carries the thumbprint either.
@@ -564,12 +563,12 @@ function PrintSheet({ receipt, idPhotoUrl, showIdPhoto, thumbprintUrl, variant =
         <div className="brs-c3"><Value>{formatDob(receipt.seller_dob)}</Value><span className="brs-label">Date of birth</span></div>
       </div>
 
-      <h2 className="sheet-section-title">Items purchased by {BUSINESS_NAME}</h2>
+      <h2 className="sheet-section-title brs-items-title">Items purchased by {BUSINESS_NAME}</h2>
       <table className="brs-items">
         <thead>
           <tr>
             <th className="brs-num">#</th>
-            <th className="brs-qty">Qty</th>
+            {showQty && <th className="brs-qty">Qty</th>}
             <th>Description</th>
             <th className="brs-amount">Amount</th>
           </tr>
@@ -578,7 +577,7 @@ function PrintSheet({ receipt, idPhotoUrl, showIdPhoto, thumbprintUrl, variant =
           {items.map((item, index) => (
             <tr key={index}>
               <td className="brs-num brs-text">{index + 1}</td>
-              <td className="brs-qty brs-text">{item.qty}</td>
+              {showQty && <td className="brs-qty brs-text">{item.qty}</td>}
               <td className="brs-desc brs-text">{item.description}</td>
               <td className="brs-amount brs-text">{formatCurrency(item.amount)}</td>
             </tr>

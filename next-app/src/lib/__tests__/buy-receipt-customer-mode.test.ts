@@ -458,7 +458,8 @@ describe('customer input mode: the owner\'s form, the paper and the seller\'s vi
     expect(sheet.match(/\{\.\.\.seat\('/g)).toHaveLength(CUSTOMER_FIELDS.length);
     for (const field of OWNER_BOXES) expect(sheet, field).not.toContain(`seat('${field}')`);
     // ID type, ID last 4, date of birth: faded, inert and disabled.
-    expect(sheet.match(/className=\{`brs-c\d\$\{offCell\}`\} inert=\{off\}/g)).toHaveLength(3);
+    // A phone-layout class (2026-10-20: brs-cell-idtype / brs-cell-idlast4) may sit beside the column class.
+    expect(sheet.match(/className=\{`brs-c\d(?: brs-cell-\w+)?\$\{offCell\}`\} inert=\{off\}/g)).toHaveLength(3);
     expect(sheet.match(/disabled=\{off\}/g)).toHaveLength(3);
     for (const field of OWNER_BOXES) {
       const line = sheet.split('\n').find((text) => text.includes(`set({ ${field}: e.target.value`)) ?? '';

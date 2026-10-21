@@ -6,6 +6,20 @@
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
 > compaction. Last reconciled: **2026-10-20**.
 
+## Buy receipt: no Qty box at any size; the paper and the seller's email show Qty only for a real quantity; the phone layout is the owner's mockup v1 (2026-10-20)
+
+- **Owner:** *"on all viewport sizes of the form, remove the quantity field... if theres a quantity i will add it in description.. and then on mobile viewport version, make sure description and price fields stay on same line"*; then *"update the sellers email qty column too... we want it to match the form going forward"*.
+- **The rule:** the form has no Qty box. Every new line saves as quantity 1, which is what a blank box always saved; the total was always the sum of the amounts, so no money changes. The printed paper and the seller's email leave the Qty column out unless the receipt has a line with a quantity other than 1 (older receipts). That rule is ONE function, `buyReceiptShowsQty` (`lib/buy-receipts.ts`), used by both, so the two cannot drift. The station's test print sample is all 1s, so it looks like a real receipt.
+- **Phone (under 520 px, `@media screen` only; owner mockup v1: "1 yes, 2 yes, 3 yes, 4 leave it — build it"):**
+  - an item is one line;
+  - State + ZIP and ID type + ID last 4 pair up (this also shows on a phone in Customer input mode — same paper);
+  - the ID photo / thumbprint strips: words beside the picture, buttons as equal halves;
+  - the buttons under the paper: two to a row, 44 px tall;
+  - "Items purchased by Naples Estate Jewelry" stays on one line, shrinking in place.
+- The admin menu was left as it is (owner: "leave it"). Its own button already folds it into one line.
+- ⛔ A Tailwind `min-w-*` on a `div` does nothing in this project (`globals.css` → `div { min-width: 0 }`, unlayered). Set the minimum in the component's own CSS. Same family of trap as *"Custom CSS beats Tailwind utilities"*.
+- Record `CHANGELOG.md` 2026-10-20 (3); runbook `features/buy-receipts.md` → *On a tablet or a phone*.
+
 ## An in-store sale can be SHIPPED: stored exactly like a shipped web order; the charge is the website's fee, none, or typed; Florida tax follows the web checkout rule (2026-10-20)
 
 - **Owner picks on mockup v1:** *"1: A, but add a fourth shipping charge option for me to enter custom amount; 2: A; 3: A"*.
@@ -672,7 +686,8 @@ https://claude.ai/artifact/5o6VdpQjChYp11JJPCqS8X.
   PayPal business account either way. ⛔ Do not add a PayPal card button
   to the in-store page.
 - **`/admin/in-store-sale` records, it does not charge.** One paid,
-  picked-up order per sale, `payment_method = in_store_<zettle|cash|zelle|check>`,
+  picked-up order per sale, `payment_method = in_store_<zettle|cash|zelle|check|cashapp|venmo|store_credit>`
+  (the last three added 2026-10-20; store credit = credit issued earlier, outside the site),
   `payment_reference = "In store · …"`, no PayPal capture id. It reuses
   `create_paypal_order` + `capture_paypal_order` so a LISTED item is sold
   exactly as a web sale sells it (row lock, quantity, `sold_price` = the

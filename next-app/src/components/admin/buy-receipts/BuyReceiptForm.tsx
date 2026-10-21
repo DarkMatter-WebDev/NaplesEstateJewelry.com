@@ -731,7 +731,7 @@ export default function BuyReceiptForm({
 
       {sheet()}
 
-      <div className="mx-auto mt-4 grid gap-2" style={{ width: 'min(8.5in, 100%)' }}>
+      <div className="brs-actions mx-auto mt-4 grid gap-2" style={{ width: 'min(8.5in, 100%)' }}>
         {error && (
           <p role="alert" className="border px-3 py-2 text-sm" style={{ borderColor: 'var(--color-error)', color: 'var(--color-error)', background: 'color-mix(in srgb, var(--color-error) 8%, transparent)' }}>
             {error}
@@ -745,30 +745,30 @@ export default function BuyReceiptForm({
         {/* What prints, on its own line: beside the buttons it pushed the main button onto a second row.
             "Save draft" shares this line for the same reason (measured 2026-10-09: as a fifth button in
             the row below, the gold button dropped to a second row on an iPad held upright). */}
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <button type="button" className="outline-button text-xs" disabled={working} title="Keep it to finish later, on this or another device. Only the seller's name is needed." onClick={() => void saveDraft()}>
+        <div className="brs-actions-row flex flex-wrap items-center justify-end gap-2">
+          <button type="button" className="brs-act-draft outline-button text-xs" disabled={working} title="Keep it to finish later, on this or another device. Only the seller's name is needed." onClick={() => void saveDraft()}>
             {draftBusy ? 'Saving…' : 'Save draft'}
           </button>
           <span className="flex-1" />
           <PrintSetSelect value={setKey} hasIdPhoto={hasPhoto} onChange={setChosenSet} disabled={working} />
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="brs-actions-row flex flex-wrap items-center gap-2">
           {/* A saved draft is not cleared from here: it stays in the Log, where Delete removes it. */}
           {linked ? (
-            <Link href={`${adminBasePath}/buy-receipts/log`} className="outline-button text-xs">Back to the log</Link>
+            <Link href={`${adminBasePath}/buy-receipts/log`} className="brs-act-clear outline-button text-xs">Back to the log</Link>
           ) : (
-            <button type="button" className="outline-button text-xs" disabled={working} onClick={startOver}>
+            <button type="button" className="brs-act-clear outline-button text-xs" disabled={working} onClick={startOver}>
               Clear
             </button>
           )}
           <span className="flex-1" />
-          <button type="button" className="outline-button text-xs" disabled={working} onClick={() => void submit('print')}>
+          <button type="button" className="brs-act-print outline-button text-xs" disabled={working} onClick={() => void submit('print')}>
             {busy === 'print' ? 'Saving…' : 'Print here'}
           </button>
-          <button type="button" className="outline-button text-xs" disabled={working} onClick={() => void submit('save')}>
+          <button type="button" className="brs-act-save outline-button text-xs" disabled={working} onClick={() => void submit('save')}>
             {busy === 'save' ? 'Saving…' : 'Save'}
           </button>
-          <button type="button" className="gold-button text-xs" disabled={working} onClick={() => void submit('send')}>
+          <button type="button" className="brs-act-send gold-button text-xs" disabled={working} onClick={() => void submit('send')}>
             {busy === 'send' ? 'Saving…' : 'Save and send to desktop printer'}
           </button>
         </div>

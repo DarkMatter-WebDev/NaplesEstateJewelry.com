@@ -40,6 +40,7 @@ import {
   resolvePrintCopies,
   sampleBuyReceipt,
   stationShortcutTarget,
+  buyReceiptShowsQty,
   type BuyReceiptDraft,
 } from '../buy-receipts';
 import { LEGACY_REDIRECTS, resolveLegacyRedirect } from '../legacy-redirects';
@@ -610,6 +611,25 @@ describe('buy receipts: the seller copy by email', () => {
     expect(email.text).not.toContain('y.webp');
     // A void receipt says so in the subject.
     expect(buildBuyReceiptEmail({ ...row, status: 'void', void_reason: 'Test' }).subject).toMatch(/^VOID — /);
+  });
+
+  it('matches the form: no Qty column, unless an older receipt has a real quantity (2026-10-20)', async () => {
+    const { buildBuyReceiptEmail } = await import('../buy-receipt-email');
+    const row = sampleBuyReceipt('2026-10-20T18:00:00Z');
+    // Every line is 1, as the form now saves.
+    const plain = buildBuyReceiptEmail(row);
+    expect(plain.html).not.toContain('>Qty</td>');
+    expect(plain.html).not.toContain('colspan="2"');
+    expect(plain.text).not.toContain('qty');
+    expect(plain.text).toContain('  2. Sample second line — $50.00');
+    // An older receipt with a quantity of 2 keeps the column, the "qty" in the text, and the wide total cell.
+    const older = buildBuyReceiptEmail({ ...row, items: row.items.map((item, index) => ({ ...item, qty: index === 1 ? 2 : 1 })) });
+    expect(older.html).toContain('>Qty</td>');
+    expect(older.html).toContain('colspan="2"');
+    expect(older.text).toContain('  2. Sample second line — qty 2 — $50.00');
+    expect(buyReceiptShowsQty([{ qty: 1 }, { qty: 1 }])).toBe(false);
+    expect(buyReceiptShowsQty([{ qty: 1 }, { qty: 3 }])).toBe(true);
+    expect(buyReceiptShowsQty([])).toBe(false);
   });
 
   it('is sent through the admin routes only, never attaching the photo', () => {

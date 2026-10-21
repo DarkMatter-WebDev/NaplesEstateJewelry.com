@@ -1,7 +1,7 @@
 # Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-10-20** (In-Store Sale "Pickup or ship" BUILT + STAGED, not pushed — first block below; `CHANGELOG.md` 2026-10-20 (1)). Before that, **2026-10-19** (SEO heroes on `/free-evaluation` + `/estate-jewelry` BUILT + STAGED, not pushed — first block below; `CHANGELOG.md` 2026-10-19 (1)). Before that, **2026-10-18** (session CLOSED — `CHANGELOG.md` 2026-10-18 (7): three changes DEPLOYED + verified live — the first three blocks below, each with only the owner's own look left; offer texts shelved; nothing to push, no SQL). Earlier the same day: the homepage headline letter-tail fix BUILT + STAGED. Before that, **2026-10-17** (session CLOSED — `CHANGELOG.md` 2026-10-17 (4): the homepage 404 fixed, deployed and confirmed — first block below, nothing open; no SQL, nothing to push). Before that, **2026-10-15** (session CLOSED — `CHANGELOG.md` 2026-10-15 (13): Make an Offer built, tested and deployed with bulk on/off, the phone card, decline/counter messages, centred email footers and delete; nothing to push, no SQL). Before that, **2026-10-14** (eBay Best Offer per
+> in `CHANGELOG.md`. Last reconciled: **2026-10-20 (2)** (Paid by + Cash App / Venmo / Store credit BUILT + STAGED, not pushed — first block below; Pickup or ship DEPLOYED by the owner — second block; `CHANGELOG.md` 2026-10-20 (2)). Earlier the same day: **2026-10-20** (In-Store Sale "Pickup or ship" built — `CHANGELOG.md` 2026-10-20 (1)). Before that, **2026-10-19** (SEO heroes on `/free-evaluation` + `/estate-jewelry` BUILT + STAGED, not pushed — first block below; `CHANGELOG.md` 2026-10-19 (1)). Before that, **2026-10-18** (session CLOSED — `CHANGELOG.md` 2026-10-18 (7): three changes DEPLOYED + verified live — the first three blocks below, each with only the owner's own look left; offer texts shelved; nothing to push, no SQL). Earlier the same day: the homepage headline letter-tail fix BUILT + STAGED. Before that, **2026-10-17** (session CLOSED — `CHANGELOG.md` 2026-10-17 (4): the homepage 404 fixed, deployed and confirmed — first block below, nothing open; no SQL, nothing to push). Before that, **2026-10-15** (session CLOSED — `CHANGELOG.md` 2026-10-15 (13): Make an Offer built, tested and deployed with bulk on/off, the phone card, decline/counter messages, centred email footers and delete; nothing to push, no SQL). Before that, **2026-10-14** (eBay Best Offer per
 > item + in bulk BUILT + STAGED; SQL RUN by the owner; only the push left — first block below). Before that, **2026-10-12** (session CLOSED —
 > `CHANGELOG.md` 2026-10-12 (3); two new blocks, first below: the short phone
 > cookie notice DEPLOYED + verified in production, and the next Google Ads
@@ -28,7 +28,43 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-10-20 (1) — Admin → In-Store Sale: **Pickup or ship** + the customer's address — BUILT + STAGED, not pushed; no SQL, no env vars
+### 🟡 2026-10-20 (3) — Buy Receipts on a phone + **no Qty** (form, paper, seller's email) — BUILT + STAGED, not pushed; no SQL, no env vars
+
+Record: `CHANGELOG.md` 2026-10-20 (3). Rule: `DECISIONS.md` top entry. Runbook: `features/buy-receipts.md`. Files:
+- `components/admin/buy-receipts/buy-receipt-sheet-css.ts`, `BuyReceiptSheet.tsx`, `BuyReceiptForm.tsx`, `IdPhotoField.tsx`, `ThumbprintField.tsx`
+- `lib/buy-receipts.ts` (`buyReceiptShowsQty`, test-print sample), `lib/buy-receipt-email.ts`
+- tests: `buy-receipt-phone-layout.test.ts` (NEW), `buy-receipts.test.ts`, `buy-receipt-thumbprint.test.ts`, `buy-receipt-customer-mode.test.ts`
+
+Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1901/1901** (168 files) · build 0 · 88 prerendered. Real form 148/148 (320–1280 px, paper, email; stand-in data).
+
+1. ◻ **Owner — push + deploy** (carries (2) Paid by as well).
+2. ◻ **Owner — on the iPhone:** Admin → Buy Receipts → New receipt. Check:
+   - the ID photo and thumbprint strips read normally;
+   - each item is one line with no Qty box;
+   - "Items purchased by Naples Estate Jewelry" fits on one line;
+   - the buttons sit two to a row.
+3. ◻ **Owner — the next real receipt:** the printed copy and the seller's email have no Qty column.
+
+**Staging (10-20 (3)):** ✅ synced 2026-10-20 ~10:48 PM ET.
+- The dry run listed exactly the 17 touched files: 11 in the app (incl. the NEW test) + 6 docs (CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS, `features/buy-receipts.md`, and STRUCTURE.md for its line-ending fix). 0 Extras, 1257 total.
+- The real run copied 17, 0 FAILED. The follow-up dry run copied 0, exit 0.
+- Checks: leak check 0; `.tsx` 251 = 251; SHA-256 MATCH on 5 app files; no `zz-*` page in staging.
+- Staging also holds 10-20 (2). Docs-only re-sync after this line.
+
+### 🟡 2026-10-20 (2) — In-Store Sale "Paid by": **Cash App, Venmo, Store credit** — BUILT + STAGED, not pushed; no SQL, no env vars
+
+Record: `CHANGELOG.md` 2026-10-20 (2). Files: `src/lib/in-store-sale.ts`, `src/components/admin/InStoreSaleForm.tsx`, `src/lib/__tests__/in-store-sale.test.ts`. Gate: `tsc` 0 · lint 0 errors · **1893/1893** · build 0 · 88 prerendered. Real form 13/13 at 1280 + 390 px (save intercepted).
+
+1. ◻ **Owner — push + deploy.**
+2. ◻ **Owner — the next sale paid one of these ways:** pick the chip. The order page should say "In store · Cash App" / "Venmo" / "Store credit".
+
+**Staging (10-20 (2)):** ✅ synced 2026-10-20 ~9:58 PM ET.
+- The dry run listed exactly the 7 touched files: 3 in the app + 4 docs (CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS). 0 Extras, 1256 total.
+- The real run copied 7, 0 FAILED. The follow-up dry run copied 0, exit 0.
+- Checks: leak check 0; `.tsx` 251 = 251; SHA-256 MATCH on the 3 app files; no temporary page in staging.
+- Docs-only re-sync after this line.
+
+### 🟢 2026-10-20 (1) — Admin → In-Store Sale: **Pickup or ship** + the customer's address — **DEPLOYED (owner, 10-20)**; ◻ item 2 (first real shipped sale) is the owner's
 
 Record: `CHANGELOG.md` 2026-10-20 (1). Rule: `DECISIONS.md` top entry. Files:
 - `src/lib/in-store-sale.ts`
@@ -40,7 +76,7 @@ Record: `CHANGELOG.md` 2026-10-20 (1). Rule: `DECISIONS.md` top entry. Files:
 
 Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1893/1893** tests (167 files) · build 0 · 88 prerendered = 41 EN + 41 ES + 6. The real form 55/55 at 1280 + 390 px (stand-in data, save intercepted).
 
-1. ◻ **Owner — push + deploy.**
+1. ✅ **Owner — push + deploy** — DONE 10-20 (owner: *"pushed and deployed"*).
 2. ◻ **Owner — the first real shipped sale.**
    - Admin → In-Store Sale → 3. Pickup or ship → **Ship**, fill in the address, pick the charge. Charge the shown total on Zettle, then Record sale.
    - Check that the receipt email shows "Ship to" and no pickup box.

@@ -481,7 +481,11 @@ export default function InStoreSaleForm({
           </div>
           <div className="flex justify-between border-t pt-3 text-2xl font-bold" style={{ ...cardStyle, fontFamily: 'var(--font-headline)' }}><span>Total</span><span>{totals ? formatCurrency(totals.total) : '—'}</span></div>
           <span className="text-xs" style={hintStyle}>
-            {paidBy === 'zettle' && totals ? <>Collect <strong>{formatCurrency(totals.total)}</strong> on Zettle before recording.</> : 'Recording does not take a payment — the money is already in hand.'}
+            {paidBy === 'zettle' && totals
+              ? <>Collect <strong>{formatCurrency(totals.total)}</strong> on Zettle before recording.</>
+              : paidBy === 'store_credit'
+                ? 'Recording does not take a payment — the customer’s store credit covers it.'
+                : 'Recording does not take a payment — the money is already in hand.'}
           </span>
           {error && (
             <div className="rounded-lg px-3 py-2 text-sm" role="alert" style={{ background: 'color-mix(in srgb, var(--color-error) 10%, transparent)', color: 'var(--color-error)' }}>{error}</div>

@@ -358,31 +358,50 @@ export const BUY_RECEIPT_SHEET_CSS = `
   .buy-receipt-sheet .brs-sign-row { grid-template-columns: 1fr; gap: 14px; }
 }
 
-/* Phone (owner, 2026-09-30: usable on tablet and mobile too). One field per row;
-   each item row becomes a small block — description across, then qty, amount and
-   the remove button; each payment row the same. */
+/* Phone (owner, 2026-09-30: usable on tablet and mobile too). One field per row,
+   except State + ZIP and ID type + ID last 4, which share a line (owner, 2026-10-20);
+   each item stays ONE line — number, description, amount, remove (owner, 2026-10-20:
+   no Qty box at any size); each payment row becomes a small block. */
 @media screen and (max-width: 520px) {
   .buy-receipt-sheet { padding: 14px 10px; font-size: 14px; }
   .buy-receipt-sheet .brs-grid { gap: 8px; }
   .buy-receipt-sheet .brs-grid > * { grid-column: span 12; }
+  .buy-receipt-sheet .brs-grid > .brs-cell-state { grid-column: span 4; }
+  .buy-receipt-sheet .brs-grid > .brs-cell-zip { grid-column: span 8; }
+  .buy-receipt-sheet .brs-grid > .brs-cell-idtype { grid-column: span 7; }
+  .buy-receipt-sheet .brs-grid > .brs-cell-idlast4 { grid-column: span 5; }
+  /* "Items purchased by Naples Estate Jewelry" stays on ONE line (owner, 2026-10-20): it shrinks in
+     place with the screen (13.5px at 375 px wide) instead of wrapping. */
+  .buy-receipt-sheet .brs-items-title { white-space: nowrap; font-size: min(15px, 3.6vw); }
   .buy-receipt-sheet .brs-items thead { display: none; }
   .buy-receipt-sheet .brs-items,
   .buy-receipt-sheet .brs-items tbody { display: block; }
   .buy-receipt-sheet .brs-items tr {
     display: grid;
-    grid-template-columns: 28px minmax(0, 1fr) minmax(0, 1fr) 30px;
-    grid-template-areas: 'num desc desc desc' 'num qty amount tools';
+    grid-template-columns: 22px minmax(0, 1fr) 96px 24px;
+    grid-template-areas: 'num desc amount tools';
+    align-items: center;
     gap: 4px 6px;
     padding: 6px 0;
     border-bottom: 1px solid #eadfbd;
   }
   .buy-receipt-sheet .brs-items td { display: block; width: auto; padding: 0; border: 0; }
-  .buy-receipt-sheet .brs-items td.brs-num { grid-area: num; align-self: start; padding-top: 6px; }
+  .buy-receipt-sheet .brs-items td.brs-num { grid-area: num; }
+  /* The computer's fixed column widths (# 28, Qty 58, Amount 118, × 30) out-rank the plain td rule
+     above; on a phone the grid columns size the cells, or the amount spills over the ×. */
+  .buy-receipt-sheet .brs-items td.brs-num,
+  .buy-receipt-sheet .brs-items td.brs-qty,
+  .buy-receipt-sheet .brs-items td.brs-amount,
+  .buy-receipt-sheet .brs-items td.brs-tools { width: auto; min-width: 0; }
+  /* An older saved receipt with a real quantity still shows it (the paper prints the column then). */
+  .buy-receipt-sheet .brs-items tr:has(> td.brs-qty) {
+    grid-template-columns: 22px 34px minmax(0, 1fr) 96px;
+    grid-template-areas: 'num qty desc amount';
+  }
   .buy-receipt-sheet .brs-items td.brs-qty { grid-area: qty; }
   .buy-receipt-sheet .brs-items td.brs-amount { grid-area: amount; }
   .buy-receipt-sheet .brs-items td.brs-tools { grid-area: tools; align-self: center; text-align: right; }
   .buy-receipt-sheet .brs-items td.brs-desc { grid-area: desc; }
-  .buy-receipt-sheet .brs-items .brs-qty input::placeholder { color: #a79e8b; }
   .buy-receipt-sheet .brs-pay-row {
     grid-template-columns: minmax(0, 1fr) 28px;
     grid-template-areas: 'method tools' 'reference reference' 'amount amount';
@@ -400,6 +419,35 @@ export const BUY_RECEIPT_SHEET_CSS = `
   .buy-receipt-sheet .brs-pictures { flex-wrap: wrap; }
   .buy-receipt-sheet .brs-signature,
   .buy-receipt-sheet .brs-sign-row .brs-signature { font-size: 28px; }
+
+  /* The ID photo and thumbprint strips (owner, 2026-10-20). Their words keep the rest of the
+     picture's line, so every button starts a new line: the tick box across, then the buttons two
+     equal halves. ⚠️ The words' Tailwind min-w-[150px] never applied: globals.css sets
+     div { min-width: 0 } unlayered, which beats every utility, so they shrank to ~70 px (and to
+     one letter a line in the thumbprint strip). Not scoped to the paper: the receipt page also
+     draws a strip outside it. */
+  .brs-strip { gap: 10px 12px; }
+  .brs-strip > .brs-strip-text { flex: 1 1 50%; min-width: 0; }
+  .brs-strip > .brs-strip-check { flex: 1 1 100%; font-size: 13px; }
+  .brs-strip > .brs-strip-btn { flex: 1 1 calc(50% - 6px); align-self: stretch; min-height: 40px; padding-left: 8px; padding-right: 8px; font-size: 13px; }
+  .brs-strip > .brs-strip-remove { flex: 1 1 100%; text-align: left; }
+
+  /* The buttons under the paper: the print choice across, then two to a line (Save draft · Clear,
+     Print here · Save), then the gold button across. The two rows fold into the grid
+     (display: contents) so the buttons can be ordered across them. */
+  .brs-actions { grid-template-columns: 1fr 1fr; }
+  .brs-actions > .brs-actions-row { display: contents; }
+  .brs-actions > .brs-actions-row > span.flex-1 { display: none; }
+  .brs-actions > p { grid-column: 1 / -1; }
+  .brs-actions > p:last-child { order: 9; }
+  .brs-actions select { grid-column: 1 / -1; order: 1; }
+  .brs-actions .brs-act-draft { order: 2; }
+  .brs-actions .brs-act-clear { order: 3; }
+  .brs-actions .brs-act-print { order: 4; }
+  .brs-actions .brs-act-save { order: 5; }
+  .brs-actions .brs-act-send { grid-column: 1 / -1; order: 6; }
+  .brs-actions .outline-button,
+  .brs-actions .gold-button { width: 100%; min-height: 44px; }
 }
 
 /* Touch screens: 16px inputs, or iOS zooms the page on every tap into a field. */

@@ -4,6 +4,21 @@
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
 > in `DECISIONS.md`. Last reconciled: **2026-10-20**.
 
+## Start Here (2026-10-20 (3) — 🟡 Buy Receipts phone layout + no Qty BUILT + STAGED, not pushed (rides with (2) Paid by); no SQL, no env vars)
+
+- 🟡 **Built and staged, waiting for the push** (`CHANGELOG.md` 2026-10-20 (3); rule `DECISIONS.md` top entry; runbook `features/buy-receipts.md` → *On a tablet or a phone*; `TASKS.md` top):
+  - **Admin → Buy Receipts on a phone** (owner mockup v1): the ID photo / thumbprint strips are no longer squeezed; each item is one line; State + ZIP and ID type + ID last 4 pair up; the items heading stays on one line; the buttons are two to a row.
+  - **No Qty box at any size.** The paper and the seller's email show Qty only for an older receipt with a real quantity.
+- Gate: `tsc` 0 · lint 0 errors · **1901/1901** · build 0 · 88. Real form 148/148 at 320–1280 px.
+- ⛔ Not seen on the owner's iPhone or behind the sign-in.
+- The 10-20 (2) In-Store "Paid by" change below is still staged too — one push carries both.
+
+## Start Here (2026-10-20 (2) — 🟢 Pickup or ship DEPLOYED (owner); 🟡 Paid by + Cash App / Venmo / Store credit BUILT + STAGED, not pushed; no SQL, no env vars)
+
+- 🟢 Owner: *"pushed and deployed"* — the 10-20 (1) Pickup or ship change below is live (owner's word). ◻ The first real shipped sale is still the owner's test (`TASKS.md` 10-20 (1) item 2).
+- 🟡 **Built and staged, waiting for the push:** In-Store Sale → Paid by now has **Cash App, Venmo, Store credit** (`CHANGELOG.md` 2026-10-20 (2); `TASKS.md` top). Stored as `in_store_cashapp` / `in_store_venmo` / `in_store_store_credit`; the order page labels them. Gate: `tsc` 0 · lint 0 errors · **1893/1893** · build 0 · 88. Real form 13/13 (save intercepted).
+- Where the block below says "STAGED, not pushed", read "deployed".
+
 ## Start Here (2026-10-20 — 🟡 In-Store Sale "Pickup or ship" BUILT + STAGED, not pushed; no SQL, no env vars)
 
 - 🟡 **Built and staged, waiting for the owner's push** (`CHANGELOG.md` 2026-10-20 (1); rule `DECISIONS.md` top entry; `TASKS.md` top):

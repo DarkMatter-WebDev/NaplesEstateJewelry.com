@@ -1,6 +1,62 @@
 
 # Changelog
 
+## 2026-10-20 (3) — Buy Receipts on a phone + **no Qty** on the form, the paper and the seller's email — BUILT + STAGED, not pushed; no SQL, no env vars
+
+The owner sent two iPhone screenshots of Admin → Buy Receipts: *"we need to reformat the mobile version… the quantity field is also below the description.. check the whole thing on mobile viewport size"*.
+
+**Found on the real form at 375 px** (temporary login-free page, headless Chrome with touch):
+- The ID photo strip's words were squeezed to ~70 px and the thumbprint strip's to one letter a line. Cause: `globals.css` `div { min-width: 0 }` (unlayered) beats the strips' Tailwind `min-w-[150px]`.
+- Each item took two lines, with Qty under the description.
+- The heading "Items purchased by Naples Estate Jewelry" wrapped.
+- The buttons under the paper sat ragged.
+- Paper + buttons: 3,078 px of scrolling.
+
+**Mockup v1** (the real page with the proposed styles added, Now vs Proposed; static sheet checked under the pane's rules) → owner: *"1 yes, 2 yes, 3 yes, 4 leave it — build it"*. Changes asked mid-build:
+- *"make the 'items purchased by Naples Estate Jewelry' text smaller so it all stays on one line"*.
+- *"on all viewport sizes of the form, remove the quantity field... make sure description and price fields stay on same line"*.
+- *"update the sellers email qty column too... we want it to match the form going forward"*.
+
+**Built:**
+- `components/admin/buy-receipts/buy-receipt-sheet-css.ts`, inside the screen-only `max-width: 520px` block:
+  - State + ZIP (4/8) and ID type + ID last 4 (7/5) share a line.
+  - An item is one line: `22px 1fr 96px 24px` = # · description · amount · ×. The computer's fixed cell widths are overridden; the 118 px amount otherwise spilled over the ×.
+  - An older row with a Qty cell gets `# · qty · description · amount` (`tr:has(> td.brs-qty)`).
+  - `.brs-items-title`: `nowrap` + `min(15px, 3.6vw)`.
+  - Strips: words `flex: 1 1 50%`, tick box across, buttons as equal halves 40 px tall.
+  - Actions: `display: contents` rows in a 2-column grid, ordered as approved, 44 px.
+- New classes (all unused before): `brs-strip*` in `IdPhotoField.tsx` / `ThumbprintField.tsx`; `brs-cell-state|zip|idtype|idlast4` + `brs-items-title` in `BuyReceiptSheet.tsx`; `brs-actions*` / `brs-act-*` in `BuyReceiptForm.tsx`.
+- **No Qty:** the form's Qty column is gone at every size. `lib/buy-receipts.ts` → `buyReceiptShowsQty(items)`; the paper (`BuyReceiptSheet` print mode) and `lib/buy-receipt-email.ts` (HTML column + colspan + text line) show Qty only when a line is not 1. The `sampleBuyReceipt` test-print line is now qty 1. Saving is unchanged (a blank qty was already 1; the total was already the sum of the amounts).
+- Tests:
+  - NEW `lib/__tests__/buy-receipt-phone-layout.test.ts` (7).
+  - +1 email test in `buy-receipts.test.ts`.
+  - Two older pinned strings updated (`buy-receipt-thumbprint.test.ts` strip class; `buy-receipt-customer-mode.test.ts` off-cell regex allows the new class).
+
+**Verified:**
+- `npx tsc --noEmit` 0 · `npm run lint` 0 errors (the 4 old `<img>` warnings) · `npx vitest run` **1901/1901** (168 files) · `npm run build` 0 · 88 prerendered = 41 EN + 41 ES + 6.
+- The REAL form on a temporary page (deleted; `.next/dev` cleared after; `tsc` 0), headless Chrome with touch: **148/148**.
+  - At 320/360/375/390/414/430/520: no sideways scroll; heading one line (11.5 px at 320, 13.5 px at 375); strips laid out as approved; no Qty box; description + amount + × on one line with the amount stopping before the ×; the pairs; the button order and 44 px height. The description box is 161 px at 375 (106 at 320).
+  - An iPhone-like run (no folder picker): one full-width "Choose a file".
+  - At 521/768/1024/1280: the heading is back to 15 px, the button rows are rows, the strips keep their flex, and the form table is # · Description · Amount.
+  - Paper: a new receipt has no Qty column; an old one with qty 2 keeps it and stays one line on a phone.
+  - Email: no Qty for new, kept for old; the total under the amounts.
+- ⛔ Not seen on a real iPhone or behind the sign-in; no real print or email sent.
+- ⚠️ **Line endings:** my Python edits saved files as CRLF. Two older tests that match multi-line text failed until the files were converted back to LF: the 5 buy-receipt files + the new test, and also `project-docs/TASKS.md` and `STRUCTURE.md`, converted earlier today. ⛔ On this PC, Python `open(…, 'w')` writes CRLF — use `newline=''` or Node.
+
+## 2026-10-20 (2) — 10-20 (1) Pickup or ship DEPLOYED (owner) + In-Store Sale "Paid by": **Cash App, Venmo, Store credit** — BUILT + STAGED, not pushed; no SQL, no env vars
+
+- Owner: *"pushed and deployed.. add cash app, venmo, and store credit to the "paid by" options on the in store sale.."* — so 10-20 (1) is live (owner's word; not checked by Claude, the page is behind the sign-in).
+- `src/lib/in-store-sale.ts`: `IN_STORE_PAYMENT_METHODS` adds `cashapp`, `venmo`, `store_credit`, labelled "Cash App", "Venmo", "Store credit". They are stored as `in_store_cashapp` / `in_store_venmo` / `in_store_store_credit`.
+  - `paymentMethodLabel` already reads any `in_store_<word>`, so the order page and print view say "In store · Venmo" etc. with no other change.
+  - No database rule limits `payment_method` (none in `supabase/`), so no SQL is needed.
+- `src/components/admin/InStoreSaleForm.tsx`: on Store credit, the Total box line reads "Recording does not take a payment — the customer's store credit covers it." The other methods keep "the money is already in hand".
+- No mockup: three more chips in the existing row, as the owner asked. They wrap to a second row on a computer.
+- Tests: `in-store-sale.test.ts` — labels and stored values for the three, and each is accepted by `normalizeInStoreSaleInput`. Same test count, more assertions.
+- **Verified:**
+  - `npx tsc --noEmit` 0 · `npm run lint` 0 errors (the 4 old `<img>` warnings) · `npx vitest run` **1893/1893** (167 files) · `npm run build` 0 · 88 prerendered = 41 EN + 41 ES + 6.
+  - The real form on a temporary page (deleted) at 1280 + 390 px with the save intercepted: **13/13** — seven chips in order; no sideways scroll; the store-credit line; the request carries `store_credit` / `venmo`; the confirmation says "Store credit".
+  - ⚠️ Trap found: after deleting a temporary page, the dev server's `.next/dev/types/validator.ts` still imports it, so `tsc` and `next build` fail with TS2307. Fix: with the dev server stopped, delete `.next/dev`. It is generated and rebuilt on the next dev start.
+
 ## 2026-10-20 (1) — Admin → In-Store Sale: **Pickup or ship** + the customer's address — BUILT + STAGED, not pushed; no SQL, no env vars
 
 The owner asked to (1) log a customer's mailing / shipping address and (2) ship an in-store sale instead of always recording it as picked up ("sometimes a customer buys in the store but I ship the item to them afterwards").

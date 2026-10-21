@@ -153,6 +153,9 @@ describe('normalizeInStoreSaleInput', () => {
     expect(normalizeInStoreSaleInput({ ...base, customer: { ...customer, phone: '123' } })).toEqual({ error: 'Enter a valid cell number.' });
     expect(normalizeInStoreSaleInput({ ...base, customer: { ...customer, email: 'not-an-email' } })).toHaveProperty('error');
     expect(normalizeInStoreSaleInput({ ...base, paidBy: 'paypal' })).toEqual({ error: 'Pick how it was paid.' });
+    for (const paidBy of ['cashapp', 'venmo', 'store_credit']) {
+      expect(normalizeInStoreSaleInput({ ...base, paidBy })).toHaveProperty('value.paidBy', paidBy);
+    }
     expect(normalizeInStoreSaleInput({ ...base, item: { kind: 'other', price: '100' } })).toHaveProperty('error');
   });
 });
@@ -162,6 +165,10 @@ describe('payment method values and labels', () => {
     expect(inStorePaymentMethodValue('zettle')).toBe('in_store_zettle');
     expect(paymentMethodLabel('in_store_zettle')).toBe('In store · Card · Zettle');
     expect(paymentMethodLabel('in_store_cash')).toBe('In store · Cash');
+    expect(paymentMethodLabel('in_store_cashapp')).toBe('In store · Cash App');
+    expect(paymentMethodLabel('in_store_venmo')).toBe('In store · Venmo');
+    expect(paymentMethodLabel('in_store_store_credit')).toBe('In store · Store credit');
+    expect(inStorePaymentMethodValue('store_credit')).toBe('in_store_store_credit');
     expect(paymentMethodLabel('paypal')).toBe('PayPal');
     expect(paymentMethodLabel('manual')).toBe('Manual');
     expect(paymentMethodLabel(null)).toBe('-');

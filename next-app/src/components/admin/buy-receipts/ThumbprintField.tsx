@@ -240,7 +240,7 @@ export default function ThumbprintField({
     }
   }
 
-  const buttonClass = 'border bg-white px-3 py-1.5 text-xs font-semibold';
+  const buttonClass = 'brs-strip-btn border bg-white px-3 py-1.5 text-xs font-semibold';
   const buttonStyle = { borderColor: '#d5c697', color: '#735c00' } as const;
   const frame = { width: 54, height: 72, border: '1px solid #d5c697' } as const;
 
@@ -262,7 +262,7 @@ export default function ThumbprintField({
 
   return (
     <div
-      className="no-print mt-2 flex flex-wrap items-center gap-3 px-3 py-2.5"
+      className="brs-strip no-print mt-2 flex flex-wrap items-center gap-3 px-3 py-2.5"
       style={{ border: '1px dashed #d5c697', background: '#fbf9f2' }}
     >
       {has ? (
@@ -275,7 +275,7 @@ export default function ThumbprintField({
           {waiting ? '…' : 'No print'}
         </div>
       )}
-      <div className="min-w-[150px] flex-1">
+      <div className="brs-strip-text min-w-[150px] flex-1">
         <div className="text-[13px]" style={{ color: '#1a1c1c' }} role={waiting ? 'status' : undefined}>
           {waiting && <span aria-hidden="true" className="mr-1.5 inline-block rounded-full" style={{ width: 9, height: 9, background: '#3b6d11' }} />}
           {title}
@@ -305,7 +305,7 @@ export default function ThumbprintField({
         Choose a file
       </button>
       {has && (
-        <button type="button" className="text-xs underline" style={{ color: '#746b5b' }} disabled={working} onClick={onRemove}>
+        <button type="button" className="brs-strip-remove text-xs underline" style={{ color: '#746b5b' }} disabled={working} onClick={onRemove}>
           Remove
         </button>
       )}

@@ -197,7 +197,7 @@ describe('thumbprint: the folder watch on the form', () => {
   const field = components('ThumbprintField.tsx');
 
   it('is a screen-only control that hands the print to its parent', () => {
-    expect(field).toContain('className="no-print mt-2 flex');
+    expect(field).toContain('className="brs-strip no-print mt-2 flex');
     expect(field).toContain('onPickRef.current(print);');
     expect(field).not.toContain('uploadThumbprint');
   });

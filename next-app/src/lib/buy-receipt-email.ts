@@ -22,6 +22,7 @@ import { BUSINESS_PHONE, SITE_DOMAIN_LABEL, getSiteUrl } from '@/lib/order-email
 import {
   BUY_RECEIPT_ATTESTATION_SELLER,
   BUY_RECEIPT_SIGNER_NAME,
+  buyReceiptShowsQty,
   formatDob,
   formatReceiptDate,
   formatReceiptDateTime,
@@ -62,6 +63,8 @@ export function buildBuyReceiptEmail(row: BuyReceiptRow): BuyReceiptEmail {
   const date = formatReceiptDateTime(row.created_at);
   const signedDate = formatReceiptDate(row.created_at);
   const items = row.items ?? [];
+  // The same rule as the printed paper: no Qty column unless an older receipt has a real quantity.
+  const showQty = buyReceiptShowsQty(items);
   const total = formatCurrency(row.total);
   const paid = paymentsLine(row.payments);
   const siteUrl = getSiteUrl();
@@ -82,7 +85,7 @@ export function buildBuyReceiptEmail(row: BuyReceiptRow): BuyReceiptEmail {
   const itemRows = items
     .map((item) => `<tr>
       <td style="${small}padding:6px 8px 6px 0;border-bottom:1px solid ${RULE};">${escapeHtml(item.description)}</td>
-      <td align="center" style="${small}padding:6px 8px;border-bottom:1px solid ${RULE};white-space:nowrap;">${escapeHtml(String(item.qty))}</td>
+      ${showQty ? `<td align="center" style="${small}padding:6px 8px;border-bottom:1px solid ${RULE};white-space:nowrap;">${escapeHtml(String(item.qty))}</td>` : ''}
       <td align="right" style="${small}padding:6px 0 6px 8px;border-bottom:1px solid ${RULE};white-space:nowrap;">${escapeHtml(formatCurrency(item.amount))}</td>
     </tr>`)
     .join('');
@@ -117,13 +120,13 @@ export function buildBuyReceiptEmail(row: BuyReceiptRow): BuyReceiptEmail {
                   <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                     <tr>
                       <td style="${tiny}padding:0 8px 4px 0;border-bottom:1px solid ${RULE};">Item</td>
-                      <td align="center" style="${tiny}padding:0 8px 4px;border-bottom:1px solid ${RULE};">Qty</td>
+                      ${showQty ? `<td align="center" style="${tiny}padding:0 8px 4px;border-bottom:1px solid ${RULE};">Qty</td>` : ''}
                       <td align="right" style="${tiny}padding:0 0 4px 8px;border-bottom:1px solid ${RULE};">Amount</td>
                     </tr>
                     ${itemRows}
                     <tr>
                       <td style="${small}padding:8px 8px 0 0;vertical-align:bottom;font-size:14px;font-weight:700;">Paid by: ${escapeHtml(paid)}</td>
-                      <td colspan="2" align="right" style="${small}padding:8px 0 0 8px;font-size:14px;font-weight:700;white-space:nowrap;">Total paid to seller&nbsp;&nbsp;&nbsp;${escapeHtml(total)}</td>
+                      <td${showQty ? ' colspan="2"' : ''} align="right" style="${small}padding:8px 0 0 8px;font-size:14px;font-weight:700;white-space:nowrap;">Total paid to seller&nbsp;&nbsp;&nbsp;${escapeHtml(total)}</td>
                     </tr>
                   </table>
 
@@ -164,7 +167,7 @@ export function buildBuyReceiptEmail(row: BuyReceiptRow): BuyReceiptEmail {
     ...detailLines(row).map((line) => `${line.label}: ${line.value}`),
     '',
     `${itemsHeading}:`,
-    ...items.map((item, index) => `  ${index + 1}. ${item.description} — qty ${item.qty} — ${formatCurrency(item.amount)}`),
+    ...items.map((item, index) => `  ${index + 1}. ${item.description}${showQty ? ` — qty ${item.qty}` : ''} — ${formatCurrency(item.amount)}`),
     '',
     `Paid by: ${paid}`,
     `Total paid to seller: ${total}`,

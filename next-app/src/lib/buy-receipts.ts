@@ -296,6 +296,16 @@ export function parseBuyQty(raw: unknown): number | null {
   return value >= 1 && value <= BUY_QTY_MAX ? value : null;
 }
 
+/**
+ * Whether a saved receipt shows a Qty column — on the printed paper and in the seller's email.
+ * The form has had no Qty box since 2026-10-20 (owner: "if theres a quantity i will add it in
+ * description"), so every new line is 1 and the column is left out. An older receipt that really
+ * has a quantity other than 1 keeps it, so its copy still says what was bought.
+ */
+export function buyReceiptShowsQty(items: readonly { qty?: number | null }[]): boolean {
+  return items.some((item) => Number(item.qty ?? 1) !== 1);
+}
+
 export function buyReceiptTotal(items: readonly { amount: number }[]): number {
   return round2(items.reduce((sum, item) => sum + item.amount, 0));
 }
@@ -688,7 +698,9 @@ export function sampleBuyReceipt(nowIso: string): BuyReceiptRow {
     seller_thumbprint_path: null,
     items: [
       { qty: 1, description: 'This is a test print. Nothing was saved.', amount: 100 },
-      { qty: 2, description: 'Sample second line', amount: 50 },
+      // Quantity 1, as every line the form saves since 2026-10-20 (no Qty box): the test print
+      // shows the paper without a Qty column, like a real receipt.
+      { qty: 1, description: 'Sample second line', amount: 50 },
     ],
     total: 150,
     payments: [{ method: 'cash', reference: null, amount: 150 }],
