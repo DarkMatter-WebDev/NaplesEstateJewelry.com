@@ -1,45 +1,43 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import type { Product, SpotData } from '@/types/product';
+import type { SpotData } from '@/types/product';
 import { formatCurrency } from '@/types/sales';
-import { getProductImages, getSnapshotPrice } from '@/lib/sales';
 import {
-  IN_STORE_METALS,
   IN_STORE_PAYMENT_LABELS,
   IN_STORE_PAYMENT_METHODS,
-  IN_STORE_SHIPPING_CHOICES,
-  IN_STORE_SHIPPING_FEE_MAX,
   IN_STORE_SHIPPING_LABELS,
-  IN_STORE_TITLE_MAX,
   inStoreChargesTax,
   inStoreTableShippingFee,
   inStoreTotals,
   parseInStorePrice,
   parseInStoreShippingFee,
-  type InStoreMetal,
   type InStorePaymentMethod,
   type InStoreShippingChoice,
 } from '@/lib/in-store-sale';
+import { round2 } from '@/lib/checkout-pricing';
 import { normalizeUsState } from '@/lib/us-address';
+import SaleItemsEditor, {
+  newSaleItem,
+  saleItemLabel,
+  saleItemPayload,
+  saleItemsProblem,
+  type InStoreProduct,
+  type SaleItemDraft,
+} from '@/components/admin/instant-sale/SaleItemsEditor';
 
-/** The columns the page loads for the search list — enough to price and describe a row. */
-export type InStoreProduct = Pick<
-  Product,
-  | 'id' | 'title' | 'status' | 'quantity' | 'inventory_number' | 'category' | 'metal_variant' | 'purity'
-  | 'gram_weight' | 'weight_grams' | 'price_mode' | 'pricing_multiplier' | 'manual_price_label' | 'asking_price'
-  | 'sold_price' | 'image_urls' | 'images'
->;
+import SaleDeliverySection, { type DeliveryMethod } from '@/components/admin/instant-sale/SaleDeliverySection';
 
-type Mode = 'listed' | 'unlisted';
-type DeliveryMethod = 'pickup' | 'ship';
+export type { InStoreProduct } from '@/components/admin/instant-sale/SaleItemsEditor';
 
 type Recorded = {
   orderId: string;
   orderNumber: string;
   receiptEmailed: boolean;
-  summary: string;
+  /** Was "Email copy" ticked (with an email)? */
+  emailCopy: boolean;
+  summary: string[];
   total: number;
   paidBy: InStorePaymentMethod;
   customer: string;
@@ -51,16 +49,6 @@ const label = 'form-label';
 const labelStyle = { color: 'var(--color-primary)' } as const;
 const hintStyle = { color: 'var(--color-on-surface-variant)' } as const;
 const cardStyle = { borderColor: 'var(--color-outline-variant)' } as const;
-
-const MAX_MATCHES = 6;
-
-function matchesQuery(product: InStoreProduct, query: string): boolean {
-  const q = query.trim().toLowerCase();
-  if (!q) return false;
-  const number = product.inventory_number != null ? String(product.inventory_number) : '';
-  if (/^#?\d+$/.test(q)) return number === q.replace('#', '');
-  return product.title.toLowerCase().includes(q) || number === q;
-}
 
 function Optional() {
   return <span style={{ color: 'var(--color-on-surface-variant)', letterSpacing: '0.06em' }}> optional</span>;
@@ -75,18 +63,14 @@ export default function InStoreSaleForm({
   products: InStoreProduct[];
   spotData: SpotData | null;
 }) {
-  const [mode, setMode] = useState<Mode>('listed');
-  const [query, setQuery] = useState('');
-  const [selected, setSelected] = useState<InStoreProduct | null>(null);
-  const [title, setTitle] = useState('');
-  const [metal, setMetal] = useState<InStoreMetal>('Gold');
-  const [gramWeight, setGramWeight] = useState('');
-  const [purity, setPurity] = useState('');
-  const [price, setPrice] = useState('');
+  const [items, setItems] = useState<SaleItemDraft[]>(() => [newSaleItem()]);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  // "Email copy" (owner, 2026-10-21): ticks itself when an email is typed in;
+  // unticking it keeps the email on the order but sends no receipt now.
+  const [emailCopy, setEmailCopy] = useState(false);
   const [delivery, setDelivery] = useState<DeliveryMethod>('pickup');
   const [mailingOn, setMailingOn] = useState(false);
   const [line1, setLine1] = useState('');
@@ -102,12 +86,10 @@ export default function InStoreSaleForm({
   const [error, setError] = useState<string | null>(null);
   const [recorded, setRecorded] = useState<Recorded | null>(null);
 
-  const matches = useMemo(
-    () => (selected ? [] : products.filter((p) => matchesQuery(p, query)).slice(0, MAX_MATCHES)),
-    [products, query, selected],
-  );
-
-  const priceValue = parseInStorePrice(price);
+  const prices = items.map((item) => parseInStorePrice(item.price));
+  // The items' total — every price typed — is what the shipping table and the tax go by.
+  const priceValue = prices.every((value) => value != null) ? round2(prices.reduce<number>((sum, value) => sum + (value ?? 0), 0)) : null;
+  const subtotal = priceValue;
   const shipped = delivery === 'ship';
   const showAddress = shipped || mailingOn;
   const stateCode = normalizeUsState(shipState);
@@ -123,15 +105,15 @@ export default function InStoreSaleForm({
     ? inStoreTotals(priceValue, { shippingFee, chargesTax })
     : null;
 
-  function pickProduct(product: InStoreProduct) {
-    setSelected(product);
-    setQuery('');
-    setPrice(String(getSnapshotPrice(product as Product, spotData) || ''));
+  function changeEmail(next: string) {
+    if (!email.trim() && next.trim()) setEmailCopy(true);
+    if (!next.trim()) setEmailCopy(false);
+    setEmail(next);
   }
 
   function clearAll() {
-    setSelected(null); setQuery(''); setTitle(''); setMetal('Gold'); setGramWeight(''); setPurity(''); setPrice('');
-    setFirstName(''); setLastName(''); setPhone(''); setEmail(''); setPaidBy('zettle'); setNote('');
+    setItems([newSaleItem()]);
+    setFirstName(''); setLastName(''); setPhone(''); setEmail(''); setEmailCopy(false); setPaidBy('zettle'); setNote('');
     setDelivery('pickup'); setMailingOn(false); setLine1(''); setLine2(''); setCity(''); setShipState(''); setZip('');
     setShipping('insured'); setCustomFee('');
     setError(null); setRecorded(null);
@@ -141,7 +123,8 @@ export default function InStoreSaleForm({
     event.preventDefault();
     if (busy) return;
     setError(null);
-    if (mode === 'listed' && !selected) { setError('Pick the listed item first.'); return; }
+    const problem = saleItemsProblem(items);
+    if (problem) { setError(problem.charAt(0).toUpperCase() + problem.slice(1)); return; }
     if (priceValue == null) { setError('Enter the price sold, e.g. 1460.'); return; }
     if (!totals) {
       setError(shipping === 'custom' ? 'Enter the shipping charge, e.g. 25.' : 'Express overnight is not offered at $5,000 and up. Pick another shipping charge.');
@@ -153,10 +136,9 @@ export default function InStoreSaleForm({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          item: mode === 'listed'
-            ? { kind: 'listed', productId: selected?.id, price }
-            : { kind: 'unlisted', title, metal, price, gramWeight, purity },
+          items: items.map(saleItemPayload),
           customer: { firstName, lastName, phone, email },
+          emailCopy: emailCopy && Boolean(email.trim()),
           delivery: {
             method: delivery,
             address: showAddress ? { line1, line2, city, state: shipState, postalCode: zip } : null,
@@ -173,7 +155,8 @@ export default function InStoreSaleForm({
         orderId: data.orderId,
         orderNumber: data.orderNumber,
         receiptEmailed: Boolean(data.receiptEmailed),
-        summary: mode === 'listed' && selected ? `#${selected.inventory_number ?? '—'} · ${selected.title}` : title,
+        emailCopy: emailCopy && Boolean(email.trim()),
+        summary: items.map((item) => (item.mode === 'listed' && item.selected ? `#${item.selected.inventory_number ?? '—'} · ${item.selected.title}` : saleItemLabel(item))),
         total: totals.total,
         paidBy,
         customer: `${firstName.trim()} ${lastName.trim()} · ${phone.trim()}`,
@@ -205,7 +188,10 @@ export default function InStoreSaleForm({
           <span className="text-xs" style={hintStyle}>Order <strong>{recorded.orderNumber}</strong></span>
         </div>
         <div className="rounded-[1.25rem] border bg-white p-5 grid gap-2 text-sm" style={cardStyle}>
-          <div className="flex justify-between gap-3"><span style={hintStyle}>Item</span><span className="text-right">{recorded.summary}</span></div>
+          <div className="flex justify-between gap-3">
+            <span style={hintStyle}>{recorded.summary.length > 1 ? `Items · ${recorded.summary.length}` : 'Item'}</span>
+            <span className="text-right">{recorded.summary.map((line, index) => <span key={`${index}-${line}`} className="block">{line}</span>)}</span>
+          </div>
           <div className="flex justify-between gap-3"><span style={hintStyle}>Customer</span><span className="text-right">{recorded.customer}</span></div>
           <div className="flex justify-between gap-3"><span style={hintStyle}>Paid by</span><span>{IN_STORE_PAYMENT_LABELS[recorded.paidBy]}</span></div>
           {recorded.shipTo && (
@@ -221,7 +207,11 @@ export default function InStoreSaleForm({
         </div>
         <div className="rounded-[1.25rem] border bg-white p-5 grid gap-2 text-sm" style={cardStyle}>
           <div className="flex justify-between gap-3"><span style={hintStyle}>Receipt</span><span className="font-bold" style={{ color: recorded.receiptEmailed ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}>{recorded.receiptEmailed ? 'Emailed' : 'Not emailed'}</span></div>
-          {!recorded.receiptEmailed && <span className="text-xs" style={hintStyle}>Open the order to add an email and send it later.</span>}
+          {!recorded.receiptEmailed && (
+            <span className="text-xs" style={hintStyle}>
+              {recorded.emailCopy ? 'The receipt did not send. Open the order to send it again.' : 'Open the order to send the receipt later.'}
+            </span>
+          )}
         </div>
         <div className="grid gap-2 pt-1">
           <button type="button" className="gold-button text-xs" onClick={clearAll}>New sale</button>
@@ -238,96 +228,19 @@ export default function InStoreSaleForm({
       <div className="grid gap-4">
         <section className="rounded-[1.25rem] border bg-white p-5 grid gap-4" style={cardStyle}>
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <h2 className="text-lg font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>1. Item</h2>
-            <div className="inline-flex rounded-full border p-[3px] gap-[3px]" role="group" aria-label="Item source" style={{ ...cardStyle, background: 'var(--color-surface-container-low)' }}>
-              {(['listed', 'unlisted'] as Mode[]).map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => { setMode(value); setError(null); }}
-                  aria-pressed={mode === value}
-                  className="rounded-full px-4 py-2 text-[0.65rem] font-bold uppercase tracking-[0.12em]"
-                  style={{ fontFamily: 'var(--font-label)', background: mode === value ? '#fff' : 'transparent', color: mode === value ? 'var(--color-primary)' : 'var(--color-on-surface-variant)', boxShadow: mode === value ? '0 1px 3px rgba(0,0,0,0.08)' : 'none' }}
-                >
-                  {value === 'listed' ? 'Listed item' : 'Not listed'}
-                </button>
-              ))}
-            </div>
+            <h2 className="text-lg font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>1. Items</h2>
+            {items.length > 1 && (
+              <span className="text-xs" style={hintStyle}>{items.length} items{subtotal != null ? ` · ${formatCurrency(subtotal)}` : ''}</span>
+            )}
           </div>
-
-          {mode === 'listed' ? (
-            <>
-              <label className="block">
-                <span className={label} style={labelStyle}>Find by inventory # or title</span>
-                <input className="form-field" type="search" inputMode="search" value={query} onChange={(e) => { setQuery(e.target.value); setSelected(null); }} placeholder="53 or ladle" autoComplete="off" />
-              </label>
-              {matches.length > 0 && (
-                <ul className="grid gap-1" aria-label="Matches">
-                  {matches.map((p) => (
-                    <li key={p.id}>
-                      <button type="button" onClick={() => pickProduct(p)} className="w-full text-left rounded-lg border px-3 py-2 text-sm hover:bg-[var(--color-surface-container-low)]" style={cardStyle}>
-                        <span className="font-semibold" style={{ color: 'var(--color-primary)' }}>#{p.inventory_number ?? '—'}</span> · {p.title}
-                        <span className="block text-xs" style={hintStyle}>{formatCurrency(getSnapshotPrice(p as Product, spotData))} · {p.category}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {query.trim() && !selected && matches.length === 0 && (
-                <span className="text-xs" style={hintStyle}>No available item matches. Sold or hidden items do not show here.</span>
-              )}
-              {selected && (
-                <div className="flex gap-3 items-center rounded-[14px] border p-3" style={{ borderColor: 'var(--color-primary)', background: '#fbf5dd' }}>
-                  {getProductImages(selected as Product)[0] ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={getProductImages(selected as Product)[0]} alt="" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
-                  ) : (
-                    <div className="w-14 h-14 rounded-lg flex-shrink-0" style={{ background: 'var(--color-surface-container-high)' }} />
-                  )}
-                  <div className="min-w-0 grid gap-0.5">
-                    <span className="text-[0.65rem] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>#{selected.inventory_number ?? '—'} · {selected.category} · In stock</span>
-                    <span className="text-sm font-semibold leading-snug" style={{ color: 'var(--color-on-surface)' }}>{selected.title}</span>
-                    <span className="text-xs" style={hintStyle}>Listed at {formatCurrency(getSnapshotPrice(selected as Product, spotData))} · marketplace listings end on save</span>
-                  </div>
-                  <button type="button" className="ml-auto text-xs underline flex-shrink-0" style={hintStyle} onClick={() => { setSelected(null); setPrice(''); }}>Change</button>
-                </div>
-              )}
-              <label className="block">
-                <span className={label} style={labelStyle}>Price sold (before tax)</span>
-                <input className="form-field text-xl font-semibold" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="1026" required />
-              </label>
-            </>
-          ) : (
-            <>
-              <label className="block">
-                <span className={label} style={labelStyle}>What sold</span>
-                <input className="form-field" value={title} maxLength={IN_STORE_TITLE_MAX} onChange={(e) => setTitle(e.target.value)} placeholder="14K rope chain · 22 in · 18.4 g" required />
-              </label>
-              <div className="grid gap-3 sm:grid-cols-[1.1fr_1fr]">
-                <label className="block">
-                  <span className={label} style={labelStyle}>Metal</span>
-                  <select className="form-field" value={metal} onChange={(e) => setMetal(e.target.value as InStoreMetal)}>
-                    {IN_STORE_METALS.map((m) => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                </label>
-                <label className="block">
-                  <span className={label} style={labelStyle}>Price (before tax)</span>
-                  <input className="form-field text-xl font-semibold" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="1460" required />
-                </label>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block">
-                  <span className={label} style={labelStyle}>Weight g<Optional /></span>
-                  <input className="form-field" inputMode="decimal" value={gramWeight} onChange={(e) => setGramWeight(e.target.value)} placeholder="18.4" />
-                </label>
-                <label className="block">
-                  <span className={label} style={labelStyle}>Purity<Optional /></span>
-                  <input className="form-field" value={purity} maxLength={20} onChange={(e) => setPurity(e.target.value)} placeholder="14K" />
-                </label>
-              </div>
-              <span className="text-xs" style={hintStyle}>Recorded on the order only. No product is created, so nothing can show in the shop.</span>
-            </>
-          )}
+          <SaleItemsEditor
+            items={items}
+            setItems={setItems}
+            products={products}
+            spotData={spotData}
+            priceLabel="Price sold (before tax)"
+            listedNote="marketplace listings end on save"
+          />
         </section>
 
         <section className="rounded-[1.25rem] border bg-white p-5 grid gap-4" style={cardStyle}>
@@ -336,101 +249,55 @@ export default function InStoreSaleForm({
             <label className="block"><span className={label} style={labelStyle}>First name</span><input className="form-field" value={firstName} onChange={(e) => setFirstName(e.target.value)} autoComplete="off" required /></label>
             <label className="block"><span className={label} style={labelStyle}>Last name</span><input className="form-field" value={lastName} onChange={(e) => setLastName(e.target.value)} autoComplete="off" required /></label>
             <label className="block"><span className={label} style={labelStyle}>Cell</span><input className="form-field" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(239) 555-0134" autoComplete="off" required /></label>
-            <label className="block">
-              <span className={label} style={labelStyle}>Email<Optional /></span>
-              <input className="form-field" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" autoComplete="off" />
-              <span className="mt-1 block text-xs" style={hintStyle}>{shipped ? 'The receipt and the tracking email go here.' : 'The receipt is emailed when this is filled in.'}</span>
-            </label>
-          </div>
-        </section>
-
-        <section className="rounded-[1.25rem] border bg-white p-5 grid gap-4" style={cardStyle}>
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <h2 className="text-lg font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>3. Pickup or ship</h2>
-            <div className="inline-flex rounded-full border p-[3px] gap-[3px]" role="group" aria-label="Pickup or ship" style={{ ...cardStyle, background: 'var(--color-surface-container-low)' }}>
-              {(['pickup', 'ship'] as DeliveryMethod[]).map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => { setDelivery(value); setError(null); }}
-                  aria-pressed={delivery === value}
-                  className="rounded-full px-4 py-2 text-[0.65rem] font-bold uppercase tracking-[0.12em]"
-                  style={{ fontFamily: 'var(--font-label)', background: delivery === value ? '#fff' : 'transparent', color: delivery === value ? 'var(--color-primary)' : 'var(--color-on-surface-variant)', boxShadow: delivery === value ? '0 1px 3px rgba(0,0,0,0.08)' : 'none' }}
-                >
-                  {value === 'pickup' ? 'Pickup' : 'Ship'}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {shipped ? (
-            <span className="text-[0.85rem]" style={hintStyle}>
-              You ship it after the sale. The order waits under <strong>Orders → Fulfillment: Pending</strong> until you mark it shipped.
-            </span>
-          ) : (
-            <>
-              <span className="text-[0.85rem]" style={hintStyle}>The customer leaves with it. Recorded as <strong>picked up</strong>, as before.</span>
-              <label className="flex items-center gap-2.5 text-sm cursor-pointer w-fit">
-                <input type="checkbox" checked={mailingOn} onChange={(e) => setMailingOn(e.target.checked)} className="w-[18px] h-[18px]" style={{ accentColor: 'var(--color-primary)' }} />
-                Add a mailing address<span className="text-xs" style={hintStyle}>optional</span>
-              </label>
-            </>
-          )}
-
-          {showAddress && (
-            <div className="grid gap-3 sm:grid-cols-2">
-              <span className={label} style={{ ...labelStyle, gridColumn: '1 / -1', margin: 0 }}>{shipped ? 'Ship to' : 'Mailing address'}</span>
-              <label className="block sm:col-span-2"><span className={label} style={labelStyle}>Street</span><input className="form-field" value={line1} maxLength={120} onChange={(e) => setLine1(e.target.value)} autoComplete="off" required={shipped} /></label>
-              <label className="block sm:col-span-2"><span className={label} style={labelStyle}>Apt / suite<Optional /></span><input className="form-field" value={line2} maxLength={60} onChange={(e) => setLine2(e.target.value)} autoComplete="off" /></label>
-              <label className="block"><span className={label} style={labelStyle}>City</span><input className="form-field" value={city} maxLength={60} onChange={(e) => setCity(e.target.value)} autoComplete="off" required={shipped} /></label>
-              <div className="grid gap-3 grid-cols-[1fr_1.3fr]">
-                <label className="block"><span className={label} style={labelStyle}>State</span><input className="form-field" value={shipState} maxLength={20} onChange={(e) => setShipState(e.target.value)} placeholder="FL" autoComplete="off" autoCapitalize="characters" required={shipped} /></label>
-                <label className="block"><span className={label} style={labelStyle}>ZIP</span><input className="form-field" inputMode="numeric" value={zip} maxLength={10} onChange={(e) => setZip(e.target.value)} placeholder="34103" autoComplete="off" required={shipped} /></label>
-              </div>
-              <span className="text-xs sm:col-span-2" style={hintStyle}>U.S. addresses only, checked the same way as web checkout.{shipped ? '' : ' Saved on the order only — never added to a mailing list.'}</span>
-            </div>
-          )}
-
-          {shipped && (
-            <div className="grid gap-2">
-              <span className={label} style={{ ...labelStyle, margin: 0 }}>Shipping charge</span>
-              <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2" role="group" aria-label="Shipping charge">
-                {IN_STORE_SHIPPING_CHOICES.map((choice) => {
-                  const on = shipping === choice;
-                  const fee = choice === 'custom' ? null : priceValue != null ? inStoreTableShippingFee(choice, priceValue) : null;
-                  const unavailable = choice === 'express' && priceValue != null && fee == null;
-                  return (
-                    <button
-                      key={choice}
-                      type="button"
-                      onClick={() => setShipping(choice)}
-                      disabled={unavailable}
-                      aria-pressed={on}
-                      className="rounded-full border px-4 py-2 text-[0.7rem] font-bold uppercase tracking-[0.08em] disabled:opacity-40"
-                      style={{ fontFamily: 'var(--font-label)', borderColor: on ? 'var(--color-primary)' : 'var(--color-outline-variant)', background: on ? '#fbf5dd' : '#fff', color: on ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}
-                    >
-                      {IN_STORE_SHIPPING_LABELS[choice]}
-                      <span className="block text-[0.72rem] font-semibold normal-case tracking-[0.04em]">
-                        {choice === 'custom' ? 'Type it' : unavailable ? 'Not at $5,000+' : fee != null ? formatCurrency(fee) : '—'}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-              {shipping === 'custom' && (
-                <label className="block sm:max-w-[12rem]">
-                  <span className={label} style={labelStyle}>Shipping charge $</span>
-                  <input className="form-field text-lg font-semibold" inputMode="decimal" value={customFee} onChange={(e) => setCustomFee(e.target.value)} placeholder="25" autoComplete="off" required />
+            <div className="block">
+              <div className="flex items-baseline justify-between gap-2">
+                <label htmlFor="in-store-email" className={label} style={{ ...labelStyle, margin: 0 }}>Email<Optional /></label>
+                <label className="flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap cursor-pointer" style={{ color: 'var(--color-on-surface)', opacity: email.trim() ? 1 : 0.45 }}>
+                  <input
+                    type="checkbox"
+                    checked={emailCopy && Boolean(email.trim())}
+                    disabled={!email.trim()}
+                    onChange={(e) => setEmailCopy(e.target.checked)}
+                    aria-label="Email a copy of the receipt to the customer"
+                    className="w-[17px] h-[17px]"
+                    style={{ accentColor: 'var(--color-primary)' }}
+                  />
+                  Email copy
                 </label>
-              )}
-              <span className="text-xs" style={hintStyle}>
-                {shipping === 'custom'
-                  ? `Any amount up to ${formatCurrency(IN_STORE_SHIPPING_FEE_MAX)}.`
-                  : `The website's own shipping fees${priceValue != null ? ` for a ${formatCurrency(priceValue)} item` : ''}. Express is not offered at $5,000 and up, the same as online.`}
+              </div>
+              <input id="in-store-email" className="form-field mt-[0.3rem]" inputMode="email" value={email} onChange={(e) => changeEmail(e.target.value)} placeholder="name@example.com" autoComplete="off" />
+              <span className="mt-1 block text-xs" style={hintStyle}>
+                {!email.trim()
+                  ? 'Type an email to send the receipt.'
+                  : emailCopy
+                    ? (shipped ? 'The receipt is emailed when you record the sale; the tracking email goes here too.' : 'The receipt is emailed when you record the sale.')
+                    : (shipped ? 'No receipt now — you can send it from the order. The tracking email still goes here.' : 'No receipt is emailed. You can send it later from the order.')}
               </span>
             </div>
-          )}
+          </div>
         </section>
+
+        <SaleDeliverySection
+          variant="in-store"
+          delivery={delivery}
+          onDelivery={(value) => { setDelivery(value); setError(null); }}
+          mailingOn={mailingOn}
+          onMailingOn={setMailingOn}
+          address={{ line1, line2, city, state: shipState, zip }}
+          onAddress={(patch) => {
+            if (patch.line1 !== undefined) setLine1(patch.line1);
+            if (patch.line2 !== undefined) setLine2(patch.line2);
+            if (patch.city !== undefined) setCity(patch.city);
+            if (patch.state !== undefined) setShipState(patch.state);
+            if (patch.zip !== undefined) setZip(patch.zip);
+          }}
+          shipping={shipping}
+          onShipping={setShipping}
+          customFee={customFee}
+          onCustomFee={setCustomFee}
+          priceValue={priceValue}
+          itemCount={items.length}
+        />
 
         <section className="rounded-[1.25rem] border bg-white p-5 grid gap-4" style={cardStyle}>
           <h2 className="text-lg font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>4. Paid by</h2>
@@ -461,7 +328,16 @@ export default function InStoreSaleForm({
       <div className="grid gap-4 lg:sticky lg:top-6">
         <section className="rounded-[1.25rem] border p-5 grid gap-3" style={{ ...cardStyle, background: 'var(--color-surface-container-low)' }}>
           <h2 className="text-lg font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>Total</h2>
-          <div className="flex justify-between text-sm"><span>Item</span><span>{priceValue != null ? formatCurrency(priceValue) : '—'}</span></div>
+          {items.length > 1 && items.map((item, index) => (
+            <div key={item.key} className="flex justify-between gap-3 text-sm">
+              <span className="min-w-0 truncate">{index + 1} · {saleItemLabel(item)}</span>
+              <span>{prices[index] != null ? formatCurrency(prices[index] as number) : '—'}</span>
+            </div>
+          ))}
+          <div className={`flex justify-between text-sm${items.length > 1 ? ' border-t border-dashed pt-2' : ''}`} style={items.length > 1 ? cardStyle : undefined}>
+            <span>{items.length > 1 ? `Items · ${items.length}` : 'Item'}</span>
+            <span>{priceValue != null ? formatCurrency(priceValue) : '—'}</span>
+          </div>
           {shipped && (
             <div className="flex justify-between text-sm">
               <span>{shipping === 'none' ? 'Shipping · no charge' : `Shipping · ${shipping === 'custom' ? 'custom' : IN_STORE_SHIPPING_LABELS[shipping].replace(' shipping', '')}`}</span>
@@ -499,11 +375,11 @@ export default function InStoreSaleForm({
           <h2 className="text-sm font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>On record</h2>
           {shipped ? (
             <span className="text-xs" style={hintStyle}>
-              An order like any web sale, marked paid and <strong>waiting to ship</strong>. A listed item is marked sold and its eBay/Etsy listings end on the next sweep. The receipt shows the Ship-to address. When you mark it <strong>Shipped</strong> in Orders and add the tracking number, the customer gets the &ldquo;Your order has shipped&rdquo; email.
+              An order like any web sale, marked paid and <strong>waiting to ship</strong>. Listed items are marked sold and their eBay/Etsy listings end on the next sweep. The receipt shows the Ship-to address. When you mark it <strong>Shipped</strong> in Orders and add the tracking number, the customer gets the &ldquo;Your order has shipped&rdquo; email.
             </span>
           ) : (
             <span className="text-xs" style={hintStyle}>
-              An order like any web sale, marked paid and picked up. A listed item is marked sold and its eBay/Etsy listings end on the next sweep. The receipt goes out when an email is given, and the sale shows under Orders.
+              An order like any web sale, marked paid and picked up. Listed items are marked sold and their eBay/Etsy listings end on the next sweep. The receipt goes out when Email copy is ticked, and the sale shows under Orders.
             </span>
           )}
         </section>

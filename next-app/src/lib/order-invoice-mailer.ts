@@ -5,6 +5,7 @@ import {
   isOrderPaid,
   withInvoiceLineDiscounts,
   type InvoiceEmailOrder,
+  type InvoicePaymentBlock,
 } from '@/lib/order-invoice-email';
 import { getStoreHours } from '@/lib/store-hours';
 
@@ -69,6 +70,8 @@ export async function sendOrderInvoiceEmail(opts: {
   itemDiscounts?: Record<string, number>;
   /** null id + a label email records an automatic (system) send. */
   sentBy?: { id?: string | null; email?: string | null };
+  /** Remote sale invoices only: the Pay online button + other ways to pay. */
+  payment?: InvoicePaymentBlock | null;
 }): Promise<SendInvoiceEmailResult> {
   const { supabase, resendKey, orderId, recipient } = opts;
 
@@ -107,6 +110,7 @@ export async function sendOrderInvoiceEmail(opts: {
   // prints the current schedule (defaults to Tue–Sat if unconfigured).
   const content = buildInvoiceEmailContent(emailOrder, invoiceNumber, {
     pickupHours: formatPickupHours(await getStoreHours()),
+    payment: opts.payment ?? null,
   });
   const emailType: 'invoice' | 'receipt' = isOrderPaid(emailOrder) ? 'receipt' : 'invoice';
 

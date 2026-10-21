@@ -1,6 +1,62 @@
 
 # Changelog
 
+## 2026-10-21 (3) — Remote sale **Save draft** — BUILT + STAGED, not pushed; ⛔ run `supabase/remote-sales-2026-10.sql` AGAIN (it now adds the drafts table); no env vars
+
+- Owner, after running the SQL for (2) (*"ran the sql, got 0.. ok to push?"*) and before pushing: *"actually add save draft to the remote sale"*.
+- **Built** (Buy Receipts drafts pattern: finish on any device):
+  - SQL — section 2 of `supabase/remote-sales-2026-10.sql`: `remote_sale_drafts` (form jsonb ≤ 64 KB, customer_name, item_count; private, service role only). The file stays safe to re-run; the closing check now counts both tables.
+  - `lib/remote-sale.ts` — `RemoteDraftForm`, `sanitizeRemoteDraft` (caps: 20 items, field lengths, 300-char message; a photo only from the product-images bucket; every pay box off → the defaults), `remoteDraftHasContent`, `remoteDraftSummary`, `remoteDraftPhotoUrls`, `RemoteDraftCardData`; `lib/remote-sale-server.ts` — `findRemoteDraft`, `listRemoteDrafts`.
+  - Routes — `api/admin/remote-sales/drafts` (POST), `drafts/[id]` (PUT / DELETE); `api/admin/remote-sales` POST takes `draftId` and deletes the draft once the invoice row exists.
+  - `api/admin/storage-gc/route.ts` — draft photos (`remote_sale_drafts.form`) join the reference set (tolerant of a missing table). AGENTS rule: a new upload-holding table goes in the GC scan.
+  - UI — `RemoteSaleForm.tsx`: **Save draft** beside Email invoice (first save → POST + `?draft=<id>` in the address bar; later saves → PUT; a draft gone on another device is saved as a new one), "Draft · saved …" line, "Start a new remote sale (the draft stays saved)"; reopening a draft rebuilds the item cards (a listed piece no longer for sale comes back unpicked with a note). `[locale]/admin/instant-sale/remote/page.tsx` reads `?draft=`; NEW `RemoteDraftCard.tsx` (Continue · Delete with a confirm); Instant Sale lists **Drafts** under Open invoices.
+  - Tests — `remote-sale.test.ts` +4 (draft cleaning, content/summary, GC keeps draft photos, a sent invoice deletes its draft + the SQL is private).
+- **Gate:** `npx tsc --noEmit` 0 · `npm run lint` 0 errors (the 4 old `<img>` warnings) · `npx vitest run` **1929/1929** (169 files) · `npm run build` 0 (dev stopped, `.next/dev` cleared) · 90 = 42 + 42 + 6.
+- **Browser (temporary page, real components, network intercepted, deleted after):** first Save draft = POST, address bar `?draft=<id>`, "Draft saved…" + "Draft · saved Oct 21, 12:20 PM"; second = PUT to the same id; Email invoice carried `draftId` and cleared the address; a stored draft reopened with its customer, Ship, Zelle off / Check on, 14 days, the message, item 1 picked, item 2 (sold) unpicked with "Item 2: the listed piece is no longer for sale…", item 3 as typed; a missing draft → "That draft is gone…"; the draft card's Continue link + Delete confirm → DELETE. Signed out, both draft routes 401.
+- ⛔ Not verified: the drafts SQL (not run yet), a real draft in the database, anything behind the sign-in.
+
+## 2026-10-21 (2) — Admin → **Instant Sale**: In-store sale (several items, a photo each, Email copy) + **Remote sale** (emailed invoice with a private PayPal pay link) — BUILT + STAGED, not pushed; ✅ SQL `supabase/remote-sales-2026-10.sql` RUN by the owner 10-21 (count 0); no env vars
+
+**Asked:** owner — several items on the in-store sale with an optional photo each, the customer's email + an Email copy box like Buy Receipts (mockup v1); then *"change the name… to instant sale"*, a first choice between **in-store sale** and **remote sale**, the remote one emailing an invoice with payment options and a pay link through the site's PayPal (mockup v2). Owner on v2: *"use your picks but make checks payable to naples estate jewelry.. email copy starts ticked if email is input, zelle phone number is 2393046229 for now… the rest is good"*.
+
+**Found first:** the In-Store Sale form took ONE item; the Email box already existed and always sent the receipt when filled. The checkout's `create_paypal_order` / `capture_paypal_order` already handle several lines; nothing clears old unpaid orders; Storage GC already keeps `order_items.image_snapshot`; the existing "Create Manual Order" + "Email invoice" sent an unpaid invoice nobody could pay from.
+
+**Built:**
+- `lib/in-store-sale.ts` — `normalizeSaleItems` (1–20 items, "Item N:" errors, no listed piece twice, `isSalePhotoUrl`), `saleSubtotal`, `normalizeSaleCustomer`, `normalizeSaleDelivery` (`shipAddress: 'optional'`), `emailCopy`, `remote_<method>` + "Invoice" labels. The old single-`item` request still parses.
+- `lib/instant-sale-server.ts` (NEW) — `buildSaleItemPayloads`, `recordOfflinePayment` (the in-store recorder's capture → stamp → hooks → finalize, now shared); `lib/order-finalize.ts` — `sendCustomerReceipt` option.
+- `app/api/admin/in-store-sales/route.ts` — several items + Email copy on the shared helpers.
+- Remote sale: `lib/remote-sale.ts` (NEW, pure), `lib/remote-sale-server.ts` (NEW), routes `api/admin/remote-sales` + `[id]` (resend / cancel / record), public `api/pay/[token]/create-order`; SQL `supabase/remote-sales-2026-10.sql` (NEW).
+- Invoice email — `InvoicePaymentBlock` in `lib/order-invoice-email.ts` (message signed "— Chris", the Pay button, hints, other ways; phone numbers kept on one line) + `payment` in `lib/order-invoice-mailer.ts`. Every other invoice / receipt unchanged (tested).
+- UI — `components/admin/instant-sale/` (NEW): `SaleItemsEditor`, `SalePhotoField`, `sale-client`, `SaleDeliverySection` (section 3 now shared), `RemoteSaleForm`, `RemoteInvoiceCard`, `load-instant-sale-page`; `InStoreSaleForm.tsx` rebuilt on them; `components/pay/PayInvoiceClient.tsx` (NEW); `PayPalCheckoutButton.tsx` gains `createOrderUrl` + `cancelOnAbandon`; `IdPhotoCapture.tsx` gains `title` / `hint` (defaults unchanged).
+- Pages — `[locale]/admin/instant-sale` (two cards + Open invoices), `…/instant-sale/in-store`, `…/instant-sale/remote`, public `[locale]/pay/[token]` (noindex, no-referrer); `[locale]/admin/in-store-sale` → a redirect to Instant Sale; `AdminHeader` menu "Instant Sale".
+- Tests — `in-store-sale.test.ts` (2 updated + 6 new), NEW `remote-sale.test.ts` (14); `buy-receipt-customer-mode.test.ts`'s every-admin-page guard now treats a markup-free redirect page as covered.
+- Fixed on the way (browser check): the pay page first showed the out-of-state total before any address was typed; `payPageTotals` now starts WITH Florida tax, matching the email.
+
+**Decided by Claude, told to the owner:** "Save draft" (in mockup v2's remote total card) left out — it needs editing an unsent invoice; offered as a follow-up. A cancelled invoice whose PayPal window was already open can still be paid (same as web checkout) — documented in `features/paypal-checkout.md`.
+
+**Gate:** `npx tsc --noEmit` 0 · `npm run lint` 0 errors (the 4 old `<img>` warnings) · `npx vitest run` **1925/1925** (169 files) · `npm run build` 0 (dev server stopped first, `.next/dev` cleared) · prerendered **90 = 42 EN + 42 ES + 6** (was 88: the old in-store address is now a static redirect, one per language — still paired).
+**Browser (dev, a temporary page with the real components + stand-in data, deleted after):** in-store — 3 items (listed #212 + 2 not listed) total $2,867.30 as mockup v1; a photo upload (stand-in route) shows "Taken for this sale"; Email copy disabled with no email, ticks itself on typing, hint changes on untick; the request carried 3 items + the photo URL + `emailCopy: true`; success screen lists the 3 items. Remote — ship with no address $2,871.54 + "Out of Florida: $2,709.00", a GA address $2,709.00; request body (blank address, Zelle on, 7 days, message) as designed; the sent screen + card. Card — Record payment (Zelle) and Cancel confirm sent `record` / `cancel`. Pay page — the message, items, Zelle line; FL $2,871.54 ↔ GA $2,709.00 as the state changes. 375 px: no sideways scroll on all four; photo strip = picture + words, buttons under (phone mockup). Real routes: `/pay/<unknown>` EN/ES 200 with the "no longer available" card, noindex + no-referrer; `/api/pay/…/create-order` 404 for an unknown link; `/admin/instant-sale`, `/in-store`, `/remote`, `/admin/in-store-sale` redirect when signed out; both admin APIs 401 signed out. The real invoice email HTML rendered from the code (stand-in order) — button, hints, Zelle line, signed message.
+- ⛔ **Not verified:** the SQL (not run); any real invoice, email, PayPal payment, Record payment or photo upload to Storage; anything behind the sign-in; a real iPad camera.
+
+## 2026-10-21 (1) — "What to bring" now says a government photo ID on three more seller spots (EN + ES) — BUILT + STAGED, not pushed; no SQL, no env vars
+
+- Owner: *"anywhere on the site that tells people what they need to bring when selling us items.. they need to bring ID"*. A search of every seller page found the ID only on the city pages' "What to bring" box (`sell/[city]/page.tsx`, since 2026-09-08) and the inherited-jewelry guide's FAQ ("Your ID at the sale"). Claude recommended three more spots plus an optional new `/faq` question; owner: *"add the ID wording to spots 1, 2 and 3 as written"* — the `/faq` question was not asked for.
+- **Built** (one sentence added to existing copy; no layout change, so no mockup):
+  - `[locale]/diamond-buyers/page.tsx` — FAQ "What should I bring for a jewelry evaluation?": *"If you decide to sell, bring a government photo ID — Florida requires it when we buy precious metals."* Also in the page's FAQPage JSON-LD (same list).
+  - `[locale]/free-evaluation/page.tsx` — "Visit the Showroom" card: the same sentence after "Bring the whole box or drawer…".
+  - `[locale]/sell/page.tsx` — "Before You Sell" → "Bring everything": *"And bring a government photo ID — Florida requires it when we buy precious metals."*
+  - Spanish: *"Si decide vender, traiga una identificación oficial con foto — Florida la exige cuando compramos metales preciosos."* / *"Y traiga una identificación oficial con foto — …"* — the city pages' wording.
+  - Guard: `lib/__tests__/service-landers-faq.test.ts` — new block, the four pages (city, `/sell`, `/free-evaluation`, `/diamond-buyers`) carry the line in EN + ES.
+- `CONTENT_LAST_MODIFIED` in `sitemap.ts` left as it is (one sentence per page; the 10-19 headline change did not bump it either).
+- **Gate:** `npx tsc --noEmit` 0 · `npm run lint` 0 errors (the 4 old `<img>` warnings) · `npx vitest run` **1905/1905** (168 files) · `npm run build` 0 (dev server stopped first) · 88 prerendered = 41 EN + 41 ES + 6. Dev server: `/diamond-buyers`, `/free-evaluation`, `/sell` (EN + ES) 200 with the line in the page text; the diamond FAQ JSON-LD carries it. Screenshot of `/free-evaluation` was the known blank interior-page pane capture; verified from the DOM.
+- ⛔ Not seen on a phone or in production.
+
+## 2026-10-20 (4) — 10-20 (2) + (3) DEPLOYED (owner); session CLOSED — docs only
+
+- Owner: *"deployed.. update docs and end session"*. One push carried (2) In-Store Sale Paid by (Cash App, Venmo, Store credit) and (3) the Buy Receipts phone layout + no Qty. (1) Pickup or ship was deployed earlier the same day.
+- Not done: no production fetch (not asked; the pages are behind the admin sign-in).
+- Open (owner's first real uses, `TASKS.md` top three blocks): the Buy Receipts form on the iPhone; the next printed copy / seller email without Qty; the first Cash App / Venmo / Store credit sale; the first shipped in-store sale.
+
 ## 2026-10-20 (3) — Buy Receipts on a phone + **no Qty** on the form, the paper and the seller's email — BUILT + STAGED, not pushed; no SQL, no env vars
 
 The owner sent two iPhone screenshots of Admin → Buy Receipts: *"we need to reformat the mobile version… the quantity field is also below the description.. check the whole thing on mobile viewport size"*.

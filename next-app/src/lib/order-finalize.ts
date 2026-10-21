@@ -13,7 +13,17 @@ import { upsertOrderInvoice } from '@/lib/order-invoices';
  * webhook (buyer's browser died after PayPal approval) got no invoice row and no
  * receipt email.
  */
-export async function finalizePaidOrder(service: SupabaseClient, orderId: string): Promise<boolean> {
+export async function finalizePaidOrder(
+  service: SupabaseClient,
+  orderId: string,
+  /**
+   * `sendCustomerReceipt: false` = Instant Sale with "Email copy" unticked
+   * (owner, 2026-10-21): the email stays on the order (tracking emails use
+   * it) but no receipt goes out now. The invoice row and the owner's email
+   * are unchanged.
+   */
+  options: { sendCustomerReceipt?: boolean } = {},
+): Promise<boolean> {
   const { data: order, error: orderError } = await service
     .from('orders')
     .select('id, customer_email, payment_status')
@@ -45,7 +55,7 @@ export async function finalizePaidOrder(service: SupabaseClient, orderId: string
   }
   const alreadyNotified = Boolean(priorAutomaticReceipts?.length);
 
-  if (resendKey && order.customer_email && !alreadyNotified) {
+  if (resendKey && order.customer_email && !alreadyNotified && options.sendCustomerReceipt !== false) {
     try {
       const { sendOrderInvoiceEmail } = await import('@/lib/order-invoice-mailer');
       const result = await sendOrderInvoiceEmail({

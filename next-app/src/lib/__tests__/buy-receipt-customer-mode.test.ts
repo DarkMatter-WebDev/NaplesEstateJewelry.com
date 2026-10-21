@@ -396,7 +396,13 @@ describe('customer input mode: the server refuses a locked browser', () => {
     }
     const adminPages = sourceFiles(join(root, 'src', 'app', '[locale]', 'admin')).filter((file) => /[\\/]page\.tsx$/.test(file));
     expect(adminPages.length).toBeGreaterThanOrEqual(25);
-    const uncovered = adminPages.filter((file) => !menu.test(readFileSync(file, 'utf8')));
+    // A page that only forwards (redirect, no markup — e.g. the old In-Store
+    // Sale address, 2026-10-21) shows nothing, so there is nothing to guard.
+    const forwardOnly = (src: string) => /\bredirect\(/.test(src) && !/<[A-Za-z]/.test(src);
+    const uncovered = adminPages.filter((file) => {
+      const src = readFileSync(file, 'utf8');
+      return !menu.test(src) && !forwardOnly(src);
+    });
     expect(uncovered.map((file) => file.replace(root, '').replace(/\\/g, '/'))).toEqual([]);
 
     // The component form is for pages with no admin menu; the public site never loads it.

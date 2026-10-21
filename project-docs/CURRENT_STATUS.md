@@ -2,7 +2,45 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-10-20**.
+> in `DECISIONS.md`. Last reconciled: **2026-10-21 (3)**.
+
+## Start Here (2026-10-21 (3) — 🟡 Remote sale **Save draft** added before the push; ⛔ run `supabase/remote-sales-2026-10.sql` AGAIN (drafts table); then push)
+
+- Owner asked for Save draft after running the SQL for (2) and before pushing. Built + staged (`CHANGELOG.md` 2026-10-21 (3)): Save draft beside Email invoice; Instant Sale lists **Drafts** (Continue · Delete); a draft is NOT an order; sending deletes the draft; draft photos kept by the Storage clean-up.
+- ⛔ **SQL:** the same file again — section 1 already ran (*"ran the sql, got 0"*), section 2 (drafts) is new. Safe to re-run.
+- Gate: `tsc` 0 · lint 0 errors · **1929/1929** · build 0 · 90 = 42 + 42 + 6. ⛔ Not seen behind the sign-in.
+
+## Start Here (2026-10-21 (2) — 🟡 Instant Sale BUILT + STAGED, not pushed; ✅ SQL section 1 RUN by the owner (count 0); no env vars)
+
+- ✅ Owner, 10-21: *"ran the sql, got 0"*. Where the bullets below say "SQL to run", read "run" — but see (3) above: the file gained section 2.
+
+- 🟡 **Built and staged, waiting for the SQL + the push** (`CHANGELOG.md` 2026-10-21 (2); rule `DECISIONS.md` top entry; runbook `features/instant-sale.md`; `TASKS.md` top):
+  - Admin menu **"In-Store Sale" → "Instant Sale"**: two cards, **In-store sale** and **Remote sale**, plus the Open invoices list. The old address forwards.
+  - **In-store sale:** several items (listed or not), an optional photo each (camera or file), **Email copy** that ticks itself when an email is typed.
+  - **Remote sale:** the same items → **Email invoice** = an unpaid order + a private `/pay/<link>` (PayPal or a card through the site's checkout) and the ways to pay ticked: Zelle **(239) 304-6229** (owner's number for now), checks to **Naples Estate Jewelry**, call to pay. Paid online it closes itself; Zelle / check → **Record payment**. Nothing is reserved.
+- Gate: `tsc` 0 · lint 0 errors · **1925/1925** · build 0 · **90 = 42 + 42 + 6** (+2: the old address is a static redirect per language).
+- ⛔ Not verified: the SQL, a real invoice / email / PayPal payment / photo upload, anything behind the sign-in, a real iPad camera. `TASKS.md` top items 3–4 are the owner's tests.
+- The 10-21 (1) block below rides the same push.
+
+## Start Here (2026-10-21 (1) — 🟡 "what to bring" + photo ID BUILT + STAGED, not pushed; no SQL, no env vars)
+
+- 🟡 **Built and staged, waiting for the push** (`CHANGELOG.md` 2026-10-21 (1); rule `DECISIONS.md` top entry; `TASKS.md` top): one sentence telling a seller to bring a government photo ID ("Florida requires it when we buy precious metals"), EN + ES, on `/diamond-buyers` (FAQ "What should I bring…", also in its FAQ schema), `/free-evaluation` (Visit the Showroom) and `/sell` (Bring everything). The city pages already said it.
+- Gate: `tsc` 0 · lint 0 errors · **1905/1905** (168 files) · build 0 · 88 = 41 + 41 + 6.
+- ⛔ Not seen on a phone or in production. After the push: optional IndexNow for the six URLs (`TASKS.md` top, item 2).
+- The 10-20 (4) block below otherwise still applies.
+
+## Start Here (2026-10-20 (4) — session CLOSED; everything from 10-20 DEPLOYED (owner); nothing staged-but-unpushed except docs; no SQL, no env vars)
+
+- 🟢 Owner: *"deployed.. update docs and end session"*. Live, on the owner's word (production not checked by Claude — not asked; these pages are behind the sign-in):
+  - (3) Buy Receipts on a phone + no Qty (form, paper, seller's email);
+  - (2) In-Store Sale Paid by: Cash App, Venmo, Store credit;
+  - (1) In-Store Sale Pickup or ship.
+- ◻ **Open, all the owner's first real uses** (`TASKS.md` top three blocks):
+  - the Buy Receipts form on the iPhone, and the next printed copy and email without Qty;
+  - the next sale paid by Cash App / Venmo / Store credit;
+  - the first real shipped in-store sale (receipt shows "Ship to"; Orders → Mark Shipped + tracking).
+- Last gate: `tsc` 0 · lint 0 errors · **1901/1901** (168 files) · build 0 · 88 = 41 + 41 + 6. Record `CHANGELOG.md` 2026-10-20 (4).
+- Where the blocks below say "STAGED" / "not pushed", read "deployed".
 
 ## Start Here (2026-10-20 (3) — 🟡 Buy Receipts phone layout + no Qty BUILT + STAGED, not pushed (rides with (2) Paid by); no SQL, no env vars)
 

@@ -4,7 +4,28 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-10-20**.
+> compaction. Last reconciled: **2026-10-21**.
+
+## Instant Sale: In-Store Sale becomes "Instant Sale" with two ways — In-store sale (several items, a photo each, Email copy) and Remote sale (an emailed invoice = an unpaid order with a private pay link) (2026-10-21)
+
+- **Owner:** *"lets change the name of the form from in-store sale to instant sale... the first option... is in-store sale... other option is remote sale... mainly use the remote sale to email the client an invoice, with payment options.. include the option to include a payment link that will allow them to fill in their info and complete the sale through our paypal system"*; on mockup v2: *"use your picks but make checks payable to naples estate jewelry.. email copy starts ticked if email is input, zelle phone number is 2393046229 for now.. will update soon when business zelle is approved.. the rest is good"*. Earlier (mockup v1): several items, *"take or choose a photo for each one (make it optional)"*, an Email copy box *"in a similar way to how the buy receipts works"*.
+- **Items:** one or more (cap 20), each Listed or Not listed, each with an OPTIONAL photo (Take photo = the device camera, or the Buy Receipts webcam window on a computer; Choose photo). A photo goes through `/api/admin/product-images` (WebP, immutable cache) and is the order line's `image_snapshot`; on a listed item it replaces the listing photo **on this order and receipt only**, never on the listing. Shipping fees go by the items' total. ⛔ No listed piece twice on one sale.
+- **Email copy (in store):** ticks itself the moment an email is typed; unticked = the email is kept on the order (tracking emails use it) but no receipt goes now. One switch: `finalizePaidOrder(…, { sendCustomerReceipt })`.
+- **Remote sale = a real unpaid order from the moment it is sent** (Claude's recommendation, accepted): the same `create_paypal_order` RPC, `payment_method 'invoice'`, plus a private `remote_sale_invoices` row. ⛔ NOT PayPal's own invoicing — the money would arrive without the site knowing the item sold. The pay link opens `/pay/<token>`, which pays THAT order through the site's PayPal checkout; capture is the unchanged web capture route, so items sold / listings end / receipt / owner email never fork. Zelle / check / call → "Record payment", the same `recordOfflinePayment` as an in-store sale (`remote_<method>`, fulfillment left pending).
+- **No reservation** (Claude's pick, accepted): listed items stay for sale everywhere until someone pays — the counter-offer rule. If one sells first, the pay page and its route refuse before any money moves.
+- **Link:** 7 days by default (3 / 14 offered); Resend gives a fresh period with the same link. The token is stored as written (not hashed like a counter's) so the admin can "Copy pay link" at any time; the table is service-role only.
+- **Tax:** the web checkout rule. With no address yet, the invoice is drawn WITH Florida tax and the pay page starts there, so the number only ever goes down (out of state) once the customer types their state.
+- **Ways to pay printed:** Zelle to **(239) 304-6229** (the owner's own number for now — `ZELLE_PAY_TO`, ONE line, change it when the business Zelle is approved); checks payable to **Naples Estate Jewelry**; call (239) 404-8505 to pay by card. ⛔ Never print a payee or number the owner did not give.
+- **The old address** `/admin/in-store-sale` forwards to Instant Sale (bookmarks, the desktop shortcut).
+- **Save draft** (owner, 2026-10-21: *"actually add save draft to the remote sale"*): the form as typed goes to the private `remote_sale_drafts` — ⛔ NO order until Email invoice, so a draft never shows in Orders or holds anything. Continue on any device from Instant Sale → Drafts; Email invoice from a draft deletes the draft. A listed piece that sold since comes back unpicked with a note. Draft photos are in the Storage GC reference set. Nothing is required to save but something typed (a name, an email or an item).
+- Files: `STRUCTURE.md` → the two *Instant Sale* rows. Runbook `features/instant-sale.md`. Record `CHANGELOG.md` 2026-10-21 (2) + (3) (drafts). SQL `supabase/remote-sales-2026-10.sql` (section 2 = drafts).
+
+## Every place that tells a seller what to bring says to bring a government photo ID, in the city pages' wording (2026-10-21)
+
+- **Owner:** *"anywhere on the site that tells people what they need to bring when selling us items.. they need to bring ID"*.
+- **The wording** (from the city pages' "What to bring" box, 2026-09-08): EN *"a government photo ID — Florida requires it when we buy precious metals"*; ES *"una identificación oficial con foto — Florida la exige cuando compramos metales preciosos"*. Where the copy is about a free evaluation, it opens "If you decide to sell, …" / "Si decide vender, …" — the evaluation itself needs no ID.
+- **Where:** `/sell/[city]` (What to bring), `/sell` (Before You Sell → Bring everything), `/free-evaluation` (Visit the Showroom), `/diamond-buyers` (FAQ "What should I bring…"). The inherited-jewelry guide's "Your ID at the sale" stays as written. A new `/faq` question was offered and not taken (not declined — not asked for).
+- A new "what to bring" passage carries the line too. Guard: `lib/__tests__/service-landers-faq.test.ts`. Record `CHANGELOG.md` 2026-10-21 (1).
 
 ## Buy receipt: no Qty box at any size; the paper and the seller's email show Qty only for a real quantity; the phone layout is the owner's mockup v1 (2026-10-20)
 

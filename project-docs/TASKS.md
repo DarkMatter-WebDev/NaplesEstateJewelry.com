@@ -1,7 +1,7 @@
 # Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-10-20 (2)** (Paid by + Cash App / Venmo / Store credit BUILT + STAGED, not pushed — first block below; Pickup or ship DEPLOYED by the owner — second block; `CHANGELOG.md` 2026-10-20 (2)). Earlier the same day: **2026-10-20** (In-Store Sale "Pickup or ship" built — `CHANGELOG.md` 2026-10-20 (1)). Before that, **2026-10-19** (SEO heroes on `/free-evaluation` + `/estate-jewelry` BUILT + STAGED, not pushed — first block below; `CHANGELOG.md` 2026-10-19 (1)). Before that, **2026-10-18** (session CLOSED — `CHANGELOG.md` 2026-10-18 (7): three changes DEPLOYED + verified live — the first three blocks below, each with only the owner's own look left; offer texts shelved; nothing to push, no SQL). Earlier the same day: the homepage headline letter-tail fix BUILT + STAGED. Before that, **2026-10-17** (session CLOSED — `CHANGELOG.md` 2026-10-17 (4): the homepage 404 fixed, deployed and confirmed — first block below, nothing open; no SQL, nothing to push). Before that, **2026-10-15** (session CLOSED — `CHANGELOG.md` 2026-10-15 (13): Make an Offer built, tested and deployed with bulk on/off, the phone card, decline/counter messages, centred email footers and delete; nothing to push, no SQL). Before that, **2026-10-14** (eBay Best Offer per
+> in `CHANGELOG.md`. Last reconciled: **2026-10-21 (3)** (Remote sale Save draft added on the owner's ask before the push; ⛔ re-run the SQL file). Before that, **2026-10-21 (2)** (Instant Sale — In-store sale with several items + photos + Email copy, and Remote sale invoices with a PayPal pay link — BUILT + STAGED, not pushed, ⛔ SQL to run; first block below). Earlier the same day, **2026-10-21 (1)** ("what to bring" says a government photo ID on three more seller spots — BUILT + STAGED, not pushed; second block below; one push carries both). Before that, **2026-10-20 (4)** (session CLOSED — everything from 10-20 DEPLOYED by the owner: (3) Buy Receipts phone layout + no Qty, (2) Paid by, (1) Pickup or ship — the first three blocks below, each with only the owner's first real use left; nothing staged-but-unpushed except docs; no SQL. Earlier: Paid by + Cash App / Venmo / Store credit BUILT + STAGED — first block below; Pickup or ship DEPLOYED by the owner — second block; `CHANGELOG.md` 2026-10-20 (2)). Earlier the same day: **2026-10-20** (In-Store Sale "Pickup or ship" built — `CHANGELOG.md` 2026-10-20 (1)). Before that, **2026-10-19** (SEO heroes on `/free-evaluation` + `/estate-jewelry` BUILT + STAGED, not pushed — first block below; `CHANGELOG.md` 2026-10-19 (1)). Before that, **2026-10-18** (session CLOSED — `CHANGELOG.md` 2026-10-18 (7): three changes DEPLOYED + verified live — the first three blocks below, each with only the owner's own look left; offer texts shelved; nothing to push, no SQL). Earlier the same day: the homepage headline letter-tail fix BUILT + STAGED. Before that, **2026-10-17** (session CLOSED — `CHANGELOG.md` 2026-10-17 (4): the homepage 404 fixed, deployed and confirmed — first block below, nothing open; no SQL, nothing to push). Before that, **2026-10-15** (session CLOSED — `CHANGELOG.md` 2026-10-15 (13): Make an Offer built, tested and deployed with bulk on/off, the phone card, decline/counter messages, centred email footers and delete; nothing to push, no SQL). Before that, **2026-10-14** (eBay Best Offer per
 > item + in bulk BUILT + STAGED; SQL RUN by the owner; only the push left — first block below). Before that, **2026-10-12** (session CLOSED —
 > `CHANGELOG.md` 2026-10-12 (3); two new blocks, first below: the short phone
 > cookie notice DEPLOYED + verified in production, and the next Google Ads
@@ -28,7 +28,46 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-10-20 (3) — Buy Receipts on a phone + **no Qty** (form, paper, seller's email) — BUILT + STAGED, not pushed; no SQL, no env vars
+### 🟡 2026-10-21 (2) + (3) — Admin → **Instant Sale** (In-store sale: several items, a photo each, Email copy · Remote sale: emailed invoice + private PayPal pay link + **Save draft**) — **BUILT + STAGED, not pushed**; ⛔ re-run the SQL file (drafts); no env vars
+
+Record: `CHANGELOG.md` 2026-10-21 (2) + (3). Rule: `DECISIONS.md` top entry. Runbook: `features/instant-sale.md`. Files: `STRUCTURE.md` → the two *Instant Sale* rows.
+
+Gate (final, with drafts): `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1929/1929** (169 files) · build 0 · 90 prerendered = 42 EN + 42 ES + 6.
+
+1. ◻ **Owner — run `supabase/remote-sales-2026-10.sql` AGAIN** (section 1 ran 10-21, owner: *"ran the sql, got 0"*; section 2 — the Save draft table, added 10-21 (3) — needs the whole file once more; safe to re-run; the closing check shows two counts). Until then only "Save draft" fails.
+2. ◻ **Owner — push + deploy** (one push carries 10-21 (1) "photo ID" as well).
+3. ◻ **Owner — first in-store sale with two items** (Admin → Instant Sale → In-store sale): add a photo to one; check the receipt email shows both items and the photo; try Email copy unticked once.
+4. ◻ **Owner — first remote sale, to yourself first:** Remote sale → one item → your own email → Email invoice. Check the email (message, Pay button, Zelle line), open the link, see the pay page; **Cancel invoice** afterwards (or pay a $1 Not-listed item for real to see the receipt, then refund it by hand in PayPal).
+5. ℹ️ When the business Zelle is approved: tell Claude the new number/email — ONE line (`ZELLE_PAY_TO` in `next-app/src/lib/remote-sale.ts`) + its test.
+6. ◻ **Owner — first draft:** Remote sale → type a name → Save draft → Instant Sale shows it under Drafts → Continue (on the iPad too) → Email invoice — the draft leaves the list.
+
+**Staging (10-21 (3), drafts):** ✅ synced 2026-10-21 ~12:24 PM ET.
+- The dry run listed exactly the 18 touched files: 11 in the app (3 NEW: `drafts/route.ts`, `drafts/[id]/route.ts`, `RemoteDraftCard.tsx`), the SQL, 6 docs. 0 Extras, 1281 total.
+- The real run copied 18, 0 FAILED. The follow-up dry run copied 0, exit 0.
+- Checks: leak check 0; `.tsx` 262 = 262; SHA-256 MATCH on 4 files (incl. the SQL); no `zz-*` page. Staging holds 10-21 (1) + (2) + (3). Docs-only re-sync after this line.
+
+**Staging (10-21 (2)):** ✅ synced 2026-10-21 ~12:08 PM ET.
+- The dry run listed exactly the 39 touched files: 31 in the app (17 NEW incl. 4 routes, 4 pages, 8 components, 3 libs, 1 test… and 14 changed), the NEW SQL, and 7 docs (CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS, `features/paypal-checkout.md`, NEW `features/instant-sale.md`). 0 Extras, 1278 total.
+- The real run copied 39 (exit 1 = copied), 0 FAILED. The follow-up dry run copied 0, exit 0.
+- Checks: leak check 0; `.tsx` 261 = 261; SHA-256 MATCH on 5 files (incl. the SQL); no `zz-*` page in staging.
+- Staging also holds 10-21 (1). Docs-only re-sync after this line.
+
+### 🟡 2026-10-21 (1) — "What to bring": government photo ID on `/diamond-buyers` (FAQ), `/free-evaluation` (Visit the Showroom), `/sell` (Bring everything), EN + ES — **BUILT + STAGED, not pushed**; no SQL, no env vars
+
+Record: `CHANGELOG.md` 2026-10-21 (1). Rule: `DECISIONS.md` top entry. Files: `src/app/[locale]/diamond-buyers/page.tsx`, `src/app/[locale]/free-evaluation/page.tsx`, `src/app/[locale]/sell/page.tsx`, `src/lib/__tests__/service-landers-faq.test.ts`.
+
+Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1905/1905** (168 files) · build 0 · 88 prerendered = 41 EN + 41 ES + 6.
+
+1. ◻ **Owner — push + deploy.**
+2. ℹ️ Optional after the deploy: IndexNow for the six URLs (Claude runs it from `next-app/` in PowerShell): `npm run indexnow -- --urls=/diamond-buyers,/es/diamond-buyers,/free-evaluation,/es/free-evaluation,/sell,/es/sell`.
+
+**Staging (10-21 (1)):** ✅ synced 2026-10-21 ~10:24 AM ET.
+- The dry run listed exactly the 8 touched files: 4 in the app (the three pages + the test) + 4 docs (CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS). 0 Extras, 1257 total.
+- The real run copied 8 (exit 1 = copied), 0 FAILED. The follow-up dry run copied 0, exit 0.
+- Checks: leak check 0; `.tsx` 251 = 251; SHA-256 MATCH on the 4 app files.
+- Docs-only re-sync after this line.
+
+### 🟢 2026-10-20 (3) — Buy Receipts on a phone + **no Qty** (form, paper, seller's email) — **DEPLOYED (owner, 10-20)**; ◻ items 2–3 are the owner's first looks
 
 Record: `CHANGELOG.md` 2026-10-20 (3). Rule: `DECISIONS.md` top entry. Runbook: `features/buy-receipts.md`. Files:
 - `components/admin/buy-receipts/buy-receipt-sheet-css.ts`, `BuyReceiptSheet.tsx`, `BuyReceiptForm.tsx`, `IdPhotoField.tsx`, `ThumbprintField.tsx`
@@ -37,7 +76,7 @@ Record: `CHANGELOG.md` 2026-10-20 (3). Rule: `DECISIONS.md` top entry. Runbook: 
 
 Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1901/1901** (168 files) · build 0 · 88 prerendered. Real form 148/148 (320–1280 px, paper, email; stand-in data).
 
-1. ◻ **Owner — push + deploy** (carries (2) Paid by as well).
+1. ✅ **Owner — push + deploy** — DONE 10-20 (owner: *"deployed.."*; carried (2) as well). Production not checked by Claude (not asked; the page is behind the sign-in).
 2. ◻ **Owner — on the iPhone:** Admin → Buy Receipts → New receipt. Check:
    - the ID photo and thumbprint strips read normally;
    - each item is one line with no Qty box;
@@ -51,11 +90,11 @@ Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1901/1901** (16
 - Checks: leak check 0; `.tsx` 251 = 251; SHA-256 MATCH on 5 app files; no `zz-*` page in staging.
 - Staging also holds 10-20 (2). Docs-only re-sync after this line.
 
-### 🟡 2026-10-20 (2) — In-Store Sale "Paid by": **Cash App, Venmo, Store credit** — BUILT + STAGED, not pushed; no SQL, no env vars
+### 🟢 2026-10-20 (2) — In-Store Sale "Paid by": **Cash App, Venmo, Store credit** — **DEPLOYED (owner, 10-20)**; ◻ item 2 is the owner's first use
 
 Record: `CHANGELOG.md` 2026-10-20 (2). Files: `src/lib/in-store-sale.ts`, `src/components/admin/InStoreSaleForm.tsx`, `src/lib/__tests__/in-store-sale.test.ts`. Gate: `tsc` 0 · lint 0 errors · **1893/1893** · build 0 · 88 prerendered. Real form 13/13 at 1280 + 390 px (save intercepted).
 
-1. ◻ **Owner — push + deploy.**
+1. ✅ **Owner — push + deploy** — DONE 10-20 (with (3)).
 2. ◻ **Owner — the next sale paid one of these ways:** pick the chip. The order page should say "In store · Cash App" / "Venmo" / "Store credit".
 
 **Staging (10-20 (2)):** ✅ synced 2026-10-20 ~9:58 PM ET.

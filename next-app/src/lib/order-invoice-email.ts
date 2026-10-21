@@ -46,6 +46,26 @@ export interface InvoicePickupBlock {
   byAppointment: string;
 }
 
+/**
+ * How to pay an UNPAID invoice sent from Instant Sale → Remote sale (owner,
+ * 2026-10-21): the owner's message, the private Pay online button, and the
+ * other ways to pay that were ticked. Absent on every other invoice/receipt,
+ * which render exactly as before.
+ */
+export interface InvoicePaymentBlock {
+  /** The private /pay/<token> link, or null when "Pay online" was not ticked. */
+  payUrl: string | null;
+  /** "Pay $2,871.54 securely". */
+  payLabel: string;
+  /** "PayPal or any debit / credit card · link good until Oct 28". */
+  payHint: string;
+  /** Shown when the tax can still come off (shipping, no address yet). */
+  taxHint: string | null;
+  otherWays: string[];
+  /** The owner's own words, printed as typed and signed "— Chris". */
+  message: string | null;
+}
+
 export interface InvoiceEmailContent {
   subject: string;
   invoiceNumber: string;
@@ -127,9 +147,14 @@ export function formatPickupHours(schedule: StoreHoursSchedule): string {
 // preview), so it cannot fetch the schedule itself. Server callers pass
 // `opts.pickupHours` from `getStoreHours()`; without it the block shows the
 // built-in default hours.
-export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoiceNumber?: string | null, opts?: { pickupHours?: string }): InvoiceEmailContent {
+export function buildInvoiceEmailContent(
+  order: InvoiceEmailOrder,
+  fallbackInvoiceNumber?: string | null,
+  opts?: { pickupHours?: string; payment?: InvoicePaymentBlock | null },
+): InvoiceEmailContent {
   const invoiceNumber = invoiceNumberForOrder(order, fallbackInvoiceNumber);
   const paid = isOrderPaid(order);
+  const payment = paid ? null : opts?.payment ?? null;
   // Local pickup orders can still have an address on file (the checkout address
   // accordion lets a pickup buyer optionally provide one) — label it "Address"
   // rather than "Ship to" since nothing is actually being shipped.
@@ -173,7 +198,9 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
   const greeting = `Hi ${customerName},`;
   const intro = paid
     ? `Thank you for your order with Naples Estate Jewelry. Your payment has been received — here is your receipt for order ${order.order_number}.`
-    : `Thank you for your order with Naples Estate Jewelry. Invoice ${invoiceNumber} for ${order.order_number} is ready for review.`;
+    : payment
+      ? `Here is your invoice from Naples Estate Jewelry for order ${order.order_number}.`
+      : `Thank you for your order with Naples Estate Jewelry. Invoice ${invoiceNumber} for ${order.order_number} is ready for review.`;
   // A pickup buyer is TOLD WHERE TO GO. Until 2026-08-17 this email said only
   // "call or text with any questions about pickup" — someone who had just paid
   // several thousand dollars had to phone up to learn the address. The showroom
@@ -236,10 +263,12 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
       ),
       shipTo: shipToLines,
       shipToLabel,
+      payment,
     }),
     text: [
       greeting,
       intro,
+      ...(payment?.message ? ['', payment.message, '— Chris'] : []),
       ...(paid ? ['', 'PAYMENT RECEIVED — PAID IN FULL'] : []),
       '',
       'Items:',
@@ -250,6 +279,12 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
       `Tax: ${totals.tax}`,
       `Shipping: ${totals.shipping}`,
       `Total: ${totals.total}`,
+      ...(payment?.payUrl
+        ? ['', `${payment.payLabel.toUpperCase()}:`, payment.payUrl, payment.payHint, ...(payment.taxHint ? [payment.taxHint] : [])]
+        : []),
+      ...(payment && payment.otherWays.length > 0
+        ? ['', payment.payUrl ? 'OTHER WAYS TO PAY' : 'HOW TO PAY', ...payment.otherWays]
+        : []),
       ...(shipToLines.length > 0 ? ['', `${shipToLabel}:`, ...shipToLines] : []),
       '',
       ...(note ? [note, ''] : []),
@@ -305,6 +340,7 @@ function buildInvoiceEmailHtml({
   shippingMethod,
   shipTo,
   shipToLabel,
+  payment,
 }: Omit<InvoiceEmailContent, 'html' | 'text' | 'invoiceNumber'> & {
   orderNumber: string;
   paid: boolean;
@@ -313,6 +349,7 @@ function buildInvoiceEmailHtml({
   shippingMethod: string;
   shipTo: string[];
   shipToLabel: string;
+  payment: InvoicePaymentBlock | null;
 }) {
   const itemRows = items.length > 0
     ? items.map((item) => `
@@ -356,6 +393,7 @@ function buildInvoiceEmailHtml({
                 <td style="padding:26px 30px;">
                   <p style="margin:0 0 14px;font-size:15px;line-height:1.55;">${escapeHtml(greeting)}</p>
                   <p style="margin:0 0 20px;font-size:15px;line-height:1.55;">${escapeHtml(intro)}</p>
+                  ${payment?.message ? paymentMessageHtml(payment.message) : ''}
 
                   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-top:1px solid #eadfbd;border-bottom:1px solid #eadfbd;margin:0 0 22px;">
                     ${itemRows}
@@ -368,6 +406,7 @@ function buildInvoiceEmailHtml({
                     ${totalRow('Shipping', totals.shipping)}
                     ${totalRow(paid ? 'Total Paid' : 'Total', totals.total, true)}
                   </table>
+                  ${payment ? paymentBlockHtml(payment) : ''}
 
                   <div style="margin:0 0 22px;padding:14px 16px;background:#fbfaf5;border:1px solid #eadfbd;color:#746b5b;font-size:13px;line-height:1.5;">
                     Shipping method: ${escapeHtml(shippingMethod)}
@@ -424,6 +463,50 @@ function pickupBlockHtml(pickup: InvoicePickupBlock) {
                     </tr>
                   </table>
   `;
+}
+
+/** The owner's message on a remote-sale invoice: quoted as typed, signed. */
+function paymentMessageHtml(message: string) {
+  return `
+                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 20px;background:#fbf7e8;border-left:3px solid #d4af37;">
+                    <tr>
+                      <td style="padding:12px 14px;color:#1d1a14;font-size:14px;line-height:1.55;font-style:italic;">
+                        ${escapeHtml(message).replace(/\n/g, '<br/>')}<br/>— Chris
+                      </td>
+                    </tr>
+                  </table>
+  `;
+}
+
+/**
+ * The Pay online button and the other ways to pay. A TABLE-cell button (the
+ * bulletproof-button pattern) so Outlook keeps its background and padding.
+ */
+function paymentBlockHtml(payment: InvoicePaymentBlock) {
+  const button = payment.payUrl
+    ? `
+                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 8px;">
+                    <tr>
+                      <td align="center" bgcolor="#b5890c" style="background:#b5890c;border-radius:4px;">
+                        <a href="${escapeHtml(payment.payUrl)}" style="display:block;padding:15px 18px;color:#ffffff;font-size:14px;font-weight:700;letter-spacing:2px;text-transform:uppercase;text-decoration:none;">${escapeHtml(payment.payLabel)}</a>
+                      </td>
+                    </tr>
+                  </table>
+                  <p style="margin:0 0 ${payment.taxHint ? '2px' : '20px'};text-align:center;color:#746b5b;font-size:12px;line-height:1.5;">${escapeHtml(payment.payHint)}</p>
+                  ${payment.taxHint ? `<p style="margin:0 0 20px;text-align:center;color:#746b5b;font-size:12px;line-height:1.5;">${escapeHtml(payment.taxHint)}</p>` : ''}`
+    : '';
+  const other = payment.otherWays.length > 0
+    ? `
+                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 22px;border:1px solid #eadfbd;">
+                    <tr>
+                      <td style="padding:12px 14px;color:#1d1a14;font-size:14px;line-height:1.6;">
+                        <strong style="display:block;margin-bottom:4px;">${payment.payUrl ? 'Other ways to pay' : 'How to pay'}</strong>
+                        ${payment.otherWays.map((line) => `<span style="display:block;">${escapeHtml(line).replace(/\(\d{3}\) \d{3}-\d{4}/g, (phone) => `<span style="white-space:nowrap;">${phone}</span>`)}</span>`).join('')}
+                      </td>
+                    </tr>
+                  </table>`
+    : '';
+  return `${button}${other}`;
 }
 
 function totalRow(label: string, value: string, strong = false) {

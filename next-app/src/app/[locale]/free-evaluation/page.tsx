@@ -353,8 +353,8 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
                 </h3>
                 <p className="leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
                   {isEs
-                    ? 'Pase durante el horario del salón — no necesita cita. Traiga la caja o el cajón entero; no tiene que ordenar nada primero. Para colecciones grandes que llevan más tiempo, le recomendamos llamar antes para reservar una cita.'
-                    : "Walk in during showroom hours — no appointment needed. Bring the whole box or drawer; you don't have to sort anything first. For larger collections that take more time, we recommend calling ahead to book an appointment."}
+                    ? 'Pase durante el horario del salón — no necesita cita. Traiga la caja o el cajón entero; no tiene que ordenar nada primero. Si decide vender, traiga una identificación oficial con foto — Florida la exige cuando compramos metales preciosos. Para colecciones grandes que llevan más tiempo, le recomendamos llamar antes para reservar una cita.'
+                    : "Walk in during showroom hours — no appointment needed. Bring the whole box or drawer; you don't have to sort anything first. If you decide to sell, bring a government photo ID — Florida requires it when we buy precious metals. For larger collections that take more time, we recommend calling ahead to book an appointment."}
                 </p>
                 <div className="text-sm leading-relaxed" style={{ color: 'var(--color-on-surface)' }}>
                   <ShowroomAddress locale={locale} />

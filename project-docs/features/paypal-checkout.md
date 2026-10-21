@@ -194,7 +194,9 @@ link there with `?order=<number>` and print the domain as
 ## In-store sales (2026-09-16)
 
 A sale made in the showroom is paid on **PayPal Zettle** (Tap to Pay on the
-iPhone), not through the site. `/admin/in-store-sale` then records it:
+iPhone), not through the site. Admin → **Instant Sale → In-store sale**
+(`/admin/instant-sale/in-store` since 2026-10-21; the old `/admin/in-store-sale`
+forwards to Instant Sale; several items per sale) then records it:
 `POST /api/admin/in-store-sales` calls `create_paypal_order` and
 `capture_paypal_order` in the same order checkout does — so a listed item is
 sold with the same row lock, `sold_price`, marketplace/Deep Field hooks and
@@ -204,7 +206,44 @@ sold with the same row lock, `sold_price`, marketplace/Deep Field hooks and
 line with `product_id null`; no product row is created. The refund route
 ignores these orders (`payment_method !== 'paypal'`); refund by hand in the
 Zettle app. Pure helpers + tests: `src/lib/in-store-sale.ts`. Rules:
-`DECISIONS.md` → *"In-store sales: Zettle takes the card…"*.
+`DECISIONS.md` → *"In-store sales: Zettle takes the card…"*. Steps 2–3 and the
+receipt are one shared function since 2026-10-21: `recordOfflinePayment` in
+`src/lib/instant-sale-server.ts`.
+
+## Remote sale invoices — pay by private link (2026-10-21)
+
+Admin → **Instant Sale → Remote sale** emails an invoice instead of recording a
+payment. "Email invoice" writes a normal **unpaid** order through the same
+`create_paypal_order` RPC (`payment_method 'invoice'`; listed items checked,
+never reserved) plus one row in the private `remote_sale_invoices` table
+(`supabase/remote-sales-2026-10.sql`) holding the pay token, expiry (3 / 7 / 14
+days), the ways to pay offered and the owner's message. The email is the
+normal invoice email with a payment block (`InvoicePaymentBlock` in
+`lib/order-invoice-email.ts`).
+
+**Pay online:** `/pay/<token>` (noindex, `referrer: no-referrer`) shows the
+invoice and the checkout's own `PayPalCheckoutButton` with
+`createOrderUrl=/api/pay/<token>/create-order` and `cancelOnAbandon={false}`.
+That route writes the customer's details onto the order, re-checks every
+listed item is still for sale, sets the Florida tax for their address (no
+state yet = taxed, as the email printed), opens a PayPal order for that exact
+total and stores `paypal_order_id`. Capture is the unchanged
+`/api/paypal/capture-order` (matched by `paypal_order_id`) → `capture_paypal_order`
+→ `finalizePaidOrder`: items sold, listings end, receipt + owner email, like a
+web sale. Closing the PayPal window never cancels the invoice. An item that sold
+meanwhile: the route refuses before PayPal (no money taken); a race after
+approval is the normal capture conflict.
+
+**Paid another way** (Zelle, check, …): "Record payment" on the invoice card
+runs `recordOfflinePayment` with `payment_method remote_<method>` (label
+"Invoice · Zelle"); fulfillment stays pending. **Cancel invoice** sets
+`cancelled_at` and cancels the unpaid order; `create-order` then refuses the
+link. Paying twice cannot happen: a second approval on a paid invoice gets
+`alreadyPaid` from capture. ⚠️ Edge case, same as web checkout: a PayPal window
+that was ALREADY open when the invoice was cancelled can still be approved —
+the capture RPC then marks the order paid + `completed` (fulfillment still reads
+`cancelled`), so the owner sees a paid order and ships or refunds it by hand. Runbook: `features/instant-sale.md`.
+Rules: `DECISIONS.md` → *"Instant Sale"* (2026-10-21).
 
 ## Admin refunds
 

@@ -74,8 +74,8 @@ export default async function DiamondBuyersPage({ params }: Props) {
     {
       qEn: 'What should I bring for a jewelry evaluation?',
       qEs: '¿Qué debo traer para evaluar mis joyas?',
-      aEn: 'Bring the jewelry and any grading reports, boxes or paperwork you already have. We can assess jewelry without papers. For loose stones, call first to discuss what you have and whether we can help before making a trip.',
-      aEs: 'Traiga las joyas y los informes, cajas o documentos que ya tenga. Podemos evaluar joyas sin documentación. Para piedras sueltas, llame primero para explicar qué tiene y confirmar si podemos ayudarle antes de venir.',
+      aEn: 'Bring the jewelry and any grading reports, boxes or paperwork you already have. We can assess jewelry without papers. If you decide to sell, bring a government photo ID — Florida requires it when we buy precious metals. For loose stones, call first to discuss what you have and whether we can help before making a trip.',
+      aEs: 'Traiga las joyas y los informes, cajas o documentos que ya tenga. Podemos evaluar joyas sin documentación. Si decide vender, traiga una identificación oficial con foto — Florida la exige cuando compramos metales preciosos. Para piedras sueltas, llame primero para explicar qué tiene y confirmar si podemos ayudarle antes de venir.',
     },
     {
       qEn: 'Why is the offer less than my insurance appraisal says?',

@@ -6,6 +6,7 @@ import {
   getProductImageStoragePath,
   uniqueProductImageStoragePaths,
 } from '@/lib/product-image-storage';
+import { remoteDraftPhotoUrls } from '@/lib/remote-sale';
 
 const ORPHAN_MIN_AGE_MS = 24 * 60 * 60 * 1000;
 const SAMPLE_LIMIT = 25;
@@ -122,6 +123,15 @@ export async function POST(req: Request) {
     ...inquiries.flatMap((row) => asStringArray(row.uploaded_image_urls)),
     ...notifications.flatMap((row) => asStringArray(row.image_urls)),
   ]));
+
+  // Instant Sale → Remote sale drafts (2026-10-21) keep the photos taken for
+  // their items inside `form` until the invoice is sent (then the order line's
+  // `image_snapshot` above holds them). Tolerant of a missing table, like the
+  // Instagram read below: no table, no drafts.
+  const { data: remoteDrafts } = await supabase.from('remote_sale_drafts').select('form');
+  for (const path of uniqueProductImageStoragePaths(
+    ((remoteDrafts as Array<{ form: unknown }> | null) ?? []).flatMap((row) => remoteDraftPhotoUrls(row.form)),
+  )) referencedPaths.add(path);
 
   // Instagram renditions live in this same bucket under their own prefix and
   // are referenced by instagram_posts.rendition_paths, not by any product row.

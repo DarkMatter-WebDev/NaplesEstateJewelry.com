@@ -97,3 +97,22 @@ describe('/gold-services + /silver-services parity (2026-09-08)', () => {
     expect(SILVER).toMatch(/Tiffany Chrysanthemum, Georg Jensen/);
   });
 });
+
+describe('"what to bring" tells a seller to bring a photo ID (owner, 2026-10-21)', () => {
+  // Florida requires the seller's ID when we buy precious metals. Every place
+  // that tells a seller what to bring says so, in both languages, in the
+  // wording the city pages have carried since 2026-09-08.
+  const PAGES = [
+    ['sell', '[city]'],
+    ['sell'],
+    ['free-evaluation'],
+    ['diamond-buyers'],
+  ];
+  for (const parts of PAGES) {
+    it(`${parts.join('/')}: EN + ES`, () => {
+      const src = read('src', 'app', '[locale]', ...parts, 'page.tsx');
+      expect(src).toMatch(/government photo ID \(?—? ?Florida requires it when we buy precious metals/);
+      expect(src).toMatch(/identificación oficial con foto \(?—? ?Florida la exige cuando compramos metales preciosos/);
+    });
+  }
+});

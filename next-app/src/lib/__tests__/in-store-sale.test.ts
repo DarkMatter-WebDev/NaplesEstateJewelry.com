@@ -4,10 +4,13 @@ import {
   inStorePaymentMethodValue,
   inStoreTableShippingFee,
   inStoreTotals,
+  isSalePhotoUrl,
   normalizeInStoreSaleInput,
   parseInStorePrice,
   parseInStoreShippingFee,
   paymentMethodLabel,
+  remotePaymentMethodValue,
+  SALE_ITEMS_MAX,
 } from '../in-store-sale';
 
 const customer = { firstName: 'Maria', lastName: 'Lopez', phone: '(239) 555-0134', email: 'Maria@Example.com' };
@@ -120,7 +123,7 @@ describe('normalizeInStoreSaleInput', () => {
   it('records a listed item with the price sold, not the listed price', () => {
     const result = normalizeInStoreSaleInput({ item: { kind: 'listed', productId: 'tiffany-ladle-53', price: '$1,000' }, customer, paidBy: 'zettle', note: ' cash discount ' });
     expect('value' in result && result.value).toMatchObject({
-      item: { kind: 'listed', productId: 'tiffany-ladle-53', price: 1000 },
+      items: [{ kind: 'listed', productId: 'tiffany-ladle-53', price: 1000, photoUrl: null }],
       customer: { name: 'Maria Lopez', email: 'maria@example.com' },
       paidBy: 'zettle',
       note: 'cash discount',
@@ -137,7 +140,7 @@ describe('normalizeInStoreSaleInput', () => {
       paidBy: 'cash',
     });
     expect('value' in result && result.value).toMatchObject({
-      item: { kind: 'unlisted', title: '14K rope chain · 22 in · 18.4 g', metal: 'Gold', price: 1460, gramWeight: 18.4, purity: '14K' },
+      items: [{ kind: 'unlisted', title: '14K rope chain · 22 in · 18.4 g', metal: 'Gold', price: 1460, gramWeight: 18.4, purity: '14K', photoUrl: null }],
       customer: { email: null },
       note: null,
       total: 1547.6,
@@ -172,5 +175,71 @@ describe('payment method values and labels', () => {
     expect(paymentMethodLabel('paypal')).toBe('PayPal');
     expect(paymentMethodLabel('manual')).toBe('Manual');
     expect(paymentMethodLabel(null)).toBe('-');
+  });
+
+  it('labels a remote-sale invoice before and after it is paid outside the site (2026-10-21)', () => {
+    expect(paymentMethodLabel('invoice')).toBe('Invoice');
+    expect(remotePaymentMethodValue('zelle')).toBe('remote_zelle');
+    expect(paymentMethodLabel('remote_zelle')).toBe('Invoice · Zelle');
+    expect(paymentMethodLabel('remote_check')).toBe('Invoice · Check');
+  });
+});
+
+// Instant Sale (owner, 2026-10-21): several items, an optional photo each, and "Email copy".
+describe('normalizeInStoreSaleInput · several items, photos, Email copy', () => {
+  const photo = 'https://evzluixourmsefwdsieu.supabase.co/storage/v1/object/public/product-images/products/1729-abc.webp';
+  const ring = { kind: 'listed', productId: 'halo-ring-212', price: '1,150', photoUrl: photo };
+  const chain = { kind: 'unlisted', title: '14K rope chain', metal: 'Gold', price: '1460' };
+  const bangle = { kind: 'unlisted', title: 'Sterling bangle', metal: 'Silver', price: '95' };
+  const base = { customer, paidBy: 'zettle' };
+
+  it('adds the items up and taxes the total, like the mockup (1,150 + 1,460 + 95)', () => {
+    const result = normalizeInStoreSaleInput({ ...base, items: [ring, chain, bangle] });
+    expect('value' in result && result.value).toMatchObject({
+      items: [
+        { kind: 'listed', productId: 'halo-ring-212', price: 1150, photoUrl: photo },
+        { kind: 'unlisted', title: '14K rope chain', price: 1460, photoUrl: null },
+        { kind: 'unlisted', title: 'Sterling bangle', metal: 'Silver', price: 95 },
+      ],
+      subtotal: 2705,
+      tax: 162.3,
+      total: 2867.3,
+    });
+  });
+
+  it('prices shipping from the items\' total, not one item', () => {
+    const address = { line1: '4100 Gulf Shore Blvd N', city: 'Naples', state: 'FL', postalCode: '34103' };
+    const result = normalizeInStoreSaleInput({ ...base, items: [ring, chain], delivery: { method: 'ship', address, shipping: 'insured' } });
+    // $2,610 of items sits in the $2,500–$5,000 band: $99.
+    expect('value' in result && result.value).toMatchObject({ subtotal: 2610, shippingFee: 99, tax: 162.54, total: 2871.54 });
+  });
+
+  it('names the item that is wrong, and refuses the same listed piece twice', () => {
+    expect(normalizeInStoreSaleInput({ ...base, items: [ring, { ...chain, price: '' }] })).toEqual({ error: 'Item 2: Enter the price sold, e.g. 1460.' });
+    expect(normalizeInStoreSaleInput({ ...base, items: [ring, { ...ring, photoUrl: '' }] })).toEqual({ error: 'The same listed item is on this sale twice.' });
+    expect(normalizeInStoreSaleInput({ ...base, items: [] })).toEqual({ error: 'Add the item that sold.' });
+    expect(normalizeInStoreSaleInput({ ...base, items: Array.from({ length: SALE_ITEMS_MAX + 1 }, () => chain) })).toHaveProperty('error');
+  });
+
+  it('takes a photo only from the site\'s own product-images bucket', () => {
+    expect(isSalePhotoUrl(photo)).toBe(true);
+    expect(isSalePhotoUrl('https://example.com/storage/v1/object/public/buy-receipt-ids/x.webp')).toBe(false);
+    expect(isSalePhotoUrl('javascript:alert(1)')).toBe(false);
+    expect(isSalePhotoUrl('http://evzluixourmsefwdsieu.supabase.co/storage/v1/object/public/product-images/products/a.webp')).toBe(false);
+    expect(normalizeInStoreSaleInput({ ...base, items: [{ ...chain, photoUrl: 'https://evil.example/x.jpg' }] }))
+      .toEqual({ error: 'That photo did not upload. Take or choose it again, or remove it.' });
+  });
+
+  it('sends the receipt only when Email copy is ticked (a request without the box keeps the old rule)', () => {
+    const ticked = normalizeInStoreSaleInput({ ...base, items: [chain], emailCopy: true });
+    const unticked = normalizeInStoreSaleInput({ ...base, items: [chain], emailCopy: false });
+    const legacy = normalizeInStoreSaleInput({ ...base, item: chain });
+    const noEmail = normalizeInStoreSaleInput({ ...base, customer: { ...customer, email: '' }, items: [chain], emailCopy: true });
+    expect('value' in ticked && ticked.value.emailCopy).toBe(true);
+    expect('value' in unticked && unticked.value.emailCopy).toBe(false);
+    // Unticked, the email is still kept on the order (the tracking email uses it).
+    expect('value' in unticked && unticked.value.customer.email).toBe('maria@example.com');
+    expect('value' in legacy && legacy.value.emailCopy).toBe(true);
+    expect('value' in noEmail && noEmail.value.emailCopy).toBe(false);
   });
 });

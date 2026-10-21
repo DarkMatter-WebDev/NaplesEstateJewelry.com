@@ -181,6 +181,8 @@ export default function PayPalCheckoutButton({
   onSuccess,
   onAvailabilityIssue,
   onPriceChange,
+  createOrderUrl = '/api/paypal/create-order',
+  cancelOnAbandon = true,
 }: {
   clientId: string;
   currency?: string;
@@ -202,6 +204,10 @@ export default function PayPalCheckoutButton({
    *  longer matches the chargeable one. Nothing was charged — the server
    *  rejects before creating an order or a PayPal order. */
   onPriceChange?: (info: { quotedTotal: number; quote: OrderQuote }) => void;
+  /** Where the PayPal order is opened. A remote-sale invoice's pay page (2026-10-21) passes its own route. */
+  createOrderUrl?: string;
+  /** false on an invoice: closing the PayPal window must never cancel the invoice's order. */
+  cancelOnAbandon?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [sdkReady, setSdkReady] = useState(false);
@@ -231,7 +237,11 @@ export default function PayPalCheckoutButton({
   // Set when createOrder/onApprove already showed a specific message, so the
   // PayPal SDK's follow-up onError doesn't clobber it with the generic one.
   const handledErrorRef = useRef(false);
+  const createOrderUrlRef = useRef(createOrderUrl);
+  const cancelOnAbandonRef = useRef(cancelOnAbandon);
   useEffect(() => {
+    createOrderUrlRef.current = createOrderUrl;
+    cancelOnAbandonRef.current = cancelOnAbandon;
     getPayloadRef.current = getPayload;
     onOrderIdRef.current = onOrderId;
     onSuccessRef.current = onSuccess;
@@ -304,7 +314,7 @@ export default function PayPalCheckoutButton({
         handledErrorRef.current = false;
         setPaymentStage('awaiting-approval');
         try {
-          const res = await fetch('/api/paypal/create-order', {
+          const res = await fetch(createOrderUrlRef.current, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(getPayloadRef.current()),
@@ -454,7 +464,7 @@ export default function PayPalCheckoutButton({
         // Buyer closed / cancelled the PayPal window before approving. Cancel the
         // unpaid order that create-order already wrote so it doesn't linger in the
         // admin as an open sale. Keep the id: an immediate retry reuses this order.
-        cancelAbandonedOrder(createdOrderIdRef.current);
+        if (cancelOnAbandonRef.current) cancelAbandonedOrder(createdOrderIdRef.current);
         setMessage(
           isEsRef.current
             ? 'Pago cancelado. Puede intentarlo de nuevo cuando esté listo.'

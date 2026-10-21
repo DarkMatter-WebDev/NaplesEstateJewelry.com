@@ -9,14 +9,14 @@ import { AppIcon } from '@/components/AppIcon';
 
 const GOLD = '#735c00';
 
-export type AdminSection = 'products' | 'social-queues' | 'orders' | 'offers' | 'in-store-sale' | 'buy-receipts' | 'buyers' | 'messages' | 'subscribers' | 'text-deals' | 'marketing' | 'discount-codes' | 'users' | 'settings';
+export type AdminSection = 'products' | 'social-queues' | 'orders' | 'offers' | 'instant-sale' | 'buy-receipts' | 'buyers' | 'messages' | 'subscribers' | 'text-deals' | 'marketing' | 'discount-codes' | 'users' | 'settings';
 
 const SECTION_LABELS: Record<AdminSection, string> = {
   products: 'Products',
   'social-queues': 'Social Queues',
   orders: 'Orders',
   offers: 'Offers',
-  'in-store-sale': 'In-Store Sale',
+  'instant-sale': 'Instant Sale',
   'buy-receipts': 'Buy Receipts',
   buyers: 'Buyers',
   messages: 'Messages',
@@ -258,8 +258,8 @@ export default function AdminHeader({
         active={active === 'offers'}
         style={active === 'offers' ? activeStyle : linkStyle}
       />
-      <AdminNavItem href={`${adminBasePath}/in-store-sale`} active={active === 'in-store-sale'}>
-        In-Store Sale
+      <AdminNavItem href={`${adminBasePath}/instant-sale`} active={active === 'instant-sale'}>
+        Instant Sale
       </AdminNavItem>
       <AdminNavItem href={`${adminBasePath}/buy-receipts`} active={active === 'buy-receipts'}>
         Buy Receipts

@@ -40,7 +40,18 @@ function stopStream(stream: MediaStream | null) {
   stream?.getTracks().forEach((track) => track.stop());
 }
 
-export default function IdPhotoCapture({ onCapture, onClose }: { onCapture: (photo: Blob) => void; onClose: () => void }) {
+export default function IdPhotoCapture({
+  onCapture,
+  onClose,
+  title = 'Seller ID photo',
+  hint = 'Hold the license so it fills the whole picture, then press Capture.',
+}: {
+  onCapture: (photo: Blob) => void;
+  onClose: () => void;
+  /** Instant Sale reuses this window for an item photo (2026-10-21). */
+  title?: string;
+  hint?: string;
+}) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [cameras, setCameras] = useState<Camera[]>([]);
@@ -140,11 +151,11 @@ export default function IdPhotoCapture({ onCapture, onClose }: { onCapture: (pho
   }
 
   return (
-    <AdminModal title="Seller ID photo" onClose={onClose} maxWidth="max-w-2xl">
+    <AdminModal title={title} onClose={onClose} maxWidth="max-w-2xl">
       <div className="grid gap-3">
         <div className="relative w-full overflow-hidden bg-black" style={{ aspectRatio: '16 / 9' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          {still && <img src={still.url} alt="Captured ID" className="absolute inset-0 h-full w-full object-contain" />}
+          {still && <img src={still.url} alt={title} className="absolute inset-0 h-full w-full object-contain" />}
           <video
             ref={videoRef}
             muted
@@ -157,7 +168,7 @@ export default function IdPhotoCapture({ onCapture, onClose }: { onCapture: (pho
           )}
         </div>
 
-        {!still && ready && <p className="text-sm">Hold the license so it fills the whole picture, then press Capture.</p>}
+        {!still && ready && <p className="text-sm">{hint}</p>}
 
         {error && (
           <p role="alert" className="border px-3 py-2 text-sm" style={{ borderColor: 'var(--color-error)', color: 'var(--color-error)' }}>
