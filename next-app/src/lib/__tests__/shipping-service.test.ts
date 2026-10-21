@@ -36,6 +36,15 @@ describe('describeShippingService — the fee identifies the service', () => {
     expect(describeShippingService({ shipping_method: 'shipping', shipping_fee: null, subtotal: 570 }).kind).toBe('unknown');
   });
 
+  it('an in-store sale shipped with no charge or a typed charge says so, and a table fee still names the service', () => {
+    const free = describeShippingService({ shipping_method: 'shipping', shipping_fee: 0, subtotal: 1460, payment_method: 'in_store_cash' });
+    expect(free).toMatchObject({ kind: 'unknown', label: 'Shipping (in-store sale)' });
+    expect(free.detail).toContain('No shipping charged');
+    const typed = describeShippingService({ shipping_method: 'shipping', shipping_fee: 25, subtotal: 1460, payment_method: 'in_store_zettle' });
+    expect(typed.detail).toContain('$25.00');
+    expect(describeShippingService({ shipping_method: 'shipping', shipping_fee: 59, subtotal: 1460, payment_method: 'in_store_zettle' }).kind).toBe('priority');
+  });
+
   it('no subtotal band has the same fee for both services (the fingerprint stays unique)', () => {
     const probes = [0, 50, 100, 249, 250, 599, 600, 999, 1000, 2499, 2500, 4999];
     for (const subtotal of probes) {

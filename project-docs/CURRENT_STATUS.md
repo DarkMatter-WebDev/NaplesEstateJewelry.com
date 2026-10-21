@@ -2,7 +2,24 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-10-19**.
+> in `DECISIONS.md`. Last reconciled: **2026-10-20**.
+
+## Start Here (2026-10-20 — 🟡 In-Store Sale "Pickup or ship" BUILT + STAGED, not pushed; no SQL, no env vars)
+
+- 🟡 **Built and staged, waiting for the owner's push** (`CHANGELOG.md` 2026-10-20 (1); rule `DECISIONS.md` top entry; `TASKS.md` top):
+  - Admin → In-Store Sale has a new **3. Pickup or ship** section. Pickup is the default and is unchanged, with an optional mailing address.
+  - **Ship** takes a U.S. address and a charge: the website's Insured or Express fee, No charge, or a custom amount. Florida tax applies to a Florida address (item + shipping); out of state there is none.
+  - A shipped sale is saved like a shipped web order and waits under Orders (Fulfillment: Pending) until Mark Shipped + tracking.
+  - Built from mockup v1 plus the owner's "Custom amount" chip.
+- Gate: `tsc` 0 · lint 0 errors · **1893/1893** · build 0 · 88 prerendered. The real form 55/55 in headless Chrome with stand-in data (save intercepted).
+- ⛔ Not seen behind the real sign-in; no real sale or receipt yet. After the push, the owner's first shipped sale is the real test (`TASKS.md` top, item 2).
+- Everything in the 10-19 (2) block below still applies.
+
+## Start Here (2026-10-19 (2) — 🟢 SEO heroes DEPLOYED (owner) + IndexNow 200 for 4; nothing staged-but-unpushed except docs; no SQL, no env vars)
+
+- 🟢 Owner: *"Pushed and deployed."* Claude ran `npm run indexnow -- --urls=/free-evaluation,/es/free-evaluation,/estate-jewelry,/es/estate-jewelry` → **IndexNow 200 OK for 4 URLs** (`CHANGELOG.md` 2026-10-19 (2)). Production was not fetched by Claude (not asked).
+- ✅ GSC Request Indexing done 10-19 for `/estate-jewelry` + `/free-evaluation` (EN; both "Indexing requested"); ES left to the normal recrawl.
+- ◻ Left: an optional iPhone look (`TASKS.md` top item 3); read Search Console in ~3–4 weeks. Where the block below says "STAGED" / "not pushed", read "deployed".
 
 ## Start Here (2026-10-19 — 🟡 SEO heroes BUILT + STAGED, not pushed; no SQL, no env vars)
 

@@ -41,6 +41,8 @@ export function describeShippingService(order: {
   shipping_fee: number | string | null | undefined;
   /** Merchandise subtotal BEFORE discount — the tiers key off it. */
   subtotal: number | string | null | undefined;
+  /** `in_store_<method>`: a shipped showroom sale, whose charge may be "No charge" or typed. */
+  payment_method?: string | null;
 }): ShippingService {
   const method = String(order.shipping_method ?? '').toLowerCase();
   if (method === 'pickup') return { kind: 'pickup', label: 'Local Pickup', detail: null };
@@ -73,6 +75,17 @@ export function describeShippingService(order: {
       kind: 'priority',
       label: 'Insured Shipping (Standard)',
       detail: 'USPS Priority Mail — small flat-rate box, USPS insurance, signature required. No delivery date was promised.',
+    };
+  }
+  // A showroom sale shipped afterwards (2026-10-20): the owner chose "No
+  // charge" or typed the amount at the counter, so no service was promised.
+  if (String(order.payment_method ?? '').startsWith('in_store_')) {
+    return {
+      kind: 'unknown',
+      label: 'Shipping (in-store sale)',
+      detail: fee > 0
+        ? `$${fee.toFixed(2)} shipping charged in the store — no service was promised; pick and insure it when you ship.`
+        : 'No shipping charged in the store — pick and insure the service when you ship.',
     };
   }
   return {

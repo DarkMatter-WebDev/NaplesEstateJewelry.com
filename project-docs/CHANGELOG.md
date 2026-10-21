@@ -1,6 +1,67 @@
 
 # Changelog
 
+## 2026-10-20 (1) — Admin → In-Store Sale: **Pickup or ship** + the customer's address — BUILT + STAGED, not pushed; no SQL, no env vars
+
+The owner asked to (1) log a customer's mailing / shipping address and (2) ship an in-store sale instead of always recording it as picked up ("sometimes a customer buys in the store but I ship the item to them afterwards").
+
+**Investigation (before any code):**
+- The route hard-coded `shipping_method 'pickup'`, `shipping_address null`, `shipping_fee 0`, then stamped `fulfillment_status 'picked_up'`. Tax was always 6% of the item.
+- Everything a shipped order needs already exists, so **no SQL**:
+  - `create_paypal_order` (latest: `supabase/discount-codes-2026-08.sql`) already takes `shipping_fee` / `shipping_method` / `shipping_address` and inserts `fulfillment_status 'pending'`. Capture never touches fulfillment.
+  - Web checkout stores the address with `buildAddressObject` after `validateUsShippingAddress`.
+  - The receipt (`order-invoice-email.ts`) shows "Ship to" + "Shipping method: …" for a non-pickup order and the "Pickup Location · Hours" box only for a pickup.
+  - Orders → Mark Shipped + tracking sends "Your order has shipped!".
+
+**Mockup v1** (static, CSS-only switch; checked 28 + 2 by hand under the pane's rules) → owner: *"1: A, but add a fourth shipping charge option for me to enter custom amount; 2: A; 3: A"*:
+1. Shipping charge = the website's fee table (Insured / Express overnight at the item's price) + No charge + **Custom amount** (the owner's addition).
+2. Tax on a shipped sale = the web checkout rule: a Florida address pays 6% on item + shipping; out of state pays none.
+3. An optional "Add a mailing address" tick box on a pickup.
+
+**Built:**
+- `src/lib/in-store-sale.ts`:
+  - `IN_STORE_SHIPPING_CHOICES` / `_LABELS`, `IN_STORE_SHIPPING_FEE_MAX` ($1,000).
+  - `inStoreTableShippingFee` (from `getCheckoutShippingFee`; Express → null at $5,000+), `parseInStoreShippingFee`, `inStoreChargesTax`.
+  - `inStoreTotals(price, { shippingFee, chargesTax })` now also returns `shippingFee`.
+  - `normalizeInStoreSaleInput` reads `delivery: { method, address, shipping, shippingFee }`:
+    - A missing `delivery` = pickup with no address (the old request shape still works).
+    - A pickup address that was started must be complete.
+    - A ship needs the full U.S. address, checked with the web checkout's own validator.
+- `src/app/api/admin/in-store-sales/route.ts`:
+  - Ship → `shipping_method 'shipping'`, the address object, `shipping_fee`, and fulfillment left `pending` (no `picked_up` stamp).
+  - Pickup → the address is saved when given, otherwise as before.
+  - Internal note adds "Ship · <choice> $x". The response adds `shipped`.
+- `src/lib/shipping-service.ts`: an `in_store_*` order whose fee matches no tier (No charge / custom) now reads "Shipping (in-store sale)": the charge, no service promised, pick and insure it when you ship. It used to say "does not match a current tier — check the receipt". A table fee still names the service exactly.
+- `src/components/admin/InStoreSaleForm.tsx`:
+  - New **3. Pickup or ship** (Pickup default). Paid by is now 4.
+  - Pickup: "Add a mailing address" tick box ("never added to a mailing list").
+  - Ship: Ship-to boxes, four charge chips (Express disabled "Not at $5,000+") and an amount box for Custom.
+  - The Total box shows the Shipping row and "FL sales tax · none, ships to GA". Until a valid state is typed, a shipment is shown taxed.
+  - The email hint and the "On record" text follow the choice.
+  - The confirmation shows "Ship to … · waiting to ship" and "Open order to ship it".
+- Tests: `in-store-sale.test.ts` (+10: fees, the $5,000 Express cut, typed fee, tax rule, pickup/ship normalisation and refusals); `shipping-service.test.ts` (+1).
+
+**Verified:**
+- `npx tsc --noEmit` 0 · `npm run lint` 0 errors (the 4 old `<img>` warnings) · `npx vitest run` **1893/1893** (167 files) · `npm run build` 0 (dev stopped first) · 88 prerendered = 41 EN + 41 ES + 6.
+- The REAL form on a temporary page (deleted; `tsc` 0 after) with stand-in products and the save request intercepted in headless Chrome (nothing reached the API), real clicks and typing at 1280 and 390 px: **55/55**. Covered:
+  - Pickup default and its $1,547.60 total; the tick box shows and hides the mailing boxes.
+  - Ship totals: $1,610.14 (FL, insured); GA $1,519.00 / Express $1,539.00 / No charge $1,460.00 / custom $25 $1,485.00; FL custom $25 → tax $89.10, total $1,574.10.
+  - The request body and both confirmation screens; New sale resets to pickup; Express disabled at $6,000 (insured $99).
+  - No sideways scroll; no page errors.
+- ⛔ Not seen behind the real admin sign-in; no real sale recorded; no real receipt opened.
+
+## 2026-10-19 (2) — 10-19 (1) SEO heroes DEPLOYED (owner) + IndexNow — docs only
+
+## 2026-10-19 (2) — 10-19 (1) SEO heroes DEPLOYED (owner) + IndexNow — docs only
+
+- Owner: *"Pushed and deployed. Run IndexNow for the four pages."*
+- `npm run indexnow -- --urls=/free-evaluation,/es/free-evaluation,/estate-jewelry,/es/estate-jewelry` (from `next-app/`, PowerShell) → **"IndexNow 200 OK for 4 URL(s)"**, exit 0.
+- Not done: no production fetch (not asked).
+- **GSC Request Indexing (owner: *"do it"*), desk Chrome (`4845baac…`, the only one connected), URL-prefix property:**
+  - `https://naplesestatejewelry.com/estate-jewelry` and `…/free-evaluation` were both already "URL is on Google · Page is indexed".
+  - The "Page changed? REQUEST INDEXING" link (coordinate click ≈ (1061, 238) in a 1406-wide frame) → **"Indexing requested"** for both. 2 of the ~10/day used.
+  - The ES pair was left to the normal recrawl (owner's choice of the two EN pages).
+
 ## 2026-10-19 (1) — SEO: `/free-evaluation` H1 + `/estate-jewelry` eyebrow, intro, title, descriptions (EN + ES) — BUILT + STAGED, not pushed; no SQL, no env vars
 
 The owner pasted an outside SEO plan ("Website SEO Optimization Prompt") for the two heroes and asked for a review, then a mockup. It was checked against the code and `DECISIONS.md` first. Items that would reverse a ruling or were already done were left out or changed. Mockup v1 (real dev-page stills, Now vs Proposed, phone + desktop, Google result text, line-by-line table) → owner: *"build it as shown in the mockup, English and Spanish, keeping the second headline."*

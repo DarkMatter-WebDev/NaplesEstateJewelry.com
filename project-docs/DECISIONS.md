@@ -4,7 +4,16 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-10-19**.
+> compaction. Last reconciled: **2026-10-20**.
+
+## An in-store sale can be SHIPPED: stored exactly like a shipped web order; the charge is the website's fee, none, or typed; Florida tax follows the web checkout rule (2026-10-20)
+
+- **Owner picks on mockup v1:** *"1: A, but add a fourth shipping charge option for me to enter custom amount; 2: A; 3: A"*.
+- **Pickup stays the default.** A pickup is recorded `picked_up` as before and may carry an optional mailing address. That address is saved on the order only and never signs anyone up.
+- **Ship** = `shipping_method 'shipping'`, the address in `shipping_address` (the `buildAddressObject` shape, checked by `validateUsShippingAddress`, U.S. only), the charge in `shipping_fee`, fulfillment left `pending`. It then follows the normal path: Orders → Mark Shipped + tracking → the customer's shipping email. Never stamp `picked_up` on a shipped sale.
+- **Charge choices:** Insured / Express overnight at the website's fee for the item's price (`getCheckoutShippingFee`; Express is refused at $5,000+, as online), No charge, or a custom amount (≤ $1,000). The order page's service box names the service from a table fee. For No charge / custom it says no service was promised, rather than "does not match a tier".
+- **Tax:** a Florida address pays 6% on item + shipping; an out-of-state address pays none — the same rule as web checkout and the admin "Create order" form. This replaces "always 6%" for shipped sales only. Claude is not a tax adviser: the owner chose it, and it is one function (`inStoreChargesTax`).
+- No new SQL. Record `CHANGELOG.md` 2026-10-20 (1).
 
 ## `/free-evaluation` H1 = "Free Estate Jewelry Appraisal in Naples, FL" (the old headline sits under it as a `<p>`); `/estate-jewelry` = "Estate Jewelry Buyers in Naples, FL" title + eyebrow; "Naples, FL" never splits (2026-10-19)
 
@@ -679,6 +688,9 @@ https://claude.ai/artifact/5o6VdpQjChYp11JJPCqS8X.
   with the next number" was dropped for this reason.
 - **Tax is always the 6% Florida rate**, the same rule local pickup uses
   online (`calculateFlSalesTax`); no tax-exempt option until the owner asks.
+  ⚠️ Since 2026-10-20 this holds for PICKUP sales only. A shipped sale follows
+  the web rule (FL address taxed on item + shipping, out of state none) — see
+  the 2026-10-20 entry at the top.
 - **Cell required, email optional.** No email → no receipt (the order page
   can send one later); the owner's new-order email still goes out.
 - **The page never signs the customer up** for email or text deals.

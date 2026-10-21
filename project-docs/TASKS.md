@@ -1,7 +1,7 @@
 # Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-10-19** (SEO heroes on `/free-evaluation` + `/estate-jewelry` BUILT + STAGED, not pushed — first block below; `CHANGELOG.md` 2026-10-19 (1)). Before that, **2026-10-18** (session CLOSED — `CHANGELOG.md` 2026-10-18 (7): three changes DEPLOYED + verified live — the first three blocks below, each with only the owner's own look left; offer texts shelved; nothing to push, no SQL). Earlier the same day: the homepage headline letter-tail fix BUILT + STAGED. Before that, **2026-10-17** (session CLOSED — `CHANGELOG.md` 2026-10-17 (4): the homepage 404 fixed, deployed and confirmed — first block below, nothing open; no SQL, nothing to push). Before that, **2026-10-15** (session CLOSED — `CHANGELOG.md` 2026-10-15 (13): Make an Offer built, tested and deployed with bulk on/off, the phone card, decline/counter messages, centred email footers and delete; nothing to push, no SQL). Before that, **2026-10-14** (eBay Best Offer per
+> in `CHANGELOG.md`. Last reconciled: **2026-10-20** (In-Store Sale "Pickup or ship" BUILT + STAGED, not pushed — first block below; `CHANGELOG.md` 2026-10-20 (1)). Before that, **2026-10-19** (SEO heroes on `/free-evaluation` + `/estate-jewelry` BUILT + STAGED, not pushed — first block below; `CHANGELOG.md` 2026-10-19 (1)). Before that, **2026-10-18** (session CLOSED — `CHANGELOG.md` 2026-10-18 (7): three changes DEPLOYED + verified live — the first three blocks below, each with only the owner's own look left; offer texts shelved; nothing to push, no SQL). Earlier the same day: the homepage headline letter-tail fix BUILT + STAGED. Before that, **2026-10-17** (session CLOSED — `CHANGELOG.md` 2026-10-17 (4): the homepage 404 fixed, deployed and confirmed — first block below, nothing open; no SQL, nothing to push). Before that, **2026-10-15** (session CLOSED — `CHANGELOG.md` 2026-10-15 (13): Make an Offer built, tested and deployed with bulk on/off, the phone card, decline/counter messages, centred email footers and delete; nothing to push, no SQL). Before that, **2026-10-14** (eBay Best Offer per
 > item + in bulk BUILT + STAGED; SQL RUN by the owner; only the push left — first block below). Before that, **2026-10-12** (session CLOSED —
 > `CHANGELOG.md` 2026-10-12 (3); two new blocks, first below: the short phone
 > cookie notice DEPLOYED + verified in production, and the next Google Ads
@@ -28,14 +28,40 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-10-19 (1) — SEO: `/free-evaluation` H1 + `/estate-jewelry` eyebrow / intro / title / descriptions (EN + ES) — **BUILT + STAGED, not pushed** — ◻ push, then IndexNow
+### 🟡 2026-10-20 (1) — Admin → In-Store Sale: **Pickup or ship** + the customer's address — BUILT + STAGED, not pushed; no SQL, no env vars
+
+Record: `CHANGELOG.md` 2026-10-20 (1). Rule: `DECISIONS.md` top entry. Files:
+- `src/lib/in-store-sale.ts`
+- `src/app/api/admin/in-store-sales/route.ts`
+- `src/components/admin/InStoreSaleForm.tsx`
+- `src/lib/shipping-service.ts`
+- `src/lib/__tests__/in-store-sale.test.ts`
+- `src/lib/__tests__/shipping-service.test.ts`
+
+Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1893/1893** tests (167 files) · build 0 · 88 prerendered = 41 EN + 41 ES + 6. The real form 55/55 at 1280 + 390 px (stand-in data, save intercepted).
+
+1. ◻ **Owner — push + deploy.**
+2. ◻ **Owner — the first real shipped sale.**
+   - Admin → In-Store Sale → 3. Pickup or ship → **Ship**, fill in the address, pick the charge. Charge the shown total on Zettle, then Record sale.
+   - Check that the receipt email shows "Ship to" and no pickup box.
+   - In Orders the sale should show Paid · Fulfillment Pending. Mark Shipped + tracking → the customer gets the shipping email.
+   - Pickup sales should look and behave as before.
+3. ℹ️ Optional: the iPhone / iPad layout of the new section (only checked in headless Chrome at 390 px).
+
+**Staging (10-20 (1)):** ✅ synced 2026-10-20 ~8:25 PM ET.
+- The dry run listed exactly the 11 touched files: 6 in the app (`in-store-sale.ts`, `in-store-sales/route.ts`, `InStoreSaleForm.tsx`, `shipping-service.ts`, the two tests) and 5 docs (CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS). 0 Extras, 1256 total.
+- The real run copied 11, 0 FAILED. The follow-up dry run copied 0, exit 0.
+- Checks: leak check 0; `.tsx` 251 = 251; SHA-256 MATCH on the 4 app source files; no temporary `zz-instore-test` page in staging.
+- Docs-only re-sync after this line.
+
+### 🟢 2026-10-19 (1) — SEO: `/free-evaluation` H1 + `/estate-jewelry` eyebrow / intro / title / descriptions (EN + ES) — **DEPLOYED (owner) + IndexNow 200 for 4** (`CHANGELOG.md` 2026-10-19 (2)) — ◻ only the optional iPhone look and the ~3–4 week Search Console read are left
 
 Record: `CHANGELOG.md` 2026-10-19 (1). Rule: `DECISIONS.md` top entry. Files: `src/app/[locale]/free-evaluation/page.tsx`, `src/app/[locale]/estate-jewelry/page.tsx`, `src/lib/__tests__/service-landers-faq.test.ts`.
 
 Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1881/1881** tests (167 files) · build 0 · 88 prerendered (unchanged). Real pages EN + ES at 1280 + 390 px: 1 H1 each, no sideways scroll, "Naples, FL" never split; EN hero heights equal mockup v1.
 
-1. ◻ **Owner — push + deploy.** No SQL, no env vars.
-2. ◻ **Claude, after the owner says it is deployed:** `npm run indexnow -- --urls=/free-evaluation,/es/free-evaluation,/estate-jewelry,/es/estate-jewelry` from `next-app/` in PowerShell (Git Bash mangles the `/` paths). Optional: GSC Request Indexing for the same four (~10 a day).
+1. ✅ **Owner — push + deploy** — DONE 10-19 (owner: *"Pushed and deployed."*).
+2. ✅ **IndexNow — DONE 10-19: 200 OK for 4 URLs.** (Claude did not fetch production; not asked.) ✅ **GSC Request Indexing — DONE 10-19** for `/estate-jewelry` + `/free-evaluation` (both already indexed → "Page changed? REQUEST INDEXING" → "Indexing requested"); ES pair left to the normal recrawl. Was: `npm run indexnow -- --urls=/free-evaluation,/es/free-evaluation,/estate-jewelry,/es/estate-jewelry` from `next-app/` in PowerShell (Git Bash mangles the `/` paths). Optional: GSC Request Indexing for the same four (~10 a day).
 3. ◻ **Owner — optional look on the iPhone:** `/free-evaluation` — the new headline on three lines, the old one in soft gold under it; `/es/estate-jewelry` — the eyebrow on two clean lines.
 4. ℹ️ Judge in Search Console after ~3–4 weeks: queries containing "estate jewelry appraisal" / "estate jewelry buyers" for these two pages. Don't change the wording before then.
 

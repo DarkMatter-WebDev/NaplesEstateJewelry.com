@@ -4,8 +4,14 @@ import { requireAdmin } from '@/lib/admin-auth';
 import { createServiceClient } from '@/lib/supabase/service';
 import { finalizePaidOrder } from '@/lib/order-finalize';
 import { scheduleProductStatusHooks } from '@/lib/product-status-hooks';
-import { generateOrderNumber, getProductImages, getProductMetal, getProductWeight } from '@/lib/sales';
-import { IN_STORE_PAYMENT_LABELS, inStorePaymentMethodValue, normalizeInStoreSaleInput } from '@/lib/in-store-sale';
+import { buildAddressObject, generateOrderNumber, getProductImages, getProductMetal, getProductWeight } from '@/lib/sales';
+import {
+  IN_STORE_PAYMENT_LABELS,
+  IN_STORE_SHIPPING_LABELS,
+  inStorePaymentMethodValue,
+  normalizeInStoreSaleInput,
+} from '@/lib/in-store-sale';
+import { formatCurrency } from '@/types/sales';
 import { isProductPurchasable, type Product } from '@/types/product';
 
 /**
@@ -20,7 +26,11 @@ import { isProductPurchasable, type Product } from '@/types/product';
  *      It stamps `payment_method = 'paypal'` and a capture id because that is
  *      its only caller until now, so step 3 restores the in-store values.
  *   3. one update: payment_method back to in-store, no PayPal capture id, the
- *      reference "In store · …", fulfillment picked_up (the buyer left with it).
+ *      reference "In store · …", and for a PICKUP fulfillment picked_up (the
+ *      buyer left with it).
+ * A SHIPPED sale (owner, 2026-10-20) is stored like a shipped web order:
+ * shipping_method 'shipping', the address, the fee, and fulfillment left
+ * `pending` so it waits under Orders until Mark Shipped + tracking.
  * No new SQL: nothing for the owner to run.
  */
 export const runtime = 'nodejs';
@@ -79,9 +89,26 @@ export async function POST(req: Request) {
   }
 
   const orderNumber = generateOrderNumber();
-  const internalNotes = [`In-store sale · ${paidByLabel} · recorded by ${admin.user.email ?? 'admin'}`, sale.note]
+  const { delivery } = sale;
+  const shipped = delivery.method === 'ship';
+  // The order page names a postage service from the fee; "No charge" and a
+  // typed amount match no tier, so the note says what was chosen.
+  const deliveryNote = delivery.method === 'ship'
+    ? `Ship · ${IN_STORE_SHIPPING_LABELS[delivery.shipping]} ${formatCurrency(delivery.shippingFee)}`
+    : null;
+  const internalNotes = [`In-store sale · ${paidByLabel} · recorded by ${admin.user.email ?? 'admin'}`, deliveryNote, sale.note]
     .filter(Boolean)
     .join(' | ');
+  const shippingAddress = delivery.address
+    ? buildAddressObject({
+      line1: delivery.address.line1,
+      line2: delivery.address.line2 ?? undefined,
+      city: delivery.address.city,
+      state: delivery.address.state,
+      postalCode: delivery.address.postalCode,
+      country: 'United States',
+    })
+    : null;
   const orderPayload = {
     order_number: orderNumber,
     user_id: null,
@@ -90,12 +117,13 @@ export async function POST(req: Request) {
     customer_phone: sale.customer.phone,
     subtotal: sale.subtotal,
     tax: sale.tax,
-    shipping_fee: 0,
+    shipping_fee: sale.shippingFee,
     discount: 0,
     total: sale.total,
     payment_method: inStorePaymentMethodValue(sale.paidBy),
-    shipping_method: 'pickup',
-    shipping_address: null,
+    // The same narrowed values web checkout stores (`shippingMethodForDb`).
+    shipping_method: shipped ? 'shipping' : 'pickup',
+    shipping_address: shippingAddress,
     billing_address: null,
     internal_notes: internalNotes,
     customer_notes: null,
@@ -138,7 +166,8 @@ export async function POST(req: Request) {
       payment_method: inStorePaymentMethodValue(sale.paidBy),
       paypal_capture_id: null,
       payment_reference: `In store · ${paidByLabel}`,
-      fulfillment_status: 'picked_up',
+      // A shipped sale stays `pending` (as created) until Mark Shipped.
+      ...(shipped ? {} : { fulfillment_status: 'picked_up' }),
     })
     .eq('id', orderId);
   if (stampError) console.error('in-store sale stamp error:', stampError);
@@ -168,5 +197,6 @@ export async function POST(req: Request) {
     orderId,
     orderNumber,
     receiptEmailed: Boolean(receiptRows?.length),
+    shipped,
   });
 }

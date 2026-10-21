@@ -14,9 +14,18 @@
 //   price with no product row at all. No hidden product is created — nothing
 //   can leak into the shop, the feed or the marketplaces, and there is no fake
 //   inventory number to explain later.
-import { calculateFlSalesTax, round2 } from '@/lib/checkout-pricing';
+//
+// Pickup or ship (owner, 2026-10-20): a showroom sale is usually carried out
+// the door (pickup, the default), but sometimes it is shipped to the customer
+// afterwards. A shipped sale is stored exactly like a shipped web order:
+// `shipping_method 'shipping'`, the address in `shipping_address`, the fee in
+// `shipping_fee`, fulfillment left `pending`. It then goes through
+// Orders → Mark Shipped + tracking like any other order.
+import { calculateFlSalesTax, isFloridaState, round2 } from '@/lib/checkout-pricing';
+import { getCheckoutShippingFee } from '@/lib/checkout-shipping';
 import { normalizePersonName } from '@/lib/person-name';
 import { normalizePhoneNumber } from '@/lib/phone';
+import { validateUsShippingAddress } from '@/lib/us-address';
 
 export const IN_STORE_PAYMENT_METHODS = ['zettle', 'cash', 'zelle', 'check'] as const;
 export type InStorePaymentMethod = (typeof IN_STORE_PAYMENT_METHODS)[number];
@@ -63,12 +72,60 @@ export type InStoreUnlistedItem = {
   purity: string | null;
 };
 
+// ---- Pickup or ship -------------------------------------------------------
+
+/**
+ * The shipping charge on a shipped in-store sale (owner picks 2026-10-20):
+ * the website's own fees, no charge, or an amount typed at the counter.
+ */
+export const IN_STORE_SHIPPING_CHOICES = ['insured', 'express', 'none', 'custom'] as const;
+export type InStoreShippingChoice = (typeof IN_STORE_SHIPPING_CHOICES)[number];
+
+export const IN_STORE_SHIPPING_LABELS: Record<InStoreShippingChoice, string> = {
+  insured: 'Insured shipping',
+  express: 'Express overnight',
+  none: 'No charge',
+  custom: 'Custom amount',
+};
+
+export const IN_STORE_SHIPPING_FEE_MAX = 1000;
+
+export type InStoreAddress = { line1: string; line2: string | null; city: string; state: string; postalCode: string };
+
+export type InStoreDelivery =
+  | { method: 'pickup'; address: InStoreAddress | null }
+  | { method: 'ship'; address: InStoreAddress; shipping: InStoreShippingChoice; shippingFee: number };
+
+/**
+ * The website's fee for a table choice at this item price (`lib/checkout-shipping.ts`),
+ * 0 for "No charge", and null for "Custom" (typed) or for a service not
+ * offered at this price (Express at $5,000+, the USPS insurance cap, as online).
+ */
+export function inStoreTableShippingFee(choice: InStoreShippingChoice, price: number): number | null {
+  if (choice === 'none') return 0;
+  if (choice === 'insured') return getCheckoutShippingFee('priority-insured', price);
+  if (choice === 'express') return getCheckoutShippingFee('express-overnight-insured', price);
+  return null;
+}
+
+/**
+ * Florida tax applies to a pickup (the sale completes in the store) and to a
+ * shipment to a Florida address. A shipment out of state owes none. This is
+ * the same rule as web checkout (`chargesFlSalesTax`) and the admin "Create
+ * order" form (owner pick 2026-10-20). The state is the one typed on the form.
+ */
+export function inStoreChargesTax(method: 'pickup' | 'ship', shipState: string | null | undefined): boolean {
+  return method === 'pickup' || isFloridaState(shipState);
+}
+
 export type InStoreSaleInput = {
   item: InStoreListedItem | InStoreUnlistedItem;
   customer: { name: string; phone: string; email: string | null };
+  delivery: InStoreDelivery;
   paidBy: InStorePaymentMethod;
   note: string | null;
   subtotal: number;
+  shippingFee: number;
   tax: number;
   total: number;
 };
@@ -82,12 +139,81 @@ export function parseInStorePrice(raw: unknown): number | null {
   return round2(value);
 }
 
-/** The totals the form shows and the route records — one function for both. */
-export function inStoreTotals(price: number): { subtotal: number; tax: number; total: number } {
+/**
+ * The totals the form shows and the route records, from one function.
+ * Florida tax is on the item plus any shipping charged (the site's policy,
+ * `calculateFlSalesTax`). `chargesTax: false` means shipped out of state.
+ */
+export function inStoreTotals(
+  price: number,
+  options: { shippingFee?: number; chargesTax?: boolean } = {},
+): { subtotal: number; shippingFee: number; tax: number; total: number } {
   const subtotal = round2(price);
-  // Every in-store sale is in Florida: the same rule local pickup uses online.
-  const tax = calculateFlSalesTax(subtotal, 0);
-  return { subtotal, tax, total: round2(subtotal + tax) };
+  const shippingFee = round2(Math.max(0, options.shippingFee ?? 0));
+  const tax = options.chargesTax === false ? 0 : calculateFlSalesTax(subtotal, shippingFee);
+  return { subtotal, shippingFee, tax, total: round2(subtotal + shippingFee + tax) };
+}
+
+/** A typed shipping charge: "$25", "12.50" → 25 / 12.5. Zero is allowed, though "No charge" says it better. */
+export function parseInStoreShippingFee(raw: unknown): number | null {
+  const text = String(raw ?? '').replace(/[$,\s]/g, '');
+  if (!/^\d+(\.\d{1,2})?$/.test(text)) return null;
+  const value = Number(text);
+  if (!Number.isFinite(value) || value < 0 || value > IN_STORE_SHIPPING_FEE_MAX) return null;
+  return round2(value);
+}
+
+type AddressFields = { line1: string; line2: string; city: string; state: string; postalCode: string };
+
+function addressFields(raw: unknown): AddressFields {
+  const source = (raw ?? {}) as Record<string, unknown>;
+  const text = (key: keyof AddressFields) => String(source[key] ?? '').replace(/\s+/g, ' ').trim();
+  return { line1: text('line1'), line2: text('line2'), city: text('city'), state: text('state'), postalCode: text('postalCode') };
+}
+
+/** Checked with the web checkout's own validator (`lib/us-address.ts`): U.S. only, real state, real ZIP. */
+function validateAddress(fields: AddressFields, incomplete: string): { address: InStoreAddress } | { error: string } {
+  const result = validateUsShippingAddress({ ...fields, country: 'United States' });
+  if (!result.address) {
+    return { error: /complete shipping address/i.test(result.error) ? incomplete : result.error };
+  }
+  const a = result.address;
+  return {
+    address: {
+      line1: a.line1.slice(0, 120),
+      line2: a.line2 ? a.line2.slice(0, 60) : null,
+      city: a.city.slice(0, 60),
+      state: a.state,
+      postalCode: a.postalCode,
+    },
+  };
+}
+
+/** Pickup (the default, with an optional mailing address) or ship (address + charge). */
+function normalizeDelivery(raw: unknown, price: number): { value: InStoreDelivery } | { error: string } {
+  const source = (raw ?? {}) as Record<string, unknown>;
+  const fields = addressFields(source.address);
+
+  if (source.method !== 'ship') {
+    // The optional mailing address: all blank = none; started = must be complete.
+    if (!Object.values(fields).some(Boolean)) return { value: { method: 'pickup', address: null } };
+    const checked = validateAddress(fields, 'Finish the mailing address (street, city, state, ZIP) or untick it.');
+    return 'error' in checked ? checked : { value: { method: 'pickup', address: checked.address } };
+  }
+
+  const checked = validateAddress(fields, 'Enter the full ship-to address (street, city, state, ZIP).');
+  if ('error' in checked) return checked;
+  const shipping = String(source.shipping ?? '') as InStoreShippingChoice;
+  if (!IN_STORE_SHIPPING_CHOICES.includes(shipping)) return { error: 'Pick the shipping charge.' };
+  const shippingFee = shipping === 'custom'
+    ? parseInStoreShippingFee(source.shippingFee)
+    : inStoreTableShippingFee(shipping, price);
+  if (shippingFee == null) {
+    return shipping === 'custom'
+      ? { error: `Enter the shipping charge, e.g. 25 (up to $${IN_STORE_SHIPPING_FEE_MAX.toLocaleString('en-US')}).` }
+      : { error: 'Express overnight is not offered at $5,000 and up (USPS insurance limit). Pick Insured shipping or a custom amount.' };
+  }
+  return { value: { method: 'ship', address: checked.address, shipping, shippingFee } };
 }
 
 function optionalText(value: unknown, max: number): string | null {
@@ -136,11 +262,18 @@ export function normalizeInStoreSaleInput(body: unknown): { value: InStoreSaleIn
   const paidBy = String(source.paidBy ?? '') as InStorePaymentMethod;
   if (!IN_STORE_PAYMENT_METHODS.includes(paidBy)) return { error: 'Pick how it was paid.' };
 
-  const totals = inStoreTotals(price);
+  const delivery = normalizeDelivery(source.delivery, price);
+  if ('error' in delivery) return delivery;
+
+  const totals = inStoreTotals(price, {
+    shippingFee: delivery.value.method === 'ship' ? delivery.value.shippingFee : 0,
+    chargesTax: inStoreChargesTax(delivery.value.method, delivery.value.address?.state),
+  });
   return {
     value: {
       item,
       customer: { name, phone, email: emailText ? emailText.toLowerCase() : null },
+      delivery: delivery.value,
       paidBy,
       note: optionalText(source.note, IN_STORE_NOTE_MAX),
       ...totals,
