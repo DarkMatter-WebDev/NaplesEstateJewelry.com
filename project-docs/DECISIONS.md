@@ -4,7 +4,18 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-10-21 (5)**.
+> compaction. Last reconciled: **2026-10-22 (1)**.
+
+## Keywords go on the page in sentences, never as a list; sterling silver is named beside gold and platinum; one guide per real topic, never one page per brand (2026-10-22)
+
+- **Owner:** *"the FIRST priority is to stay on good terms with google"*; *"add sterling silver alongside gold and platinum anywhere its mentioned… if they only read the paragraph with gold and platinum, we dont want them to think we dont buy sterling"*; *"high end designers we like even more than native american / turquoise"*; *"a lot of the value in this category depends on the particular artist"*.
+- **The rules:**
+  - Search terms are written into real sentences, or into grouped cards that each say why the names matter (`/estate-jewelry` → `DESIGNER_GROUPS`). ⛔ Never a bare block of names, cities or terms (Google's spam policy names exactly that), never hidden text.
+  - A new page only for a topic with real substance (the Native American guide). ⛔ Never one thin page per designer, style or city (doorway pages). If Search Console later shows designer searches, the next step is ONE "selling designer jewelry" guide.
+  - Wherever the site lists the metals it buys, sterling silver sits next to gold and platinum.
+  - Website vs Google Ads: rare local terms go on the site first; an ad keyword only once Keyword Planner shows real local volume. The landing page must say what the keyword says (landing-page score).
+  - The Native American guide leads with the artist; its photos, when added, are the shop's own, never generated (a made-up "Navajo" piece would misrepresent the category).
+- `/estate-jewelry` description = *"…gold, sterling silver, diamonds, signed designer and vintage pieces…"* (≤ 160, phone last). Guard `lib/__tests__/service-landers-faq.test.ts`. Record `CHANGELOG.md` 2026-10-22 (1).
 
 ## Paper receipts are ONE page and are not the email: Record & print receipt and Print Invoice print `order-receipt-paper.ts`; the in-store email drops what a carried-out sale does not need (2026-10-21)
 

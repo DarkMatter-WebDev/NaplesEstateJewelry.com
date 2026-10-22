@@ -14,6 +14,7 @@ describe('phone contact bar: which pages', () => {
     '/silver-services/silver-marks',
     '/silver-services/flatware-value',
     '/estate-jewelry',
+    '/estate-jewelry/native-american-jewelry',
     '/estate-services/selling-inherited-jewelry',
     '/bullion',
     '/sell',

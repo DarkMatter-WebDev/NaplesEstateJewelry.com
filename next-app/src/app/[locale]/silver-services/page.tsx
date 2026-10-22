@@ -638,9 +638,9 @@ export default async function SilverServicesPage({ params }: Props) {
           faqs={SILVER_FAQS}
           footer={
             isEs ? (
-              <>¿Vende más que plata? También compramos <Link href="/es/gold-services" className="font-semibold text-[#735c00] underline underline-offset-2">oro</Link> y <Link href="/es/estate-jewelry" className="font-semibold text-[#735c00] underline underline-offset-2">joyería de patrimonio</Link>.</>
+              <>¿Vende más que plata? También compramos <Link href="/es/gold-services" className="font-semibold text-[#735c00] underline underline-offset-2">oro</Link> y <Link href="/es/estate-jewelry" className="font-semibold text-[#735c00] underline underline-offset-2">joyería de patrimonio</Link>. ¿Joyería de plata navajo, zuni o de Taxco? Vea <Link href="/es/estate-jewelry/native-american-jewelry" className="font-semibold text-[#735c00] underline underline-offset-2">cómo valoramos la joyería nativa americana y de turquesa</Link>.</>
             ) : (
-              <>Selling more than silver? We also buy <Link href="/gold-services" className="font-semibold text-[#735c00] underline underline-offset-2">gold</Link> and <Link href="/estate-jewelry" className="font-semibold text-[#735c00] underline underline-offset-2">estate jewelry</Link>.</>
+              <>Selling more than silver? We also buy <Link href="/gold-services" className="font-semibold text-[#735c00] underline underline-offset-2">gold</Link> and <Link href="/estate-jewelry" className="font-semibold text-[#735c00] underline underline-offset-2">estate jewelry</Link>. Navajo, Zuni, or Taxco silver jewelry? See <Link href="/estate-jewelry/native-american-jewelry" className="font-semibold text-[#735c00] underline underline-offset-2">how we value Native American and turquoise jewelry</Link>.</>
             )
           }
         />

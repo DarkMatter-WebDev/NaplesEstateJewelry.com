@@ -17,12 +17,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     // slot of the 08-30 title split (home = "Sell…", /sell/naples = "Jewelry
     // Buyers…", this page = estate jewelry buyers). ≤ ~60 characters with the
     // suffix; the description keeps the phone last (DECISIONS 2026-09-08).
+    // 2026-10-22 (owner): "signed designer and vintage", and sterling silver
+    // next to gold wherever the metals are listed.
     title: isEs
       ? 'Compradores de Joyería de Patrimonio en Naples'
       : 'Estate Jewelry Buyers in Naples, FL',
     description: isEs
-      ? 'Venda joyería heredada en Naples, FL — oro, diamantes, piezas antiguas y colecciones. Evaluación gratis, pago al aceptar. Llame al (239) 404-8505.'
-      : 'Sell estate jewelry in Naples, FL — gold, diamonds, vintage pieces and inherited collections. Free evaluation, paid on agreement. Call (239) 404-8505.',
+      ? 'Venda joyería heredada en Naples, FL: oro, plata esterlina, diamantes, piezas firmadas y antiguas. Evaluación gratis, pago al aceptar. Llame al (239) 404-8505.'
+      : 'Sell estate jewelry in Naples, FL: gold, sterling silver, diamonds, signed designer and vintage pieces. Free evaluation, paid on agreement. Call (239) 404-8505.',
     path: '/estate-jewelry',
     locale,
   });
@@ -31,6 +33,32 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 interface Props {
   params: Promise<{ locale: string }>;
 }
+
+// The makers named in "Signed & Designer Jewelry" (owner, 2026-10-22). Brand
+// names are not translated.
+const DESIGNER_GROUPS = [
+  {
+    labelEn: 'The great jewelry houses',
+    labelEs: 'Las grandes casas joyeras',
+    names: ['Cartier', 'Van Cleef & Arpels', 'Tiffany & Co.', 'Bulgari', 'Harry Winston', 'Buccellati', 'Graff', 'Chopard'],
+    bodyEn: 'Signed and numbered pieces — a Cartier Love bracelet, a Van Cleef & Arpels Alhambra necklace — are priced as jewelry against their resale market, not by the weight of the gold.',
+    bodyEs: 'Las piezas firmadas y numeradas — una pulsera Love de Cartier, un collar Alhambra de Van Cleef & Arpels — se valoran como joyería según su mercado de reventa, no por el peso del oro.',
+  },
+  {
+    labelEn: 'American designers',
+    labelEs: 'Diseñadores estadounidenses',
+    names: ['David Webb', 'Verdura', 'Jean Schlumberger', 'Elsa Peretti', 'Seaman Schepps', 'Aldo Cipullo', 'Oscar Heyman'],
+    bodyEn: 'Bold gold, enamel, and gemstone work from these makers has a devoted collector market. Their marks are among the first things we look for.',
+    bodyEs: 'El oro, el esmalte y las gemas de estos creadores tienen un mercado de coleccionistas fiel. Sus marcas están entre lo primero que buscamos.',
+  },
+  {
+    labelEn: 'Contemporary designers',
+    labelEs: 'Diseñadores contemporáneos',
+    names: ['David Yurman', 'John Hardy', 'Roberto Coin', 'Marco Bicego', 'Lagos', 'Ippolita', 'Mikimoto', 'Hermès', 'Chanel'],
+    bodyEn: 'Popular modern pieces in sterling silver and 18K gold. Boxes, pouches, and receipts help, but none of them is required.',
+    bodyEs: 'Piezas modernas populares en plata esterlina y oro de 18K. Las cajas, bolsas y recibos ayudan, pero ninguno es necesario.',
+  },
+] as const;
 
 export default async function EstateJewelryPage({ params }: Props) {
   const { locale } = await params;
@@ -141,20 +169,20 @@ export default async function EstateJewelryPage({ params }: Props) {
                   {
                     title: isEs ? 'Fabricante y Procedencia' : 'Maker & Provenance',
                     body: isEs
-                      ? 'Buscamos marcas del fabricante y revisamos cualquier documentación que conserve. Una firma de Cartier, Van Cleef & Arpels o Tiffany puede influir en el valor de reventa, junto con el diseño y el estado. No hace falta una firma para que evaluemos su joyería.'
-                      : 'We look for maker\'s marks and review any paperwork you have. A Cartier, Van Cleef & Arpels, or Tiffany signature can affect resale value alongside design and condition. Your jewelry does not need a designer signature for an evaluation.',
+                      ? 'Buscamos marcas del fabricante y revisamos cualquier documentación que conserve. Una firma de Cartier, Van Cleef & Arpels, Tiffany o David Webb puede influir en el valor de reventa, junto con el diseño y el estado. No hace falta una firma para que evaluemos su joyería.'
+                      : 'We look for maker\'s marks and review any paperwork you have. A Cartier, Van Cleef & Arpels, Tiffany, or David Webb signature can affect resale value alongside design and condition. Your jewelry does not need a designer signature for an evaluation.',
                   },
                   {
                     title: isEs ? 'Calidad de las Gemas' : 'Gemstone Quality',
                     body: isEs
-                      ? 'Revisamos las piedras montadas mediante inspección visual, investigación de mercado y los informes gemológicos disponibles. Si hace falta un análisis especializado, organizamos la evaluación fuera del sitio. Esta revisión de las gemas es distinta de las pruebas de ácido del metal.'
-                      : 'We assess mounted stones through visual inspection, market research, and any available gemological reports. If specialist analysis is needed, we arrange an offsite assessment. This gemstone review is separate from acid testing the metal.',
+                      ? 'Revisamos las piedras montadas — diamantes, esmeraldas, zafiros y rubíes — y las perlas mediante inspección visual, investigación de mercado y los informes gemológicos disponibles. Si hace falta un análisis especializado, organizamos la evaluación fuera del sitio. Esta revisión de las gemas es distinta de las pruebas de ácido del metal.'
+                      : 'We assess mounted stones — diamonds, emeralds, sapphires, and rubies — and pearls through visual inspection, market research, and any available gemological reports. If specialist analysis is needed, we arrange an offsite assessment. This gemstone review is separate from acid testing the metal.',
                   },
                   {
                     title: isEs ? 'Era Histórica' : 'Historical Era',
                     body: isEs
-                      ? 'Ya sea victoriano, Art Deco o Retro Moderno, el significado histórico de una pieza contribuye a su deseabilidad. Consideramos la era tanto como los materiales.'
-                      : 'Whether Victorian, Art Deco, or Retro Modern, the historical significance of a piece contributes to its desirability. We consider the era as much as the materials.',
+                      ? 'Ya sea georgiano, victoriano, eduardiano, Art Nouveau, Art Deco, Retro o de mediados de siglo, el significado histórico de una pieza contribuye a su deseabilidad. Consideramos la era tanto como los materiales.'
+                      : 'Whether Georgian, Victorian, Edwardian, Art Nouveau, Art Deco, Retro, or Mid-Century, the historical significance of a piece contributes to its desirability. We consider the era as much as the materials.',
                   },
                 ].map((item, i) => (
                   <div key={i}>
@@ -272,8 +300,8 @@ export default async function EstateJewelryPage({ params }: Props) {
                 </h2>
                 <p style={{ color: 'var(--color-on-surface-variant)' }}>
                   {isEs
-                    ? 'Compramos anillos de oro, cadenas, pulseras, aretes y joyería heredada, incluidas piezas rotas o sin firma. También evaluamos joyería antigua y de diseñador y relojes de lujo, tanto piezas individuales como colecciones.'
-                    : 'We buy gold rings, chains, bracelets, earrings, and inherited jewelry, including broken or unsigned pieces. We also evaluate antique and designer jewelry and luxury watches, as individual pieces or collections.'}
+                    ? 'Compramos anillos, cadenas, pulseras, aretes, colgantes y broches de oro, platino y plata esterlina, y joyería heredada, incluidas piezas rotas o sin firma. También evaluamos joyería antigua y de diseñador firmada y relojes de lujo, tanto piezas individuales como colecciones.'
+                    : 'We buy gold, platinum, and sterling silver rings, chains, bracelets, earrings, pendants, and brooches, and inherited jewelry, including broken or unsigned pieces. We also evaluate antique and signed designer jewelry and luxury watches, as individual pieces or collections.'}
                 </p>
               </div>
               <Link
@@ -376,6 +404,82 @@ export default async function EstateJewelryPage({ params }: Props) {
                 <>Selling more than jewelry? We also buy <Link href={p('/gold-services')} className="font-semibold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>scrap gold</Link> and <Link href={p('/silver-services')} className="font-semibold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>sterling silver flatware and hollowware</Link>. If your collection includes pieces with stones, see our <Link href={p('/diamond-buyers')} className="font-semibold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>diamond jewelry evaluations</Link>.</>
               )}
             </p>
+          </div>
+        </section>
+
+        {/* Signed & designer jewelry + the Native American guide band
+            (2026-10-22, owner, mockup v1). Names sit in three groups, each
+            with a sentence on why the mark matters — never a bare list
+            (Google's keyword-stuffing rule). */}
+        <section
+          className="border-y py-20 md:py-28"
+          style={{ background: 'var(--color-surface-container-low)', borderColor: 'var(--color-outline-variant)' }}
+        >
+          <div className="ultrawide-page container mx-auto px-6 md:px-12 max-w-6xl">
+            <div className="max-w-3xl">
+              <h2
+                className="text-3xl md:text-4xl font-bold mb-4 tracking-tight"
+                style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
+              >
+                {isEs ? 'Joyería Firmada y de Diseñador' : 'Signed & Designer Jewelry'}
+              </h2>
+              <p className="leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
+                {isEs
+                  ? 'La firma de un fabricante puede valer más que el metal en el que está grabada. Estos son los nombres que buscamos primero. Si el suyo no está aquí, tráigalo de todos modos — investigamos cada marca que encontramos.'
+                  : 'A maker’s signature can be worth more than the metal it is stamped on. These are the names we look for first. If yours is not here, bring it anyway — we look up every mark we find.'}
+              </p>
+            </div>
+            <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-3">
+              {DESIGNER_GROUPS.map((group) => (
+                <div
+                  key={group.labelEn}
+                  className="rounded-2xl border bg-white p-6 shadow-[0_10px_28px_rgba(38,28,6,0.04)]"
+                  style={{ borderColor: 'var(--color-outline-variant)' }}
+                >
+                  <h3
+                    className="mb-3 text-xs font-bold uppercase tracking-[0.16em]"
+                    style={{ fontFamily: 'var(--font-label)', color: 'var(--color-primary)' }}
+                  >
+                    {isEs ? group.labelEs : group.labelEn}
+                  </h3>
+                  <p
+                    className="mb-3 text-[17px] font-bold leading-relaxed"
+                    style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
+                  >
+                    {group.names.join(' · ')}
+                  </p>
+                  <p className="text-sm leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
+                    {isEs ? group.bodyEs : group.bodyEn}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-8 grid items-center gap-5 rounded-2xl p-7 md:grid-cols-[1fr_auto] md:px-10 md:py-8" style={{ background: '#1a1c1c' }}>
+              <div>
+                <span
+                  className="mb-2 block text-xs font-bold uppercase tracking-[0.2em]"
+                  style={{ color: '#f2ca50', fontFamily: 'var(--font-label)' }}
+                >
+                  {isEs ? 'Joyería de Plata Esterlina' : 'Sterling Silver Jewelry'}
+                </span>
+                <h3 className="mb-2 text-2xl font-bold text-white" style={{ fontFamily: 'var(--font-headline)' }}>
+                  {isEs ? 'Plata Nativa Americana, Turquesa y Plata de Taxco' : 'Native American, Turquoise & Taxco Silver'}
+                </h3>
+                <p className="leading-relaxed" style={{ color: '#d0c9bc' }}>
+                  {isEs
+                    ? 'Plata y turquesa navajo, zuni y hopi, plata mexicana de Taxco y joyería de Georg Jensen. En esta joyería, gran parte del valor depende del artista en particular.'
+                    : 'Navajo, Zuni, and Hopi silver and turquoise, Mexican Taxco silver, and Georg Jensen jewelry. With this jewelry, much of the value depends on the particular artist.'}
+                </p>
+              </div>
+              <Link
+                href={p('/estate-jewelry/native-american-jewelry')}
+                className="text-sm font-bold uppercase tracking-widest underline underline-offset-8 md:whitespace-nowrap"
+                style={{ color: '#f2ca50', fontFamily: 'var(--font-label)' }}
+              >
+                {isEs ? 'Cómo la valoramos →' : 'How we value it →'}
+              </Link>
+            </div>
           </div>
         </section>
 

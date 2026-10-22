@@ -30,7 +30,10 @@ const BASE = 'https://naplesestatejewelry.com';
 // and reduced standalone diamond promotion across the buying pages.
 // 2026-09-11: /free-evaluation rebuilt call/visit-first with appraisal
 // wording; sitewide "Free Appraisal" CTA labels; Spanish call labels.
-const CONTENT_LAST_MODIFIED = new Date('2026-09-11');
+// 2026-10-22: /estate-jewelry gained "Signed & Designer Jewelry" and the
+// eras / stones / sterling wording; new guide
+// /estate-jewelry/native-american-jewelry, linked from it and /silver-services.
+const CONTENT_LAST_MODIFIED = new Date('2026-10-22');
 
 // Both locale prefixes the app serves. EVERY public page exists in both, so each
 // language version gets its OWN <url> entry — Google's documented pattern —
@@ -73,6 +76,7 @@ const STATIC_PAGES = [
   { path: '/gold-services/what-is-my-gold-worth', priority: 0.6, changeFrequency: 'monthly' },
   { path: '/jewelry-appraisal/hallmarks', priority: 0.6, changeFrequency: 'monthly' },
   { path: '/estate-services/selling-inherited-jewelry', priority: 0.6, changeFrequency: 'monthly' },
+  { path: '/estate-jewelry/native-american-jewelry', priority: 0.6, changeFrequency: 'monthly' },
   { path: '/sell/dont-melt-it', priority: 0.6, changeFrequency: 'monthly' },
   { path: '/bullion', priority: 0.7, changeFrequency: 'weekly' },
   // 2026-09-06: live-prices destination page (social + About menu); low

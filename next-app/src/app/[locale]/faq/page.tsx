@@ -50,8 +50,8 @@ const FAQ_ITEMS = [
   {
     questionEn: 'Do you buy broken or damaged jewelry?',
     questionEs: '¿Compran joyería rota o dañada?',
-    answerEn: 'Absolutely. We purchase damaged, broken, mismatched, and unworn jewelry regularly. The value of gold, platinum, and most gemstones is unaffected by minor damage, and we pay competitive market rates regardless of condition.',
-    answerEs: 'Absolutamente. Compramos joyería dañada, rota, sin par y sin usar regularmente. El valor del oro, el platino y la mayoría de las piedras preciosas no se ve afectado por daños menores.',
+    answerEn: 'Absolutely. We purchase damaged, broken, mismatched, and unworn jewelry regularly. The value of gold, platinum, sterling silver, and most gemstones is unaffected by minor damage, and we pay competitive market rates regardless of condition.',
+    answerEs: 'Absolutamente. Compramos joyería dañada, rota, sin par y sin usar regularmente. El valor del oro, el platino, la plata esterlina y la mayoría de las piedras preciosas no se ve afectado por daños menores.',
   },
   {
     questionEn: 'What areas do you serve?',

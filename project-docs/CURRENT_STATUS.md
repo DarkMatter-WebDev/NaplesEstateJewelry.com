@@ -2,7 +2,23 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-10-21 (5)**.
+> in `DECISIONS.md`. Last reconciled: **2026-10-22 (1)**.
+
+## Start Here (2026-10-22 — 🟡 `/estate-jewelry` keywords + NEW Native American guide BUILT + STAGED, not pushed; no SQL, no env vars)
+
+- 🟡 **Built and staged, waiting for the owner's push** (`CHANGELOG.md` 2026-10-22 (1); rule `DECISIONS.md` top entry; `TASKS.md` top): `/estate-jewelry` names more eras, stones and sterling silver next to gold and platinum, gains a **Signed & Designer Jewelry** section (24 makers in three groups, David Webb included) and a band to the NEW guide **`/estate-jewelry/native-american-jewelry`** ("most of the value is in the artist"), EN + ES. `/faq` and `/silver-services` touched by one sentence each; sitemap updated.
+- Gate: `tsc` 0 · lint 0 errors · **1945/1945** · build 0. ⛔ Not seen on a real phone or in production.
+- ◻ After the push: IndexNow for 4 URLs (Claude runs it); GSC Request Indexing for the guide (EN) optional. The 10-21 (9) block below otherwise still applies.
+
+## Start Here (2026-10-21 (9) — session CLOSED; everything from 10-21 DEPLOYED (owner); nothing staged-but-unpushed except docs; no SQL, no env vars)
+
+- 🟢 Owner: *"update docs and end session"* (`CHANGELOG.md` 2026-10-21 (9)). Live: photo-ID wording · Instant Sale (In-store + Remote sale + Save draft) · the one-page paper receipt + Record & print · in-store email fixes. Last gate: `tsc` 0 · lint 0 errors · **1938/1938** · build 0 · 90 = 42 + 42 + 6.
+- ◻ Open — the owner's first uses only (`TASKS.md` top two blocks). When the business Zelle is approved: one line, `ZELLE_PAY_TO` in `next-app/src/lib/remote-sale.ts` + its test.
+
+## Start Here (2026-10-21 (8) — 🟢 everything from 10-21 DEPLOYED (owner); nothing staged-but-unpushed except docs; no SQL, no env vars)
+
+- 🟢 Owner: *"Pushed and deployed."* — the one-page paper receipt (Record & print receipt + the order page's Print), the in-store email fixes, no photo / no box, the kept photo space (`CHANGELOG.md` 2026-10-21 (8)). Claude did not check production (behind the sign-in).
+- ◻ Open — the owner's first uses (`TASKS.md` top two blocks): Record & print on the real printer (one page?); an older order's Print; the next in-store receipt email; a two-item in-store sale with a photo; a remote invoice to yourself; the first draft. Where the blocks below say "STAGED" / "not pushed", read "deployed".
 
 ## Start Here (2026-10-21 (5) — 🟡 one-page paper receipt + "Record & print receipt" + in-store email fixes BUILT + STAGED, not pushed; no SQL, no env vars)
 

@@ -107,6 +107,7 @@ describe('"what to bring" tells a seller to bring a photo ID (owner, 2026-10-21)
     ['sell'],
     ['free-evaluation'],
     ['diamond-buyers'],
+    ['estate-jewelry', 'native-american-jewelry'],
   ];
   for (const parts of PAGES) {
     it(`${parts.join('/')}: EN + ES`, () => {
@@ -115,4 +116,40 @@ describe('"what to bring" tells a seller to bring a photo ID (owner, 2026-10-21)
       expect(src).toMatch(/identificación oficial con foto \(?—? ?Florida la exige cuando compramos metales preciosos/);
     });
   }
+});
+
+describe('/estate-jewelry keywords + the Native American guide (owner, 2026-10-22)', () => {
+  const ESTATE = read('src', 'app', '[locale]', 'estate-jewelry', 'page.tsx');
+  const GUIDE = read('src', 'app', '[locale]', 'estate-jewelry', 'native-american-jewelry', 'page.tsx');
+  const SITEMAP = read('src', 'app', 'sitemap.ts');
+
+  it('names sterling silver beside gold and platinum, EN + ES', () => {
+    expect(ESTATE).toContain('We buy gold, platinum, and sterling silver rings');
+    expect(ESTATE).toContain('de oro, platino y plata esterlina');
+  });
+
+  it('keeps the designer names in groups with a sentence each, David Webb included', () => {
+    expect(ESTATE).toContain('DESIGNER_GROUPS.map(');
+    expect(ESTATE.match(/bodyEn: '/g)?.length).toBe(3);
+    expect(ESTATE).toContain("'David Webb'");
+  });
+
+  it('the guide leads with the artist, is in the sitemap, and is linked from its parent and the silver page', () => {
+    expect(ESTATE).toContain('much of the value depends on the particular artist');
+    expect(GUIDE).toContain('Most of the value is in the artist');
+    expect(SITEMAP).toContain("path: '/estate-jewelry/native-american-jewelry'");
+    expect(ESTATE).toContain("p('/estate-jewelry/native-american-jewelry')");
+    expect(SILVER).toContain('href="/estate-jewelry/native-american-jewelry"');
+    expect(SILVER).toContain('href="/es/estate-jewelry/native-american-jewelry"');
+  });
+
+  it('the guide renders its FAQ and its FAQPage JSON-LD from one list', () => {
+    expect(GUIDE.match(/FAQS\.map\(/g)?.length).toBe(2);
+    expect(GUIDE).toContain("'@type': 'FAQPage'");
+  });
+
+  it('the guide writes non-breaking spaces as the visible escape', () => {
+    expect(GUIDE).not.toMatch(/\u00a0/);
+    expect(GUIDE).toContain('Naples,\\u00a0FL');
+  });
 });
