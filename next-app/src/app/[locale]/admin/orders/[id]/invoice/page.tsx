@@ -2,7 +2,9 @@ import { notFound, redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { getVerifiedUser } from '@/lib/auth-claims';
-import { buildInvoiceEmailContent, formatPickupHours } from '@/lib/order-invoice-email';
+import { invoiceNumberForOrder } from '@/lib/order-invoice-email';
+import { buildPaperReceipt, isPaidStatus } from '@/lib/order-receipt-paper';
+import { hoursLine } from '@/lib/business-location';
 import { getStoreHours } from '@/lib/store-hours';
 import type { Order, OrderItem } from '@/types/sales';
 import CustomerModeTabGuard from '@/components/admin/buy-receipts/CustomerModeTabGuard';
@@ -22,6 +24,7 @@ const INVOICE_COLUMNS = [
   'discount',
   'total',
   'payment_status',
+  'payment_method',
   'fulfillment_status',
   'order_status',
   'shipping_method',
@@ -89,15 +92,17 @@ export default async function AdminOrderInvoicePrintPage({ params }: Props) {
 
   const typedOrder = order as unknown as Order & { order_items: OrderItem[] };
   const latestInvoiceNumber = invoices?.[0]?.invoice_number ?? null;
-  const invoiceContent = buildInvoiceEmailContent(typedOrder, latestInvoiceNumber, {
-    pickupHours: formatPickupHours(await getStoreHours()),
+  // The one-page paper (2026-10-21), not the email's HTML.
+  const paper = buildPaperReceipt(typedOrder, {
+    invoiceNumber: invoiceNumberForOrder(typedOrder, latestInvoiceNumber),
+    hoursLine: hoursLine(await getStoreHours(), false),
   });
 
   return (
     <>
       <PrintInvoiceClient
-        invoiceHtml={invoiceContent.html}
-        invoiceNumber={invoiceContent.invoiceNumber}
+        paper={paper}
+        label={isPaidStatus(typedOrder.payment_status) ? `Receipt · ${typedOrder.order_number}` : `Invoice · ${invoiceNumberForOrder(typedOrder, latestInvoiceNumber)}`}
         orderNumber={typedOrder.order_number}
         backHref={`${adminBasePath}/orders/${id}`}
       />

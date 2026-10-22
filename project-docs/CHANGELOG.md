@@ -1,6 +1,41 @@
 
 # Changelog
 
+## 2026-10-21 (7) — The receipt email keeps the photo's SPACE on a row without one, so titles line up (phone) — BUILT + STAGED with (5) + (6), not pushed
+
+- Owner: *"change the mobile format to be more like the desktop... where there is a space where the photo would normally go, if the line had one... currently the line with no photo is all the way to the left and is a bit confusing at first glance"*.
+- `lib/order-invoice-email.ts`: while any item has a picture, every row keeps the 72 px picture cell — empty (no box) where there is none — like the paper receipt; with no picture on any item the cell is left out. Test updated in `order-receipt-paper.test.ts`.
+- Gate: `tsc` 0 · lint 0 errors · **1938/1938** (170 files) · build 0 · 90 = 42 + 42 + 6. Rendered at 390 px: the no-photo title lines up under the others.
+
+## 2026-10-21 (6) — No photo, no box: the paper receipt and the receipt email leave out an item's picture when none was added — BUILT + STAGED with (5), not pushed
+
+- Owner, before pushing (5): *"if there is no pic added to an item not yet on the site, dont print the email / receipt with a blank box like it does now.. just omit that if there is no pic added, and use the pic if it is"*.
+- `lib/order-receipt-paper.ts`: a row without a photo has an empty photo cell (no box); when NO item has a photo the photo column is dropped entirely (`anyPhoto`). The `.noimg` box is gone.
+- `lib/order-invoice-email.ts`: the picture cell is only drawn when the item has one (every email using the template — a listed item always has its listing photo, so in practice this is unlisted pieces).
+- Tests: `order-receipt-paper.test.ts` +2. Gate: `tsc` 0 · lint 0 errors · **1938/1938** (170 files) · build 0 · 90 = 42 + 42 + 6. Rendered from the code: 2 photos + 1 none, and 3 with none, both 1 letter page; the email shows the two photos and no box for the third.
+
+## 2026-10-21 (5) — One-page paper receipt (Record & print receipt + the order page's Print) + the in-store receipt email fixes — BUILT + STAGED, not pushed; no SQL, no env vars
+
+- Owner: *"add a button to 'record and print reciept' alongside the button to record sale on the in-store sale form... also show me what the receipt and email look like.. we will try and adjust the format to all fit on one page most of the time.."*.
+- **Found (rendered from the real code, measured in headless Chrome as letter PDFs):** Print Invoice printed the EMAIL's HTML — **2 pages even for ONE item**, with no date and no "paid by". The in-store email showed "No inventory #", "Shipping $0.00", a "Shipping method: Local Pickup" box and the pickup address + hours for a piece already carried out.
+- **Mockup** (proposed paper 3 / 9 items / shipped, the email now, the button) → owner: *"Build it: the one-page paper receipt (also for Print Invoice on the order page), the in-store email fixes, and the Record & print receipt button."*
+- **Built:**
+  - NEW `lib/order-receipt-paper.ts` — `buildPaperReceipt` (RECEIPT / INVOICE; order, Naples date + time, PAID IN FULL / UNPAID / REFUNDED; Sold to / Bill to · Paid by · Delivery / Ship to; numbered items with 40 px photos, discounts, quantities; totals; one footer line with phone, order lookup and the admin-editable hours), every style under `.nej-paper`, `paperReceiptDocument`, `PAPER_PAGE_CSS` (letter, 0.5 in), `paperDateLine`, `isPaidStatus`. NEW `lib/order-receipt-paper-server.ts` — `loadPaperReceipt` (fresh read + `hoursLine(getStoreHours())`). NEW `lib/print-paper.ts` — `printPaperInFrame` (hidden frame, page-origin base, waits for images, no pop-up).
+  - Order → **Print Invoice** (`[locale]/admin/orders/[id]/invoice/page.tsx` + `PrintInvoiceClient.tsx`) now shows and prints the paper (letter-size preview; Print = frame; Ctrl+P prints the same page). `payment_method` added to its read.
+  - In-store **Record & print receipt** — `InStoreSaleForm.tsx`: Record sale (gold) + Record & print receipt (outlined) + Clear as a link (mockup); `print: true` → the route returns `paper` (`api/admin/in-store-sales/route.ts` → `loadPaperReceipt`) → printed in a frame. Success screen gains **Print receipt** (reprints the paper, or opens the order's Print page after a plain Record sale). A print that fails never undoes the sale; the screen says so.
+  - Email (`lib/order-invoice-email.ts`): an unlisted item's line no longer says "No inventory #" (all emails); for an IN-STORE sale carried out (`in_store_*` + pickup): "Paid in full by Card · Zettle on October 21, 2026 — thank you.", no Shipping row / box, no pickup block, a plain contact line. A shipped in-store sale and every web order are unchanged.
+  - Tests — NEW `lib/__tests__/order-receipt-paper.test.ts` (7).
+- **Gate:** `npx tsc --noEmit` 0 · `npm run lint` 0 errors (the 4 old `<img>` warnings) · `npx vitest run` **1936/1936** (170 files) · `npm run build` 0 (dev stopped, `.next/dev` cleared) · 90 = 42 + 42 + 6.
+- **Measured (the real builder, letter PDF in headless Chrome):** 1 item, 3 items, 9 items, and a shipped sale each print on **1 page** (the old print: 2 pages for 1 item). The in-store email on a phone: 1565 → 1212 px.
+- **Browser (temporary page with the real form, network intercepted, the frame's print caught; deleted after):** buttons read Record sale · $1,219.00 / Record & print receipt / Clear; Record & print sent `print: true`, a hidden frame printed "Receipt NEJ-…" (RECEIPT, letter page, logo + photo loaded, base = the page's origin); Print receipt on the success screen printed again; a plain Record sale sent `print: false` and its Print receipt opens `/admin/orders/<id>/invoice` in a new tab.
+- ⛔ Not verified: a real printer / the print dialog's layout on the owner's computer, behind the sign-in, a real email.
+
+## 2026-10-21 (4) — 10-21 (1) + (2) + (3) DEPLOYED (owner); drafts SQL RUN; IndexNow 200 for the six photo-ID pages — docs only
+
+- Owner: *"Re-ran the SQL and pushed + deployed."* One push carried (1) the photo-ID wording, (2) Instant Sale and (3) Save draft; `supabase/remote-sales-2026-10.sql` has now run with both sections.
+- Claude ran `npm run indexnow -- --urls=/diamond-buyers,/es/diamond-buyers,/free-evaluation,/es/free-evaluation,/sell,/es/sell` from `next-app/` (PowerShell) → **IndexNow 200 OK for 6 URLs**. No other production fetch (not asked; the Instant Sale pages are behind the sign-in).
+- Open (owner's first real uses, `TASKS.md` top): a two-item in-store sale with a photo; a remote invoice to yourself; the first draft (iPad → laptop).
+
 ## 2026-10-21 (3) — Remote sale **Save draft** — BUILT + STAGED, not pushed; ⛔ run `supabase/remote-sales-2026-10.sql` AGAIN (it now adds the drafts table); no env vars
 
 - Owner, after running the SQL for (2) (*"ran the sql, got 0.. ok to push?"*) and before pushing: *"actually add save draft to the remote sale"*.

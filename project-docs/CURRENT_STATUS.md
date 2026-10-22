@@ -2,7 +2,20 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-10-21 (3)**.
+> in `DECISIONS.md`. Last reconciled: **2026-10-21 (5)**.
+
+## Start Here (2026-10-21 (5) — 🟡 one-page paper receipt + "Record & print receipt" + in-store email fixes BUILT + STAGED, not pushed; no SQL, no env vars)
+
+- 🟡 Built and staged (`CHANGELOG.md` 2026-10-21 (5); rule `DECISIONS.md` top entry; `TASKS.md` top): In-store sale gains **Record & print receipt** (prints the new ONE-page receipt in place); the order page's **Print** uses the same paper (was the email's HTML — 2 pages for 1 item); the in-store receipt email says how/when it was paid and drops the shipping lines and the pickup block.
+- (6) + (7) on the owner's asks before the push: **no photo, no box** on the paper and in the email, and the email keeps the empty photo space so titles line up on a phone (`CHANGELOG.md` 2026-10-21 (6), (7)).
+- Gate: `tsc` 0 · lint 0 errors · **1938/1938** · build 0 · 90. Measured 1 page for 1 / 3 / 9 items, shipped, and no photos. ⛔ Not seen on a real printer or behind the sign-in.
+- Everything older is deployed (block below).
+
+## Start Here (2026-10-21 (4) — 🟢 everything from 10-21 DEPLOYED (owner); SQL fully run; nothing staged-but-unpushed except docs; no env vars)
+
+- 🟢 Owner: *"Re-ran the SQL and pushed + deployed."* Live (owner's word; Claude did not check production — the Instant Sale pages are behind the sign-in): (1) photo-ID wording on three seller pages, (2) Instant Sale (In-store sale with several items + photos + Email copy; Remote sale invoices with the PayPal pay link), (3) Save draft. `supabase/remote-sales-2026-10.sql` run with both sections.
+- ✅ IndexNow 200 OK for the six photo-ID URLs (`CHANGELOG.md` 2026-10-21 (4)).
+- ◻ Open — the owner's first real uses (`TASKS.md` top): a two-item in-store sale with a photo; a remote invoice to yourself (then Cancel); the first draft (iPad → laptop). Where the blocks below say "STAGED" / "not pushed" / "SQL to run", read "deployed" / "run".
 
 ## Start Here (2026-10-21 (3) — 🟡 Remote sale **Save draft** added before the push; ⛔ run `supabase/remote-sales-2026-10.sql` AGAIN (drafts table); then push)
 

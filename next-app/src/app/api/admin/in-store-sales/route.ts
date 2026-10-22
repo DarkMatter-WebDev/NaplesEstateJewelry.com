@@ -10,6 +10,7 @@ import {
   normalizeInStoreSaleInput,
 } from '@/lib/in-store-sale';
 import { formatCurrency } from '@/types/sales';
+import { loadPaperReceipt } from '@/lib/order-receipt-paper-server';
 
 /**
  * POST: record a sale made in the showroom (the card was taken on Zettle).
@@ -31,6 +32,8 @@ import { formatCurrency } from '@/types/sales';
  * shipping_method 'shipping', the address, the fee, and fulfillment left
  * `pending` so it waits under Orders until Mark Shipped + tracking.
  * Several items + a photo each + "Email copy" (owner, 2026-10-21). No new SQL.
+ * `print: true` ("Record & print receipt", 2026-10-21) also returns the
+ * one-page paper (`lib/order-receipt-paper.ts`) for the form to print.
  */
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -119,10 +122,12 @@ export async function POST(req: Request) {
   });
   if (!paid.ok) return NextResponse.json({ error: paid.error, orderId }, { status: paid.status });
 
+  const wantsPaper = Boolean((body as Record<string, unknown> | null)?.print);
   return NextResponse.json({
     orderId,
     orderNumber,
     receiptEmailed: paid.receiptEmailed,
     shipped,
+    paper: wantsPaper ? await loadPaperReceipt(service, orderId) : null,
   });
 }

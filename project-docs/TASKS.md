@@ -1,7 +1,7 @@
 # Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-10-21 (3)** (Remote sale Save draft added on the owner's ask before the push; ⛔ re-run the SQL file). Before that, **2026-10-21 (2)** (Instant Sale — In-store sale with several items + photos + Email copy, and Remote sale invoices with a PayPal pay link — BUILT + STAGED, not pushed, ⛔ SQL to run; first block below). Earlier the same day, **2026-10-21 (1)** ("what to bring" says a government photo ID on three more seller spots — BUILT + STAGED, not pushed; second block below; one push carries both). Before that, **2026-10-20 (4)** (session CLOSED — everything from 10-20 DEPLOYED by the owner: (3) Buy Receipts phone layout + no Qty, (2) Paid by, (1) Pickup or ship — the first three blocks below, each with only the owner's first real use left; nothing staged-but-unpushed except docs; no SQL. Earlier: Paid by + Cash App / Venmo / Store credit BUILT + STAGED — first block below; Pickup or ship DEPLOYED by the owner — second block; `CHANGELOG.md` 2026-10-20 (2)). Earlier the same day: **2026-10-20** (In-Store Sale "Pickup or ship" built — `CHANGELOG.md` 2026-10-20 (1)). Before that, **2026-10-19** (SEO heroes on `/free-evaluation` + `/estate-jewelry` BUILT + STAGED, not pushed — first block below; `CHANGELOG.md` 2026-10-19 (1)). Before that, **2026-10-18** (session CLOSED — `CHANGELOG.md` 2026-10-18 (7): three changes DEPLOYED + verified live — the first three blocks below, each with only the owner's own look left; offer texts shelved; nothing to push, no SQL). Earlier the same day: the homepage headline letter-tail fix BUILT + STAGED. Before that, **2026-10-17** (session CLOSED — `CHANGELOG.md` 2026-10-17 (4): the homepage 404 fixed, deployed and confirmed — first block below, nothing open; no SQL, nothing to push). Before that, **2026-10-15** (session CLOSED — `CHANGELOG.md` 2026-10-15 (13): Make an Offer built, tested and deployed with bulk on/off, the phone card, decline/counter messages, centred email footers and delete; nothing to push, no SQL). Before that, **2026-10-14** (eBay Best Offer per
+> in `CHANGELOG.md`. Last reconciled: **2026-10-21 (5)** (one-page paper receipt + Record & print receipt + in-store email fixes — BUILT + STAGED, not pushed; first block below). Before that, **2026-10-21 (4)** (everything from 10-21 DEPLOYED by the owner, drafts SQL run, IndexNow 200 for the six photo-ID pages; only the owner's first Instant Sale uses are open). Before that, **2026-10-21 (3)** (Remote sale Save draft added on the owner's ask before the push; ⛔ re-run the SQL file). Before that, **2026-10-21 (2)** (Instant Sale — In-store sale with several items + photos + Email copy, and Remote sale invoices with a PayPal pay link — BUILT + STAGED, not pushed, ⛔ SQL to run; first block below). Earlier the same day, **2026-10-21 (1)** ("what to bring" says a government photo ID on three more seller spots — BUILT + STAGED, not pushed; second block below; one push carries both). Before that, **2026-10-20 (4)** (session CLOSED — everything from 10-20 DEPLOYED by the owner: (3) Buy Receipts phone layout + no Qty, (2) Paid by, (1) Pickup or ship — the first three blocks below, each with only the owner's first real use left; nothing staged-but-unpushed except docs; no SQL. Earlier: Paid by + Cash App / Venmo / Store credit BUILT + STAGED — first block below; Pickup or ship DEPLOYED by the owner — second block; `CHANGELOG.md` 2026-10-20 (2)). Earlier the same day: **2026-10-20** (In-Store Sale "Pickup or ship" built — `CHANGELOG.md` 2026-10-20 (1)). Before that, **2026-10-19** (SEO heroes on `/free-evaluation` + `/estate-jewelry` BUILT + STAGED, not pushed — first block below; `CHANGELOG.md` 2026-10-19 (1)). Before that, **2026-10-18** (session CLOSED — `CHANGELOG.md` 2026-10-18 (7): three changes DEPLOYED + verified live — the first three blocks below, each with only the owner's own look left; offer texts shelved; nothing to push, no SQL). Earlier the same day: the homepage headline letter-tail fix BUILT + STAGED. Before that, **2026-10-17** (session CLOSED — `CHANGELOG.md` 2026-10-17 (4): the homepage 404 fixed, deployed and confirmed — first block below, nothing open; no SQL, nothing to push). Before that, **2026-10-15** (session CLOSED — `CHANGELOG.md` 2026-10-15 (13): Make an Offer built, tested and deployed with bulk on/off, the phone card, decline/counter messages, centred email footers and delete; nothing to push, no SQL). Before that, **2026-10-14** (eBay Best Offer per
 > item + in bulk BUILT + STAGED; SQL RUN by the owner; only the push left — first block below). Before that, **2026-10-12** (session CLOSED —
 > `CHANGELOG.md` 2026-10-12 (3); two new blocks, first below: the short phone
 > cookie notice DEPLOYED + verified in production, and the next Google Ads
@@ -28,14 +28,31 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-10-21 (2) + (3) — Admin → **Instant Sale** (In-store sale: several items, a photo each, Email copy · Remote sale: emailed invoice + private PayPal pay link + **Save draft**) — **BUILT + STAGED, not pushed**; ⛔ re-run the SQL file (drafts); no env vars
+### 🟡 2026-10-21 (5) + (6) + (7) — One-page paper receipt (In-store **Record & print receipt** + the order page's Print) + in-store email fixes + **no photo, no box** — **BUILT + STAGED, not pushed**; no SQL, no env vars
+
+Record: `CHANGELOG.md` 2026-10-21 (5) + (6). Rule: `DECISIONS.md` top entry. Files: `STRUCTURE.md` → *Paper receipt*.
+
+Gate (with (6)): `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1938/1938** (170 files) · build 0 · 90 = 42 + 42 + 6. Measured: 1 / 3 / 9 items + shipped + no photos = 1 letter page each.
+
+1. ◻ **Owner — push + deploy.**
+2. ◻ **Owner — first Record & print receipt** at the counter: the print dialog opens by itself; check it is ONE page on the real printer (the printer's own margins may differ — if it spills, tell Claude the page count).
+3. ◻ **Owner — an older order → Print** (Orders → the order → its invoice number): the same one-page paper.
+4. ◻ **Owner — the next in-store receipt email:** "Paid in full by … on …", no shipping lines, no pickup block.
+
+**Staging (10-21 (7)):** ✅ synced 2026-10-21. The dry run listed exactly the 6 touched files (`order-invoice-email.ts`, `order-receipt-paper.test.ts`; CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS), 0 Extras, 1285 total; real run copied 6, 0 FAILED; follow-up dry run 0, exit 0; leak 0; `.tsx` 262 = 262; SHA-256 MATCH on `order-invoice-email.ts`. Staging holds (5) + (6) + (7). Docs-only re-sync after this line.
+
+**Staging (10-21 (6)):** ✅ synced 2026-10-21. The dry run listed exactly the 7 touched files (`order-receipt-paper.ts`, `order-invoice-email.ts`, the test; CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS), 0 Extras, 1285 total; real run copied 7, 0 FAILED; follow-up dry run 0, exit 0; leak 0; `.tsx` 262 = 262; SHA-256 MATCH on the 2 app files. Staging holds (5) + (6). Docs-only re-sync after this line.
+
+**Staging (10-21 (5)):** ✅ synced 2026-10-21. The dry run listed exactly the 15 touched files (9 app: 4 NEW — `order-receipt-paper.ts`, `order-receipt-paper-server.ts`, `print-paper.ts`, the test — and 5 changed; 6 docs), 0 Extras, 1285 total; real run copied 15, 0 FAILED; follow-up dry run 0, exit 0; leak 0; `.tsx` 262 = 262; SHA-256 MATCH on 3 app files; no `zz-*` page. Docs-only re-sync after this line.
+
+### 🟢 2026-10-21 (2) + (3) — Admin → **Instant Sale** (In-store sale: several items, a photo each, Email copy · Remote sale: emailed invoice + private PayPal pay link + **Save draft**) — **DEPLOYED, SQL run** (owner, 10-21: *"Re-ran the SQL and pushed + deployed."*); ◻ items 3, 4, 6 are the owner's first uses
 
 Record: `CHANGELOG.md` 2026-10-21 (2) + (3). Rule: `DECISIONS.md` top entry. Runbook: `features/instant-sale.md`. Files: `STRUCTURE.md` → the two *Instant Sale* rows.
 
 Gate (final, with drafts): `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1929/1929** (169 files) · build 0 · 90 prerendered = 42 EN + 42 ES + 6.
 
-1. ◻ **Owner — run `supabase/remote-sales-2026-10.sql` AGAIN** (section 1 ran 10-21, owner: *"ran the sql, got 0"*; section 2 — the Save draft table, added 10-21 (3) — needs the whole file once more; safe to re-run; the closing check shows two counts). Until then only "Save draft" fails.
-2. ◻ **Owner — push + deploy** (one push carries 10-21 (1) "photo ID" as well).
+1. ✅ **Owner — run `supabase/remote-sales-2026-10.sql` AGAIN** — DONE 10-21 (*"Re-ran the SQL"*). (section 1 ran 10-21, owner: *"ran the sql, got 0"*; section 2 — the Save draft table, added 10-21 (3) — needs the whole file once more; safe to re-run; the closing check shows two counts). Until then only "Save draft" fails.
+2. ✅ **Owner — push + deploy** — DONE 10-21 (carried 10-21 (1) as well). Production not checked by Claude (not asked; behind the sign-in).
 3. ◻ **Owner — first in-store sale with two items** (Admin → Instant Sale → In-store sale): add a photo to one; check the receipt email shows both items and the photo; try Email copy unticked once.
 4. ◻ **Owner — first remote sale, to yourself first:** Remote sale → one item → your own email → Email invoice. Check the email (message, Pay button, Zelle line), open the link, see the pay page; **Cancel invoice** afterwards (or pay a $1 Not-listed item for real to see the receipt, then refund it by hand in PayPal).
 5. ℹ️ When the business Zelle is approved: tell Claude the new number/email — ONE line (`ZELLE_PAY_TO` in `next-app/src/lib/remote-sale.ts`) + its test.
@@ -52,14 +69,14 @@ Gate (final, with drafts): `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings)
 - Checks: leak check 0; `.tsx` 261 = 261; SHA-256 MATCH on 5 files (incl. the SQL); no `zz-*` page in staging.
 - Staging also holds 10-21 (1). Docs-only re-sync after this line.
 
-### 🟡 2026-10-21 (1) — "What to bring": government photo ID on `/diamond-buyers` (FAQ), `/free-evaluation` (Visit the Showroom), `/sell` (Bring everything), EN + ES — **BUILT + STAGED, not pushed**; no SQL, no env vars
+### 🟢 2026-10-21 (1) — "What to bring": government photo ID on `/diamond-buyers` (FAQ), `/free-evaluation` (Visit the Showroom), `/sell` (Bring everything), EN + ES — **DEPLOYED (owner, 10-21) + IndexNow 200 for 6** — nothing open
 
 Record: `CHANGELOG.md` 2026-10-21 (1). Rule: `DECISIONS.md` top entry. Files: `src/app/[locale]/diamond-buyers/page.tsx`, `src/app/[locale]/free-evaluation/page.tsx`, `src/app/[locale]/sell/page.tsx`, `src/lib/__tests__/service-landers-faq.test.ts`.
 
 Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1905/1905** (168 files) · build 0 · 88 prerendered = 41 EN + 41 ES + 6.
 
-1. ◻ **Owner — push + deploy.**
-2. ℹ️ Optional after the deploy: IndexNow for the six URLs (Claude runs it from `next-app/` in PowerShell): `npm run indexnow -- --urls=/diamond-buyers,/es/diamond-buyers,/free-evaluation,/es/free-evaluation,/sell,/es/sell`.
+1. ✅ **Owner — push + deploy** — DONE 10-21 (with Instant Sale).
+2. ✅ IndexNow — DONE 10-21: 200 OK for 6 URLs. Was: IndexNow for the six URLs (Claude runs it from `next-app/` in PowerShell): `npm run indexnow -- --urls=/diamond-buyers,/es/diamond-buyers,/free-evaluation,/es/free-evaluation,/sell,/es/sell`.
 
 **Staging (10-21 (1)):** ✅ synced 2026-10-21 ~10:24 AM ET.
 - The dry run listed exactly the 8 touched files: 4 in the app (the three pages + the test) + 4 docs (CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS). 0 Extras, 1257 total.

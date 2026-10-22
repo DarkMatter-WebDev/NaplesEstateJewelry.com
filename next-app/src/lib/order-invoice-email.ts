@@ -14,6 +14,8 @@ import {
   type StoreHoursSchedule,
 } from '@/lib/business-location';
 import { describeOrderShippingService } from '@/lib/checkout-shipping';
+import { IN_STORE_PAYMENT_LABELS, type InStorePaymentMethod } from '@/lib/in-store-sale';
+import { paperDateLine } from '@/lib/order-receipt-paper';
 
 export type InvoiceEmailOrder = Order & { order_items: OrderItem[] };
 
@@ -155,6 +157,13 @@ export function buildInvoiceEmailContent(
   const invoiceNumber = invoiceNumberForOrder(order, fallbackInvoiceNumber);
   const paid = isOrderPaid(order);
   const payment = paid ? null : opts?.payment ?? null;
+  // In-store receipts (owner, 2026-10-21): the customer was at the counter, so
+  // the receipt says how and when it was paid, and leaves out what does not
+  // apply to a piece they carried out — the $0.00 shipping row, the "Shipping
+  // method: Local Pickup" box and the pickup address + hours.
+  const inStoreMethod = /^in_store_(\w+)$/.exec(String(order.payment_method ?? ''))?.[1] as InStorePaymentMethod | undefined;
+  const inStore = Boolean(inStoreMethod);
+  const carriedOut = inStore && order.shipping_method === 'pickup';
   // Local pickup orders can still have an address on file (the checkout address
   // accordion lets a pickup buyer optionally provide one) — label it "Address"
   // rather than "Ship to" since nothing is actually being shipped.
@@ -180,7 +189,8 @@ export function buildInvoiceEmailContent(
 
     return {
       title: item.title_snapshot,
-      inventory: item.inventory_number || 'No inventory #',
+      // An unlisted piece (in-store / remote sale) has no number: say nothing rather than "No inventory #".
+      inventory: item.inventory_number || '',
       details: details || 'Estate jewelry item',
       price: formatCurrency(lineTotal),
       originalPrice: formatCurrency(lineSubtotal),
@@ -209,7 +219,7 @@ export function buildInvoiceEmailContent(
   // Laid out as a block since 2026-08-23 (owner request). The business name is
   // deliberately NOT a line: on an envelope it would be, but this is an email
   // from that same business, so it only pushed the street address down.
-  const pickup: InvoicePickupBlock | null = isPickup
+  const pickup: InvoicePickupBlock | null = isPickup && !carriedOut
     ? {
       label: 'Pickup Location',
       addressLines: [streetLine(), cityLine()],
@@ -221,10 +231,16 @@ export function buildInvoiceEmailContent(
     : null;
 
   // Sent from a no-reply address, so don't invite replies — direct to phone/text.
-  const note = paid ? 'Your payment has been received in full — thank you.' : '';
-  const contactNote = paid
-    ? `Call or text us at ${BUSINESS_PHONE} with any questions about pickup, delivery, or shipping.`
-    : `Call or text us at ${BUSINESS_PHONE} with any questions about payment, pickup, delivery, or shipping.`;
+  const note = paid
+    ? inStoreMethod
+      ? `Paid in full by ${IN_STORE_PAYMENT_LABELS[inStoreMethod] ?? 'in store'} on ${paperDateLine(order.created_at).split(' · ')[0] || 'the day of the sale'} — thank you.`
+      : 'Your payment has been received in full — thank you.'
+    : '';
+  const contactNote = carriedOut
+    ? `Call or text us at ${BUSINESS_PHONE} with any questions.`
+    : paid
+      ? `Call or text us at ${BUSINESS_PHONE} with any questions about pickup, delivery, or shipping.`
+      : `Call or text us at ${BUSINESS_PHONE} with any questions about payment, pickup, delivery, or shipping.`;
   const closing = 'Thank you, NaplesEstateJewelry.com';
   const shipToLines = formatAddressLines(order.shipping_address);
   const shipToLabel = isPickup ? 'Address' : 'Ship to';
@@ -264,6 +280,7 @@ export function buildInvoiceEmailContent(
       shipTo: shipToLines,
       shipToLabel,
       payment,
+      hideShipping: carriedOut,
     }),
     text: [
       greeting,
@@ -272,12 +289,12 @@ export function buildInvoiceEmailContent(
       ...(paid ? ['', 'PAYMENT RECEIVED — PAID IN FULL'] : []),
       '',
       'Items:',
-      ...(items.length > 0 ? items.map((item) => `- ${item.title} (${item.inventory}) - ${item.discount ? `${item.originalPrice}, line discount ${item.discount}, total ${item.price}` : item.price}`) : ['- No item details were attached.']),
+      ...(items.length > 0 ? items.map((item) => `- ${item.title}${item.inventory ? ` (${item.inventory})` : ''} - ${item.discount ? `${item.originalPrice}, line discount ${item.discount}, total ${item.price}` : item.price}`) : ['- No item details were attached.']),
       '',
       `Subtotal: ${totals.subtotal}`,
       ...(totals.discount ? [`Discount: ${totals.discount}`] : []),
       `Tax: ${totals.tax}`,
-      `Shipping: ${totals.shipping}`,
+      ...(carriedOut ? [] : [`Shipping: ${totals.shipping}`]),
       `Total: ${totals.total}`,
       ...(payment?.payUrl
         ? ['', `${payment.payLabel.toUpperCase()}:`, payment.payUrl, payment.payHint, ...(payment.taxHint ? [payment.taxHint] : [])]
@@ -341,6 +358,7 @@ function buildInvoiceEmailHtml({
   shipTo,
   shipToLabel,
   payment,
+  hideShipping,
 }: Omit<InvoiceEmailContent, 'html' | 'text' | 'invoiceNumber'> & {
   orderNumber: string;
   paid: boolean;
@@ -350,19 +368,25 @@ function buildInvoiceEmailHtml({
   shipTo: string[];
   shipToLabel: string;
   payment: InvoicePaymentBlock | null;
+  /** An in-store sale carried out of the showroom: no shipping row, no shipping box. */
+  hideShipping: boolean;
 }) {
+  // No photo, no box — but the row keeps the photo's space while any item has
+  // one, so every title lines up (owner, 2026-10-21: a flush-left row read as
+  // confusing on a phone). With no photo on any item the column goes.
+  const anyImage = items.some((item) => Boolean(item.imageUrl));
   const itemRows = items.length > 0
     ? items.map((item) => `
       <tr>
         <td style="padding:14px 0;border-bottom:1px solid #eadfbd;">
           <table role="presentation" cellspacing="0" cellpadding="0" width="100%">
             <tr>
-              <td width="72" valign="top" style="width:72px;padding-right:14px;">
-                ${item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}" width="58" height="58" style="display:block;width:58px;height:58px;object-fit:contain;border:1px solid #eadfbd;background:#fbfaf5;" />` : `<div style="width:58px;height:58px;border:1px solid #eadfbd;background:#fbfaf5;"></div>`}
-              </td>
+              ${anyImage ? `<td width="72" valign="top" style="width:72px;padding-right:14px;">
+                ${item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}" width="58" height="58" style="display:block;width:58px;height:58px;object-fit:contain;border:1px solid #eadfbd;background:#fbfaf5;" />` : ''}
+              </td>` : ''}
               <td valign="top">
                 <strong style="display:block;color:#1d1a14;font-size:15px;line-height:1.35;">${escapeHtml(item.title)}</strong>
-                <span style="display:block;margin-top:4px;color:#746b5b;font-size:12px;">${escapeHtml(item.inventory)}${item.details ? ` - ${escapeHtml(item.details)}` : ''}</span>
+                <span style="display:block;margin-top:4px;color:#746b5b;font-size:12px;">${escapeHtml([item.inventory, item.details].filter(Boolean).join(' - '))}</span>
               </td>
             </tr>
           </table>
@@ -403,15 +427,15 @@ function buildInvoiceEmailHtml({
                     ${totalRow('Subtotal', totals.subtotal)}
                     ${totals.discount ? totalRow('Discount', totals.discount) : ''}
                     ${totalRow('Tax', totals.tax)}
-                    ${totalRow('Shipping', totals.shipping)}
+                    ${hideShipping ? '' : totalRow('Shipping', totals.shipping)}
                     ${totalRow(paid ? 'Total Paid' : 'Total', totals.total, true)}
                   </table>
                   ${payment ? paymentBlockHtml(payment) : ''}
 
-                  <div style="margin:0 0 22px;padding:14px 16px;background:#fbfaf5;border:1px solid #eadfbd;color:#746b5b;font-size:13px;line-height:1.5;">
+                  ${hideShipping ? '' : `<div style="margin:0 0 22px;padding:14px 16px;background:#fbfaf5;border:1px solid #eadfbd;color:#746b5b;font-size:13px;line-height:1.5;">
                     Shipping method: ${escapeHtml(shippingMethod)}
                     ${shipTo.length > 0 ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid #eadfbd;"><strong style="display:block;color:#1d1a14;font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">${escapeHtml(shipToLabel)}</strong>${shipTo.map(escapeHtml).join('<br/>')}</div>` : ''}
-                  </div>
+                  </div>`}
 
                   ${note ? `<p style="margin:0 0 18px;font-size:15px;line-height:1.55;">${pinPhoneToOneLine(escapeHtml(note))}</p>` : ''}
                   ${pickup ? pickupBlockHtml(pickup) : ''}

@@ -1,27 +1,46 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
-import { waitForPrintImages, waitForPrintLayout } from '@/lib/print-images';
+import { useState } from 'react';
+import { PAPER_PAGE_CSS, paperReceiptDocument, type PaperReceipt } from '@/lib/order-receipt-paper';
+import { printPaperInFrame } from '@/lib/print-paper';
 
-const INVOICE_PRINT_SCALE = 0.98;
-
+/**
+ * Order → Print Invoice. Since 2026-10-21 this prints the ONE-PAGE paper
+ * receipt / invoice (`lib/order-receipt-paper.ts`, the owner's approved
+ * layout) instead of the email's HTML, which ran to two pages for one item.
+ * The paper is drawn on the page as it will print; Print sends it through a
+ * hidden frame (`lib/print-paper.ts`).
+ */
 export default function PrintInvoiceClient({
-  invoiceHtml,
-  invoiceNumber,
+  paper,
+  label,
   orderNumber,
   backHref,
 }: {
-  invoiceHtml: string;
-  invoiceNumber: string;
+  paper: PaperReceipt;
+  /** "Receipt NEJ-…" / "Invoice NEJ-…". */
+  label: string;
   orderNumber: string;
   backHref: string;
 }) {
-  const [showPreview, setShowPreview] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function print() {
+    setPrinting(true);
+    setError(null);
+    try {
+      await printPaperInFrame(paperReceiptDocument(paper));
+    } catch {
+      setError('Could not open printing. Try again, or use the browser’s own Print (Ctrl+P).');
+    } finally {
+      setPrinting(false);
+    }
+  }
 
   return (
     <>
-      {/* Page toolbar */}
       <div
         className="no-print"
         style={{
@@ -37,23 +56,16 @@ export default function PrintInvoiceClient({
           fontFamily: 'Arial, Helvetica, sans-serif',
         }}
       >
-        <Link
-          href={backHref}
-          style={{
-            fontSize: '0.82rem',
-            color: '#735c00',
-            fontWeight: 600,
-            textDecoration: 'underline',
-            textUnderlineOffset: '3px',
-          }}
-        >
+        <Link href={backHref} style={{ fontSize: '0.82rem', color: '#735c00', fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: '3px' }}>
           ← {orderNumber}
         </Link>
         <span style={{ color: '#d5c697' }}>|</span>
-        <span style={{ fontSize: '0.82rem', color: '#1d1a14', fontWeight: 700 }}>{invoiceNumber}</span>
+        <span style={{ fontSize: '0.82rem', color: '#1d1a14', fontWeight: 700 }}>{label}</span>
+        {error && <span role="alert" style={{ fontSize: '0.78rem', color: '#a32d2d' }}>{error}</span>}
         <button
           type="button"
-          onClick={() => setShowPreview(true)}
+          onClick={() => void print()}
+          disabled={printing}
           style={{
             marginLeft: 'auto',
             padding: '0.5rem 1.25rem',
@@ -66,110 +78,24 @@ export default function PrintInvoiceClient({
             cursor: 'pointer',
           }}
         >
-          Print Invoice
+          {printing ? 'Opening print…' : 'Print'}
         </button>
       </div>
 
-      {/* Invoice content on page */}
-      <div dangerouslySetInnerHTML={{ __html: invoiceHtml }} />
-
-      {/* Print preview overlay */}
-      {showPreview && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 100,
-            background: '#2b2519',
-            display: 'flex',
-            flexDirection: 'column',
-            overflowY: 'auto',
-          }}
-        >
-          {/* Preview toolbar — hidden on print */}
-          <div
-            className="no-print"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              padding: '0.75rem 1.25rem',
-              background: '#1e1b15',
-              borderBottom: '1px solid #3d3522',
-              position: 'sticky',
-              top: 0,
-              zIndex: 1,
-              fontFamily: 'Arial, Helvetica, sans-serif',
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => setShowPreview(false)}
-              style={{
-                fontSize: '0.82rem',
-                color: '#e5d48a',
-                fontWeight: 600,
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: 0,
-              }}
-            >
-              ← Back
-            </button>
-            <span style={{ color: '#55493a', fontSize: '0.82rem' }}>|</span>
-            <span style={{ fontSize: '0.82rem', color: '#c8b264', fontWeight: 700 }}>Print Preview — {invoiceNumber}</span>
-            <button
-              type="button"
-              onClick={async () => {
-                const win = window.open('', '_blank');
-                if (!win) return;
-                win.document.write(
-                  '<!DOCTYPE html><html><head><meta charset="utf-8">' +
-                  `<title>${invoiceNumber}</title>` +
-                  `<style>*{box-sizing:border-box;}body{margin:0;padding:0;zoom:${INVOICE_PRINT_SCALE};}@page{size:letter;margin:0.5in;}</style>` +
-                  `</head><body>${invoiceHtml}</body></html>`,
-                );
-                win.document.close();
-                win.onafterprint = () => win.close();
-                await waitForPrintImages(win);
-                await waitForPrintLayout(win);
-                win.focus();
-                win.print();
-              }}
-              style={{
-                marginLeft: 'auto',
-                padding: '0.5rem 1.4rem',
-                background: 'linear-gradient(135deg, #dcb336, #b5890c)',
-                color: '#ffffff',
-                fontWeight: 700,
-                fontSize: '0.82rem',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-              }}
-            >
-              Print Now
-            </button>
-          </div>
-
-          {/* Paper — the only thing that prints */}
-          <div
-            className="invoice-print-paper"
-            style={{
-              width: 'min(816px, calc(100% - 2rem))',
-              margin: '1.5rem auto 3rem',
-              boxShadow: '0 8px 40px rgba(0,0,0,0.45)',
-            }}
-            dangerouslySetInnerHTML={{ __html: invoiceHtml }}
-          />
+      {/* The paper as it prints: letter width, half-inch margins. */}
+      <div className="paper-wrap" style={{ background: '#e9e5da', padding: '1.5rem 0 3rem', minHeight: 'calc(100vh - 3.2rem)' }}>
+        <div className="paper-sheet" style={{ width: 'min(816px, calc(100% - 2rem))', margin: '0 auto', background: '#fff', padding: '48px', boxShadow: '0 8px 30px rgba(0,0,0,0.18)' }}>
+          <style>{paper.css}</style>
+          <div dangerouslySetInnerHTML={{ __html: paper.body }} />
         </div>
-      )}
-
+      </div>
+      {/* The browser's own Print (Ctrl+P) gives the same one page: no toolbar, no grey surround. */}
       <style>{`
+        ${PAPER_PAGE_CSS}
         @media print {
           .no-print { display: none !important; }
-          body { margin: 0; padding: 0; zoom: ${INVOICE_PRINT_SCALE}; }
+          .paper-wrap { background: none !important; padding: 0 !important; min-height: 0 !important; }
+          .paper-sheet { box-shadow: none !important; padding: 0 !important; width: auto !important; }
         }
       `}</style>
     </>

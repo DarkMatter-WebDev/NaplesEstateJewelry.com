@@ -4,7 +4,16 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-10-21**.
+> compaction. Last reconciled: **2026-10-21 (5)**.
+
+## Paper receipts are ONE page and are not the email: Record & print receipt and Print Invoice print `order-receipt-paper.ts`; the in-store email drops what a carried-out sale does not need (2026-10-21)
+
+- **Owner:** *"add a button to 'record and print reciept' alongside the button to record sale… we will try and adjust the format to all fit on one page most of the time"*; approved the mockup: *"Build it: the one-page paper receipt (also for Print Invoice on the order page), the in-store email fixes, and the Record & print receipt button."*
+- **The rule:** paper is built by `lib/order-receipt-paper.ts`, never by printing the email's HTML (that ran to 2 pages for 1 item). Header row · Sold to / Paid by / Delivery row · numbered items with small photos · totals · ONE footer line. One page for 1, 3, 9 items and a shipped sale (measured); ~11–12 items fit. Paid = RECEIPT, unpaid = INVOICE (Total due). Dates are Naples time.
+- **Printing is in place** (`lib/print-paper.ts`, a hidden frame): "Record & print" prints AFTER the save, when a new window would be blocked as a pop-up. A failed print never undoes a recorded sale.
+- **The email** is still the email: for an in-store sale carried out it says how and when it was paid and drops the $0.00 shipping row, the shipping box and the pickup block; "No inventory #" is gone everywhere. A shipped in-store sale and web orders keep their blocks.
+- **No photo, no box — but the space stays** (owner, 2026-10-21, twice): an item without a photo prints no placeholder box; its row keeps an EMPTY photo space while any item on the sale has a photo, on paper and in the email, so every title lines up (a flush-left row read as confusing on a phone). With no photo on any item the space goes.
+- Files: `STRUCTURE.md` → *Paper receipt*. Record `CHANGELOG.md` 2026-10-21 (5) + (6).
 
 ## Instant Sale: In-Store Sale becomes "Instant Sale" with two ways — In-store sale (several items, a photo each, Email copy) and Remote sale (an emailed invoice = an unpaid order with a private pay link) (2026-10-21)
 

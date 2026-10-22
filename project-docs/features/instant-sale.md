@@ -28,7 +28,11 @@
    the email on the order but send no receipt now (send it later from the order).
 4. **Pickup or ship**, **Paid by**, **Note** — unchanged. Shipping fees go by the
    items' total.
-5. Take the card on Zettle (the total is on the button), then **Record sale**.
+5. Take the card on Zettle (the total is on the button), then **Record sale** —
+   or **Record & print receipt**: it records the sale and opens the print
+   dialog with the one-page receipt (date, how it was paid, the items with
+   photos). **Print receipt** on the "Sale recorded" screen prints it again.
+   Email copy still follows its own box.
 
 ## Remote sale — email an invoice
 

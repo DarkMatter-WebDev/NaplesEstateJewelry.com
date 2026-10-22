@@ -28,6 +28,8 @@ import SaleItemsEditor, {
 } from '@/components/admin/instant-sale/SaleItemsEditor';
 
 import SaleDeliverySection, { type DeliveryMethod } from '@/components/admin/instant-sale/SaleDeliverySection';
+import { paperReceiptDocument, type PaperReceipt } from '@/lib/order-receipt-paper';
+import { printPaperInFrame } from '@/lib/print-paper';
 
 export type { InStoreProduct } from '@/components/admin/instant-sale/SaleItemsEditor';
 
@@ -38,6 +40,8 @@ type Recorded = {
   /** Was "Email copy" ticked (with an email)? */
   emailCopy: boolean;
   summary: string[];
+  /** "Record & print receipt": the one-page paper the route returned. */
+  paper: PaperReceipt | null;
   total: number;
   paidBy: InStorePaymentMethod;
   customer: string;
@@ -82,7 +86,8 @@ export default function InStoreSaleForm({
   const [customFee, setCustomFee] = useState('');
   const [paidBy, setPaidBy] = useState<InStorePaymentMethod>('zettle');
   const [note, setNote] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<'record' | 'print' | null>(null);
+  const [printNote, setPrintNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [recorded, setRecorded] = useState<Recorded | null>(null);
 
@@ -116,11 +121,26 @@ export default function InStoreSaleForm({
     setFirstName(''); setLastName(''); setPhone(''); setEmail(''); setEmailCopy(false); setPaidBy('zettle'); setNote('');
     setDelivery('pickup'); setMailingOn(false); setLine1(''); setLine2(''); setCity(''); setShipState(''); setZip('');
     setShipping('insured'); setCustomFee('');
-    setError(null); setRecorded(null);
+    setError(null); setRecorded(null); setPrintNote(null);
   }
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
+    await record(false);
+  }
+
+  /** Print the one-page receipt in place (a hidden frame — no pop-up to block). */
+  async function printReceipt(paper: PaperReceipt) {
+    setPrintNote(null);
+    try {
+      await printPaperInFrame(paperReceiptDocument(paper));
+    } catch {
+      setPrintNote('The sale is recorded, but printing did not open. Press Print receipt to try again.');
+    }
+  }
+
+  /** "Record sale", or "Record & print receipt" (owner, 2026-10-21) with `print`. */
+  async function record(print: boolean) {
     if (busy) return;
     setError(null);
     const problem = saleItemsProblem(items);
@@ -130,7 +150,8 @@ export default function InStoreSaleForm({
       setError(shipping === 'custom' ? 'Enter the shipping charge, e.g. 25.' : 'Express overnight is not offered at $5,000 and up. Pick another shipping charge.');
       return;
     }
-    setBusy(true);
+    setBusy(print ? 'print' : 'record');
+    setPrintNote(null);
     try {
       const res = await fetch('/api/admin/in-store-sales', {
         method: 'POST',
@@ -147,11 +168,14 @@ export default function InStoreSaleForm({
           },
           paidBy,
           note,
+          print,
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data.error ?? 'Could not record the sale.'); return; }
+      const paper: PaperReceipt | null = data.paper ?? null;
       setRecorded({
+        paper,
         orderId: data.orderId,
         orderNumber: data.orderNumber,
         receiptEmailed: Boolean(data.receiptEmailed),
@@ -170,10 +194,14 @@ export default function InStoreSaleForm({
           }
           : null,
       });
+      if (print) {
+        if (paper) void printReceipt(paper);
+        else setPrintNote('The sale is recorded, but the receipt could not be read back to print. Press Print receipt.');
+      }
     } catch {
       setError('Could not reach the server. Nothing was recorded — try again.');
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
@@ -214,7 +242,13 @@ export default function InStoreSaleForm({
           )}
         </div>
         <div className="grid gap-2 pt-1">
+          {printNote && <span className="text-xs text-center" role="alert" style={{ color: 'var(--color-error)' }}>{printNote}</span>}
           <button type="button" className="gold-button text-xs" onClick={clearAll}>New sale</button>
+          {recorded.paper ? (
+            <button type="button" className="outline-button text-xs" onClick={() => void printReceipt(recorded.paper as PaperReceipt)}>Print receipt</button>
+          ) : (
+            <Link href={`${adminBasePath}/orders/${recorded.orderId}/invoice`} target="_blank" rel="noopener noreferrer" className="outline-button text-xs">Print receipt</Link>
+          )}
           <Link href={`${adminBasePath}/orders/${recorded.orderId}`} className="outline-button text-xs">
             {recorded.shipTo ? 'Open order to ship it' : `Open order ${recorded.orderNumber}`}
           </Link>
@@ -366,9 +400,12 @@ export default function InStoreSaleForm({
           {error && (
             <div className="rounded-lg px-3 py-2 text-sm" role="alert" style={{ background: 'color-mix(in srgb, var(--color-error) 10%, transparent)', color: 'var(--color-error)' }}>{error}</div>
           )}
-          <div className="flex gap-2 pt-1">
-            <button type="button" className="outline-button text-xs" onClick={clearAll} disabled={busy}>Clear</button>
-            <button type="submit" className="gold-button text-xs flex-1" disabled={busy}>{busy ? 'Recording…' : totals ? `Record sale · ${formatCurrency(totals.total)}` : 'Record sale'}</button>
+          <div className="grid gap-2 pt-1">
+            <button type="submit" className="gold-button text-xs" disabled={Boolean(busy)}>{busy === 'record' ? 'Recording…' : totals ? `Record sale · ${formatCurrency(totals.total)}` : 'Record sale'}</button>
+            <button type="button" className="outline-button text-xs" style={{ borderWidth: '1.5px', borderColor: '#b5890c' }} disabled={Boolean(busy)} onClick={() => void record(true)}>
+              {busy === 'print' ? 'Recording…' : 'Record & print receipt'}
+            </button>
+            <button type="button" className="text-xs underline justify-self-start" style={hintStyle} onClick={clearAll} disabled={Boolean(busy)}>Clear</button>
           </div>
         </section>
         <section className="rounded-[1.25rem] border bg-white p-5 grid gap-2" style={cardStyle}>
