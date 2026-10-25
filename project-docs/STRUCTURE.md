@@ -1,7 +1,7 @@
 # Structure And Build Integrity
 
 > Canonical project map and single sources of truth. Last reconciled:
-> **2026-10-24** (Text Deals detail boxes added to the text-alerts row). Before that, **2026-10-22** (the Native American guide added to the guide-pages row). Before that, **2026-10-21** (Instant Sale: the in-store row rewritten, a Remote sale row added). Before that, **2026-10-18** (Offers "Item details" added to the Make an Offer row). Before that, **2026-10-15** (Make an Offer on the site shop: one new row). Before that, **2026-10-14** (eBay Best Offer per item: one new row; before that,
+> **2026-10-25** (product feeds row: the Meta catalog channel + JPEG image route). Before that, **2026-10-24** (Text Deals detail boxes added to the text-alerts row). Before that, **2026-10-22** (the Native American guide added to the guide-pages row). Before that, **2026-10-21** (Instant Sale: the in-store row rewritten, a Remote sale row added). Before that, **2026-10-18** (Offers "Item details" added to the Make an Offer row). Before that, **2026-10-15** (Make an Offer on the site shop: one new row). Before that, **2026-10-14** (eBay Best Offer per item: one new row; before that,
 > 2026-10-09, buy receipt drafts and "Fill form from ID": two new rows; before that,
 > 10-07, text-deal photos: `deal-photos.ts` added to the text-alerts row).
 
@@ -122,6 +122,7 @@ let additional loose app assets accumulate at root.
 | Etsy integration | `src/lib/etsy/`, Etsy API routes, and `features/etsy-sync.md` |
 | eBay integration | `src/lib/ebay/`, eBay API routes, and `features/ebay-sync.md` |
 | Instagram posting | `src/lib/instagram/`, `/api/admin/instagram/*`, and `features/instagram-posting.md` |
+| Product feeds — Google Merchant Center AND the Meta catalog (Instagram shop) | ONE route `src/app/api/merchant-feed/route.ts` (Google = no parameter; Meta = `?channel=meta`: adds `g:brand`, images via the converter); Meta rules `src/lib/meta-feed.ts`; JPEG converter `src/app/feed-image/[id]/[file]/route.ts` (token = hash of the stored URL; outside `/api/*` and the locale proxy); domain tag `verification.other` in `src/app/layout.tsx`; guard `lib/__tests__/meta-feed.test.ts`. Meta catalog `28466931839669076` in portfolio `1236237339568680`. Rule `DECISIONS.md` → *"The Meta catalog (Instagram shop) reads the SAME merchant feed"* |
 | Facebook posting | `src/lib/facebook/`, `/api/admin/facebook/*`, and `features/facebook-posting.md` |
 | Deep Field Gallery product push (outbound, one-way) | `src/lib/deepfield/{payload,sync}.ts`, hooked from `app/actions/admin-products.ts` + `api/paypal/{capture-order,webhook}`, and `features/deepfield-sync.md`. No API route of its own — NEJ is the sender, never a receiver |
 | Social captions/card/renditions (shared by both channels) | `src/lib/instagram/{mapping,card,images,backdrop}.ts` + fonts in `src/assets/fonts` |

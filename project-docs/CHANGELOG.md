@@ -1,6 +1,67 @@
 
 # Changelog
 
+## 2026-10-25 (7) — Instagram shop, part 1: Meta catalog CREATED (empty), `.com` ADDED to Meta Domains (not verified yet), Meta feed variant + JPEG image route + verification tag BUILT + STAGED, not pushed; no SQL, no env vars
+
+- Owner: *"Yes, set it up: accept Meta's catalog terms, create the catalog with the hourly feed, add and verify the .com with the meta tag, and add the Meta feed brand line. Stop before submitting the shop for review."*
+- **Done in Meta** (desk Chrome, business portfolio "Naples Estate Jewelry" `1236237339568680`):
+  - Business settings → Domains: **`naplesestatejewelry.com` added** (ID `970865445568594`), "Not Verified". The meta-tag method gave token `6qraoa3bc9aa19chfta5mqr1cpbkkq`, which is public by design.
+  - Commerce Manager: **catalog "Naples Estate Jewelry Products"** created (ID `28466931839669076`), type Online products. Catalog terms accepted on the owner's yes. All three "Connect your data" dataset switches were ON by default and were switched **OFF**: AI Social Manager `2484188215427109`, AiSocialsv2 `1513151826605929`, Naples Estate Jewelry Social `1551269126645242`. The site has no Meta pixel. Products: "Add products later".
+- **Found:** Meta's catalog takes JPEG/PNG photos only, and every product photo is WebP by design. Without a fix, every item would be rejected for its image.
+- **Built:**
+  - `src/lib/meta-feed.ts` (NEW): `parseFeedChannel`, `metaFeedBrand` (the product's brand, else "Naples Estate Jewelry", ≤ 100 characters), `feedImageToken` (10 hex characters of SHA-256 over the stored URL), `feedImagePath`, `parseFeedImageFile`, `productFeedImages`, `META_FEED_MAX_IMAGES` 11.
+  - `src/app/api/merchant-feed/route.ts`: `?channel=meta` adds `<g:brand>` and points every image at `/feed-image/<id>/<n>-<token>.jpg`. Without the parameter the output is unchanged: dev Google output = production output, prices aside.
+  - `src/app/feed-image/[id]/[file]/route.ts` (NEW): reads the product's photo at that position. The token must match the hash of the photo stored there, else 404 (no open proxy, and a replaced photo gets a new address). It fetches the photo and converts it with sharp (rotate, ≤ 1600 px inside, flatten white, JPEG q85 mozjpeg) through `toOwnedBuffer`, then answers `Cache-Control: public, max-age=31536000, immutable`. It sits outside the `/api/*` edge rate limit, and `.jpg` paths skip the locale proxy.
+  - `src/app/layout.tsx`: `verification.other['facebook-domain-verification']` next to the Google token.
+  - `src/lib/__tests__/meta-feed.test.ts` (NEW, 10 tests).
+- **Checked on the dev server (3007):** Meta feed 200, 61 items, 61 `g:brand`, 0 `.webp` links. All 61 main images → 200 `image/jpeg` (e.g. 1200×900 progressive), immutable cache header. A wrong token → 404. The homepage `<head>` carries the meta tag.
+- Gate: `npx tsc --noEmit` 0 · `npm run lint` 0 errors (4 old `<img>` warnings) · `npx vitest run --maxWorkers=4` **1966/1966** (172 files) · `npm run build` 0 · prerender 92 = 43 EN + 43 ES + 6 · no `.next/cache/turbopack`.
+- **After the owner's push (Claude, desk Chrome):** Meta Domains → Verify domain; catalog → Data sources → scheduled feed `https://naplesestatejewelry.com/api/merchant-feed?channel=meta`, hourly, replace; read the first upload's issues. Then the owner connects the catalog to Instagram and submits the shop for review.
+
+## 2026-10-25 (6) — 📖 Google Merchant Center read (read-only): the feed is LIVE and healthy — 60/60 Approved; Meta Commerce Manager looked at (nothing created); no code change
+
+- Owner asked whether the Google product feed was ever really used, or had stopped syncing and been abandoned. Answer: neither. It has run since 2026-08-31, and nobody had checked it since then.
+- **Merchant Center 5836867944** (desk Chrome, info@surettesystems.com; the owner signed in again): the data source "Website Feed (naplesestatejewelry.com)", File (URL) → `/api/merchant-feed`, last updated **Oct 25, 2026 00:00 EDT** (the daily fetch is running), **60 products**, United States, English. The "Naples Estate Jewelry · Merchant API" source has 0 products (unused). Overview: **60 Approved · 0 Limited · 0 Not approved · 0 Under review**; *"No account-level or product-level issues"*; organic product clicks **+16.7%** over 28 days (top product: the Kurt Goldschmidt cigar band ring). Store quality: overall Good, shipping cost Fair, **return cost "Incomplete"**. Warnings only (still approved): Missing age group / color / gender on 41 products.
+- ⛔ **Never click "Add all products found" (76).** That is the "Found by Google" crawl the feed replaced on 08-31: both languages of every product, plus sold pages.
+- Production feed read by Claude: 200, **61 items**, 0 skipped (one more than Google's midnight copy). 11 of them spot-checked against their live product pages: price and InStock matched on all 11.
+- **Meta Commerce Manager** (business portfolio "Naples Estate Jewelry" `1236237339568680`): no catalog yet. The Facebook Page and Instagram `naples_estate_jewelry` are in the portfolio. Domains verified: `naplesestatejewelry.co` and `naplesestatejewelryy.etsy.com`, **NOT `.com`**. Proposed to the owner and NOT started: a catalog that reads the same feed every hour (replace mode), verify `.com`, add a brand for Meta. Waiting on the owner's yes.
+
+## 2026-10-25 (5) — session CLOSED; shop sort + "Products per page" STAGED, not pushed (owner will push later today); no SQL, no env vars
+
+- Owner: *"will push later today.,. update docs and end session"*. Nothing checked in production (not asked).
+- **The session (10-24 → 10-25):**
+  - Text Deals form (2026-10-24 (1)): photos first, Comparable price, Metal + Purity, Size / length, Description, built picture line.
+  - The text as a list, layout B with "Our price" (2026-10-24 (2)).
+  - SQL run (2026-10-25 (1)); DEPLOYED by the owner (2026-10-25 (2), "form looks good").
+  - Shop toolbar sort box (2026-10-25 (3)) and "Products per page" (2026-10-25 (4)) back to their original small bold size on phones and tablets, with "Per page" beside its box. STAGED, not pushed.
+- **Open:** the push of (3) + (4), then the owner's iPhone look at `/shop`; the Text Deals test text and the first real deal.
+- Last gate: `npx tsc --noEmit` 0 · `npm run lint` 0 errors (4 old `<img>` warnings) · `npx vitest run` **1956/1956** (171 files) · `npm run build` 0 · prerender 92 = 43 EN + 43 ES + 6.
+- Folder: no stray files (no `zz-*`, no logs); `next-env.d.ts` / `tsconfig.tsbuildinfo` are generated and excluded from staging. Mockups, render scripts and build logs stayed in the session scratchpad. The dev server was left running on 3007.
+
+## 2026-10-25 (4) — Shop "Products per page" box: same small-label treatment + "Per page" beside its box on phones — BUILT + STAGED with (3), not pushed; no SQL, no env vars
+
+- Owner: *"Yes, give the Products per page box the same treatment as the sort box."* + mid-build *"make sure the 'per page' label is right next to the number selection.. currently they are far apart"*.
+- `components/shop/ShopPagination.tsx`: the number is a label (`.shop-pagination-size-value`, `aria-hidden`) + ▾ inside `.shop-pagination-size-control` (the old bordered white box: 2.45rem tall, 4.25rem min, 0.82rem / 800, `letter-spacing: normal` and `text-transform: none` so the row's uppercase label styling does not reach the number); the real select lies over it at `opacity: 0` (16px on touch screens, no iOS zoom); focus ring on the box via `:has(select:focus-visible)`.
+- **The gap:** the ≤ 760 px rule `.shop-pagination-size { justify-content: space-between }` pushed "Per page" to the left edge and the box to the right of the full-width row → now `justify-content: center`, so the pair sits together (0.55rem gap), centred like the count and page buttons above.
+- **Measured on dev:** 375 px touch — "Per page" 117–181, box 190–258 (9 px apart, centred in 31–344), "24" 13.12px / 800, select 16px / opacity 0, a tap at the number lands on the select; choosing 48 → `?perPage=48`, box shows 48, grid 48 pieces. `/es/shop?perPage=96` at 320 px — "Por página 96 ▾", 9 px apart, scroll width 320, tap lands on the select. Desktop 1202 px — right end of the bar, box 68 × 39 px (= the old 4.25rem × 2.45rem), 13.12px.
+- Guard `lib/__tests__/shop-sort-select.test.ts` +2 (5).
+- Gate: `npx tsc --noEmit` 0 · `npm run lint` 0 errors (4 old warnings) · `npx vitest run` **1956/1956** (171 files) · `npm run build` 0 · 92 = 43 + 43 + 6. ⛔ Not seen on a real iPhone / iPad.
+
+## 2026-10-25 (3) — Shop toolbar sort box back to its original small size on phones and tablets (option B), iOS no-zoom kept — BUILT + STAGED, not pushed; no SQL, no env vars
+
+- Owner: *"on the mobile viewport … the text and font style of the label in the 'sort by' field is a little bit too large … Inspect it first and see what drifted."* Measured on dev at 375 px with touch emulation: toolbar sort **16px / weight 800**; its "SORT" label 9.3px; "60 of 142 pieces" 12px / 400; search and every filter-drawer field 16px / 400. **What drifted:** the sitewide iOS no-zoom rule (`CHANGELOG.md` 2026-09-20 (10), `@media (hover: none) { :is(input, select, textarea)… { font-size: 1rem !important } }`) raised the sort box from its designed 0.78rem (12.48px) to 16px; unlike the other fields it is weight 800, so it became the heaviest text in the toolbar. Three looks shown (today / A 16px normal / B original) → *"Build option B: the sort box back to its original small size, keeping the iPhone zoom fix."*
+- **Built:** `components/shop/ShopSortSelect.tsx` (gallery appearance) shows the choice in a label (`.shop-gallery-sort-value`, `aria-hidden`) + a ▾ (`AppIcon arrow_drop_down`) and lays the real `<select>` over them, invisible (`position: absolute; inset: 0; opacity: 0`), so the select stays 16px on touch screens (no zoom) while the words keep 0.78rem / 800. Styles in `app/[locale]/shop/(list)/shop-page-renderer.tsx`: `.shop-gallery-sort span` → `.shop-gallery-sort-label`; `.shop-gallery-sort select` → `.shop-gallery-sort-control` (+ `-value`, `-chevron`, the overlay select); the ≤767 / ≤440 px rules retargeted to the control; a focus ring via `.shop-gallery-sort:has(select:focus-visible)` (the old select had `outline: none`). The filter-drawer Sort (appearance `filter`) is unchanged.
+- **Tablet (owner, mid-build: "apply the change … to tablet view too.. or does the change already take effect on tablet too?"):** it already does — one size rule, no width media query; an iPad matches `(hover: none)` like a phone, so its select is 16px and its words 0.78rem.
+- **Measured on dev:** 375 px touch — words 12.48px / 800, select 16px / opacity 0 covering the control, a tap at the words lands on the select, no sideways scroll; choosing "Price: low to high" → `?sort=price-asc` and the label follows. `/es/shop` at 320 px — "Ordenar · Peso: mayor a menor", not clipped, scroll width 320. 768 px — words 12.48px / 800, tap lands on the select. Desktop 1202 px — 12.48px / 800, control 184px (= the old 11.5rem), choice left, ▾ right. ⛔ Not seen on a real iPhone / iPad (the picker opening and no zoom are the owner's check).
+- NEW guard `lib/__tests__/shop-sort-select.test.ts` (3).
+- Gate: `npx tsc --noEmit` 0 · `npm run lint` 0 errors (4 old warnings) · `npx vitest run` **1954/1954** (171 files) · `npm run build` 0 · 92 = 43 + 43 + 6.
+- ℹ️ The "Products per page" box at the foot of the grid has the same 16px-bold look on phones; not changed (not asked).
+
+## 2026-10-25 (2) — Text Deals form + list-format text DEPLOYED (owner) — docs only
+
+- Owner: *"pushed and deployed.. form looks good.. will send test txt later"*. Live (owner's word; Claude did not check production — behind the sign-in, not asked): 2026-10-24 (1) the new form (photos first, Comparable price, Metal + Purity, Size / length, Description, built picture line) and (2) the text as a list (layout B, "Our price"); SQL run 10-25 (1).
+- ◻ Open: the owner's test text on the iPhone, then the first real deal (`TASKS.md` top block, item 3).
+
 ## 2026-10-25 (1) — `supabase/text-deals-details-2026-10.sql` RUN (owner); staging re-verified for the push — docs only
 
 - Owner: *"ran sql, got this... good to deploy?"* with the closing check: `comparable_price_text` text YES · `description` text NO · `metal` text NO · `purity` text NO · `size_text` text NO — exactly the file's five columns.

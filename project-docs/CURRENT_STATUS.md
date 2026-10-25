@@ -2,7 +2,36 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-10-24 (1)**.
+> in `DECISIONS.md`. Last reconciled: **2026-10-25 (7)**.
+
+## Start Here (2026-10-25 (7) — 🟡 Instagram shop part 1: Meta catalog CREATED (empty) + `.com` added to Meta; Meta feed + JPEG image route + verification tag BUILT + STAGED, not pushed; no SQL, no env vars)
+
+- 🟡 **Waiting for the owner's push** (one push also carries the 10-25 (3)+(4) shop sort / "Products per page" changes below). Record `CHANGELOG.md` 2026-10-25 (7); rule `DECISIONS.md` top entry; steps `TASKS.md` top block.
+- After the push, Claude: verify `.com` in Meta Domains, add the hourly Replace feed `…/api/merchant-feed?channel=meta` to catalog `28466931839669076`, read the first upload. Then the owner submits the shop for review (Claude stops before that).
+- ✅ Google Merchant Center read 10-25: 60/60 Approved, daily fetch running (`CHANGELOG.md` 2026-10-25 (6)).
+- Gate: `tsc` 0 · lint 0 errors · **1966/1966** (172 files) · build 0 · 92 = 43 + 43 + 6.
+
+## Start Here (2026-10-25 (5) — session CLOSED; 🟡 the shop sort + "Products per page" changes are STAGED, not pushed (owner: "will push later today"); no SQL, no env vars)
+
+- 🟡 **Waiting for the owner's push:** 2026-10-25 (3) + (4) — the `/shop` toolbar sort box and the "Products per page" box back to their original small bold size on phones/tablets (real 16px select laid invisibly over a label, so no iOS zoom), and "Per page" beside its box on phones. Staging holds both (synced, follow-up dry run 0). After the push: the owner's iPhone check (`TASKS.md` top block, items 2–3).
+- 🟢 **Deployed earlier this session:** the Text Deals form (photos first, Comparable price, Metal + Purity, Size, Description) + the list-format text; SQL run. ◻ Open: the owner's test text on the iPhone, then the first real deal (`TASKS.md` 2026-10-24 block, item 3).
+- Last gate: `tsc` 0 · lint 0 errors (4 old `<img>` warnings) · **1956/1956** (171 files) · build 0 · 92 = 43 + 43 + 6. Record `CHANGELOG.md` 2026-10-25 (5).
+- Still open from before (unchanged): the ~Nov 1 GBP Offer post renewal; the ~Nov 7 Google Ads read; Search Console ~Nov 12–19 for the Native American guide.
+
+## Start Here (2026-10-25 (4) — 🟡 shop sort box + "Products per page" box back to their original small size on phones/tablets, "Per page" beside its box — BUILT + STAGED, not pushed; no SQL, no env vars)
+
+- (4) on top of (3) below: the "Products per page" box got the same treatment, and on phones "Per page" now sits right beside its box, centred (`CHANGELOG.md` 2026-10-25 (4)). Gate: `tsc` 0 · lint 0 errors · **1956/1956** · build 0 · 92. One push carries both.
+
+## Start Here (2026-10-25 (3) — 🟡 shop sort box back to its original small size on phones/tablets BUILT + STAGED, not pushed; no SQL, no env vars)
+
+- 🟡 **Built and staged** (`CHANGELOG.md` 2026-10-25 (3); rule `DECISIONS.md` top entry; `TASKS.md` top): the `/shop` toolbar's sort box ("Inventory order") reads 0.78rem bold again on phones and tablets — the choice is a label with the real 16px select laid over it, invisible, so iPhone still does not zoom. Desktop unchanged.
+- Gate: `tsc` 0 · lint 0 errors · **1954/1954** · build 0 · 92 = 43 + 43 + 6. ⛔ Not seen on a real iPhone / iPad.
+- The 10-25 (2) block below (Text Deals deployed; the owner's test text) still applies.
+
+## Start Here (2026-10-25 (2) — 🟢 Text Deals form + list-format text DEPLOYED (owner), SQL run; nothing staged-but-unpushed except docs; no env vars)
+
+- 🟢 Owner: *"pushed and deployed.. form looks good.. will send test txt later"* (`CHANGELOG.md` 2026-10-25 (2)). Claude did not check production (behind the sign-in; not asked).
+- ◻ Open: the owner's test text on the iPhone (the list layout), then the first real deal (`TASKS.md` top block, item 3). Where the blocks below say "STAGED" / "not pushed" / "SQL to run", read "deployed" / "run".
 
 ## Start Here (2026-10-24 (2) — 🟡 Text Deals form changes + the text as a LIST (layout B, "Our price") BUILT + STAGED, not pushed; ⛔ SQL `supabase/text-deals-details-2026-10.sql` to run BEFORE the push; no env vars)
 

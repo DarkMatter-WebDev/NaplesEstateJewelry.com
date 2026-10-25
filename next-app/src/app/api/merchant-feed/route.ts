@@ -2,6 +2,13 @@ import { createClient } from '@supabase/supabase-js';
 import { fetchSpotData } from '@/lib/spot-price';
 import { getProductPriceValue } from '@/lib/pricing';
 import type { Product } from '@/types/product';
+import {
+  feedImagePath,
+  META_FEED_MAX_IMAGES,
+  metaFeedBrand,
+  parseFeedChannel,
+  productFeedImages,
+} from '@/lib/meta-feed';
 
 // Google Merchant Center product feed (RSS 2.0 + g: namespace), replacing the
 // crawl-based "products found by Google" source (2026-08-31). Why a feed: the
@@ -23,6 +30,12 @@ import type { Product } from '@/types/product';
 // ⚠️ If the site's shipping tiers or this feed's shape ever change, remember
 // Merchant Center's shipping table is configured by hand and nothing syncs it
 // (TASKS 2026-08-30).
+//
+// `?channel=meta` (2026-10-25) is the same feed for the Meta catalog behind
+// the Instagram shop: it adds `g:brand` (Meta requires it) and points every
+// image at the JPEG converter, since Meta does not take WebP. Without the
+// parameter the output is byte-for-byte what Merchant Center has always read.
+// See lib/meta-feed.ts.
 
 export const dynamic = 'force-dynamic';
 
@@ -30,12 +43,12 @@ const BASE = 'https://naplesestatejewelry.com';
 
 /** Everything the feed and its pricing path actually read. */
 const FEED_COLUMNS =
-  'id, status, title, description, category, image_urls, images, inventory_number, '
+  'id, status, title, description, category, brand, image_urls, images, inventory_number, '
   + 'price_mode, pricing_multiplier, gram_weight, weight_grams, purity, manual_price_label, sold_price';
 
 type FeedRow = Pick<
   Product,
-  | 'id' | 'status' | 'title' | 'description' | 'category' | 'image_urls' | 'images'
+  | 'id' | 'status' | 'title' | 'description' | 'category' | 'brand' | 'image_urls' | 'images'
   | 'inventory_number' | 'price_mode' | 'pricing_multiplier' | 'gram_weight'
   | 'weight_grams' | 'purity' | 'manual_price_label' | 'sold_price'
 >;
@@ -66,7 +79,8 @@ function feedId(row: FeedRow): string | null {
   return row.id.length <= 50 ? row.id : null;
 }
 
-export async function GET(): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
+  const channel = parseFeedChannel(new URL(request.url).searchParams.get('channel'));
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -107,9 +121,12 @@ export async function GET(): Promise<Response> {
       return [];
     }
 
-    const imageUrls = (row.image_urls?.length ? row.image_urls : row.images ?? [])
-      .filter((url): url is string => typeof url === 'string' && url.length > 0)
-      .map(absoluteUrl);
+    const sourceUrls = productFeedImages(row);
+    const imageUrls = channel === 'meta'
+      ? sourceUrls
+        .slice(0, META_FEED_MAX_IMAGES)
+        .map((url, index) => `${BASE}${feedImagePath(row.id, index, url)}`)
+      : sourceUrls.map(absoluteUrl);
     if (imageUrls.length === 0) {
       // A listing without a usable image would be disapproved anyway.
       skippedNoImage += 1;
@@ -135,6 +152,7 @@ export async function GET(): Promise<Response> {
         '      <g:availability>in_stock</g:availability>',
         `      <g:price>${price.toFixed(2)} USD</g:price>`,
         '      <g:condition>used</g:condition>',
+        channel === 'meta' ? `      <g:brand>${xmlEscape(metaFeedBrand(row.brand))}</g:brand>` : '',
         '      <g:identifier_exists>no</g:identifier_exists>',
         '    </item>',
       ].filter(Boolean).join('\n'),

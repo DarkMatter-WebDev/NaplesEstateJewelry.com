@@ -4,7 +4,23 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-10-24 (1)**.
+> compaction. Last reconciled: **2026-10-25 (7)**.
+
+## The Meta catalog (Instagram shop) reads the SAME merchant feed with `?channel=meta`: brand added, photos converted to JPEG on request; Google's feed never changes for Meta (2026-10-25)
+
+- **Owner:** wants product links on Instagram reels; *"Yes, set it up: accept Meta's catalog terms, create the catalog with the hourly feed, add and verify the .com with the meta tag, and add the Meta feed brand line. Stop before submitting the shop for review."*
+- **One feed, two channels.** `/api/merchant-feed` stays the only product feed (available pieces only, canonical price, fail-closed 503). `?channel=meta` adds `g:brand` (Meta requires it: the product's brand, else "Naples Estate Jewelry") and swaps image links for `/feed-image/<id>/<n>-<token>.jpg`. ⛔ Never a second feed route or a stored JPEG copy of the catalog. ⛔ Never add `g:brand` to Google's output: unbranded vintage stays `identifier_exists: no`.
+- **Photos:** Meta takes JPEG/PNG, the site is WebP (Media rule unchanged). `/feed-image` converts on request and is cached for a year. The token = a hash of the stored URL, so a replaced photo gets a new address and an unissued URL is a 404. ⛔ Never let it fetch a URL from the request. ⛔ Never move it under `/api/` (the 180/min edge limit would throttle Meta's image fetcher).
+- **Meta settings:** scheduled fetch **hourly, Replace**, so a sold piece leaves within the hour. No Meta pixel / dataset is connected (the site has none; the defaults were switched off).
+- **Domain:** verified by the `facebook-domain-verification` meta tag in `app/layout.tsx` (owner chose the meta tag over a GoDaddy TXT). ⛔ Don't remove it while the catalog is in use.
+- Guard `lib/__tests__/meta-feed.test.ts`. Record `CHANGELOG.md` 2026-10-25 (7).
+
+## A select that must LOOK smaller than 16px on a phone shows its choice in a label and lays the real select over it, invisible — never a smaller select (2026-10-25)
+
+- **Owner:** *"Build option B: the sort box back to its original small size, keeping the iPhone zoom fix."* (Option A was the 16px select at normal weight.)
+- **The rule:** the sitewide 16px touch-screen rule ("Accidental zoom" entry) stays absolute. Where a design needs smaller words in a select (the shop toolbar sort, 0.78rem / 800), the words are a `aria-hidden` label + ▾ and the real `<select>` covers the box at `opacity: 0` — it keeps 16px, so iOS does not zoom, and a tap opens the phone's own picker. A visible focus ring goes on the wrapper (`:has(select:focus-visible)`). Applies at every width; iPads match `(hover: none)` too.
+- Pattern: `components/shop/ShopSortSelect.tsx` + `.shop-gallery-sort-control` in `shop-page-renderer.tsx`; the same for "Products per page" in `components/shop/ShopPagination.tsx` (`.shop-pagination-size-control`, owner: *"give the Products per page box the same treatment"*). Guard `lib/__tests__/shop-sort-select.test.ts`. Record `CHANGELOG.md` 2026-10-25 (3) + (4).
+- On a phone a field's label sits beside its box, never pushed to the far edge of a full-width row (owner, 10-25: *"make sure the 'per page' label is right next to the number selection"*).
 
 ## Text deals: photos can go first; Metal + Purity are must-pick and build the line on the pictures; the comparable price is words only, "Comparable retail"; the text is a LIST (layout B) up to 1,500 characters (2026-10-24)
 

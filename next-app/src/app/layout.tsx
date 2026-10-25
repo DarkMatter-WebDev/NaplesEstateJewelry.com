@@ -69,8 +69,15 @@ export const metadata: Metadata = {
   // property and the new https://naplesestatejewelry.com property (add the .com
   // property in Search Console after the domain switch deploys). Do not remove —
   // Search Console re-checks this tag periodically to keep properties verified.
+  // Meta (2026-10-25): verifies naplesestatejewelry.com in the "Naples Estate
+  // Jewelry" business portfolio (Business settings → Domains), which the
+  // Instagram shop / product catalog requires. Public by design; Meta re-checks
+  // it, so do not remove it while the catalog is in use.
   verification: {
     google: 'mOpCYI06DOHizh2_SK1_iWJ967utv2WO4T3OFmbLSsA',
+    other: {
+      'facebook-domain-verification': '6qraoa3bc9aa19chfta5mqr1cpbkkq',
+    },
   },
 };
 

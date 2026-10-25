@@ -164,19 +164,27 @@ export default function ShopPagination({
         )}
       </div>
 
+      {/* Same treatment as the toolbar sort box (owner, 2026-10-25): the number
+          is a label and the real <select> lies over it, invisible, so it can
+          stay 16px on touch screens (the sitewide iOS no-zoom rule) while the
+          box keeps its original 0.82rem bold. A tap opens the phone's picker. */}
       <label
         className="shop-pagination-size"
       >
         <span>{isEs ? 'Por página' : 'Per page'}</span>
-        <select
-          value={perPage}
-          onChange={(event) => updatePerPage(event.target.value)}
-          aria-label={isEs ? 'Productos por página' : 'Products per page'}
-        >
-          {PER_PAGE_OPTIONS.map((option) => (
-            <option key={option} value={option}>{option}</option>
-          ))}
-        </select>
+        <span className="shop-pagination-size-control">
+          <span className="shop-pagination-size-value" aria-hidden="true">{perPage}</span>
+          <AppIcon name="arrow_drop_down" className="shop-pagination-size-chevron" strokeWidth={2.4} />
+          <select
+            value={perPage}
+            onChange={(event) => updatePerPage(event.target.value)}
+            aria-label={isEs ? 'Productos por página' : 'Products per page'}
+          >
+            {PER_PAGE_OPTIONS.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+        </span>
       </label>
       <style>{`
         .shop-pagination {
@@ -242,21 +250,46 @@ export default function ShopPagination({
           text-transform: uppercase;
           letter-spacing: 0.1em;
         }
-        .shop-pagination-size select {
+        /* The box people see (the number + a chevron); the real select lies
+           over it at opacity 0 and is free to be 16px on touch screens. */
+        .shop-pagination-size-control {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 0.35rem;
           min-height: 2.45rem;
           min-width: 4.25rem;
           border: 1px solid rgba(115, 92, 0, 0.18);
           border-radius: 7px;
           background: #ffffff;
           color: var(--color-on-surface);
+          cursor: pointer;
           font-family: var(--font-label);
           font-size: 0.82rem;
           font-weight: 800;
-          outline: none;
-          padding: 0 2rem 0 0.85rem;
+          letter-spacing: normal;
+          text-transform: none;
+          padding: 0 0.55rem 0 0.85rem;
           box-shadow: 0 8px 18px rgba(42, 34, 12, 0.04);
         }
-        .shop-pagination-size select:focus-visible {
+        .shop-pagination-size-chevron {
+          flex: none;
+          width: 0.95rem;
+          height: 0.95rem;
+        }
+        .shop-pagination-size-control select {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          margin: 0;
+          opacity: 0;
+          border: 0;
+          cursor: pointer;
+          appearance: none;
+        }
+        .shop-pagination-size-control:has(select:focus-visible) {
           border-color: ${GOLD};
           box-shadow: 0 0 0 3px rgba(115, 92, 0, 0.12);
         }
@@ -328,8 +361,10 @@ export default function ShopPagination({
             justify-content: center;
             justify-self: stretch;
           }
+          /* "Per page" sits right beside its box, centred like the rows above
+             (owner, 2026-10-25: they were pushed to opposite edges). */
           .shop-pagination-size {
-            justify-content: space-between;
+            justify-content: center;
           }
         }
         @media (max-width: 440px) {

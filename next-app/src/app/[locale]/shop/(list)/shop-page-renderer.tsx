@@ -1146,13 +1146,13 @@ export async function renderShopPage({
                 justify-content: space-between;
               }
               /* Higher specificity so this wins over the later base
-                 .shop-gallery-sort select min-width rule (min 11.5rem / 56vw) —
-                 otherwise the select can't shrink and overflows beside the
-                 piece count in the toolbar. */
-              .shop-gallery-toolbar .shop-gallery-sort select {
+                 .shop-gallery-sort-control min-width rule (min 11.5rem / 56vw) —
+                 otherwise the box can't shrink and overflows beside the
+                 piece count in the toolbar. The choice sits at the right end. */
+              .shop-gallery-toolbar .shop-gallery-sort-control {
                 min-width: 0;
                 flex: 1;
-                text-align: right;
+                justify-content: flex-end;
               }
               /* Merge the hero and the filter card into one seamless card */
               .modern-shop-hero {
@@ -1239,7 +1239,7 @@ export async function renderShopPage({
               font-family: var(--font-label);
               padding: 0 0.55rem 0 0.75rem;
             }
-            .shop-gallery-sort span {
+            .shop-gallery-sort-label {
               color: var(--color-primary);
               font-size: 0.58rem;
               font-weight: 800;
@@ -1248,17 +1248,51 @@ export async function renderShopPage({
               text-transform: uppercase;
               white-space: nowrap;
             }
-            .shop-gallery-sort select {
+            /* The visible choice is a label; the real select lies over it,
+               invisible (ShopSortSelect, owner 2026-10-25 "option B"). The
+               words keep the toolbar's 0.78rem bold on every screen, while
+               the select is free to be 16px on touch screens (the sitewide
+               iOS no-zoom rule in globals.css) — before this, that rule made
+               the words themselves 16px bold on a phone. */
+            .shop-gallery-sort-control {
+              position: relative;
+              display: inline-flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 0.3rem;
               min-width: min(11.5rem, 56vw);
               height: 2.15rem;
-              border: 0;
-              background: transparent;
               color: var(--color-on-surface);
               cursor: pointer;
               font-family: var(--font-label);
               font-size: 0.78rem;
               font-weight: 800;
-              outline: none;
+            }
+            .shop-gallery-sort-value {
+              min-width: 0;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            }
+            .shop-gallery-sort-chevron {
+              flex: none;
+              width: 0.95rem;
+              height: 0.95rem;
+            }
+            .shop-gallery-sort-control select {
+              position: absolute;
+              inset: 0;
+              width: 100%;
+              height: 100%;
+              margin: 0;
+              opacity: 0;
+              border: 0;
+              cursor: pointer;
+              appearance: none;
+            }
+            .shop-gallery-sort:has(select:focus-visible) {
+              outline: 2px solid color-mix(in srgb, var(--color-primary) 72%, transparent);
+              outline-offset: 2px;
             }
             @media (max-width: 440px) {
               .shop-gallery-toolbar {
@@ -1274,7 +1308,7 @@ export async function renderShopPage({
                 flex: 1 1 100%;
                 width: 100%;
               }
-              .shop-gallery-toolbar .shop-gallery-sort select {
+              .shop-gallery-toolbar .shop-gallery-sort-control {
                 min-width: 0;
                 width: auto;
                 flex: 1;

@@ -163,6 +163,17 @@ review remains deliberately strict.
 - `supabase/instagram-sync.sql` and the later social-scheduling migration are
   applied.
 
+## Instagram shop (product tags) — separate from posting
+
+Product tags on posts and reels come from a Meta **catalog**, not from this
+posting pipeline or its Meta app. Catalog "Naples Estate Jewelry Products"
+(`28466931839669076`, created 2026-10-25) reads
+`/api/merchant-feed?channel=meta` hourly (Replace). Brand and JPEG photos are
+handled in `src/lib/meta-feed.ts` and `/feed-image/...`. The domain is verified
+by a meta tag in `app/layout.tsx`. Tags appear only after Meta approves the
+shop. Rule: `DECISIONS.md` → *"The Meta catalog (Instagram shop) reads the SAME
+merchant feed"*; status: `TASKS.md`.
+
 ## Current constraints
 
 - Development-mode Meta apps are limited to assigned tester accounts. Moving to
