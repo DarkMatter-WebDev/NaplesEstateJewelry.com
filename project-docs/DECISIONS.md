@@ -14,6 +14,8 @@
 - **Meta settings:** scheduled fetch **hourly, Replace**, so a sold piece leaves within the hour. No Meta pixel / dataset is connected (the site has none; the defaults were switched off).
 - **Domain:** verified by the `facebook-domain-verification` meta tag in `app/layout.tsx` (owner chose the meta tag over a GoDaddy TXT). ⛔ Don't remove it while the catalog is in use.
 - Guard `lib/__tests__/meta-feed.test.ts`. Record `CHANGELOG.md` 2026-10-25 (7).
+- **Checkout URL (2026-10-25 (9)):** Meta's shop sends buyers to `/meta-checkout?products=<g:id>:<qty>,…`. The page puts only pieces still for sale in the cart, built by the SAME `productCartItem` as the product page, and opens `/checkout`, where prices, tax and shipping are recomputed as always. ⛔ Never trust a price or quantity from Meta. ⛔ Never add to the cart before `hydrated` (the localStorage read would wipe it). ⛔ A failed read never says "sold". `coupon` is ignored (no Meta promotions). Guard `lib/__tests__/meta-checkout.test.ts`.
+- **Shop settings:** return window **5 days** (= `/returns-refunds`: all sales final + the 5-day misrepresentation guarantee), free returns off. Shipping profile = speeds only (Standard 2–10 = Insured, Rush 1–3 = Express Overnight), free shipping off. ⛔ If the returns page or shipping promises change, change Commerce Manager the same day (nothing syncs them).
 
 ## A select that must LOOK smaller than 16px on a phone shows its choice in a label and lays the real select over it, invisible — never a smaller select (2026-10-25)
 

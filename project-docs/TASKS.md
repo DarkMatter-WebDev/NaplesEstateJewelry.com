@@ -28,7 +28,7 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-10-25 (7) — Instagram shop (product tags in reels): Meta catalog CREATED (empty) + `.com` added to Meta Domains; Meta feed + JPEG image route + verification tag BUILT + STAGED, not pushed; no SQL, no env vars
+### 🟡 2026-10-25 (7)+(8)+(9) — Instagram shop (product tags in reels): feed LIVE (61 products, 0 issues), `.com` VERIFIED, shop CREATED + submitted, shipping profile saved; the checkout URL page `/meta-checkout` BUILT + STAGED, not pushed (item 5a); no SQL, no env vars
 
 Record: `CHANGELOG.md` 2026-10-25 (7) (and (6) for the Merchant Center read). Rule: `DECISIONS.md` top entry. Files: NEW `src/lib/meta-feed.ts`, `src/app/api/merchant-feed/route.ts`, NEW `src/app/feed-image/[id]/[file]/route.ts`, `src/app/layout.tsx`, NEW `src/lib/__tests__/meta-feed.test.ts`.
 
@@ -36,10 +36,13 @@ Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1966/1966** (17
 
 1. ✅ Catalog "Naples Estate Jewelry Products" (`28466931839669076`) created in portfolio `1236237339568680`; catalog terms accepted (owner's yes); no dataset connected.
 2. ✅ `naplesestatejewelry.com` added to Business settings → Domains (`970865445568594`), "Not Verified" until the tag is live.
-3. ◻ **Owner — push + deploy** (carries the shop sort / "Products per page" changes too).
-4. ◻ **Claude, after the deploy (desk Chrome):** (a) curl the live feed `?channel=meta`, one `/feed-image/…jpg` and the homepage tag; (b) Domains → **Verify domain** (Meta says it can take up to 72 h); (c) catalog → Data sources → **scheduled feed** `https://naplesestatejewelry.com/api/merchant-feed?channel=meta`, **hourly, Replace**; (d) read the first upload: item count and issues.
-5. ◻ **Owner:** Commerce Manager → shop / Instagram setup (connect the catalog to `naples_estate_jewelry`, checkout on website) → **submit for review**. Claude stops before this (owner's instruction). Product tags in reels only after Meta approves.
+3. ✅ **Owner — push + deploy** — DONE 10-25 (with the shop sort / "Products per page" changes).
+4. ✅ DONE 10-25 (`CHANGELOG.md` 2026-10-25 (8)): live checks passed; `.com` **Verified**; data source `1894112751752820` "Replaced hourly"; first upload 61 added / 0 failed / 0 issues. Was: **Claude, after the deploy (desk Chrome):** (a) curl the live feed `?channel=meta`, one `/feed-image/…jpg` and the homepage tag; (b) Domains → **Verify domain** (Meta says it can take up to 72 h); (c) catalog → Data sources → **scheduled feed** `https://naplesestatejewelry.com/api/merchant-feed?channel=meta`, **hourly, Replace**; (d) read the first upload: item count and issues.
+5. ✅ Shop created + submitted 10-25 (`CHANGELOG.md` 2026-10-25 (9)): commerce account `997292439422811`, Instagram `naples_estate_jewelry` + the Naples Estate Jewelry Page, return window 5 days, the owner ticked the Seller Agreement and submitted; shipping profile saved (Standard 2–10, Rush 1–3, no free shipping).
+5a. 🟡 **Checkout URL page `/meta-checkout` BUILT + STAGED, not pushed** (Meta requires it before **Publish shop**). Files: NEW `src/lib/meta-checkout.ts`, NEW `src/lib/product-cart-item.ts`, NEW `src/app/[locale]/meta-checkout/page.tsx`, NEW `src/components/checkout/MetaCheckoutHandoff.tsx`, `src/context/CartContext.tsx` (`hydrated`), `src/app/[locale]/shop/[id]/page.tsx` (uses `productCartItem`), NEW `src/lib/__tests__/meta-checkout.test.ts`. Gate: `tsc` 0 · lint 0 errors · **1975/1975** (173 files) · build 0 · 92. ◻ **Owner — push + deploy.** ◻ **Claude, after it:** Commerce Manager → Settings → checkout URL → step 3 `https://naplesestatejewelry.com/meta-checkout` → step 4 test → **Publish shop**. Product tags in reels only after that and Meta's approval.
 6. ◻ First week: Commerce Manager → Catalog → Issues (rejected items), and a sold piece leaving within the hour.
+
+**Staging (10-25 (9)):** ✅ synced 2026-10-25. The dry run listed exactly the 13 touched files: 7 app (5 NEW: `meta-checkout/page.tsx`, `MetaCheckoutHandoff.tsx`, `meta-checkout.ts`, `product-cart-item.ts`, `meta-checkout.test.ts`; changed: `shop/[id]/page.tsx`, `CartContext.tsx`) and 6 docs. 0 Extras, 1296 total. The real run copied 13, 0 FAILED; follow-up dry run 0, exit 0. Leak check 0; `.tsx` 265 = 265; SHA-256 MATCH on 5 app files; no `zz-*` page. Docs-only re-sync after this line.
 
 **Staging (10-25 (7)):** ✅ synced 2026-10-25. The dry run listed exactly the 11 touched files: 5 app (3 NEW: `meta-feed.ts`, `feed-image/[id]/[file]/route.ts`, `meta-feed.test.ts`; changed: `merchant-feed/route.ts`, `app/layout.tsx`) and 6 docs (CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS, `features/instagram-posting.md`). 0 Extras, 1291 total. The real run copied 11, 0 FAILED; follow-up dry run 0, exit 0. Leak check 0; `.tsx` 263 = 263; SHA-256 MATCH on the 4 app source files; no `zz-*` page. Staging also holds 10-25 (3)+(4). Docs-only re-sync after this line.
 
@@ -49,7 +52,7 @@ Record: `CHANGELOG.md` 2026-10-25 (3). Rule: `DECISIONS.md` top entry. Files: `s
 
 Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1954/1954** (171 files) · build 0 · 92 = 43 + 43 + 6.
 
-1. ◻ **Owner — push + deploy** (no SQL, no env vars).
+1. ✅ **Owner — push + deploy** — DONE 10-25 (with the Meta feed, `CHANGELOG.md` 2026-10-25 (8)).
 2. ◻ **Owner — on the iPhone (and the iPad):** `/shop` → the Sort line reads small and bold like before; tap it → the phone's picker opens and the page does NOT zoom in; pick "Newest arrivals" → the grid re-sorts and the line says it.
 3. ✅ **(4) "Products per page"** got the same treatment, and "Per page" now sits right beside its box on phones (`CHANGELOG.md` 2026-10-25 (4); files `src/components/shop/ShopPagination.tsx`, the same test file). ◻ On the iPhone: the bottom of `/shop` reads "PER PAGE 24 ▾" together, centred; tap it → the picker opens, no zoom; pick 48 → 48 pieces.
 

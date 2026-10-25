@@ -1,6 +1,36 @@
 
 # Changelog
 
+## 2026-10-25 (9) — Instagram shop, part 3: shop CREATED + shipping profile; Meta's required **checkout URL** page `/meta-checkout` BUILT + STAGED, not pushed; no SQL, no env vars
+
+- Owner: *"do the commerce manager steps for me in chrome"*, then (the Seller Agreement was put to the owner first) *"i agreed and submitted, continue"*.
+- **Shop setup (Claude, desk Chrome):** Commerce Manager → Add account → market United States → Create shop → "I don't use these platforms". Sales channel: Instagram **naples_estate_jewelry** + Page **Naples Estate Jewelry** (`1236201566238924`), NOT surettesystems / Naples Gold Buyers. Catalog: Naples Estate Jewelry Products (61). Business details:
+  - contact info@naplesestatejewelry.com
+  - **return window 5 days**, matching `/returns-refunds` (all sales final + the 5-day misrepresentation guarantee; Meta's default was 30), free returns NOT ticked
+  - return policy https://naplesestatejewelry.com/returns-refunds, privacy https://naplesestatejewelry.com/privacy
+- The owner ticked the **Seller Agreement** and clicked **Submit for review** themself. Meta created commerce account **`997292439422811`**; "Create shop" ✓, "Checking your shop info" ✓. **Publish shop** stays disabled until the remaining steps are done.
+- **Shipping profile** (the To-do list's only outstanding issue), Settings → Shipping and returns: "US insured shipping (matches website)", 50 states, USD, all products. **Standard 2–10 business days** (= Insured Shipping, `getShippingServiceNote`) and **Rush 1–3** (= Express Overnight Insured); free shipping OFF on both. Meta stores speeds only, no prices. Saved.
+- **Checkout URL (Meta requires it):** Meta opens `<url>?products=<content id>:<qty>,…&coupon=…`. Built `/meta-checkout`:
+  - `src/lib/meta-checkout.ts` (NEW): `parseMetaCheckoutProducts`. `nej-<inv#>` or a product id; quantities clamped 1–99; repeats merged; ≤ 20 lines; anything else dropped.
+  - `src/lib/product-cart-item.ts` (NEW): `productCartItem` (the product page's cart item, moved out of `shop/[id]/page.tsx`, which now calls it) + `CART_ITEM_PRODUCT_COLUMNS`.
+  - `src/app/[locale]/meta-checkout/page.tsx` (NEW, noindex, dynamic): resolves the pieces (newest row per inventory number), adds only `isProductVisibleInShop && isProductPurchasable` ones, prices them with `getStorefrontDisplayPrice` (display only; checkout recomputes). A failed read lists nothing (never "sold").
+  - `src/components/checkout/MetaCheckoutHandoff.tsx` (NEW): waits for `hydrated`, adds what is not already in the cart, then `router.replace('/checkout')`. If something sold: the OfferUnavailable-style card (title, the sold titles, Continue to checkout / Browse the shop).
+  - `src/context/CartContext.tsx`: exposes `hydrated`, because an add before the localStorage read is overwritten by it.
+  - Test `src/lib/__tests__/meta-checkout.test.ts` (NEW, 9 tests). `coupon` is ignored (no Meta promotions).
+- **Checked in the dev preview (3007):** `/meta-checkout?products=nej-26%3A1&coupon=TEST` → `/checkout` with the Tiffany bracelet in the cart, qty 1, $5,871. `?products=nej-26:1,nej-999999:1` with it already in the cart → still qty 1, card "This piece has already sold · nej-999999 · Continue to checkout · Browse the shop", `robots` noindex, 0 console errors. Test cart cleared; server stopped.
+- Gate: `npx tsc --noEmit` 0 · `npm run lint` 0 errors (4 old `<img>` warnings) · `npx vitest run --maxWorkers=4` **1975/1975** (173 files) · `npm run build` 0 (`/[locale]/meta-checkout` dynamic) · prerender 92 = 43 + 43 + 6 · no `.next/cache/turbopack`. ⚠️ The first build failed on a stale `.next/dev/types/validator.ts` left by the stopped dev server (the known trap); `.next/dev` deleted with the server stopped, rebuilt clean.
+- **After the push (Claude, desk Chrome):** Settings → checkout URL step 3: enter `https://naplesestatejewelry.com/meta-checkout`, step 4 preview/test, then **Publish shop**.
+
+## 2026-10-25 (8) — Instagram shop, part 2: DEPLOYED (owner), `.com` VERIFIED in Meta, hourly feed LIVE — 61 products, 0 issues; the shop / review step is the owner's
+
+- Owner: *"Pushed and deployed. Verify the domain and add the hourly feed."* The push also carried 10-25 (3)+(4) (shop sort / "Products per page").
+- **Production read by Claude (curl):** `/api/merchant-feed?channel=meta` → 200, 61 items, 61 `g:brand`, 0 `.webp`. All 61 main `/feed-image/…jpg` → 200 `image/jpeg`. The homepage `<head>` carries `facebook-domain-verification`. The Google feed (no parameter) → 200, 0 `g:brand` (unchanged).
+- **Meta Domains:** Verify domain → `naplesestatejewelry.com` **Verified** (at once, no 72 h wait).
+- **Catalog `28466931839669076` → Data sources:** Data File → format **Google Merchant Center** → URL `https://naplesestatejewelry.com/api/merchant-feed?channel=meta`. Name "Website feed (naplesestatejewelry.com) - hourly", default currency USD, **Hourly** from 9:57 AM GMT-04:00. The data source ID is `1894112751752820`, and its page reads **"Replaced hourly"**.
+- **First upload (1:58 PM):** **61 updated or added · 0 removed · 0 failed · 0 issues.** Products list: 61, visible rows "Eligible" with thumbnails. The 2 "Actions" are recommendations only (create sets; connect a dataset — deliberately not done).
+- Not done (owner's instruction): Shops → connect to Instagram → submit for review.
+- No code change in this step; nothing new to stage except docs.
+
 ## 2026-10-25 (7) — Instagram shop, part 1: Meta catalog CREATED (empty), `.com` ADDED to Meta Domains (not verified yet), Meta feed variant + JPEG image route + verification tag BUILT + STAGED, not pushed; no SQL, no env vars
 
 - Owner: *"Yes, set it up: accept Meta's catalog terms, create the catalog with the hourly feed, add and verify the .com with the meta tag, and add the Meta feed brand line. Stop before submitting the shop for review."*

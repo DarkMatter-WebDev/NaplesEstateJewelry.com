@@ -42,6 +42,7 @@ import WishlistButton from '@/components/shop/WishlistButton';
 import type { WishlistItem } from '@/context/WishlistContext';
 import CartButton from '@/components/shop/CartButton';
 import type { CartItem } from '@/context/CartContext';
+import { productCartItem } from '@/lib/product-cart-item';
 import PriceUpdateTicker from '@/components/shop/PriceUpdateTicker';
 import { ProductPolicyAccordions, ProductTrustBadges } from '@/components/shop/ProductTrustSections';
 import { hoursLine } from '@/lib/business-location';
@@ -470,34 +471,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
 
   const normalizedStatus = normalizeProductStatus(p.status);
 
-  const cartItem: CartItem = {
-    id: p.id,
-    title: p.title,
-    title_es: p.title_es,
-    description: p.description,
-    description_es: p.description_es,
-    public_notes: p.public_notes,
-    image: productImages[0] ?? null,
-    image_padding: firstImagePadding,
-    status: normalizedStatus,
-    stockQuantity: p.quantity,
-    priceLabel: price,
-    category: p.category,
-    metal_type: p.metal_type,
-    metal_variant: p.metal_variant,
-    purity: p.purity,
-    weight_grams: p.weight_grams,
-    gram_weight: p.gram_weight,
-    product_type: p.product_type,
-    jewelry_type: p.jewelry_type,
-    chain_type: p.chain_type,
-    length: p.length,
-    brand: p.brand,
-    item_year: p.item_year,
-    tags: p.tags,
-    tags_es: p.tags_es,
-    gender: p.gender,
-  };
+  const cartItem: CartItem = productCartItem(p, price);
 
   const wishlistItem: WishlistItem = {
     id: p.id,

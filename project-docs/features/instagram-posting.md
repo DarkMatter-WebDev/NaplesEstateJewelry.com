@@ -170,8 +170,9 @@ posting pipeline or its Meta app. Catalog "Naples Estate Jewelry Products"
 (`28466931839669076`, created 2026-10-25) reads
 `/api/merchant-feed?channel=meta` hourly (Replace). Brand and JPEG photos are
 handled in `src/lib/meta-feed.ts` and `/feed-image/...`. The domain is verified
-by a meta tag in `app/layout.tsx`. Tags appear only after Meta approves the
-shop. Rule: `DECISIONS.md` → *"The Meta catalog (Instagram shop) reads the SAME
+by a meta tag in `app/layout.tsx`. The shop (commerce account
+`997292439422811`) sends buyers to `/meta-checkout`, which fills the site's
+cart and opens `/checkout`. Tags appear only after Meta approves the shop. Rule: `DECISIONS.md` → *"The Meta catalog (Instagram shop) reads the SAME
 merchant feed"*; status: `TASKS.md`.
 
 ## Current constraints

@@ -57,6 +57,9 @@ export interface CartItem {
 
 interface CartContextValue {
   items: CartItem[];
+  // True once the saved cart has been read from localStorage. An add() before
+  // then is overwritten by that read (the Meta checkout hand-off waits on it).
+  hydrated: boolean;
   count: number;
   isIn: (id: string) => boolean;
   add: (item: CartItem, quantity?: number) => void;
@@ -309,7 +312,7 @@ export function CartProvider({
   const visibleStockAlerts = stockAlerts.filter((alert) => items.some((item) => item.id === alert.id));
 
   return (
-    <CartContext.Provider value={{ items, count: items.reduce((sum, i) => sum + (i.purchaseQuantity ?? 1), 0), isIn, add, setQuantity, remove, clear, drawerOpen, openDrawer, closeDrawer, recentlyAdded, notifyAdded, dismissAdded, stockAlerts: visibleStockAlerts, refreshAvailability, dismissStockAlerts }}>
+    <CartContext.Provider value={{ items, hydrated, count: items.reduce((sum, i) => sum + (i.purchaseQuantity ?? 1), 0), isIn, add, setQuantity, remove, clear, drawerOpen, openDrawer, closeDrawer, recentlyAdded, notifyAdded, dismissAdded, stockAlerts: visibleStockAlerts, refreshAvailability, dismissStockAlerts }}>
       {children}
       <CartDrawer locale={locale} />
     </CartContext.Provider>

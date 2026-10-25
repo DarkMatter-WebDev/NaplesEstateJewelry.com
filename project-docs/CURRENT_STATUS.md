@@ -2,7 +2,19 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-10-25 (7)**.
+> in `DECISIONS.md`. Last reconciled: **2026-10-25 (9)**.
+
+## Start Here (2026-10-25 (9) — 🟡 Meta shop CREATED + submitted, shipping profile saved; the required checkout URL page `/meta-checkout` BUILT + STAGED, not pushed; no SQL, no env vars)
+
+- 🟡 **Waiting for the owner's push:** `/meta-checkout` (Meta's checkout URL: fills the cart, opens /checkout). Record `CHANGELOG.md` 2026-10-25 (9); steps `TASKS.md` top block, item 5a.
+- After the push, Claude: Commerce Manager → checkout URL `https://naplesestatejewelry.com/meta-checkout` → test → **Publish shop**. Then tags in reels, once Meta approves.
+- Gate: `tsc` 0 · lint 0 errors · **1975/1975** (173 files) · build 0 · 92 = 43 + 43 + 6. Everything older is deployed (block below).
+
+## Start Here (2026-10-25 (8) — 🟢 everything DEPLOYED (owner); Meta catalog LIVE: `.com` verified, hourly feed, 61 products, 0 issues; nothing staged-but-unpushed except docs; no SQL, no env vars)
+
+- 🟢 Deployed: the Meta feed + JPEG photo route + verification tag (10-25 (7)) and the shop sort / "Products per page" boxes (10-25 (3)+(4)). Record `CHANGELOG.md` 2026-10-25 (8).
+- ◻ **Owner:** Commerce Manager → Shops → connect the catalog to Instagram `naples_estate_jewelry` → submit for review; then tag products in reels once approved. First week: catalog Issues + a sold piece dropping off within the hour (`TASKS.md` top block). Also the iPhone look at `/shop` (sort / per page).
+- Where the 10-25 (7) and (3)/(4) blocks below say "STAGED" / "not pushed", read "deployed".
 
 ## Start Here (2026-10-25 (7) — 🟡 Instagram shop part 1: Meta catalog CREATED (empty) + `.com` added to Meta; Meta feed + JPEG image route + verification tag BUILT + STAGED, not pushed; no SQL, no env vars)
 
