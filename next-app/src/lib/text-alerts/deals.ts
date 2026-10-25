@@ -18,7 +18,8 @@ import {
   withDealPhotoAsMain,
   withDealPhotoRemoved,
 } from './deal-photos';
-import { dealText, DEFAULT_SOLD_REPLY, soldNoticeText, winnerText } from './messages';
+import { dealLine, dealMetalLabel, dealReadyProblem, dealSizeLabel } from './deal-input';
+import { dealText, DEFAULT_SOLD_REPLY, soldNoticeText, winnerText, type DealCopy } from './messages';
 import { sendTwilioMessage, TwilioError } from './twilio';
 
 /**
@@ -46,6 +47,12 @@ export type DealRow = {
   title: string;
   price_text: string;
   message: string;
+  /** The 2026-10-24 boxes; absent on a row read before `text-deals-details-2026-10.sql` ran. */
+  description?: string | null;
+  comparable_price_text?: string | null;
+  metal?: string | null;
+  purity?: string | null;
+  size_text?: string | null;
   photo_path: string | null;
   card_path: string | null;
   /** Detail shots and their rendered JPEGs; absent on a row read before `text-deals-photos-2026-10.sql` ran. */
@@ -129,16 +136,20 @@ async function storeDealJpeg(service: SupabaseClient, dealId: string, kind: 'car
 export async function buildDealMedia(service: SupabaseClient, deal: DealRow): Promise<{ pictures: DealPicture[]; totalBytes: number }> {
   const [main, ...details] = dealPhotoList(deal);
   if (!main) throw new Error('Add a photo before sending.');
+  // Photos may come first (2026-10-24); the boxes are checked here, before any picture is drawn.
+  const problem = dealReadyProblem(deal);
+  if (problem) throw new Error(problem);
+  const line = dealLine(deal);
   const budget = dealPictureBudget(details.length);
   // "Photo 2 of 5" on every picture of a deal with more than one — the main picture is 1.
   const total = details.length + 1;
 
-  const card = await renderDealCard(await readStoredPhoto(service, main), { price: deal.price_text, line: deal.title, badge: 'First reply wins', counter: dealPhotoCounter(0, total) }, budget.card);
+  const card = await renderDealCard(await readStoredPhoto(service, main), { price: deal.price_text, line, badge: 'First reply wins', counter: dealPhotoCounter(0, total) }, budget.card);
   const cardPath = await storeDealJpeg(service, deal.id, 'card', card.jpeg);
   const pictures: DealPicture[] = [{ path: cardPath, url: publicUrl(service, cardPath), bytes: card.bytes, main: true }];
 
   for (const [index, source] of details.entries()) {
-    const detail = await renderDealDetail(await readStoredPhoto(service, source), { price: deal.price_text, line: deal.title, counter: dealPhotoCounter(index + 1, total) }, budget.detail);
+    const detail = await renderDealDetail(await readStoredPhoto(service, source), { price: deal.price_text, line, counter: dealPhotoCounter(index + 1, total) }, budget.detail);
     const path = await storeDealJpeg(service, deal.id, 'detail', detail.jpeg);
     pictures.push({ path, url: publicUrl(service, path), bytes: detail.bytes, main: false });
   }
@@ -306,7 +317,7 @@ export async function runDealSendPass(dealId: string, limit = SEND_PASS_LIMIT): 
   // One message, every picture, the main one first.
   const mediaUrls = dealMediaUrls(service, deal);
   if (!mediaUrls) throw new Error('The deal has no picture yet.');
-  const body = dealText({ title: deal.title, price: deal.price_text, message: deal.message });
+  const body = dealText(dealCopy(deal));
 
   const { data: queued, error } = await service
     .from('text_deal_sends')
@@ -365,6 +376,19 @@ export async function runDealSendPass(dealId: string, limit = SEND_PASS_LIMIT): 
   return result;
 }
 
+/** The words of a deal's text, from its row — one line per box (layout B, `dealText`). */
+export function dealCopy(deal: DealRow): DealCopy {
+  return {
+    item: deal.title,
+    metal: dealMetalLabel(deal),
+    size: dealSizeLabel(deal),
+    price: deal.price_text,
+    comparable: deal.comparable_price_text ?? null,
+    description: deal.description ?? null,
+    message: deal.message,
+  };
+}
+
 /** A test to one number (the owner's cell); logged, never counted as a deal send. */
 export async function sendDealTest(dealId: string, to: string): Promise<{ sid: string }> {
   const service = createServiceClient();
@@ -372,7 +396,7 @@ export async function sendDealTest(dealId: string, to: string): Promise<{ sid: s
   if (!deal) throw new Error('Deal not found.');
   if (!twilioConfigured()) throw new Error('Twilio is not configured yet.');
   const mediaUrls = dealMediaUrls(service, deal) ?? (await buildDealMedia(service, deal)).pictures.map((picture) => picture.url);
-  const body = dealText({ title: deal.title, price: deal.price_text, message: deal.message });
+  const body = dealText(dealCopy(deal));
   const sent = await sendTwilioMessage({ to, body, mediaUrls });
   await service.from('text_system_messages').insert({ kind: 'deal_test', to_phone: to, deal_id: dealId, message_sid: sent.sid, status: sent.status });
   return { sid: sent.sid };
@@ -442,7 +466,7 @@ export async function notifyDealSold(dealId: string): Promise<SoldNotifyOutcome>
 
   const winner = deal.sold_to_phone;
   if (winner) {
-    outcome.winner = await sendOne('deal_winner', winner, winnerText({ title: deal.title, price: deal.price_text }));
+    outcome.winner = await sendOne('deal_winner', winner, winnerText({ title: dealLine(deal), price: deal.price_text }));
   }
 
   // Everyone the deal actually reached (accepted by Twilio or delivered), minus the buyer.
@@ -458,6 +482,15 @@ export async function notifyDealSold(dealId: string): Promise<SoldNotifyOutcome>
     for (const result of results) outcome.others[result] += 1;
   }
   return outcome;
+}
+
+const DETAIL_COLUMNS = ['description', 'comparable_price_text', 'metal', 'purity', 'size_text'] as const;
+
+/** The detail boxes a reopened deal copies — only the ones the source row has, so reopen works before the SQL ran. */
+function reopenedDetails(source: DealRow): Partial<DealRow> {
+  const out: Record<string, unknown> = {};
+  for (const key of DETAIL_COLUMNS) if (key in source) out[key] = source[key];
+  return out as Partial<DealRow>;
 }
 
 /** The message a reopened deal starts with (the owner edits it before sending). */
@@ -482,6 +515,8 @@ export async function reopenDealAsDraft(dealId: string): Promise<DealRow> {
       title: source.title,
       price_text: source.price_text,
       message: REOPEN_MESSAGE,
+      // The 2026-10-24 boxes come along, named only when the old row has them.
+      ...reopenedDetails(source),
       photo_path: source.photo_path,
       card_path: null,
       // The detail shots come along; their pictures are rendered again on Preview.

@@ -4,7 +4,21 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-10-22 (1)**.
+> compaction. Last reconciled: **2026-10-24 (1)**.
+
+## Text deals: photos can go first; Metal + Purity are must-pick and build the line on the pictures; the comparable price is words only, "Comparable retail"; the text is a LIST (layout B) up to 1,500 characters (2026-10-24)
+
+- **The text is a full list, one box per line (owner, mockup v2: *"Build layout B (full list) with 'Our price'"*):** `Naples Estate Jewelry - Text Deal`, blank, `Item:`, `Metal:` (purity + metal), `Size:`, `Comparable retail:`, `Our price:`, blank, description, blank, closing message, `Reply STOP to opt out.` alone on the last line. Empty / "Other / leave off" boxes are not listed. Line breaks are the only layout a text keeps (no bold, no sizes) — ⛔ never promise styling in a text. The pictures keep the one built line. This replaces the "paragraphs" bullet below.
+
+- **Owner, on mockup v1:** *"Build it as drawn: 1 Comparable retail, 2 words only, 3 line built for me, 4 metal + purity must-pick, 5 two boxes."*
+- **The rules:**
+  - A draft saves with nothing typed (photos first). What a deal needs — price, What it is, Metal, Purity — is checked only when its pictures are drawn (`dealReadyProblem` in `buildDealMedia`: Preview, test, send). ⛔ Never move that check back into the save: it is what blocked "Add photos" before.
+  - Metal and Purity are must-pick; **"Other / leave off"** (`'none'`) counts as picked and prints nothing. `''` = not picked yet.
+  - The line on every picture, in the text and in the buyer's text is **built**: Purity + Metal + What it is + " · " + Size (`dealLine`). The owner types only the piece (and weight) into What it is. A row without metal/purity (older deals) prints its line as typed. Long lines still shrink in place (`dealLineFontSize`).
+  - Comparable price reads **"Comparable retail: $2,400"** (`COMPARABLE_LABEL`), on its own line under the price, **in the words only** — ⛔ not on the main picture or the detail strips (owner chose "words only"). The number should be a real comparable; a made-up "compare at" price is an FTC problem (said on the mockup).
+  - Description and Closing message are **two boxes**: the description (≤ 1,000, line breaks kept) is about the piece; the closing message keeps the pickup default. The text is paragraphs; cap **1,500** (Twilio 1,600, one message, same cost). Over the cap, the description is cut first, never the price, the closing message or STOP.
+  - Text deals stay pickup only (2026-10-07 entry); nothing new offers shipping.
+- Storage: `text_deals.description`, `comparable_price_text`, `metal`, `purity`, `size_text` (`supabase/text-deals-details-2026-10.sql`). Written only when typed or already on the row (`dealDetailColumns`), so the feature degrades to the old form where the SQL has not run. Guards `lib/__tests__/text-alerts.test.ts`, `text-deal-photos.test.ts`. Record `CHANGELOG.md` 2026-10-24 (1).
 
 ## Keywords go on the page in sentences, never as a list; sterling silver is named beside gold and platinum; one guide per real topic, never one page per brand (2026-10-22)
 

@@ -2,7 +2,38 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-10-22 (1)**.
+> in `DECISIONS.md`. Last reconciled: **2026-10-24 (1)**.
+
+## Start Here (2026-10-24 (2) — 🟡 Text Deals form changes + the text as a LIST (layout B, "Our price") BUILT + STAGED, not pushed; ⛔ SQL `supabase/text-deals-details-2026-10.sql` to run BEFORE the push; no env vars)
+
+- ✅ **SQL RUN** (owner, 10-25; the check listed all five columns). Only the push + deploy is left; staging re-verified 10-25 (dry run 0, hashes MATCH).
+- (2) on top of (1) below: the deal text is now one box per line — Item / Metal / Size / Comparable retail / Our price, then the description, the closing message, and Reply STOP on its own line (`CHANGELOG.md` 2026-10-24 (2)). Gate: `tsc` 0 · lint 0 errors · **1951/1951** · build 0 · 92. One push carries both.
+
+## Start Here (2026-10-24 (1) — 🟡 Text Deals form changes BUILT + STAGED, not pushed; ⛔ SQL `supabase/text-deals-details-2026-10.sql` to run BEFORE the push; no env vars)
+
+- 🟡 **Built and staged** (`CHANGELOG.md` 2026-10-24 (1); rule `DECISIONS.md` top entry; `TASKS.md` top): Admin → Text Deals — photos can go first (nothing else typed); new **Comparable price** (optional, "Comparable retail: $X" in the words only), **Metal** + **Purity** (must-pick, "Other / leave off"), **Size / length** (optional), **Description** (optional, 1,000 chars, line breaks kept); "One line" → **What it is**; the picture line is built from Purity + Metal + What it is + Size; the text is paragraphs, cap 1,500.
+- Gate: `tsc` 0 · lint 0 errors · **1951/1951** · build 0 · 92 = 43 + 43 + 6.
+- ⛔ Not seen behind the sign-in, no real Preview / test text yet. Everything older is deployed (block below).
+
+## Start Here (2026-10-22 (13) — session CLOSED; all app code DEPLOYED (owner); nothing staged-but-unpushed except docs; no SQL, no env vars)
+
+- 🟢 Owner: *"are we done?"* → done (`CHANGELOG.md` 2026-10-22 (13)). Live: `/estate-jewelry` keyword additions + Signed & Designer section + the NEW `/estate-jewelry/native-american-jewelry` guide (EN+ES), IndexNow 200 ×4, GSC requested ×4. Google Ads: `"jewelry appraisal"` → `/jewelry-appraisal`; Sellers **$33/day** (account $37); 7 ads re-headlined for the near-me / sell-silver / sell-jewelry searches (+ "Sell Jewelry for Cash"); 4 new callouts; Coins Types snippet; "Sell Scrap Gold" sitelink; Google's dynamic sitelinks / callouts / snippets OFF and its two sitelinks removed; `"cash for gold"` running. Nextdoor cancelled (runs to Nov 11); Yelp $5/day untouched. Last gate: `tsc` 0 · lint 0 errors · **1945/1945** · build 0.
+- ◻ Open: Google's reviews of the new assets (< 1 day); the **~Nov 7** Google Ads read (`TASKS.md` 10-22 blocks); Search Console ~Nov 12–19 for the new guide's queries; optional iPhone look at the two pages; a real Native American photo for the guide some day.
+- ⛔ Owner's standing priority (10-22): coins and bullion are LOW priority next to jewelry, gold and silver.
+
+## Start Here (2026-10-22 (6) — 💵 ad spend moved: Nextdoor subscription CANCELLED (runs to Nov 11, no further charge); Google NEJ Sellers $28 → $33/day (account $37/day); Yelp unchanged at $5/day)
+
+- Applied on the owner's yes, both read back after a reload (`CHANGELOG.md` 2026-10-22 (6)); the owner completed Google's passkey. Read in `CHANGELOG.md` 2026-10-22 (5).
+
+## Start Here (2026-10-22 (3) — 📖 Google Ads read (read-only, nothing changed); one keyword URL change awaits the owner's yes; nothing staged-but-unpushed except docs)
+
+- 📖 Life: 386 clicks · $839.95 · 14 conversions ($60 each); Sellers $28/day since 10-12 (the only change since 10-10); this week (Oct 19–22) 5 conversions for $134, last week 1 for $229 (`CHANGELOG.md` 2026-10-22 (3)).
+- ✅ APPLIED 10-22 (owner's yes): `"jewelry appraisal"` keyword → final URL `/jewelry-appraisal`, "Pending / Under review" (`CHANGELOG.md` 2026-10-22 (4)); re-read in a few days. Keep `"sell jewelry"` (real seller searches). No Maximize conversions. Re-read at ~30 conversions.
+
+## Start Here (2026-10-22 (2) — 🟢 `/estate-jewelry` keywords + NEW Native American guide DEPLOYED (owner) + verified live + IndexNow 200 for 4 + GSC Request Indexing for all 4; nothing staged-but-unpushed except docs)
+
+- 🟢 Owner: *"pushed and deployed"*. Claude: production curl — all 4 URLs 200 with the new content, sitemap lists the guide; IndexNow 200 OK for 4; Search Console (desk Chrome): both guide URLs "unknown to Google" → Indexing requested; both estate pages already indexed → re-crawl requested (`CHANGELOG.md` 2026-10-22 (2)).
+- ◻ Left: an optional iPhone look; a real photo for the guide some day; read Search Console in ~3–4 weeks (turquoise / navajo / zuni / designer queries). Where the block below says "STAGED" / "not pushed", read "deployed".
 
 ## Start Here (2026-10-22 — 🟡 `/estate-jewelry` keywords + NEW Native American guide BUILT + STAGED, not pushed; no SQL, no env vars)
 

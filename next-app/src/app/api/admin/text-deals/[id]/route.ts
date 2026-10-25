@@ -3,7 +3,7 @@ import { requireAdmin } from '@/lib/admin-auth';
 import { createServiceClient } from '@/lib/supabase/service';
 import { normalizeUsPhone } from '@/lib/subscriber-phone';
 import { dealMediaUrls, dealPhotos, deleteDeal, loadDeal, markDealAvailable, markDealSold, notifyDealSold } from '@/lib/text-alerts/deals';
-import { normalizeDealInput } from '@/lib/text-alerts/deal-input';
+import { dealDetailColumns, normalizeDealDraft } from '@/lib/text-alerts/deal-input';
 
 /**
  * GET: one deal with its send tally and the replies in clock order (the first
@@ -90,12 +90,20 @@ export async function PATCH(req: Request, context: Context) {
     const current = await loadDeal(service, id);
     if (!current) return NextResponse.json({ error: 'Deal not found.' }, { status: 404 });
     if (current.status !== 'draft') return NextResponse.json({ error: 'Only a draft can be edited.' }, { status: 409 });
-    const input = normalizeDealInput(body);
+    // A draft as typed so far; Preview checks what the deal needs (2026-10-24).
+    const input = normalizeDealDraft(body);
     if ('error' in input) return NextResponse.json({ error: input.error }, { status: 400 });
     // New words need a new picture (the price and line are drawn on it).
     const { data, error: updateError } = await service
       .from('text_deals')
-      .update({ ...input.value, card_path: null, updated_at: new Date().toISOString() })
+      .update({
+        title: input.value.title,
+        price_text: input.value.price_text,
+        message: input.value.message,
+        ...dealDetailColumns(input.value, current),
+        card_path: null,
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', id)
       .select('*')
       .single();

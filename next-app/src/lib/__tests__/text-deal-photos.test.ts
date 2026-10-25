@@ -145,7 +145,10 @@ describe('text-deal photos: source guards', () => {
     // "option a, price and the one line").
     const deals = read('lib/text-alerts/deals.ts');
     expect(deals.match(/renderDealCard\(/g)).toHaveLength(1);
-    expect(deals).toContain('renderDealDetail(await readStoredPhoto(service, source), { price: deal.price_text, line: deal.title, counter: dealPhotoCounter(index + 1, total) }, budget.detail)');
+    // The line is the built one (Purity + Metal + What it is + Size, 2026-10-24) on every picture.
+    expect(deals).toContain('const line = dealLine(deal);');
+    expect(deals).toContain('renderDealDetail(await readStoredPhoto(service, source), { price: deal.price_text, line, counter: dealPhotoCounter(index + 1, total) }, budget.detail)');
+    expect(deals).toContain("{ price: deal.price_text, line, badge: 'First reply wins', counter: dealPhotoCounter(0, total) }");
     const card = read('lib/text-alerts/card.ts');
     const detail = card.slice(card.indexOf('export async function renderDealDetail('));
     expect(detail).toContain('renderStripLayer(');
@@ -160,7 +163,7 @@ describe('text-deal photos: source guards', () => {
     expect(strip).toContain("flexDirection: 'column'");
     // New words need new pictures on every photo: a word change clears the card, and the send renders all again.
     const route = read('app/api/admin/text-deals/[id]/route.ts');
-    expect(route).toContain('.update({ ...input.value, card_path: null,');
+    expect(route).toMatch(/\.update\(\{[^}]*\.\.\.dealDetailColumns\(input\.value, current\),\s*card_path: null,/);
   });
 
   it('photos change only on a draft, through requireAdmin, and a shared photo is never deleted', () => {

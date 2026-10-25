@@ -17,7 +17,18 @@ import {
   withStopLine,
 } from '../text-alerts/messages';
 import { expectedTwilioSignature, formBodyToParams, isValidTwilioSignature } from '../text-alerts/signature';
-import { DEFAULT_DEAL_MESSAGE, formatDealPrice, normalizeDealInput } from '../text-alerts/deal-input';
+import {
+  cleanDealDescription,
+  DEAL_LEAVE_OFF,
+  dealDetailColumns,
+  dealLine,
+  dealMetalLabel,
+  dealReadyProblem,
+  DEFAULT_DEAL_MESSAGE,
+  formatDealPrice,
+  normalizeDealDraft,
+  normalizeDealInput,
+} from '../text-alerts/deal-input';
 
 describe('keyword replies', () => {
   it('confirms on the word in any case or with punctuation, not inside a sentence', () => {
@@ -55,11 +66,12 @@ describe('the words on file with Twilio', () => {
   });
 
   it('builds the deal text with the STOP line exactly once and inside the cap', () => {
-    const text = dealText({ title: '14K rope chain · 22 in · 18.4 g', price: '$1,460', message: DEFAULT_DEAL_MESSAGE });
-    expect(text).toBe(`${BRAND}: 14K rope chain · 22 in · 18.4 g - $1,460. ${DEFAULT_DEAL_MESSAGE} ${STOP_LINE}`);
-    const own = dealText({ title: 'Ring', price: '$300', message: 'First reply takes it. Reply STOP to opt out.' });
+    // An older deal (no metal / size boxes): just Item and Our price.
+    const text = dealText({ item: '14K rope chain · 22 in · 18.4 g', price: '$1,460', message: DEFAULT_DEAL_MESSAGE });
+    expect(text).toBe(`${BRAND} - Text Deal\n\nItem: 14K rope chain · 22 in · 18.4 g\nOur price: $1,460\n\n${DEFAULT_DEAL_MESSAGE}\n${STOP_LINE}`);
+    const own = dealText({ item: 'Ring', price: '$300', message: 'First reply takes it. Reply STOP to opt out.' });
     expect(own.match(/reply stop/gi)).toHaveLength(1);
-    const long = dealText({ title: 'x', price: '$1', message: 'a'.repeat(2000) });
+    const long = dealText({ item: 'x', price: '$1', message: 'a'.repeat(2000) });
     expect(long.length).toBeLessThanOrEqual(DEAL_TEXT_MAX);
     expect(long.endsWith(STOP_LINE)).toBe(true);
   });
@@ -95,7 +107,7 @@ describe('the words on file with Twilio', () => {
     const reopenSource = readFileSync(join(process.cwd(), 'src', 'lib', 'text-alerts', 'deals.ts'), 'utf8');
     const reopenMessage = /export const REOPEN_MESSAGE = '([^']+)';/.exec(reopenSource)?.[1] ?? '';
     expect(reopenMessage).toContain('Pickup at our Naples showroom.');
-    for (const text of [win, DEFAULT_DEAL_MESSAGE, reopenMessage, soldNoticeText(null), dealText({ title: 'Ring', price: '$100', message: DEFAULT_DEAL_MESSAGE })]) {
+    for (const text of [win, DEFAULT_DEAL_MESSAGE, reopenMessage, soldNoticeText(null), dealText({ item: 'Ring', price: '$100', message: DEFAULT_DEAL_MESSAGE })]) {
       expect(text).not.toMatch(/ship/i);
     }
     expect(DEFAULT_DEAL_MESSAGE).toBe('Not on the website. First reply takes it. Pickup at our Naples showroom.');
@@ -193,10 +205,98 @@ describe('the deal form', () => {
     expect(formatDealPrice('0')).toBeNull();
   });
 
-  it('needs a line and a price, defaults the message', () => {
-    expect(normalizeDealInput({ title: '  14K rope chain  ', price: '1460' })).toEqual({ value: { title: '14K rope chain', price_text: '$1,460', message: DEFAULT_DEAL_MESSAGE } });
-    expect(normalizeDealInput({ price: '1460' })).toHaveProperty('error');
-    expect(normalizeDealInput({ title: 'Ring', price: 'lots' })).toHaveProperty('error');
+  it('needs a line, a price, a metal and a purity; defaults the message', () => {
+    expect(normalizeDealInput({ title: '  Rope chain  ', price: '1460', metal: 'yellow gold', purity: '14k' })).toEqual({
+      value: { title: 'Rope chain', price_text: '$1,460', message: DEFAULT_DEAL_MESSAGE, description: '', comparable_price_text: null, metal: 'Yellow Gold', purity: '14K', size_text: '' },
+    });
+    expect(normalizeDealInput({ price: '1460', metal: 'Silver', purity: '925' })).toHaveProperty('error');
+    expect(normalizeDealInput({ title: 'Ring', price: 'lots', metal: 'Silver', purity: '925' })).toHaveProperty('error');
+    // Metal and Purity are must-pick (owner, 2026-10-24); "Other / leave off" counts as picked.
+    expect(normalizeDealInput({ title: 'Ring', price: '100', purity: '14K' })).toEqual({ error: 'Pick the metal (or "Other / leave off").' });
+    expect(normalizeDealInput({ title: 'Ring', price: '100', metal: 'Platinum' })).toEqual({ error: 'Pick the purity (or "Other / leave off").' });
+    expect(normalizeDealInput({ title: 'Watch', price: '100', metal: DEAL_LEAVE_OFF, purity: DEAL_LEAVE_OFF })).not.toHaveProperty('error');
+    expect(normalizeDealInput({ title: 'Ring', price: '100', metal: 'Unobtainium', purity: '14K' })).toHaveProperty('error');
+  });
+
+  it('a draft saves with nothing typed, so photos can go first (owner, 2026-10-24)', () => {
+    const empty = normalizeDealDraft({});
+    expect(empty).toEqual({ value: { title: '', price_text: '', message: DEFAULT_DEAL_MESSAGE, description: '', comparable_price_text: null, metal: '', purity: '', size_text: '' } });
+    if (!('value' in empty)) throw new Error('expected a draft');
+    expect(dealReadyProblem(empty.value)).toBe('Enter a price, e.g. 1460.');
+    // Only what is typed wrong is refused.
+    expect(normalizeDealDraft({ price: 'lots' })).toHaveProperty('error');
+    expect(normalizeDealDraft({ comparable: 'retail' })).toHaveProperty('error');
+    expect(normalizeDealDraft({ comparable: '$2,400' })).toMatchObject({ value: { comparable_price_text: '$2,400' } });
+    expect(normalizeDealDraft({ description: 'a'.repeat(1001) })).toHaveProperty('error');
+    expect(normalizeDealDraft({ size: 'x'.repeat(41) })).toHaveProperty('error');
+  });
+
+  it('keeps the line breaks of the description, at most one blank line', () => {
+    expect(cleanDealDescription('  Heavy   rope.\r\n\r\n\r\n\r\nNo dents.  \n')).toBe('Heavy rope.\n\nNo dents.');
+  });
+
+  it('builds the line on the pictures from Purity + Metal + What it is + Size; an old deal keeps its line', () => {
+    expect(dealLine({ title: 'Rope chain · 18.4 g', price_text: '$1,460', metal: 'Yellow Gold', purity: '14K', size_text: '22 in' })).toBe('14K Yellow Gold Rope chain · 18.4 g · 22 in');
+    // The text's Metal line: purity + metal, either alone, nothing when both are left off.
+    expect(dealMetalLabel({ title: '', price_text: '', metal: 'Sterling Silver', purity: '925' })).toBe('925 Sterling Silver');
+    expect(dealMetalLabel({ title: '', price_text: '', metal: DEAL_LEAVE_OFF, purity: '14K' })).toBe('14K');
+    expect(dealMetalLabel({ title: '', price_text: '', metal: DEAL_LEAVE_OFF, purity: DEAL_LEAVE_OFF })).toBe('');
+    expect(dealLine({ title: 'Watch', price_text: '$1', metal: DEAL_LEAVE_OFF, purity: DEAL_LEAVE_OFF, size_text: '' })).toBe('Watch');
+    expect(dealLine({ title: '14K rope chain · 22 in', price_text: '$1' })).toBe('14K rope chain · 22 in');
+    expect(dealLine({ title: '', price_text: '' })).toBe('');
+  });
+
+  it('writes the new columns only when typed or already on the row (a deal still saves before the SQL ran)', () => {
+    const blank = normalizeDealDraft({});
+    const typed = normalizeDealDraft({ metal: 'Silver', comparable: '90' });
+    if (!('value' in blank) || !('value' in typed)) throw new Error('expected drafts');
+    expect(dealDetailColumns(blank.value)).toEqual({});
+    expect(dealDetailColumns(blank.value, { metal: 'Silver', description: 'x' })).toEqual({ metal: '', description: '' });
+    expect(dealDetailColumns(typed.value)).toEqual({ metal: 'Silver', comparable_price_text: '$90' });
+  });
+
+  it('the text is layout B, a full list: one box per line, Comparable retail above Our price (owner, 2026-10-24, mockup v2)', () => {
+    const text = dealText({ item: 'Rope chain · 18.4 g', metal: '14K Yellow Gold', size: '22 in', price: '$1,460', comparable: '$2,400', description: 'Heavy rope.\nNo dents.', message: DEFAULT_DEAL_MESSAGE });
+    expect(text).toBe([
+      `${BRAND} - Text Deal`,
+      '',
+      'Item: Rope chain · 18.4 g',
+      'Metal: 14K Yellow Gold',
+      'Size: 22 in',
+      'Comparable retail: $2,400',
+      'Our price: $1,460',
+      '',
+      'Heavy rope.',
+      'No dents.',
+      '',
+      DEFAULT_DEAL_MESSAGE,
+      STOP_LINE,
+    ].join('\n'));
+    // A box left empty is not listed.
+    expect(dealText({ item: 'Watch', metal: '', size: null, price: '$900', message: DEFAULT_DEAL_MESSAGE })).toBe(`${BRAND} - Text Deal\n\nItem: Watch\nOur price: $900\n\n${DEFAULT_DEAL_MESSAGE}\n${STOP_LINE}`);
+    // Too long: the description loses its end; the list, the closing message and STOP stay.
+    const long = dealText({ item: 'Ring', price: '$300', description: 'word '.repeat(400), message: DEFAULT_DEAL_MESSAGE });
+    expect(long.length).toBeLessThanOrEqual(DEAL_TEXT_MAX);
+    expect(long).toContain('Our price: $300');
+    expect(long.endsWith(`${DEFAULT_DEAL_MESSAGE}\n${STOP_LINE}`)).toBe(true);
+    expect(long).toContain('…');
+    expect(DEAL_TEXT_MAX).toBeLessThan(1600);
+  });
+
+  it('Preview, the test and the send all check the boxes before a picture is drawn', () => {
+    const deals = readFileSync(join(process.cwd(), 'src', 'lib', 'text-alerts', 'deals.ts'), 'utf8');
+    expect(deals).toMatch(/export async function buildDealMedia[\s\S]*?const problem = dealReadyProblem\(deal\);\n\s*if \(problem\) throw new Error\(problem\);/);
+    expect(deals.match(/dealText\(dealCopy\(deal\)\)/g)).toHaveLength(2);
+    expect(deals).toContain('winnerText({ title: dealLine(deal), price: deal.price_text })');
+    for (const route of ['route.ts', '[id]/route.ts']) {
+      const source = readFileSync(join(process.cwd(), 'src', 'app', 'api', 'admin', 'text-deals', route), 'utf8');
+      expect(source).toContain('normalizeDealDraft(body)');
+      expect(source).toContain('...dealDetailColumns(input.value');
+    }
+    const sql = readFileSync(join(process.cwd(), '..', 'supabase', 'text-deals-details-2026-10.sql'), 'utf8');
+    for (const column of ['description', 'comparable_price_text', 'metal', 'purity', 'size_text']) {
+      expect(sql).toMatch(new RegExp(`add column if not exists ${column}\\s+text`));
+    }
   });
 });
 

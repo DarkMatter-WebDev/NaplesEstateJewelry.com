@@ -10,8 +10,14 @@ import { formatUsPhone } from '@/lib/subscriber-phone';
 
 export const BRAND = 'Naples Estate Jewelry';
 export const STOP_LINE = 'Reply STOP to opt out.';
-/** Twilio's hard cap per message is 1,600 characters; keep deals well under it. */
-export const DEAL_TEXT_MAX = 600;
+/**
+ * Twilio's hard cap per message is 1,600 characters; a deal stays under it.
+ * Raised from 600 on 2026-10-24 for the Description box — still ONE message
+ * (an MMS is billed per message, not by length).
+ */
+export const DEAL_TEXT_MAX = 1500;
+/** How the comparable price reads (owner, 2026-10-24, mockup v1 question 1). Words only — never drawn on a picture. */
+export const COMPARABLE_LABEL = 'Comparable retail';
 
 /** One-time confirmation, sent after the web sign-up. Deals start only after YES. */
 export function confirmationText(): string {
@@ -57,11 +63,19 @@ export function soldNoticeText(soldReplyText: string | null | undefined): string
 }
 
 export type DealCopy = {
-  /** The one line drawn on the photo, e.g. "14K rope chain · 22 in · 18.4 g". */
-  title: string;
-  /** Pre-formatted, e.g. "$1,460". */
+  /** What it is, as typed, e.g. "Rope chain · 18.4 g" → "Item: Rope chain · 18.4 g". */
+  item: string;
+  /** Purity + metal, e.g. "14K Yellow Gold" (`dealMetalLabel` in deal-input); empty = no Metal line. */
+  metal?: string | null;
+  /** e.g. "22 in"; empty = no Size line. */
+  size?: string | null;
+  /** Pre-formatted, e.g. "$1,460" → "Our price: $1,460". */
   price: string;
-  /** The owner's message, e.g. "Not on the website. First reply takes it. Pickup at our Naples showroom." */
+  /** Optional, pre-formatted, e.g. "$2,400" → "Comparable retail: $2,400", the line above Our price. */
+  comparable?: string | null;
+  /** Optional, line breaks kept; its own paragraph under the list. */
+  description?: string | null;
+  /** The owner's closing message, e.g. "Not on the website. First reply takes it. Pickup at our Naples showroom." */
   message: string;
 };
 
@@ -69,19 +83,58 @@ function collapse(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
 }
 
+/** The first line of every deal text (layout B, owner 2026-10-24). */
+export const DEAL_TEXT_HEADING = `${BRAND} - Text Deal`;
+
 /**
- * The deal text that rides with the picture: brand, line, price, the
- * owner's message, and the STOP line — appended automatically, never
- * duplicated when the owner already typed it.
+ * The deal text that rides with the pictures — layout B, "full list" (owner,
+ * 2026-10-24, mockup v2: "Build layout B (full list) with 'Our price'"):
+ *
+ *   Naples Estate Jewelry - Text Deal
+ *
+ *   Item: Rope chain · 18.4 g
+ *   Metal: 14K Yellow Gold
+ *   Size: 22 in
+ *   Comparable retail: $2,400
+ *   Our price: $1,460
+ *
+ *   <description>
+ *
+ *   <closing message>
+ *   Reply STOP to opt out.
+ *
+ * One fact per line because a text carries no styling — line breaks are the
+ * only layout that survives Twilio and the phone. A box left empty (no size,
+ * "Other / leave off", no comparable price) is not listed. The STOP line is
+ * its own last line, never duplicated when the owner already typed it. A
+ * text over the cap loses the end of the description first, never the list,
+ * the closing message or STOP.
  */
 export function dealText(copy: DealCopy): string {
-  const parts = [collapse(copy.title), collapse(copy.price)].filter(Boolean).join(' - ');
-  let body = `${BRAND}: ${parts}. ${collapse(copy.message)}`.replace(/\.\s*\./g, '.').trim();
-  if (!/reply stop/i.test(body)) body = `${body} ${STOP_LINE}`;
-  if (body.length > DEAL_TEXT_MAX) {
-    body = `${body.slice(0, DEAL_TEXT_MAX - STOP_LINE.length - 2).trim()}… ${STOP_LINE}`;
-  }
-  return body;
+  const rows: Array<[string, string | null | undefined]> = [
+    ['Item', copy.item],
+    ['Metal', copy.metal],
+    ['Size', copy.size],
+    [COMPARABLE_LABEL, copy.comparable],
+    ['Our price', copy.price],
+  ];
+  const list = rows
+    .map(([label, value]) => [label, collapse(value ?? '')] as const)
+    .filter(([, value]) => value)
+    .map(([label, value]) => `${label}: ${value}`)
+    .join('\n');
+  const message = collapse(copy.message);
+  const closing = /reply stop/i.test(message) ? message : [message, STOP_LINE].filter(Boolean).join('\n');
+  const head = `${DEAL_TEXT_HEADING}\n\n${list}`;
+  const base = `${head}\n\n${closing}`;
+
+  let description = (copy.description ?? '').replace(/\r\n?/g, '\n').trim();
+  const room = DEAL_TEXT_MAX - base.length - 2;
+  if (description.length > room) description = room >= 40 ? `${description.slice(0, room - 1).trimEnd()}…` : '';
+  const body = description ? `${head}\n\n${description}\n\n${closing}` : base;
+
+  if (body.length <= DEAL_TEXT_MAX) return body;
+  return `${body.slice(0, DEAL_TEXT_MAX - STOP_LINE.length - 2).trim()}…\n${STOP_LINE}`;
 }
 
 /** What the owner's cell receives when someone replies. */

@@ -2,7 +2,20 @@
 
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
 import { formatUsPhone } from '@/lib/subscriber-phone';
-import { DEFAULT_DEAL_MESSAGE, DEAL_MESSAGE_MAX, DEAL_TITLE_MAX } from '@/lib/text-alerts/deal-input';
+import {
+  DEAL_DESCRIPTION_MAX,
+  DEAL_LEAVE_OFF,
+  DEAL_MESSAGE_MAX,
+  DEAL_METALS,
+  DEAL_PURITIES,
+  DEAL_SIZE_MAX,
+  DEAL_TITLE_MAX,
+  DEFAULT_DEAL_MESSAGE,
+  dealLine,
+  dealMetalLabel,
+  dealSizeLabel,
+  formatDealPrice,
+} from '@/lib/text-alerts/deal-input';
 import { DEAL_PHOTO_MAX, formatPictureBytes } from '@/lib/text-alerts/deal-photos';
 import { DEFAULT_SOLD_REPLY, dealText } from '@/lib/text-alerts/messages';
 
@@ -24,12 +37,21 @@ import { DEFAULT_SOLD_REPLY, dealText } from '@/lib/text-alerts/messages';
  * told it is taken.
  * Sold sends the polite one-liner to anyone who answers late (wording
  * editable, owner's call 2026-09-15).
+ * Since 2026-10-24 (owner, mockup v1): photos can go first (the draft saves
+ * with nothing typed; Preview checks the boxes), plus Comparable price, Metal
+ * + Purity (must-pick), Size / length and a longer Description. The line on
+ * the pictures is built from Purity + Metal + What it is + Size (`dealLine`).
  */
 type Deal = {
   id: string;
   title: string;
   price_text: string;
   message: string;
+  description?: string | null;
+  comparable_price_text?: string | null;
+  metal?: string | null;
+  purity?: string | null;
+  size_text?: string | null;
   photo_path: string | null;
   card_path: string | null;
   status: 'draft' | 'sending' | 'sent' | 'sold';
@@ -85,6 +107,11 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
   const [message, setMessage] = useState(DEFAULT_DEAL_MESSAGE);
+  const [comparable, setComparable] = useState('');
+  const [metal, setMetal] = useState('');
+  const [purity, setPurity] = useState('');
+  const [size, setSize] = useState('');
+  const [description, setDescription] = useState('');
   const [draftId, setDraftId] = useState<string | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [pictures, setPictures] = useState<Picture[] | null>(null);
@@ -120,11 +147,28 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
     });
   }, [selectedId, loadDetail]);
 
-  // Live text preview of what rides with the picture.
-  const previewText = useMemo(() => dealText({ title: title || '…', price: price ? (price.startsWith('$') ? price : `$${price}`) : '$…', message }), [title, price, message]);
+  // The line drawn on the pictures, and the live text preview of what rides with them (one line per box).
+  const words = useMemo(() => ({ title, price_text: price, metal, purity, size_text: size }), [title, price, metal, purity, size]);
+  const line = useMemo(() => dealLine(words), [words]);
+  const previewText = useMemo(() => dealText({
+    item: title || '…',
+    metal: dealMetalLabel(words),
+    size: dealSizeLabel(words),
+    price: formatDealPrice(price) ?? '$…',
+    comparable: formatDealPrice(comparable),
+    description,
+    message,
+  }), [words, title, price, message, comparable, description]);
+
+  function resetComposer() {
+    setDraftId(null); setTitle(''); setPrice(''); setMessage(DEFAULT_DEAL_MESSAGE);
+    setComparable(''); setMetal(''); setPurity(''); setSize(''); setDescription('');
+    setPhotos([]); setPictures(null); setReopenedFrom(null);
+  }
 
   async function saveDraft(): Promise<string> {
-    const payload = { title, price, message };
+    // Every box may still be empty — photos can go first; Preview checks what the deal needs.
+    const payload = { title, price, message, comparable, metal, purity, size, description };
     if (draftId) {
       const data = await readJson(await fetch(`/api/admin/text-deals/${draftId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }));
       setPictures(null);
@@ -225,7 +269,7 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
       const data = await readJson(await fetch(`/api/admin/text-deals/${draftId}/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }));
       setNotice({ text: data.finished ? `Sent to ${data.sent}${data.failed ? `, ${data.failed} failed` : ''}.` : `Sending: ${data.sent} so far, ${data.remaining} to go (the sweep finishes it).`, ok: true });
       const id = draftId;
-      setDraftId(null); setTitle(''); setPrice(''); setMessage(DEFAULT_DEAL_MESSAGE); setPhotos([]); setPictures(null); setReopenedFrom(null);
+      resetComposer();
       await loadList();
       setSelectedId(id);
     } catch (err) {
@@ -272,6 +316,7 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
       const data = await readJson(await fetch(`/api/admin/text-deals/${detail.deal.id}/reopen`, { method: 'POST' }));
       const d = data.deal;
       setDraftId(d.id); setTitle(d.title); setPrice(d.price_text); setMessage(d.message);
+      setComparable(d.comparable_price_text ?? ''); setMetal(d.metal ?? ''); setPurity(d.purity ?? ''); setSize(d.size_text ?? ''); setDescription(d.description ?? '');
       setPhotos(d.photos ?? []); setPictures(null);
       setReopenedFrom(detail.deal.id);
       await loadList();
@@ -287,12 +332,12 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
 
   async function onDelete() {
     if (!detail) return;
-    if (!window.confirm(`Delete "${detail.deal.title}"? Its replies stay on file but lose the link to this deal. This cannot be undone.`)) return;
+    if (!window.confirm(`Delete "${dealLine(detail.deal) || 'this draft'}"? Its replies stay on file but lose the link to this deal. This cannot be undone.`)) return;
     setBusy('delete');
     setNotice(null);
     try {
       await readJson(await fetch(`/api/admin/text-deals/${detail.deal.id}`, { method: 'DELETE' }));
-      if (draftId === detail.deal.id) { setDraftId(null); setTitle(''); setPrice(''); setMessage(DEFAULT_DEAL_MESSAGE); setPhotos([]); setPictures(null); setReopenedFrom(null); }
+      if (draftId === detail.deal.id) resetComposer();
       setSelectedId(null); setDetail(null);
       await loadList();
       setNotice({ text: 'Deal deleted.', ok: true });
@@ -348,28 +393,67 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
                 ))}
               </ul>
             )}
-            <span className="mt-1 block text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>Up to {DEAL_PHOTO_MAX}: one main picture (shop name + price) and up to {DEAL_PHOTO_MAX - 1} detail shots with a small price strip. All go out in one text.</span>
+            <span className="mt-1 block text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>Up to {DEAL_PHOTO_MAX}: one main picture (shop name + price) and up to {DEAL_PHOTO_MAX - 1} detail shots with a small price strip. All go out in one text. Photos can go first — nothing else has to be typed; the boxes below are checked when you press Preview.</span>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-[130px_1fr]">
+          <div className="grid gap-3 grid-cols-2">
             <label className="block">
-              <span className={label} style={labelStyle}>Price</span>
+              <span className={label} style={labelStyle}>Price *</span>
               <input className="form-field w-full" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="1460" required />
             </label>
             <label className="block">
-              <span className={label} style={labelStyle}>One line</span>
-              <input className="form-field w-full" value={title} maxLength={DEAL_TITLE_MAX} onChange={(e) => setTitle(e.target.value)} placeholder="14K rope chain · 22 in · 18.4 g" required />
+              <span className={label} style={labelStyle}>Comparable price <span className="normal-case tracking-normal font-semibold">optional</span></span>
+              <input className="form-field w-full" inputMode="decimal" value={comparable} onChange={(e) => setComparable(e.target.value)} placeholder="2400" />
             </label>
           </div>
 
           <label className="block">
-            <span className={label} style={labelStyle}>Message</span>
+            <span className={label} style={labelStyle}>What it is *</span>
+            <input className="form-field w-full" value={title} maxLength={DEAL_TITLE_MAX} onChange={(e) => setTitle(e.target.value)} placeholder="Rope chain · 18.4 g" required />
+            <span className="mt-1 block text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>Just the piece (and the weight if you like) — the metal, purity and size come from their own boxes.</span>
+          </label>
+
+          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3">
+            <label className="block">
+              <span className={label} style={labelStyle}>Metal *</span>
+              <select className="form-field w-full" value={metal} onChange={(e) => setMetal(e.target.value)} required>
+                <option value="">Choose…</option>
+                {DEAL_METALS.map((option) => <option key={option} value={option}>{option}</option>)}
+                <option value={DEAL_LEAVE_OFF}>Other / leave off</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className={label} style={labelStyle}>Purity *</span>
+              <select className="form-field w-full" value={purity} onChange={(e) => setPurity(e.target.value)} required>
+                <option value="">Choose…</option>
+                {DEAL_PURITIES.map((option) => <option key={option} value={option}>{option}</option>)}
+                <option value={DEAL_LEAVE_OFF}>Other / leave off</option>
+              </select>
+            </label>
+            <label className="block col-span-2 sm:col-span-1">
+              <span className={label} style={labelStyle}>Size / length <span className="normal-case tracking-normal font-semibold">optional</span></span>
+              <input className="form-field w-full" value={size} maxLength={DEAL_SIZE_MAX} onChange={(e) => setSize(e.target.value)} placeholder="22 in · ring size 7" />
+            </label>
+          </div>
+
+          <div className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-low)', color: 'var(--color-on-surface)' }}>
+            <span className="font-bold">Line on the pictures (built for you):</span> <span className="uppercase tracking-[0.06em]">{line || '…'}</span>
+          </div>
+
+          <label className="block">
+            <span className={label} style={labelStyle}>Description <span className="normal-case tracking-normal font-semibold">optional · up to {DEAL_DESCRIPTION_MAX.toLocaleString('en-US')} characters · line breaks kept</span></span>
+            <textarea className="form-field w-full min-h-[118px]" value={description} maxLength={DEAL_DESCRIPTION_MAX} onChange={(e) => setDescription(e.target.value)} placeholder="Heavy solid rope, no dents or kinks, strong lobster clasp." />
+            <span className="mt-1 block text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>Goes in the text under the price. Not drawn on the pictures.</span>
+          </label>
+
+          <label className="block">
+            <span className={label} style={labelStyle}>Closing message</span>
             <textarea className="form-field w-full min-h-[72px]" value={message} maxLength={DEAL_MESSAGE_MAX} onChange={(e) => setMessage(e.target.value)} />
             <span className="mt-1 block text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>&quot;Reply STOP to opt out&quot; is added automatically.</span>
           </label>
 
-          <div className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-low)', color: 'var(--color-on-surface)' }}>
-            <span className="font-bold">Text as it will read:</span> {previewText}
+          <div className="rounded-lg border px-3 py-2 text-xs whitespace-pre-line" style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-low)', color: 'var(--color-on-surface)' }}>
+            <span className="block font-bold">Text as it will read:</span>{previewText}
           </div>
 
           <div>
@@ -417,7 +501,7 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
                 {deals.map((deal) => (
                   <li key={deal.id}>
                     <button type="button" onClick={() => setSelectedId(deal.id)} className="w-full text-left py-2 flex items-center justify-between gap-3 hover:opacity-80" style={{ color: 'var(--color-on-surface)' }}>
-                      <span className="text-sm"><span className="font-semibold">{deal.price_text}</span> · {deal.title}</span>
+                      <span className="text-sm"><span className="font-semibold">{deal.price_text || '—'}</span> · {dealLine(deal) || 'Untitled draft'}</span>
                       <span className="text-[0.6rem] font-bold uppercase tracking-[0.12em] whitespace-nowrap" style={{ color: deal.status === 'sold' ? 'var(--color-error)' : 'var(--color-on-surface-variant)' }}>
                         {STATUS_LABEL[deal.status]}{deal.sent_at ? ` · ${formatWhen(deal.sent_at)}` : ''}
                       </span>
@@ -432,7 +516,7 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
             <div className="rounded-[1.25rem] border bg-white p-5 grid gap-3" style={{ borderColor: 'var(--color-outline-variant)' }}>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-base font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>{detail.deal.price_text} · {detail.deal.title}</h3>
+                  <h3 className="text-base font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>{detail.deal.price_text || '—'} · {dealLine(detail.deal) || 'Untitled draft'}</h3>
                   <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
                     {STATUS_LABEL[detail.deal.status]}{detail.deal.sent_at ? ` · sent ${formatWhen(detail.deal.sent_at)} to ${detail.deal.recipients_count}` : ''}
                     {Object.keys(detail.tally).length > 0 && ` · ${Object.entries(detail.tally).map(([k, v]) => `${v} ${k}`).join(', ')}`}
