@@ -1,6 +1,42 @@
 
 # Changelog
 
+## 2026-10-25 (12) — Instagram shop showed pieces OUT OF STOCK: the Meta feed now sends `quantity_to_sell_on_facebook` — BUILT + STAGED, not pushed; no SQL, no env vars
+
+- Owner: the cow creamer was taggable in Instagram but showed out of stock. Then: *"Yes, add the quantity and the 5-day return window to the Meta feed, test it, and stage it."*
+- **Diagnosis (read-only):**
+  - Live Meta feed: nej-146 `in_stock`, $1,795.
+  - Product page JSON-LD: `InStock`, 1795. Meta's crawler user agent → 200.
+  - Commerce Manager: Eligible / In stock, but in the full attributes **"Quantity to sell: 0"** (our Google-format feed never sent one). The shop reads that as sold out. All 61 pieces were affected.
+  - Same panel: "Return policy days: 30".
+- **Field names checked in Meta's catalog field reference** ([Meta Catalog Fields](https://developers.facebook.com/docs/commerce-platform/catalog/fields/)): `quantity_to_sell_on_facebook` (integer, "only relevant for Shops on Facebook and Instagram"; formerly `inventory`). **No return-days field is documented**, so none was added: the shop's Return profile (5 days, 10-25 (9)) is the setting; a guessed field name would be ignored at best. ◻ Re-read the item's "Return policy days" after the next upload.
+- **Built:**
+  - `src/lib/meta-feed.ts`: `metaFeedQuantity` (= `normalizeProductQuantity`, blank = 1).
+  - `src/app/api/merchant-feed/route.ts`: `quantity` added to `FEED_COLUMNS` / `FeedRow`; `?channel=meta` adds `<g:quantity_to_sell_on_facebook>`; Google output unchanged.
+  - `src/lib/__tests__/meta-feed.test.ts`: +2 tests.
+- **Checked on the dev server:** Meta feed 61 items, 61 quantity lines (values 1 and 5), nej-146 → `1`. Meta output minus the new line == production (prices ignored). Google dev == Google production. The first dev Meta request returned 503 (cold live-spot read, fail-closed by design); the retry gave 200.
+- Gate: `npx tsc --noEmit` 0 · `npm run lint` 0 errors (4 old `<img>` warnings) · `npx vitest run --maxWorkers=4` **1977/1977** (173 files) · `npm run build` 0 · prerender 92 = 43 + 43 + 6 · no `.next/cache/turbopack` (stale `.next/dev` removed first, server stopped).
+- **After the push:** within the hour (or Data sources → Update), Commerce Manager → nej-146 → "Quantity to sell: 1"; Instagram shows the piece in stock.
+
+## 2026-10-25 (11) — 🟢 Instagram / Facebook shop PUBLISHED; both sales channels Active
+
+- Owner: *"Yes, confirm the ratings and reviews option and publish the shop."*
+- Commerce Manager (`997292439422811`) → Overview → **Optimize shop → Confirm** ("Display ratings and reviews from your website on your shop" + the rights statement, on the owner's yes). All 6 setup steps ✓ → **Publish shop** enabled → clicked.
+- After publishing, the shop overview reads: Catalog "Website feed (naplesestatejewelry.com) - hourly — **61 items synced**"; Sales channels **Naples Estate Jewelry (Facebook) — Active**, **@naples_estate_jewelry — Active**; UGC 0 reviews / 0 questions.
+- Not done (not asked): Meta's "Create campaign" (Shops ads) and "Offer a discount for email sign-ups" (left as offered, neither configured nor skipped); the To-do growth tip.
+- Next is the owner's: in the Instagram app, a new reel/post → **Tag products** → pick the piece. If the option is missing, Instagram may still be reviewing the account for shopping (usually a few days).
+
+## 2026-10-25 (10) — Instagram shop, part 4: `/meta-checkout` DEPLOYED (owner) + Meta checkout URL SUBMITTED and tested; catalog step done; **Publish shop still disabled** — the last step ("Optimize your shop" = show website ratings/reviews) is waiting on the owner's call
+
+- Owner: *"Pushed and deployed. Enter the checkout URL, test it, and publish the shop."*
+- Production: `/meta-checkout?products=nej-26%3A1` → 200, `noindex, nofollow`, "Opening your cart…".
+- **Checkout URL** (Commerce Manager → Settings → Build checkout URL): step 3 = `https://naplesestatejewelry.com/meta-checkout`. ⚠️ The field keeps "https://" locked at the front; typing a full URL gives `https://https://…`. Delete back to exactly `https://` and type the rest.
+- **Step 4, Meta's own test:** Meta picked nej-64 (Taxco lightning-bolt brooch) and nej-93 (amethyst earrings) at qty **5**; Claude set them to 1 (one-of-a-kind; the cart caps at stock). Preview opened `…/meta-checkout?products=nej-64%3A1%2Cnej-93%3A1&coupon&cart_origin=meta_shops&fbclid=…`. That landed on `/checkout` with exactly those 2 pieces, qty 1, $95 + $49 = $144 subtotal. Claude then removed the two test pieces from the desk Chrome's site cart (it was otherwise empty) and closed the tab. Ticked "appear correctly" → **Submit**. Meta: *"You've submitted your checkout URL. You'll be notified if we detect issues."* All 4 steps ✓.
+- **Optimize your catalog:** "Add product variants" **Skipped** (no variants; its upload would REPLACE the hourly feed as the data source) and "Connect a dataset" **Skipped** → step ✓.
+- To-do list: **No outstanding issues** (the "1" badge is a growth tip, "Measure metrics in Google reporting", left alone).
+- **Optimize your shop:** its only item is *"Display ratings and reviews from your website on your shop — By allowing Meta to update your shop using this source, you represent that you have the necessary rights to do so"*, Cancel / Confirm, no Skip. Claude **Cancelled** it: not requested, it is a rights statement, and the site's reviews are verbatim Google quotes with no rating data (`DECISIONS.md` → *"The /reviews page"*). **Publish shop stays disabled** (`aria-disabled="true"`) after a reload, with every other step ✓. ◻ Owner's call.
+- No code change in this step.
+
 ## 2026-10-25 (9) — Instagram shop, part 3: shop CREATED + shipping profile; Meta's required **checkout URL** page `/meta-checkout` BUILT + STAGED, not pushed; no SQL, no env vars
 
 - Owner: *"do the commerce manager steps for me in chrome"*, then (the Seller Agreement was put to the owner first) *"i agreed and submitted, continue"*.

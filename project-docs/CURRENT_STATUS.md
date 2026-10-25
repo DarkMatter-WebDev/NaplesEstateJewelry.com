@@ -2,7 +2,23 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-10-25 (9)**.
+> in `DECISIONS.md`. Last reconciled: **2026-10-25 (12)**.
+
+## Start Here (2026-10-25 (12) — 🟡 Instagram "out of stock" fix (Meta feed sends `quantity_to_sell_on_facebook`) BUILT + STAGED, not pushed; no SQL, no env vars)
+
+- 🟡 **Waiting for the owner's push.** The shop is published, but Meta stored "Quantity to sell: 0" for every piece, so Instagram shows them out of stock. Record `CHANGELOG.md` 2026-10-25 (12); steps `TASKS.md` top block, 5d.
+- Gate: `tsc` 0 · lint 0 errors · **1977/1977** (173 files) · build 0 · 92 = 43 + 43 + 6. Everything else is deployed (block below).
+
+## Start Here (2026-10-25 (11) — 🟢 Instagram / Facebook shop PUBLISHED, both channels Active; everything DEPLOYED; nothing staged-but-unpushed except docs; no SQL, no env vars)
+
+- 🟢 Meta shop live: catalog 61 items (hourly feed), checkout → `/meta-checkout` → `/checkout`, Facebook Page + @naples_estate_jewelry Active (`CHANGELOG.md` 2026-10-25 (11)).
+- ◻ **Owner:** first reel with **Tag products**; first week: catalog Issues + a sold piece dropping off within the hour (`TASKS.md` top block, 5c + 6). Also still open: the iPhone look at `/shop` (sort / per page); the Text Deals test text.
+
+## Start Here (2026-10-25 (10) — 🟢 everything DEPLOYED; Meta checkout URL submitted + tested; ◻ **Publish shop** waits on one owner decision; nothing staged-but-unpushed except docs; no SQL, no env vars)
+
+- 🟢 `/meta-checkout` live; Meta's own test landed on /checkout with the right 2 pieces (`CHANGELOG.md` 2026-10-25 (10)).
+- ◻ **Owner's call:** Meta greys out Publish until "Optimize your shop" is confirmed, and its only option is "Display ratings and reviews from your website" + a rights statement. Claude cancelled it; yes → Confirm → Publish (`TASKS.md` top block, 5b).
+- Where the 10-25 (9) block says "STAGED" / "not pushed", read "deployed".
 
 ## Start Here (2026-10-25 (9) — 🟡 Meta shop CREATED + submitted, shipping profile saved; the required checkout URL page `/meta-checkout` BUILT + STAGED, not pushed; no SQL, no env vars)
 

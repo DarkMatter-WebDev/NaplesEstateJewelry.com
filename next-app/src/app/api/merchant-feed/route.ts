@@ -6,6 +6,7 @@ import {
   feedImagePath,
   META_FEED_MAX_IMAGES,
   metaFeedBrand,
+  metaFeedQuantity,
   parseFeedChannel,
   productFeedImages,
 } from '@/lib/meta-feed';
@@ -32,7 +33,9 @@ import {
 // (TASKS 2026-08-30).
 //
 // `?channel=meta` (2026-10-25) is the same feed for the Meta catalog behind
-// the Instagram shop: it adds `g:brand` (Meta requires it) and points every
+// the Instagram shop: it adds `g:brand` (Meta requires it) and
+// `g:quantity_to_sell_on_facebook` (without it Instagram shows every piece
+// out of stock), and points every
 // image at the JPEG converter, since Meta does not take WebP. Without the
 // parameter the output is byte-for-byte what Merchant Center has always read.
 // See lib/meta-feed.ts.
@@ -44,13 +47,13 @@ const BASE = 'https://naplesestatejewelry.com';
 /** Everything the feed and its pricing path actually read. */
 const FEED_COLUMNS =
   'id, status, title, description, category, brand, image_urls, images, inventory_number, '
-  + 'price_mode, pricing_multiplier, gram_weight, weight_grams, purity, manual_price_label, sold_price';
+  + 'price_mode, pricing_multiplier, gram_weight, weight_grams, purity, manual_price_label, sold_price, quantity';
 
 type FeedRow = Pick<
   Product,
   | 'id' | 'status' | 'title' | 'description' | 'category' | 'brand' | 'image_urls' | 'images'
   | 'inventory_number' | 'price_mode' | 'pricing_multiplier' | 'gram_weight'
-  | 'weight_grams' | 'purity' | 'manual_price_label' | 'sold_price'
+  | 'weight_grams' | 'purity' | 'manual_price_label' | 'sold_price' | 'quantity'
 >;
 
 function xmlEscape(value: string): string {
@@ -153,6 +156,9 @@ export async function GET(request: Request): Promise<Response> {
         `      <g:price>${price.toFixed(2)} USD</g:price>`,
         '      <g:condition>used</g:condition>',
         channel === 'meta' ? `      <g:brand>${xmlEscape(metaFeedBrand(row.brand))}</g:brand>` : '',
+        channel === 'meta'
+          ? `      <g:quantity_to_sell_on_facebook>${metaFeedQuantity(row.quantity)}</g:quantity_to_sell_on_facebook>`
+          : '',
         '      <g:identifier_exists>no</g:identifier_exists>',
         '    </item>',
       ].filter(Boolean).join('\n'),

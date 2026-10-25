@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { normalizeProductQuantity } from '@/types/product';
 
 // Meta (Facebook / Instagram) catalog variant of the merchant feed
 // (2026-10-25). Meta reads the same Google-format RSS as Merchant Center
@@ -7,6 +8,11 @@ import { createHash } from 'node:crypto';
 // 1. Meta requires `brand` on every item. The product's own brand when it has
 //    one, otherwise the shop's name. Google's feed is left without a brand on
 //    purpose (unbranded vintage pieces, `identifier_exists: no`).
+// 1b. Meta's Instagram / Facebook shop reads `quantity_to_sell_on_facebook`
+//    as the units on hand; without it the field is 0 and Instagram shows
+//    every piece as out of stock even with `availability: in_stock`
+//    (found 2026-10-25 on the cow creamer). Sent from `products.quantity`,
+//    blank = 1, as the cart counts it.
 // 2. Meta accepts JPEG/PNG only, and every product photo is WebP by design
 //    (DECISIONS → Media). Image links point at `/feed-image/<id>/<n>-<token>.jpg`,
 //    which converts the stored WebP on request. The token is a hash of the
@@ -29,6 +35,11 @@ export function parseFeedChannel(value: string | null): FeedChannel {
 export function metaFeedBrand(brand: string | null | undefined): string {
   const trimmed = (brand ?? '').trim();
   return (trimmed || META_FALLBACK_BRAND).slice(0, 100);
+}
+
+/** Units for `quantity_to_sell_on_facebook`: the stock count, blank = 1 (one-of-a-kind). */
+export function metaFeedQuantity(quantity: number | string | null | undefined): number {
+  return normalizeProductQuantity(quantity);
 }
 
 /** 10 hex characters of SHA-256 over the stored photo URL. */

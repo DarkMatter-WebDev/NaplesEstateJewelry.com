@@ -7,6 +7,7 @@ import {
   META_FALLBACK_BRAND,
   META_FEED_MAX_IMAGES,
   metaFeedBrand,
+  metaFeedQuantity,
   parseFeedChannel,
   parseFeedImageFile,
   productFeedImages,
@@ -33,6 +34,14 @@ describe('meta feed helpers', () => {
     expect(metaFeedBrand(null)).toBe(META_FALLBACK_BRAND);
     expect(metaFeedBrand('   ')).toBe(META_FALLBACK_BRAND);
     expect(metaFeedBrand('x'.repeat(150))).toHaveLength(100);
+  });
+
+  it('sends the units on hand, a blank stock count as one piece', () => {
+    expect(metaFeedQuantity(null)).toBe(1);
+    expect(metaFeedQuantity(undefined)).toBe(1);
+    expect(metaFeedQuantity(3)).toBe(3);
+    expect(metaFeedQuantity('2')).toBe(2);
+    expect(metaFeedQuantity(0)).toBe(0);
   });
 
   it('image addresses round-trip and change when the photo changes', () => {
@@ -66,6 +75,11 @@ describe('meta feed wiring', () => {
 
   it('adds the brand line for Meta only', () => {
     expect(feed).toMatch(/channel === 'meta' \? `\s*<g:brand>/);
+  });
+
+  it('sends quantity_to_sell_on_facebook for Meta only (Instagram reads 0 as sold out)', () => {
+    expect(feed).toMatch(/channel === 'meta'\s*\?\s*`\s*<g:quantity_to_sell_on_facebook>\$\{metaFeedQuantity\(row\.quantity\)\}/);
+    expect(feed).toMatch(/FEED_COLUMNS =[\s\S]*?quantity';/);
   });
 
   it('keeps Google on the stored photo URLs', () => {
