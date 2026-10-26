@@ -28,24 +28,40 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-10-25 (19) — Listing editor photo uploads: nothing dropped silently; "Received N photos · N added" — BUILT + STAGED, not pushed (one push with (18)); no SQL
+### 🟡 2026-10-25 (21) + (22) — Listing photo upload: notice INSIDE the editor, retry at the end + original fallback, Try again; (22) a retried photo goes back into its place — BUILT + STAGED, not pushed; no SQL
+
+(22): `CHANGELOG.md` 2026-10-25 (22) — gate `tsc` 0 · lint 0 errors · **2014/2014** · build 0. On the iPad, if a photo fails and then goes in on the retry, it should sit where it was in the pick, not last.
+
+**Staging (10-25 (22)):** ✅ synced 2026-10-25 ~10:20 PM. The dry run listed exactly the 7 touched files (3 app: `AdminShell.tsx`, `listing-photo-upload.ts`, its test; 4 docs), 0 Extras, 1301 total; real run copied 7, 0 FAILED; follow-up dry run 0, exit 0; leak 0; `.tsx` 265 = 265; SHA-256 MATCH on the 3 app files. Staging holds (21) + (22). Docs-only re-sync after this line.
+
+
+Record: `CHANGELOG.md` 2026-10-25 (21). Rule: `DECISIONS.md` → the photo-prep entry. Files: `src/lib/listing-photo-upload.ts`, `src/components/admin/AdminShell.tsx`, `src/lib/__tests__/listing-photo-upload.test.ts`.
+
+Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **2007/2007** (176 files) · build 0.
+
+1. ◻ **Owner — push + deploy.**
+2. ◻ **Owner — on the iPad:** a listing → Photos → pick a big batch (10+) → under "Take photos" a box reads "Received N photos · N added." and goes away by itself. If a photo fails it stays in red with the photo's name and the reason, plus **Try again** — tap it; then tell Claude the reason text (that is the clue for the 10-25 failure).
+
+**Staging (10-25 (21)):** ✅ synced 2026-10-25 ~10:15 PM. The dry run listed exactly the 7 touched files: 3 app (`AdminShell.tsx`, `listing-photo-upload.ts`, `listing-photo-upload.test.ts`) and 4 docs (CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS). 0 Extras, 1301 total. Real run copied 7, 0 FAILED; follow-up dry run 0, exit 0. Leak check 0; `.tsx` 265 = 265; SHA-256 MATCH on all 3 app files. Docs-only re-sync after this line.
+
+### 🟢 2026-10-25 (19) — Listing editor photo uploads: nothing dropped silently; "Received N photos · N added" — **DEPLOYED (owner, with (18))**; ◻ item 2 only
 
 Record: `CHANGELOG.md` 2026-10-25 (19). Rule: `DECISIONS.md` top entry. Files: `src/components/admin/AdminShell.tsx`, `src/lib/lead-photo-prep.ts`, NEW `src/lib/listing-photo-upload.ts`, NEW `src/lib/__tests__/listing-photo-upload.test.ts`.
 
 Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **2000/2000** (176 files) · build 0.
 
-1. ◻ **Owner — push + deploy** (carries (18) too).
+1. ✅ **Owner — push + deploy** — DONE 10-25 (*"Pushed and deployed."*, carried (18) too). Production not checked by Claude (behind the sign-in; not asked).
 2. ◻ **Owner — on the iPad:** Edit listing → Photos → choose 5–8 photos from the library → tap ✓ (grey is normal — Apple's) → the message reads "Received N photos · N added." Compare N with what you picked: fewer received = the picker kept some back (try again once they have finished downloading); "Couldn't add …" = tell Claude the names.
 
 **Staging (10-25 (19)):** ✅ synced 2026-10-25 ~9:55 PM. The dry run listed exactly the 8 touched files: 4 app (`AdminShell.tsx`, `lead-photo-prep.ts`, NEW `listing-photo-upload.ts`, NEW `listing-photo-upload.test.ts`) and 4 docs (CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS). 0 Extras, 1301 total. Real run copied 8, 0 FAILED; follow-up dry run 0, exit 0. Leak check 0; `.tsx` 265 = 265; SHA-256 MATCH on `AdminShell.tsx`, `lead-photo-prep.ts`, `listing-photo-upload.ts` and (18)'s `globals.css`. Staging holds (18) + (19). Docs-only re-sync after this line.
 
-### 🟡 2026-10-25 (18) — Short admin fields made short (`.form-field` width layered; 15 fields) + trade-in box and "%" on one line — BUILT + STAGED, not pushed; no SQL
+### 🟢 2026-10-25 (18) — Short admin fields made short (`.form-field` width layered; 15 fields) + trade-in box and "%" on one line — **DEPLOYED (owner, with (19))**; ◻ item 2 only
 
 Record: `CHANGELOG.md` 2026-10-25 (18). Rule: `DECISIONS.md` top entry. Files: `src/app/globals.css`, `src/components/admin/AdminSpecialPricePanel.tsx`, NEW `src/lib/__tests__/form-field-width.test.ts`.
 
 Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1993/1993** (175 files) · build 0.
 
-1. ◻ **Owner — push + deploy.**
+1. ✅ **Owner — push + deploy** — DONE 10-25 (with (19)).
 2. ◻ **Owner — on the iPad:** Settings → Customer Trade-in Price → the box is short and the "%" sits right after it, on the same line, in both choices. While there: Settings → eBay and Etsy (the "%" boxes), Homepage carousel ("Cards visible at once"), and a marketplace review pencil (quantity / year / weight) — all short now. Anything that looks too tight → tell Claude which one.
 
 **Staging (10-25 (18)):** ✅ synced 2026-10-25 ~9:45 PM. The dry run listed exactly the 7 touched files: 3 app (`globals.css`, `AdminSpecialPricePanel.tsx`, NEW `form-field-width.test.ts`) and 4 docs (CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS). 0 Extras, 1299 total. Real run copied 7, 0 FAILED; follow-up dry run 0, exit 0. Leak check 0; `.tsx` 265 = 265; SHA-256 MATCH on all 3 app files. Docs-only re-sync after this line.

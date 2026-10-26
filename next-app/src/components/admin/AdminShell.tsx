@@ -11,7 +11,7 @@ import { createClient } from '@/lib/supabase/client';
 import { copyTextToClipboard } from '@/lib/clipboard';
 import { encodeCanvasForUpload } from '@/lib/image-encode';
 import { shrinkPhotoFile } from '@/lib/lead-photo-prep';
-import { LISTING_PHOTO_TIER, listingPhotoUploadSummary } from '@/lib/listing-photo-upload';
+import { LISTING_PHOTO_TIER, insertBatchPhoto, listingPhotoUploadSummary, uploadListingPhotos } from '@/lib/listing-photo-upload';
 import {
   PRODUCT_METAL_VARIANTS,
   PRODUCT_METAL_TYPES,
@@ -1435,6 +1435,18 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   const productVideoEditorRef = useRef<ProductVideoEditorHandle>(null);
   const [uploading, setUploading] = useState(false);
   const [sessionUploadedImageUrls, setSessionUploadedImageUrls] = useState<Set<string>>(() => new Set());
+  // The listing editor's own photo-upload notice. The page `flash` renders
+  // BEHIND the open editor, so upload results were invisible there (owner,
+  // 2026-10-25: "when the one failed.. i wasnt alerted at all"). A clean batch
+  // clears itself; anything that failed stays until dismissed, with Try again.
+  const [photoUploadNotice, setPhotoUploadNotice] = useState<{ text: string; ok: boolean; retryFiles: File[] } | null>(null);
+  const photoUploadNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showPhotoUploadNotice = useCallback((notice: { text: string; ok: boolean; retryFiles: File[] } | null) => {
+    if (photoUploadNoticeTimer.current) clearTimeout(photoUploadNoticeTimer.current);
+    photoUploadNoticeTimer.current = null;
+    setPhotoUploadNotice(notice);
+    if (notice?.ok) photoUploadNoticeTimer.current = setTimeout(() => setPhotoUploadNotice(null), 8000);
+  }, []);
   const [dragOver, setDragOver] = useState(false);
   const [dragSrcIdx, setDragSrcIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
@@ -1895,6 +1907,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
 
   function openEdit(p: Product) {
     resetSpanishTranslation();
+    showPhotoUploadNotice(null);
     stopAiRecording();
     setAiTranscript('');
     setAiInterimText('');
@@ -2646,6 +2659,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setEditing(null);
     setQuickAddMode(false);
     setSessionUploadedImageUrls(new Set());
+    showPhotoUploadNotice(null);
     setPreviewImg(null);
     setCropTarget(null);
     setQuickFillNotice(null);
@@ -2727,13 +2741,15 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     });
   }
 
-  const uploadImageBlob = useCallback(async (blob: Blob): Promise<string | null> => {
-    // Since 2026-09-09 every photo is encoded to WebP on the SERVER (sharp, in
-    // /api/admin/product-images): WebKit — every iPhone browser — cannot encode
-    // WebP in a canvas, so the browser only downsizes and hands over a
-    // high-quality intermediate (JPEG on iPhone, WebP on desktop Chrome). The
-    // stored object is WebP as a fact, not as a request — the old client path
-    // once put 46 PNGs into the bucket under `.webp` names.
+  // Since 2026-09-09 every photo is encoded to WebP on the SERVER (sharp, in
+  // /api/admin/product-images): WebKit — every iPhone browser — cannot encode
+  // WebP in a canvas, so the browser only downsizes and hands over a
+  // high-quality intermediate (JPEG on iPhone, WebP on desktop Chrome). The
+  // stored object is WebP as a fact, not as a request — the old client path
+  // once put 46 PNGs into the bucket under `.webp` names.
+  // Returns the reason instead of flashing it: the page flash sits BEHIND the
+  // open editor, so the listing editor shows upload failures in its own notice.
+  const uploadImageBlobResult = useCallback(async (blob: Blob): Promise<{ url: string } | { error: string }> => {
     let response: Response;
     try {
       response = await fetch('/api/admin/product-images', {
@@ -2742,16 +2758,23 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
         body: blob,
       });
     } catch {
-      flash('Upload failed: the connection dropped before the photo reached the server.', false);
-      return null;
+      return { error: 'the connection dropped before the photo reached the server' };
     }
     const data = await response.json().catch(() => null) as { url?: string; error?: string } | null;
     if (!response.ok || !data?.url) {
-      flash(`Upload failed: ${data?.error ?? response.statusText ?? 'unknown error'}`, false);
+      return { error: data?.error ?? (response.statusText || `server error ${response.status}`) };
+    }
+    return { url: data.url };
+  }, []);
+
+  const uploadImageBlob = useCallback(async (blob: Blob): Promise<string | null> => {
+    const result = await uploadImageBlobResult(blob);
+    if ('error' in result) {
+      flash(`Upload failed: ${result.error}`, false);
       return null;
     }
-    return data.url;
-  }, []);
+    return result.url;
+  }, [uploadImageBlobResult]);
 
   const deleteImagePaths = useCallback(async (paths: string[]) => {
     if (paths.length === 0) return true;
@@ -2792,7 +2815,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     const files = Array.from(input);
     const availableSlots = Math.max(0, MAX_PRODUCT_IMAGE_COUNT - editing.images.length);
     if (availableSlots <= 0) {
-      flash(`Maximum ${MAX_PRODUCT_IMAGE_COUNT} photos per product. Remove a photo before uploading another.`, false);
+      showPhotoUploadNotice({ text: `Maximum ${MAX_PRODUCT_IMAGE_COUNT} photos per product. Remove a photo before uploading another.`, ok: false, retryFiles: [] });
       return;
     }
     const acceptedFiles = files.slice(0, availableSlots);
@@ -2800,77 +2823,71 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     const oversizedFiles = acceptedFiles.filter((file) => file.size > MAX_PRODUCT_IMAGE_UPLOAD_BYTES);
     const uploadFiles = acceptedFiles.filter((file) => file.size <= MAX_PRODUCT_IMAGE_UPLOAD_BYTES);
     if (uploadFiles.length === 0) {
-      flash(listingPhotoUploadSummary({ received: files.length, added: 0, failed: [], overLimit: rejectedForCount, oversized: oversizedFiles.length, availableSlots }), false);
+      showPhotoUploadNotice({
+        text: listingPhotoUploadSummary({ received: files.length, added: 0, failed: [], overLimit: rejectedForCount, oversized: oversizedFiles.length, availableSlots }),
+        ok: false,
+        retryFiles: [],
+      });
       return;
     }
     setUploading(true);
-
-    // One photo at a time, each fully released before the next (see
-    // `shrinkPhotoFile`): iPad Safari's canvas-memory cap used to stop a batch
-    // partway, silently dropping that photo and every one after it. A photo that
-    // still fails is retried once, then NAMED in the summary — never skipped
-    // without a word (owner, 2026-10-25: "some are left out and skipped").
-    async function processAndUpload(file: File): Promise<string | null> {
-      let prepared: File;
-      try {
-        prepared = await shrinkPhotoFile(file, LISTING_PHOTO_TIER);
-      } catch {
-        await new Promise((resolve) => window.setTimeout(resolve, 400));
-        prepared = await shrinkPhotoFile(file, LISTING_PHOTO_TIER);
-      }
-      return uploadImageBlob(prepared);
-    }
-
-    let successCount = 0;
-    const failedNames: string[] = [];
+    setPhotoUploadNotice(null);
 
     // Add a freshly-uploaded photo to the editor, defaulting it to WHITE side
     // padding. New products already default their product-level padding to white
     // (nothing to pin). Existing products may use a different padding, so the new
     // photo gets a per-photo white entry — the new upload defaults to white without
     // changing the product's other photos. The admin can still change it after.
-    const addUploadedImage = (prev: NonNullable<typeof editing>, url: string) => {
+    // A photo goes in at ITS place in the batch (`insertBatchPhoto`), so one that
+    // lands late on the end-of-batch retry is not moved to the end.
+    const batchUrls: (string | null)[] = uploadFiles.map(() => null);
+    const addUploadedImage = (prev: NonNullable<typeof editing>, url: string, index: number) => {
       const productLevelIsWhite = normalizeProductImagePaddingValue(prev.image_padding) === 'white';
       return {
         ...prev,
-        images: [...prev.images, url],
+        images: insertBatchPhoto(prev.images, url, index, batchUrls),
         image_padding_by_image: productLevelIsWhite
           ? prev.image_padding_by_image
           : { ...(prev.image_padding_by_image ?? {}), [url]: 'white' as const },
       };
     };
 
+    // One photo at a time, each fully released before the next (see
+    // `shrinkPhotoFile`); a photo that fails is retried at the END of the batch
+    // after a pause, then with its original file, and only then reported — by
+    // name and reason, in the editor's own notice, with Try again (owner,
+    // 2026-10-25: "one was consistently being skipped" … "i wasnt alerted").
     // Each photo is added to the editor the moment it lands, so the AI assistant
     // becomes available after the first while the rest keep uploading.
+    let outcome: Awaited<ReturnType<typeof uploadListingPhotos>> = { added: 0, failed: [] };
     try {
-      for (const file of uploadFiles) {
-        try {
-          const url = await processAndUpload(file);
-          if (!url) {
-            failedNames.push(file.name || 'photo');
-            continue;
-          }
-          successCount++;
+      outcome = await uploadListingPhotos(uploadFiles, {
+        shrink: (file) => shrinkPhotoFile(file, LISTING_PHOTO_TIER),
+        upload: uploadImageBlobResult,
+        onAdded: (url, index) => {
+          batchUrls[index] = url;
           setSessionUploadedImageUrls((current) => new Set(current).add(url));
-          setEditing((prev) => prev ? addUploadedImage(prev, url) : prev);
-        } catch {
-          failedNames.push(file.name || 'photo');
-        }
-      }
+          setEditing((prev) => prev ? addUploadedImage(prev, url, index) : prev);
+        },
+      });
     } finally {
       setUploading(false);
     }
 
-    const summary = listingPhotoUploadSummary({
-      received: files.length,
-      added: successCount,
-      failed: failedNames,
-      overLimit: rejectedForCount,
-      oversized: oversizedFiles.length,
-      availableSlots,
+    const ok = outcome.failed.length === 0 && rejectedForCount === 0 && oversizedFiles.length === 0;
+    showPhotoUploadNotice({
+      text: listingPhotoUploadSummary({
+        received: files.length,
+        added: outcome.added,
+        failed: outcome.failed.map((f) => ({ name: f.file.name, reason: f.reason })),
+        overLimit: rejectedForCount,
+        oversized: oversizedFiles.length,
+        availableSlots,
+      }),
+      ok,
+      retryFiles: outcome.failed.map((f) => f.file),
     });
-    flash(summary, failedNames.length === 0 && rejectedForCount === 0 && oversizedFiles.length === 0);
-  }, [editing, uploadImageBlob]);
+  }, [editing, uploadImageBlobResult, showPhotoUploadNotice]);
 
   async function saveCroppedImage() {
     if (!editing || !cropTarget) return;
@@ -5225,6 +5242,40 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   <AppIcon name="photo_camera"  aria-hidden="true" />
                   Take photos
                 </label>
+
+                {/* Upload result, INSIDE the editor (the page flash is hidden behind it). */}
+                {photoUploadNotice && (
+                  <div
+                    role={photoUploadNotice.ok ? 'status' : 'alert'}
+                    className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5 text-sm font-medium"
+                    style={{
+                      background: photoUploadNotice.ok ? 'color-mix(in srgb, var(--color-primary) 10%, transparent)' : 'color-mix(in srgb, var(--color-error) 10%, transparent)',
+                      border: `1px solid ${photoUploadNotice.ok ? 'color-mix(in srgb, var(--color-primary) 30%, transparent)' : 'color-mix(in srgb, var(--color-error) 35%, transparent)'}`,
+                      color: photoUploadNotice.ok ? 'var(--color-primary)' : 'var(--color-error)',
+                      borderRadius: 'var(--radius-lg)',
+                    }}
+                  >
+                    <span className="min-w-0 flex-1" style={{ overflowWrap: 'anywhere' }}>{photoUploadNotice.text}</span>
+                    {photoUploadNotice.retryFiles.length > 0 && (
+                      <button
+                        type="button"
+                        className="gold-button text-xs disabled:opacity-50"
+                        disabled={uploading}
+                        onClick={() => void handleImageUpload(photoUploadNotice.retryFiles)}
+                      >
+                        Try again
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="text-xs font-bold underline"
+                      style={{ color: 'inherit' }}
+                      onClick={() => showPhotoUploadNotice(null)}
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                )}
 
                 {/* Uploaded photo gallery — click to preview & crop, drag to reorder */}
                 {editing.images.length > 0 && (

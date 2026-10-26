@@ -2,7 +2,22 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-10-25 (19)**.
+> in `DECISIONS.md`. Last reconciled: **2026-10-25 (22)**.
+
+## Start Here (2026-10-25 (22) — 🟡 a retried photo goes back into its place (not the end) BUILT + STAGED, not pushed; one push carries (21) + (22); no SQL, no env vars)
+
+- 🟡 **Waiting for the owner's push** (`CHANGELOG.md` 2026-10-25 (22); `TASKS.md` top block, now covering (21) + (22)). Gate: `tsc` 0 · lint 0 errors · **2014/2014** · build 0. ⛔ Not tried on the iPad.
+
+## Start Here (2026-10-25 (21) — 🟡 listing photo upload: result shown inside the editor, retry-at-end + original fallback + Try again — BUILT + STAGED, not pushed; no SQL, no env vars)
+
+- 🟡 **Waiting for the owner's push** (`CHANGELOG.md` 2026-10-25 (21); rule `DECISIONS.md` → the photo-prep entry; `TASKS.md` top). Storage proved the 10-25 skipped photo failed on the page (13 of 14 reached the server, twice, the 2nd photo each time); its message was invisible behind the editor.
+- Gate: `tsc` 0 · lint 0 errors · **2007/2007** (176 files) · build 0. ⛔ Not tried on the iPad.
+- The owner's open editor is safe to save (unused session uploads are deleted on save).
+
+## Start Here (2026-10-25 (20) — 🟢 everything DEPLOYED (owner): (18) short admin fields + (19) listing photo uploads; nothing staged-but-unpushed except docs; no SQL, no env vars)
+
+- 🟢 Owner: *"Pushed and deployed."* (`CHANGELOG.md` 2026-10-25 (20)). Claude did not check production (behind the sign-in; not asked).
+- ◻ Open — the owner's iPad checks (`TASKS.md` top three blocks): a batch of library photos on a listing ("Received N photos · N added"); the short trade-in / eBay / Etsy / carousel boxes; the trade-in "% off the asking price" choice. Where the (16)/(18)/(19) blocks below say "STAGED" / "not pushed", read "deployed". The 10-25 (15) open checks still apply.
 
 ## Start Here (2026-10-25 (19) — 🟡 listing photo uploads no longer drop photos + a "Received N · N added" message BUILT + STAGED, not pushed; one push carries (18) + (19); no SQL, no env vars)
 

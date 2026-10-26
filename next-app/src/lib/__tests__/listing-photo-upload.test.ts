@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { LISTING_PHOTO_TIER, listingPhotoUploadSummary } from '../listing-photo-upload';
+import {
+  LISTING_PHOTO_ORIGINAL_MAX_BYTES,
+  LISTING_PHOTO_RETRY_PAUSE_MS,
+  LISTING_PHOTO_TIER,
+  canSendOriginal,
+  insertBatchPhoto,
+  listingPhotoUploadSummary,
+  uploadListingPhotos,
+  type ListingPhotoUploadDeps,
+} from '../listing-photo-upload';
 
 const base = { received: 4, added: 4, failed: [], overLimit: 0, oversized: 0, availableSlots: 19 };
 
@@ -14,11 +23,10 @@ describe('listing photo upload summary', () => {
     expect(listingPhotoUploadSummary({ ...base, received: 1, added: 1 })).toBe('Received 1 photo · 1 added.');
   });
 
-  it('names every photo it could not add', () => {
-    expect(listingPhotoUploadSummary({ ...base, added: 3, failed: ['IMG_4521.jpeg'] })).toBe(
-      "Received 4 photos · 3 added · Couldn't add IMG_4521.jpeg — try it again.",
-    );
-    expect(listingPhotoUploadSummary({ ...base, added: 2, failed: ['a.jpg', 'b.jpg'] })).toContain("Couldn't add a.jpg, b.jpg — try them again");
+  it('names every photo it could not add, with why', () => {
+    expect(
+      listingPhotoUploadSummary({ ...base, added: 3, failed: [{ name: 'IMG_4521.jpeg', reason: 'this device could not read it' }] }),
+    ).toBe("Received 4 photos · 3 added · Couldn't add IMG_4521.jpeg (this device could not read it).");
   });
 
   it('counts the photos left out for the 20-photo limit or size', () => {
@@ -33,20 +41,167 @@ describe('listing photo upload summary', () => {
   });
 });
 
+const photo = (name: string, size = 3 * 1024 * 1024, type = 'image/jpeg') =>
+  new File([new Uint8Array(size)], name, { type });
+
+/** Fake deps: `shrinkFails[name]` = how many shrink calls fail for that photo. */
+function harness(opts: { shrinkFails?: Record<string, number>; uploadFails?: Record<string, number> } = {}) {
+  const shrinkFails = { ...(opts.shrinkFails ?? {}) };
+  const uploadFails = { ...(opts.uploadFails ?? {}) };
+  const log: string[] = [];
+  const added: string[] = [];
+  const waits: number[] = [];
+  const deps: ListingPhotoUploadDeps = {
+    shrink: async (file) => {
+      log.push(`shrink ${file.name}`);
+      if ((shrinkFails[file.name] ?? 0) > 0) {
+        shrinkFails[file.name] -= 1;
+        throw new Error('No 2d canvas context');
+      }
+      return new File([new Uint8Array(10)], `${file.name}.small`, { type: 'image/jpeg' });
+    },
+    upload: async (blob) => {
+      const name = (blob as File).name;
+      log.push(`upload ${name}`);
+      const key = name.replace(/\.small$/, '');
+      if ((uploadFails[key] ?? 0) > 0) {
+        uploadFails[key] -= 1;
+        return { error: 'Upload failed: storage busy' };
+      }
+      return { url: `https://cdn/${name}` };
+    },
+    onAdded: (url) => added.push(url),
+    wait: async (ms) => { waits.push(ms); log.push(`wait ${ms}`); },
+  };
+  return { deps, log, added, waits };
+}
+
+describe('uploadListingPhotos', () => {
+  it('a clean batch uploads every photo in order, with no pause', async () => {
+    const h = harness();
+    const result = await uploadListingPhotos([photo('a'), photo('b'), photo('c')], h.deps);
+    expect(result).toEqual({ added: 3, failed: [] });
+    expect(h.added).toEqual(['https://cdn/a.small', 'https://cdn/b.small', 'https://cdn/c.small']);
+    expect(h.waits).toEqual([]);
+  });
+
+  it('retries a failed photo at the END of the batch, after the pause (the 10-25 case)', async () => {
+    const h = harness({ shrinkFails: { b: 1 } });
+    const result = await uploadListingPhotos([photo('a'), photo('b'), photo('c')], h.deps);
+    expect(result).toEqual({ added: 3, failed: [] });
+    expect(h.log).toEqual([
+      'shrink a', 'upload a.small', 'shrink b', 'shrink c', 'upload c.small',
+      `wait ${LISTING_PHOTO_RETRY_PAUSE_MS}`, 'shrink b', 'upload b.small',
+    ]);
+    expect(LISTING_PHOTO_RETRY_PAUSE_MS).toBeGreaterThanOrEqual(2000);
+  });
+
+  it('on the retry, sends the ORIGINAL when the browser still cannot shrink it', async () => {
+    const h = harness({ shrinkFails: { b: 2 } });
+    const result = await uploadListingPhotos([photo('a'), photo('b')], h.deps);
+    expect(result).toEqual({ added: 2, failed: [] });
+    expect(h.log.slice(-2)).toEqual(['shrink b', 'upload b']);
+  });
+
+  it('reports a photo that still fails, with the reason, and never stops the batch', async () => {
+    const big = photo('huge', LISTING_PHOTO_ORIGINAL_MAX_BYTES + 1);
+    const h = harness({ shrinkFails: { huge: 2 }, uploadFails: { c: 2 } });
+    const result = await uploadListingPhotos([big, photo('b'), photo('c')], h.deps);
+    expect(result.added).toBe(1);
+    expect(result.failed.map((f) => [f.file.name, f.reason])).toEqual([
+      ['huge', 'this device could not read it (No 2d canvas context)'],
+      ['c', 'Upload failed: storage busy'],
+    ]);
+  });
+
+  it('never sends an original that is too big or a type the server may not read', () => {
+    expect(canSendOriginal(photo('ok'))).toBe(true);
+    expect(canSendOriginal(photo('big', LISTING_PHOTO_ORIGINAL_MAX_BYTES + 1))).toBe(false);
+    expect(canSendOriginal(photo('heic', 1000, 'image/heic'))).toBe(false);
+    expect(canSendOriginal(photo('empty', 0))).toBe(false);
+  });
+
+  it('never throws, even when the upload itself throws', async () => {
+    const h = harness();
+    h.deps.upload = async () => { throw new Error('network gone'); };
+    const result = await uploadListingPhotos([photo('a')], h.deps);
+    expect(result.added).toBe(0);
+    expect(result.failed[0].reason).toBe('network gone');
+  });
+});
+
+// Owner, 2026-10-25: a retried photo should "insert in where it was supposed to
+// go instead of as the last photo".
+describe('a retried photo goes back into its place', () => {
+  it('the 10-25 case: the 2nd photo fails, lands last, and is put back 2nd', async () => {
+    const h = harness({ shrinkFails: { b: 1 } });
+    let images = ['old1'];
+    const batchUrls: (string | null)[] = [null, null, null, null];
+    await uploadListingPhotos([photo('a'), photo('b'), photo('c'), photo('d')], {
+      ...h.deps,
+      onAdded: (url, index) => {
+        batchUrls[index] = url;
+        images = insertBatchPhoto(images, url, index, batchUrls);
+      },
+    });
+    expect(images).toEqual(['old1', 'https://cdn/a.small', 'https://cdn/b.small', 'https://cdn/c.small', 'https://cdn/d.small']);
+  });
+
+  it('a failed FIRST photo becomes the cover again on an empty listing', () => {
+    expect(insertBatchPhoto(['b', 'c'], 'a', 0, [null, 'b', 'c'])).toEqual(['a', 'b', 'c']);
+  });
+
+  it('two failed neighbours both go back in order', () => {
+    let images = ['x', 'a', 'd'];
+    const batch: (string | null)[] = ['a', null, null, 'd'];
+    batch[1] = 'b'; images = insertBatchPhoto(images, 'b', 1, batch);
+    batch[2] = 'c'; images = insertBatchPhoto(images, 'c', 2, batch);
+    expect(images).toEqual(['x', 'a', 'b', 'c', 'd']);
+  });
+
+  it('follows its neighbour if the owner dragged it while uploading', () => {
+    // batch a,b,c; b retried; the owner moved "a" to the front meanwhile.
+    expect(insertBatchPhoto(['a', 'old1', 'c'], 'b', 1, ['a', null, 'c'])).toEqual(['a', 'b', 'old1', 'c']);
+  });
+
+  it('goes to the end when none of its batch is left (all removed)', () => {
+    expect(insertBatchPhoto(['old1'], 'b', 1, ['a', null, 'c'])).toEqual(['old1', 'b']);
+  });
+
+  it('a clean batch is simply appended in order', () => {
+    let images = ['old1'];
+    const batch: (string | null)[] = [null, null];
+    batch[0] = 'a'; images = insertBatchPhoto(images, 'a', 0, batch);
+    batch[1] = 'b'; images = insertBatchPhoto(images, 'b', 1, batch);
+    expect(images).toEqual(['old1', 'a', 'b']);
+  });
+});
+
 describe('the listing editor upload', () => {
   const shell = readFileSync(join(process.cwd(), 'src', 'components', 'admin', 'AdminShell.tsx'), 'utf8');
   const prep = readFileSync(join(process.cwd(), 'src', 'lib', 'lead-photo-prep.ts'), 'utf8');
+  const handler = shell.slice(shell.indexOf('const handleImageUpload'), shell.indexOf('async function saveCroppedImage'));
 
-  it('prepares photos with the shared shrinker, not its own canvas code', () => {
-    expect(shell).toContain('shrinkPhotoFile(file, LISTING_PHOTO_TIER)');
+  it('prepares photos with the shared shrinker and the shared batch logic', () => {
+    expect(handler).toContain('shrinkPhotoFile(file, LISTING_PHOTO_TIER)');
+    expect(handler).toContain('uploadListingPhotos(uploadFiles');
     expect(shell).not.toMatch(/createImageBitmap\(file\)/);
   });
 
-  it('one failed photo never stops the rest, and "Uploading…" always clears', () => {
-    const handler = shell.slice(shell.indexOf('const handleImageUpload'), shell.indexOf('async function saveCroppedImage'));
-    expect(handler).toMatch(/for \(const file of uploadFiles\) \{\s*try \{/);
+  it('shows the result INSIDE the editor, never with the page flash (hidden behind it)', () => {
+    expect(handler).not.toMatch(/\bflash\(/);
+    expect(handler).toContain('showPhotoUploadNotice(');
+    expect(shell).toMatch(/\{photoUploadNotice && \(/);
+    expect(shell).toContain('Try again');
+  });
+
+  it('places each photo by its batch position, never a plain append', () => {
+    expect(handler).toContain('insertBatchPhoto(prev.images, url, index, batchUrls)');
+    expect(handler).not.toMatch(/images: \[\.\.\.prev\.images, url\]/);
+  });
+
+  it('"Uploading…" always clears', () => {
     expect(handler).toMatch(/\} finally \{\s*setUploading\(false\);/);
-    expect(handler).toContain('failedNames.push');
   });
 
   it('the shrinker releases the decoded photo and the canvas on every path', () => {

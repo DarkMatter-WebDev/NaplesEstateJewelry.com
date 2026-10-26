@@ -13,6 +13,8 @@
   - Downsizing in the browser goes through `shrinkPhotoFile` (`lib/lead-photo-prep.ts`): JPEG intermediate (never ask WebKit for WebP), `<img>` fallback, and the decoded photo + canvas released in a `finally`. ⛔ Never a second copy of canvas code in a component (the listing editor's copy leaked 100–190 MB per photo on iPad).
   - A batch is one photo at a time, each in its own try/catch (one retry), and the busy flag clears in a `finally`. ⛔ Never let one failed photo end the loop.
   - The closing message counts what the page RECEIVED and names any photo it could not add (`lib/listing-photo-upload.ts`), so "the picker kept it back" and "the page failed" are told apart.
+  - **(2026-10-25 (21))** The result is shown INSIDE the listing editor (Photos section), never with the page `flash` — that renders behind the editor overlay and was invisible. ⛔ Never report an editor action with `flash` while the editor is open. A failed photo is retried at the END of the batch after 2 s, then (still unreadable) sent as the original when JPEG/PNG/WebP ≤ 4 MB; what still fails stays on screen with its reason and a **Try again** button until dismissed.
+  - **(2026-10-25 (22))** Photos keep their picked order: a photo that lands late goes back into its place in the batch (`insertBatchPhoto`, anchored to its batch neighbours), never to the end. ⛔ Never `images: [...prev.images, url]` for a batch upload. (Try again is a new pick and appends.)
   - The iPadOS picker's grey ✓ is Apple's; nothing in the site controls it.
 - Guard `lib/__tests__/listing-photo-upload.test.ts`. Record `CHANGELOG.md` 2026-10-25 (19).
 

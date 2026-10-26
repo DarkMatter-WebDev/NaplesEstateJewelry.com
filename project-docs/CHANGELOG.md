@@ -1,6 +1,37 @@
 
 # Changelog
 
+## 2026-10-25 (22) — A retried photo goes back into ITS place in the batch, not to the end — BUILT + STAGED, not pushed (one push with (21)); no SQL
+
+- Owner: *"if a photo fails and is retried at the end of the batch, can we have it insert in where it was supposed to go instead of as the last photo?"*
+- `uploadListingPhotos` now reports each photo's batch position (`onAdded(url, index)`); the editor places it with NEW `insertBatchPhoto` (`lib/listing-photo-upload.ts`): right after the nearest EARLIER photo of the same batch still in the list, else right before the nearest LATER one (a retried first photo becomes the cover again on a new listing), else at the end. Anchored to the batch's own photos, so it stays right if a photo is removed or dragged while the batch uploads. A clean batch still appends in order.
+- **Try again** (the button) is a new pick, so it still adds at the end — drag to reorder.
+- Files: `src/lib/listing-photo-upload.ts`, `src/components/admin/AdminShell.tsx`, `src/lib/__tests__/listing-photo-upload.test.ts` (21; the 10-25 case — 2nd of 4 fails, lands last, goes back 2nd — is a test).
+- Gate: `npx tsc --noEmit` 0 · `npm run lint` 0 errors (the 4 old `<img>` warnings) · `npx vitest run` **2014/2014** (176 files) · `npm run build` 0 (dev stopped first; 563/563).
+- ⛔ Not tried on the iPad.
+
+## 2026-10-25 (21) — Listing photos: the result shows INSIDE the editor; a failed photo is retried at the end, then sent as the original; "Try again" — BUILT + STAGED, not pushed; no SQL, no env vars
+
+- Owner (iPad, after (19) was live): *"i uploaded 4 photos fine.. then i chose the remaining 14 the item needed and only 13 uploaded.. one was consistently being skipped.. once i chose only the next 2, the one that had been being skipped went in fine … investigate"*; *"when the one failed.. i wasnt alerted at all"*; *"i have been in the edit form the whole time and havent saved anything yet"*. Then: *"Yes, build the four-part photo upload fix."*
+- **Evidence (Storage, read-only list of `product-images/products/`, Naples time):** 10:02:17–:23 → 4 objects; 10:03:03–:24 → **13** (missing the 219 KB photo); 10:04:22–:43 → **13** of the same set (missing the 228 KB one; the other 12 match by size); 10:05:05–:07 → the 228 KB + 219 KB, fine. Both 14-photo batches lost their **2nd** photo, each with a ~1 s extra gap after the first upload (a failed read + the 0.4 s retry). So the page — not the picker, not the server — failed that photo; it never reached the route.
+- **Why no alert:** the page `flash` renders in the products page BEHIND the open editor overlay (`fixed inset-0 z-50`) and clears after 3.5 s — no upload message, good or bad, was ever visible in the editor.
+- **Unsaved editor:** Save keeps exactly the photos shown and deletes every session upload not in the saved set; Cancel deletes all of them (`AdminShell.tsx` `discardEditorDraft` / the commit reconcile) — the orphaned re-uploads clean themselves up. Counts fit 1 + 4 + 13 + 2 = 20 (the cap).
+- **The fix (owner's yes on all four):**
+  1. **Notice inside the editor** (Photos section, under Take photos): a clean batch clears itself after 8 s; anything that failed stays until **Dismiss**, naming each photo with its reason. The page flash is no longer used by the upload. Cleared on open/close of the editor.
+  2. **Retry at the END** of the batch after **2 s** (`LISTING_PHOTO_RETRY_PAUSE_MS`), not 0.4 s in place.
+  3. **Try again** button on the notice for photos that still failed (the files are kept; no re-picking).
+  4. **Original-file fallback** on the retry when the browser still cannot shrink it: JPEG/PNG/WebP ≤ 4 MB (`LISTING_PHOTO_ORIGINAL_MAX_BYTES`; route cap 5 MB, Netlify body ~4.5 MB after base64); the server re-encodes to WebP as always.
+  - `uploadImageBlobResult` returns the server's reason instead of flashing it; `uploadImageBlob` (crop) still flashes.
+- Files: `src/lib/listing-photo-upload.ts` (batch logic `uploadListingPhotos`, `canSendOriginal`, summary with reasons), `src/components/admin/AdminShell.tsx`, `src/lib/__tests__/listing-photo-upload.test.ts` (14).
+- Gate: `npx tsc --noEmit` 0 · `npm run lint` 0 errors (the 4 old `<img>` warnings) · `npx vitest run` **2007/2007** (176 files) · `npm run build` 0 (dev stopped first; 563/563) · `.next/dev` cleared before the dev restart.
+- **Browser run (Chromium, dev page, the same shrinker + batch code pasted in, upload stubbed):** 14 generated 12 MP JPEGs + one non-image placed 2nd → 14 added (all `image/jpeg`, ~185–192 KB at 2048 px) in 3.4 s; the non-image was retried at the end, sent as the original, and reported "NOT_A_PHOTO.jpeg (That file is not an image this server can read.)".
+- ⛔ Not verified: the iPad (behind the sign-in; Chromium does not reproduce iPad Safari's failure). The real reason for the 10-25 failure is still unknown — the next one will be NAMED in the notice.
+
+## 2026-10-25 (20) — 🟢 (18) short admin fields + (19) listing photo uploads DEPLOYED (owner); nothing staged-but-unpushed except docs
+
+- Owner: *"Pushed and deployed."* — one push carried (18) and (19). Claude did not check production (both are behind the sign-in; not asked).
+- ◻ Open, the owner's iPad checks (`TASKS.md` top three blocks): pick 5–8 library photos on a listing → "Received N photos · N added."; the short boxes (trade-in, eBay/Etsy %, carousel counts, inline editor); the trade-in "% off the asking price" choice.
+
 ## 2026-10-25 (19) — Listing editor: photos chosen from the library no longer go missing; the message says how many were received — BUILT + STAGED, not pushed (rides with (18)); no SQL, no env vars
 
 - Owner (iPad, Edit listing → Photos → library picker): *"why … is the blue check button in the top right greyed out? it still works and adds photos when i press it, but some are left out and skipped"*; then *"even when i choose 1 photo that does work, it still stays greyed out"*.
