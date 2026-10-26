@@ -1439,9 +1439,15 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   // BEHIND the open editor, so upload results were invisible there (owner,
   // 2026-10-25: "when the one failed.. i wasnt alerted at all"). A clean batch
   // clears itself; anything that failed stays until dismissed, with Try again.
-  const [photoUploadNotice, setPhotoUploadNotice] = useState<{ text: string; ok: boolean; retryFiles: File[] } | null>(null);
+  // `retry` keeps what Try again needs to put each photo back in its place.
+  type PhotoUploadNotice = {
+    text: string;
+    ok: boolean;
+    retry: { files: File[]; indices: number[]; batchUrls: (string | null)[] } | null;
+  };
+  const [photoUploadNotice, setPhotoUploadNotice] = useState<PhotoUploadNotice | null>(null);
   const photoUploadNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const showPhotoUploadNotice = useCallback((notice: { text: string; ok: boolean; retryFiles: File[] } | null) => {
+  const showPhotoUploadNotice = useCallback((notice: PhotoUploadNotice | null) => {
     if (photoUploadNoticeTimer.current) clearTimeout(photoUploadNoticeTimer.current);
     photoUploadNoticeTimer.current = null;
     setPhotoUploadNotice(notice);
@@ -2808,25 +2814,32 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   }, [deleteImagePaths]);
 
   // --- Image upload ---
-  const handleImageUpload = useCallback(async (input: FileList | File[]) => {
+  // `resume` = the notice's Try again: it continues the ORIGINAL batch (its
+  // `batchUrls` and the failed photos' original places), so a photo added by
+  // hand lands where it was picked, exactly like the automatic retry.
+  const handleImageUpload = useCallback(async (
+    input: FileList | File[],
+    resume?: { batchUrls: (string | null)[]; indices: number[] },
+  ) => {
     if (!editing) return;
     // A real array, taken before anything else: the picker's FileList is live
     // and the input is reset right after the pick.
     const files = Array.from(input);
+    const entries = files.map((file, i) => ({ file, index: resume ? resume.indices[i] : i }));
     const availableSlots = Math.max(0, MAX_PRODUCT_IMAGE_COUNT - editing.images.length);
     if (availableSlots <= 0) {
-      showPhotoUploadNotice({ text: `Maximum ${MAX_PRODUCT_IMAGE_COUNT} photos per product. Remove a photo before uploading another.`, ok: false, retryFiles: [] });
+      showPhotoUploadNotice({ text: `Maximum ${MAX_PRODUCT_IMAGE_COUNT} photos per product. Remove a photo before uploading another.`, ok: false, retry: null });
       return;
     }
-    const acceptedFiles = files.slice(0, availableSlots);
-    const rejectedForCount = files.length - acceptedFiles.length;
-    const oversizedFiles = acceptedFiles.filter((file) => file.size > MAX_PRODUCT_IMAGE_UPLOAD_BYTES);
-    const uploadFiles = acceptedFiles.filter((file) => file.size <= MAX_PRODUCT_IMAGE_UPLOAD_BYTES);
-    if (uploadFiles.length === 0) {
+    const acceptedEntries = entries.slice(0, availableSlots);
+    const rejectedForCount = entries.length - acceptedEntries.length;
+    const oversizedCount = acceptedEntries.filter((e) => e.file.size > MAX_PRODUCT_IMAGE_UPLOAD_BYTES).length;
+    const uploadEntries = acceptedEntries.filter((e) => e.file.size <= MAX_PRODUCT_IMAGE_UPLOAD_BYTES);
+    if (uploadEntries.length === 0) {
       showPhotoUploadNotice({
-        text: listingPhotoUploadSummary({ received: files.length, added: 0, failed: [], overLimit: rejectedForCount, oversized: oversizedFiles.length, availableSlots }),
+        text: listingPhotoUploadSummary({ received: files.length, added: 0, failed: [], overLimit: rejectedForCount, oversized: oversizedCount, availableSlots }),
         ok: false,
-        retryFiles: [],
+        retry: null,
       });
       return;
     }
@@ -2839,8 +2852,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     // photo gets a per-photo white entry — the new upload defaults to white without
     // changing the product's other photos. The admin can still change it after.
     // A photo goes in at ITS place in the batch (`insertBatchPhoto`), so one that
-    // lands late on the end-of-batch retry is not moved to the end.
-    const batchUrls: (string | null)[] = uploadFiles.map(() => null);
+    // lands late — the end-of-batch retry, or Try again — is not moved to the end.
+    const batchUrls: (string | null)[] = resume ? resume.batchUrls : files.map(() => null);
     const addUploadedImage = (prev: NonNullable<typeof editing>, url: string, index: number) => {
       const productLevelIsWhite = normalizeProductImagePaddingValue(prev.image_padding) === 'white';
       return {
@@ -2861,10 +2874,11 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     // becomes available after the first while the rest keep uploading.
     let outcome: Awaited<ReturnType<typeof uploadListingPhotos>> = { added: 0, failed: [] };
     try {
-      outcome = await uploadListingPhotos(uploadFiles, {
+      outcome = await uploadListingPhotos(uploadEntries.map((e) => e.file), {
         shrink: (file) => shrinkPhotoFile(file, LISTING_PHOTO_TIER),
         upload: uploadImageBlobResult,
-        onAdded: (url, index) => {
+        onAdded: (url, i) => {
+          const index = uploadEntries[i].index;
           batchUrls[index] = url;
           setSessionUploadedImageUrls((current) => new Set(current).add(url));
           setEditing((prev) => prev ? addUploadedImage(prev, url, index) : prev);
@@ -2874,18 +2888,20 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       setUploading(false);
     }
 
-    const ok = outcome.failed.length === 0 && rejectedForCount === 0 && oversizedFiles.length === 0;
+    const ok = outcome.failed.length === 0 && rejectedForCount === 0 && oversizedCount === 0;
     showPhotoUploadNotice({
       text: listingPhotoUploadSummary({
         received: files.length,
         added: outcome.added,
         failed: outcome.failed.map((f) => ({ name: f.file.name, reason: f.reason })),
         overLimit: rejectedForCount,
-        oversized: oversizedFiles.length,
+        oversized: oversizedCount,
         availableSlots,
       }),
       ok,
-      retryFiles: outcome.failed.map((f) => f.file),
+      retry: outcome.failed.length > 0
+        ? { files: outcome.failed.map((f) => f.file), indices: outcome.failed.map((f) => uploadEntries[f.index].index), batchUrls }
+        : null,
     });
   }, [editing, uploadImageBlobResult, showPhotoUploadNotice]);
 
@@ -5256,12 +5272,15 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     }}
                   >
                     <span className="min-w-0 flex-1" style={{ overflowWrap: 'anywhere' }}>{photoUploadNotice.text}</span>
-                    {photoUploadNotice.retryFiles.length > 0 && (
+                    {photoUploadNotice.retry && (
                       <button
                         type="button"
                         className="gold-button text-xs disabled:opacity-50"
                         disabled={uploading}
-                        onClick={() => void handleImageUpload(photoUploadNotice.retryFiles)}
+                        onClick={() => {
+                          const retry = photoUploadNotice.retry;
+                          if (retry) void handleImageUpload(retry.files, { batchUrls: retry.batchUrls, indices: retry.indices });
+                        }}
                       >
                         Try again
                       </button>

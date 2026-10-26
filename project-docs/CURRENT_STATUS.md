@@ -2,7 +2,16 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-10-25 (22)**.
+> in `DECISIONS.md`. Last reconciled: **2026-10-25 (24)**.
+
+## Start Here (2026-10-25 (24) — 🟡 "Try again" puts photos back into their place BUILT + STAGED, not pushed; no SQL, no env vars)
+
+- 🟡 **Waiting for the owner's push** (`CHANGELOG.md` 2026-10-25 (24); `TASKS.md` top block). Gate: `tsc` 0 · lint 0 errors · **2017/2017** · build 0. ⛔ Not tried on the iPad. Everything else is deployed (10-25 (23) block below).
+
+## Start Here (2026-10-25 (23) — 🟢 everything DEPLOYED (owner): (21) in-editor photo upload notice + retry/fallback/Try again, (22) retried photo keeps its place; nothing staged-but-unpushed except docs; no SQL, no env vars)
+
+- 🟢 Owner: *"Pushed and deployed."* (`CHANGELOG.md` 2026-10-25 (23)). Claude did not check production (behind the sign-in; not asked).
+- ◻ Open — the owner's iPad checks (`TASKS.md` top blocks): a big library batch on a listing (the notice under "Take photos"; any failure's reason text → Claude); the short admin boxes; the trade-in "% off the asking price" choice. Where the (21)/(22) blocks below say "STAGED" / "not pushed", read "deployed". The 10-25 (15) open checks still apply.
 
 ## Start Here (2026-10-25 (22) — 🟡 a retried photo goes back into its place (not the end) BUILT + STAGED, not pushed; one push carries (21) + (22); no SQL, no env vars)
 

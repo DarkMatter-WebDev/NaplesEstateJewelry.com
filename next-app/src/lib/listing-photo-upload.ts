@@ -34,7 +34,8 @@ export const LISTING_PHOTO_ORIGINAL_MAX_BYTES = 4 * 1024 * 1024;
 /** Types the server's encoder reads for certain. */
 const ORIGINAL_FALLBACK_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
-export type ListingPhotoFailure = { file: File; reason: string };
+/** `index` = the photo's position in the `files` passed to `uploadListingPhotos`. */
+export type ListingPhotoFailure = { file: File; index: number; reason: string };
 
 export type ListingPhotoUploadDeps = {
   /** Downsize in the browser (`shrinkPhotoFile` with LISTING_PHOTO_TIER). */
@@ -116,7 +117,7 @@ export async function uploadListingPhotos(
         added++;
         deps.onAdded(result.url, index);
       } else {
-        failed.push({ file, reason: result.reason });
+        failed.push({ file, index, reason: result.reason });
       }
     }
   }
@@ -129,6 +130,10 @@ export async function uploadListingPhotos(
  * not at the end (owner, 2026-10-25: a retried photo should "insert in where
  * it was supposed to go instead of as the last photo"). `batchUrls[i]` = the
  * URL of the batch's i-th photo once it landed, else null.
+ *
+ * The manual **Try again** continues the SAME batch (same `batchUrls`, the
+ * failed photos' original indices), so it places photos the same way (owner,
+ * 2026-10-25: "the manual button … placed them at the end").
  *
  * Anchored to the batch's own photos, never a fixed position, so it stays right
  * even if a photo is removed or dragged while the batch is still uploading:

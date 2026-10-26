@@ -28,7 +28,16 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-10-25 (21) + (22) — Listing photo upload: notice INSIDE the editor, retry at the end + original fallback, Try again; (22) a retried photo goes back into its place — BUILT + STAGED, not pushed; no SQL
+### 🟡 2026-10-25 (24) — "Try again" puts a photo back into its place (continues the original batch) — BUILT + STAGED, not pushed; no SQL
+
+Record: `CHANGELOG.md` 2026-10-25 (24). Files: `src/lib/listing-photo-upload.ts`, `src/components/admin/AdminShell.tsx`, `src/lib/__tests__/listing-photo-upload.test.ts`. Gate: `tsc` 0 · lint 0 errors · **2017/2017** · build 0.
+
+1. ◻ **Owner — push + deploy.**
+2. ◻ **Owner — on the iPad, next time a photo fails:** tap **Try again** → it lands where it was in the pick, not last. (The red notice stays until Dismiss, a new upload, or closing the editor.)
+
+**Staging (10-25 (24)):** ✅ synced 2026-10-25 ~10:31 PM. The dry run listed exactly the 7 touched files (3 app: `AdminShell.tsx`, `listing-photo-upload.ts`, its test; 4 docs), 0 Extras, 1301 total; real run copied 7, 0 FAILED; follow-up dry run 0, exit 0; leak 0; `.tsx` 265 = 265; SHA-256 MATCH on the 3 app files. Docs-only re-sync after this line.
+
+### 🟢 2026-10-25 (21) + (22) — Listing photo upload: notice INSIDE the editor, retry at the end + original fallback, Try again; (22) a retried photo goes back into its place — **DEPLOYED (owner)**; ◻ item 2 only
 
 (22): `CHANGELOG.md` 2026-10-25 (22) — gate `tsc` 0 · lint 0 errors · **2014/2014** · build 0. On the iPad, if a photo fails and then goes in on the retry, it should sit where it was in the pick, not last.
 
@@ -39,7 +48,7 @@ Record: `CHANGELOG.md` 2026-10-25 (21). Rule: `DECISIONS.md` → the photo-prep 
 
 Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **2007/2007** (176 files) · build 0.
 
-1. ◻ **Owner — push + deploy.**
+1. ✅ **Owner — push + deploy** — DONE 10-25 (*"Pushed and deployed."*, carried (21) + (22)). Production not checked by Claude (behind the sign-in; not asked).
 2. ◻ **Owner — on the iPad:** a listing → Photos → pick a big batch (10+) → under "Take photos" a box reads "Received N photos · N added." and goes away by itself. If a photo fails it stays in red with the photo's name and the reason, plus **Try again** — tap it; then tell Claude the reason text (that is the clue for the 10-25 failure).
 
 **Staging (10-25 (21)):** ✅ synced 2026-10-25 ~10:15 PM. The dry run listed exactly the 7 touched files: 3 app (`AdminShell.tsx`, `listing-photo-upload.ts`, `listing-photo-upload.test.ts`) and 4 docs (CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS). 0 Extras, 1301 total. Real run copied 7, 0 FAILED; follow-up dry run 0, exit 0. Leak check 0; `.tsx` 265 = 265; SHA-256 MATCH on all 3 app files. Docs-only re-sync after this line.

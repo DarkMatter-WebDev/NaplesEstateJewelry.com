@@ -147,6 +147,38 @@ describe('a retried photo goes back into its place', () => {
     expect(images).toEqual(['old1', 'https://cdn/a.small', 'https://cdn/b.small', 'https://cdn/c.small', 'https://cdn/d.small']);
   });
 
+  // Owner, 2026-10-25: "the auto-retry feature placed the photos where they
+  // should go, but the manual button 'retry' placed them at the end".
+  it('Try again continues the SAME batch: the photo goes back into its place', async () => {
+    // The editor's own mapping: entries carry the ORIGINAL batch index.
+    let images = ['old1'];
+    const batchUrls: (string | null)[] = [null, null, null, null];
+    const run = async (files: File[], indices: number[], h: ReturnType<typeof harness>) => {
+      const result = await uploadListingPhotos(files, {
+        ...h.deps,
+        onAdded: (url, i) => {
+          batchUrls[indices[i]] = url;
+          images = insertBatchPhoto(images, url, indices[i], batchUrls);
+        },
+      });
+      return result.failed.map((f) => indices[f.index]);
+    };
+    // b fails the first try AND the automatic retry (upload refused twice).
+    const first = await run([photo('a'), photo('b'), photo('c'), photo('d')], [0, 1, 2, 3], harness({ uploadFails: { b: 2 } }));
+    expect(first).toEqual([1]);
+    expect(images).toEqual(['old1', 'https://cdn/a.small', 'https://cdn/c.small', 'https://cdn/d.small']);
+    // Try again: only b, at its original index 1, same batchUrls.
+    const second = await run([photo('b')], first, harness());
+    expect(second).toEqual([]);
+    expect(images).toEqual(['old1', 'https://cdn/a.small', 'https://cdn/b.small', 'https://cdn/c.small', 'https://cdn/d.small']);
+  });
+
+  it('reports a failed photo with its position in the batch', async () => {
+    const h = harness({ uploadFails: { c: 2 } });
+    const result = await uploadListingPhotos([photo('a'), photo('b'), photo('c')], h.deps);
+    expect(result.failed.map((f) => [f.file.name, f.index])).toEqual([['c', 2]]);
+  });
+
   it('a failed FIRST photo becomes the cover again on an empty listing', () => {
     expect(insertBatchPhoto(['b', 'c'], 'a', 0, [null, 'b', 'c'])).toEqual(['a', 'b', 'c']);
   });
@@ -184,7 +216,7 @@ describe('the listing editor upload', () => {
 
   it('prepares photos with the shared shrinker and the shared batch logic', () => {
     expect(handler).toContain('shrinkPhotoFile(file, LISTING_PHOTO_TIER)');
-    expect(handler).toContain('uploadListingPhotos(uploadFiles');
+    expect(handler).toContain('uploadListingPhotos(uploadEntries.map((e) => e.file)');
     expect(shell).not.toMatch(/createImageBitmap\(file\)/);
   });
 
@@ -193,6 +225,12 @@ describe('the listing editor upload', () => {
     expect(handler).toContain('showPhotoUploadNotice(');
     expect(shell).toMatch(/\{photoUploadNotice && \(/);
     expect(shell).toContain('Try again');
+  });
+
+  it('Try again resumes the original batch (its batchUrls + original places)', () => {
+    expect(shell).toContain('handleImageUpload(retry.files, { batchUrls: retry.batchUrls, indices: retry.indices })');
+    expect(handler).toContain('const batchUrls: (string | null)[] = resume ? resume.batchUrls');
+    expect(handler).toContain('indices: outcome.failed.map((f) => uploadEntries[f.index].index)');
   });
 
   it('places each photo by its batch position, never a plain append', () => {

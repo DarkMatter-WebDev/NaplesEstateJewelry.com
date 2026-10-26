@@ -1,6 +1,20 @@
 
 # Changelog
 
+## 2026-10-25 (24) — "Try again" puts a photo back into its place too (it continues the original batch) — BUILT + STAGED, not pushed; no SQL
+
+- Owner (iPad, after (21)+(22) were live): *"worked well, except when i hit "retry" to get the final photo to add, it added to the end rather than where it shouldve been … the auto-retry feature placed the photos where they should go, but the manual button "retry" placed them at the end"*.
+- **Fix:** the notice keeps what Try again needs — the failed files, their ORIGINAL places in the batch, and the batch's `batchUrls` — and `handleImageUpload(files, resume)` continues that batch, so `insertBatchPhoto` places them exactly like the automatic retry (after the nearest earlier batch photo still in the list). `ListingPhotoFailure` now carries its `index`.
+- Owner also asked: *"does the notice regarding any failed images and the option to retry stay on the screen until manually dismissed?"* → yes: a notice with a failure has no timer; it stays until Dismiss, until Try again / another upload replaces it with the new result, or until the editor closes / another listing opens. Only an all-added notice clears itself (8 s).
+- Files: `src/lib/listing-photo-upload.ts`, `src/components/admin/AdminShell.tsx`, `src/lib/__tests__/listing-photo-upload.test.ts` (24; the owner's case — b fails both automatic tries, Try again puts it back 2nd — is a test).
+- Gate: `npx tsc --noEmit` 0 · `npm run lint` 0 errors (the 4 old `<img>` warnings) · `npx vitest run` **2017/2017** (176 files) · `npm run build` 0 (dev stopped first; 563/563).
+- ⛔ Not tried on the iPad.
+
+## 2026-10-25 (23) — 🟢 (21) + (22) listing photo upload changes DEPLOYED (owner); nothing staged-but-unpushed except docs
+
+- Owner: *"Pushed and deployed."* — one push carried (21) (in-editor notice, retry at the end, original fallback, Try again) and (22) (a retried photo keeps its place). Claude did not check production (behind the sign-in; not asked).
+- ◻ Open: the owner's iPad batch (`TASKS.md` top block, item 2) — if a photo fails, its reason text is the clue to the 10-25 failure.
+
 ## 2026-10-25 (22) — A retried photo goes back into ITS place in the batch, not to the end — BUILT + STAGED, not pushed (one push with (21)); no SQL
 
 - Owner: *"if a photo fails and is retried at the end of the batch, can we have it insert in where it was supposed to go instead of as the last photo?"*
