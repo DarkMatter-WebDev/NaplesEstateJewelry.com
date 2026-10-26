@@ -199,17 +199,20 @@ export default function AdminSpecialPricePanel() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm" style={{ color: 'var(--color-on-surface)' }}>Trade-in price = melt value</span>
                   <span className="text-sm" style={{ color: 'var(--color-on-surface)' }}>{percentNum < 0 ? '−' : '+'}</span>
-                  <input
-                    type="number"
-                    step="0.5"
-                    className="form-field w-24"
-                    value={percent}
-                    disabled={busy}
-                    onChange={(e) => update({ percent: e.target.value })}
-                    placeholder="e.g. 10"
-                    aria-label="Trade-in percent over melt value"
-                  />
-                  <span className="text-sm" style={{ color: 'var(--color-on-surface)' }}>%</span>
+                  {/* Box and % stay together: if the row wraps, they move as one. */}
+                  <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                    <input
+                      type="number"
+                      step="0.5"
+                      className="form-field w-24"
+                      value={percent}
+                      disabled={busy}
+                      onChange={(e) => update({ percent: e.target.value })}
+                      placeholder="e.g. 10"
+                      aria-label="Trade-in percent over melt value"
+                    />
+                    <span className="text-sm" style={{ color: 'var(--color-on-surface)' }}>%</span>
+                  </span>
                 </div>
                 <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
                   Use a negative number (e.g. −10) to advertise <em>below</em> spot. {examplePreview}
@@ -222,19 +225,21 @@ export default function AdminSpecialPricePanel() {
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm" style={{ color: 'var(--color-on-surface)' }}>Trade-in price = asking price −</span>
-                  <input
-                    type="number"
-                    step="0.5"
-                    min={0}
-                    max={100}
-                    className="form-field w-24"
-                    value={discount}
-                    disabled={busy}
-                    onChange={(e) => update({ discount: e.target.value })}
-                    placeholder="e.g. 20"
-                    aria-label="Trade-in percent off the asking price"
-                  />
-                  <span className="text-sm" style={{ color: 'var(--color-on-surface)' }}>%</span>
+                  <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                    <input
+                      type="number"
+                      step="0.5"
+                      min={0}
+                      max={100}
+                      className="form-field w-24"
+                      value={discount}
+                      disabled={busy}
+                      onChange={(e) => update({ discount: e.target.value })}
+                      placeholder="e.g. 20"
+                      aria-label="Trade-in percent off the asking price"
+                    />
+                    <span className="text-sm" style={{ color: 'var(--color-on-surface)' }}>%</span>
+                  </span>
                 </div>
                 <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
                   The asking price is the price shown in the shop. An item with no number for its price (“Contact for price”)

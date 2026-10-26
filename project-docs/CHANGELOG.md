@@ -1,6 +1,43 @@
 
 # Changelog
 
+## 2026-10-25 (19) — Listing editor: photos chosen from the library no longer go missing; the message says how many were received — BUILT + STAGED, not pushed (rides with (18)); no SQL, no env vars
+
+- Owner (iPad, Edit listing → Photos → library picker): *"why … is the blue check button in the top right greyed out? it still works and adds photos when i press it, but some are left out and skipped"*; then *"even when i choose 1 photo that does work, it still stays greyed out"*.
+- **The grey ✓:** drawn by iPadOS's own photo picker; the page only asks for photos (`<input type="file" accept="image/*" multiple>`) and cannot style or enable it. The owner's one-photo test (grey, yet works) says it is cosmetic. Claude first tied it to iCloud downloads; the one-photo test does not support that as a reliable sign. Not changed — nothing in the site controls it.
+- **The skipped photos (our code):** `handleImageUpload` decoded each full-size photo (`createImageBitmap`, 100–190 MB for a 24–48 MP iPhone photo), never closed it, never released the canvas, asked WebKit for WebP first (a wasted PNG encode), and had NO per-photo error handling. iPad Safari's canvas-memory cap could stop a batch partway; the exception ended the loop, so that photo and every later one were dropped silently (and "Uploading…" could stick).
+- **Fix:**
+  - The editor now uses the lead forms' shrinker, exported as `shrinkPhotoFile` (`lib/lead-photo-prep.ts`): JPEG intermediate first, `<img>` fallback, and — new — the decoded photo and the canvas are released in a `finally` on every path. 2048 px / 0.92, as before (`LISTING_PHOTO_TIER`).
+  - One photo at a time, each in its own try/catch, retried once after 400 ms; `setUploading(false)` in a `finally`.
+  - One summary at the end (`lib/listing-photo-upload.ts`): **"Received 4 photos · 4 added."** — or names what failed ("Couldn't add IMG_4521.jpeg — try it again") and counts photos left out for the 20-photo limit / 25 MB. Received < picked = the picker kept some back; received = picked but fewer added = the page, named.
+  - The two inputs reset after each pick, so the same photo can be picked again.
+- Files: `src/components/admin/AdminShell.tsx`, `src/lib/lead-photo-prep.ts`, NEW `src/lib/listing-photo-upload.ts`, NEW `src/lib/__tests__/listing-photo-upload.test.ts` (7).
+- Gate: `npx tsc --noEmit` 0 · `npm run lint` 0 errors (the 4 old `<img>` warnings) · `npx vitest run` **2000/2000** (176 files) · `npm run build` 0 (dev stopped first; 563/563) · `.next/dev` cleared before the dev restart.
+- ⛔ Not verified: a real batch on the iPad (behind the sign-in; Chromium cannot reproduce iPad Safari's canvas-memory cap). The lead forms share the shrinker; their behavior is unchanged apart from the `finally` release.
+
+## 2026-10-25 (18) — Short admin fields finally SHORT: `.form-field`'s width moved into `@layer components` (15 fields); trade-in box + "%" kept on one line — BUILT + STAGED, not pushed; no SQL, no env vars
+
+- Owner (iPad screenshot of Customer Trade-in Price): *"the "%" sign is wrapped onto a new line because the input field is huge … the input field only needs to take a two digit numeral … do that and then scan the site for any other input fields that are way longer/larger than they need to be and shorten them if we find any."*
+- **Cause:** `.form-field { width: 100% }` sat in an UNLAYERED rule in `globals.css`, and unlayered CSS beats Tailwind's `@layer utilities`, so every `w-24` / `w-32` … on a `.form-field` was dead (the same trap as `.responsive-card-grid`, DECISIONS). The trade-in box already said `w-24`; it rendered full width.
+- **Fix (one rule):** the `width: 100%` default now lives in `@layer components { .form-field { width: 100% } }`; the unlayered `.form-field` rule keeps everything else. A field with no width class is still full width; a field with one gets it.
+- **The scan — the 15 fields this shortens (each already carried its intended width):**
+  - Settings → Customer Trade-in Price: % over melt, % off asking (`w-24`, 96 px).
+  - Settings → eBay: "Push when price changes by at least %", "eBay price markup %" (`w-24`).
+  - Settings → Etsy: "Push threshold %", "Etsy price markup %" (`w-24`).
+  - Settings → Homepage carousel: "Cards visible at once" Desktop / Mobile (`w-20`, 80 px).
+  - The marketplace inline editor (pencil): purity `w-32`, quantity `w-28`, length `w-36`, brand `w-56`, year `w-28`, weight `w-32`, main stone `w-64`.
+  - Every other number/price field was checked and is already sized by its own box (a grid column, an inline width or a `max-w` wrapper: order discounts, partial refund, offer counter, quantity in New Order, discount codes, Instant Sale, Text Deals, shop price filter) — left alone. Public forms unchanged.
+- **Trade-in panel:** the box and its "%" are wrapped together (`inline-flex whitespace-nowrap`), so a narrow screen wraps the pair, never the "%" alone.
+- Files: `src/app/globals.css`, `src/components/admin/AdminSpecialPricePanel.tsx`, NEW `src/lib/__tests__/form-field-width.test.ts`.
+- Gate: `npx tsc --noEmit` 0 · `npm run lint` 0 errors (the 4 old `<img>` warnings) · `npx vitest run` **1993/1993** (175 files) · `npm run build` 0 (dev stopped first; 563/563; built CSS has `@layer components{.form-field{width:100%}}` and the unlayered rule without width) · `.next/dev` cleared before the dev restart.
+- **Measured in dev (real stylesheet, replica of the trade-in row):** at 1000 px the box is 96 px and the "%" on the same line (row 44 px = one line); at 343 px (phone) the row wraps but the "%" stays beside its box. `w-20…w-64` measure 80/96/112/128/144/224/256 px; a `.form-field` with no width class = its container (960 / 303 px). `/contact`: all 5 fields still fill their parent (365/365, 750/750 …).
+- ⛔ Not seen behind the sign-in (the admin panels themselves) or on the real iPad.
+
+## 2026-10-25 (17) — 🟢 Customer Trade-in Price "% off the asking price" DEPLOYED (owner); SQL run; nothing staged-but-unpushed except docs
+
+- Owner: *"Pushed and deployed."* — the 10-25 (16) change is live (owner's word). Claude did not check production (not asked; the admin panel is behind the sign-in).
+- ◻ Open: the owner's iPad check (`TASKS.md` top block, item 3) — pick "Percent off the asking price", 20, Save, reload; a product's trade-in line ≈ 80% of its price within ~5 min.
+
 ## 2026-10-25 (16) — Customer Trade-in Price: new "% off the asking price" choice — BUILT + STAGED, not pushed; ⛔ SQL `supabase/shop-trade-in-asking-discount-2026-10.sql` to run BEFORE the push; no env vars
 
 - Owner: *"let's add an option for the admin to choose to set a site-wide trade-in price based on a percentage discount off of the asking price … Repeat back to me the plan"*; then, on the plan: *"Yes, build it as planned."*

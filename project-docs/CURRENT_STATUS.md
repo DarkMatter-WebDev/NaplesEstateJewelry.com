@@ -2,7 +2,24 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-10-25 (16)**.
+> in `DECISIONS.md`. Last reconciled: **2026-10-25 (19)**.
+
+## Start Here (2026-10-25 (19) — 🟡 listing photo uploads no longer drop photos + a "Received N · N added" message BUILT + STAGED, not pushed; one push carries (18) + (19); no SQL, no env vars)
+
+- 🟡 **Waiting for the owner's push** (`CHANGELOG.md` 2026-10-25 (19); rule `DECISIONS.md` top entry; `TASKS.md` top). Edit listing → Photos → library: each photo is released before the next and a failure is named, never silently dropped. The grey ✓ in the iPad picker is Apple's and cannot be changed by the site.
+- Gate: `tsc` 0 · lint 0 errors · **2000/2000** (176 files) · build 0. ⛔ Not tried on the iPad.
+- The (18) block below rides the same push.
+
+## Start Here (2026-10-25 (18) — 🟡 short admin fields made short (15 fields; trade-in box + "%" on one line) BUILT + STAGED, not pushed; no SQL, no env vars)
+
+- 🟡 **Waiting for the owner's push** (`CHANGELOG.md` 2026-10-25 (18); rule `DECISIONS.md` top entry; `TASKS.md` top). One CSS change: `.form-field`'s full width moved into `@layer components`, so the 15 fields that already asked for a short width get it (trade-in %, eBay/Etsy %, carousel counts, the inline editor's purity/quantity/length/brand/year/weight/stone). Public forms unchanged (measured).
+- Gate: `tsc` 0 · lint 0 errors · **1993/1993** (175 files) · build 0. ⛔ Not seen behind the sign-in or on the iPad.
+- The 10-25 (17) block below still applies (the trade-in "% off asking" iPad check can be done after this push).
+
+## Start Here (2026-10-25 (17) — 🟢 Customer Trade-in Price "% off the asking price" DEPLOYED (owner), SQL run; nothing staged-but-unpushed except docs; no env vars)
+
+- 🟢 Owner: *"Pushed and deployed."* (`CHANGELOG.md` 2026-10-25 (17)). Claude did not check production (not asked; the panel is behind the sign-in).
+- ◻ Open: the owner's iPad check of the new choice (`TASKS.md` top block, item 3). Where the 10-25 (16) block below says "STAGED" / "not pushed", read "deployed". The 10-25 (15) open checks still apply.
 
 ## Start Here (2026-10-25 (16) — 🟡 Customer Trade-in Price "% off the asking price" choice BUILT + STAGED, not pushed; ⛔ SQL `supabase/shop-trade-in-asking-discount-2026-10.sql` to run BEFORE the push; no env vars)
 

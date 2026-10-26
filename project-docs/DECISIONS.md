@@ -4,7 +4,24 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-10-25 (16)**.
+> compaction. Last reconciled: **2026-10-25 (19)**.
+
+## Browser photo prep is ONE shared shrinker that releases memory on every path; a batch upload never drops a photo without naming it, and always says how many it received (2026-10-25)
+
+- **Owner (iPad):** photos chosen from the library were *"left out and skipped"*.
+- **The rules:**
+  - Downsizing in the browser goes through `shrinkPhotoFile` (`lib/lead-photo-prep.ts`): JPEG intermediate (never ask WebKit for WebP), `<img>` fallback, and the decoded photo + canvas released in a `finally`. ⛔ Never a second copy of canvas code in a component (the listing editor's copy leaked 100–190 MB per photo on iPad).
+  - A batch is one photo at a time, each in its own try/catch (one retry), and the busy flag clears in a `finally`. ⛔ Never let one failed photo end the loop.
+  - The closing message counts what the page RECEIVED and names any photo it could not add (`lib/listing-photo-upload.ts`), so "the picker kept it back" and "the page failed" are told apart.
+  - The iPadOS picker's grey ✓ is Apple's; nothing in the site controls it.
+- Guard `lib/__tests__/listing-photo-upload.test.ts`. Record `CHANGELOG.md` 2026-10-25 (19).
+
+## `.form-field` is full width by default, but its width lives in `@layer components` so a width utility on the field wins; a short field gets a width class, never a full row (2026-10-25)
+
+- **Owner (iPad):** *"the input field only needs to take a two digit numeral so can be shortened greatly … scan the site for any other input fields that are way longer/larger than they need to be and shorten them."*
+- **The rule:** `globals.css` → `@layer components { .form-field { width: 100% } }`; the unlayered `.form-field` rule carries no width. ⛔ Never move `width` back into the unlayered rule (it silently killed `w-24` etc. on 15 admin fields). Size a short field with a Tailwind width (`w-20` 2 digits, `w-24` a %, `w-28`–`w-36` a year/weight/length) or an inline width.
+- A unit sign that follows a field ("%", "grams") goes in one `inline-flex whitespace-nowrap` wrapper with its box, so the pair wraps together.
+- Same family as the `.responsive-card-grid` entry: unlayered CSS beats every Tailwind utility. Guard `lib/__tests__/form-field-width.test.ts`. Record `CHANGELOG.md` 2026-10-25 (18).
 
 ## The site-wide trade-in line can be a % off the ASKING price as well as a % over melt; the admin picks one, each keeps its own number (2026-10-25)
 

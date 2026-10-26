@@ -1919,8 +1919,21 @@ body:has([data-site-header]) .route-progress {
   .product-gallery-fade-in { animation: none; }
 }
 
+/* `.form-field` is full width by default, but its WIDTH lives in
+   `@layer components` so a Tailwind width on the field (`w-24`, `w-32` …, in
+   `@layer utilities`) wins. Until 2026-10-25 the width sat in this unlayered
+   rule, and unlayered beats every layer, so 15 deliberately short admin fields
+   (trade-in %, eBay/Etsy %, carousel counts, the inline editor's quantity /
+   year / grams / purity …) all stretched across the screen — the iPad showed
+   the trade-in "%" wrapped onto its own line. ⛔ Never move `width` back into
+   the unlayered rule below; size a field with a width utility or inline style.
+   Guard: `lib/__tests__/form-field-width.test.ts`. */
+@layer components {
+  .form-field {
+    width: 100%;
+  }
+}
 .form-field {
-  width: 100%;
   border: 1px solid var(--color-outline-variant);
   border-radius: var(--radius-lg);
   padding: 0.65rem 0.85rem;

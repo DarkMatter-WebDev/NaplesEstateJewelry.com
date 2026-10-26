@@ -10,6 +10,8 @@ import { startRouteProgress } from '@/components/layout/RouteProgressBar';
 import { createClient } from '@/lib/supabase/client';
 import { copyTextToClipboard } from '@/lib/clipboard';
 import { encodeCanvasForUpload } from '@/lib/image-encode';
+import { shrinkPhotoFile } from '@/lib/lead-photo-prep';
+import { LISTING_PHOTO_TIER, listingPhotoUploadSummary } from '@/lib/listing-photo-upload';
 import {
   PRODUCT_METAL_VARIANTS,
   PRODUCT_METAL_TYPES,
@@ -2783,44 +2785,44 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   }, [deleteImagePaths]);
 
   // --- Image upload ---
-  const handleImageUpload = useCallback(async (files: FileList) => {
+  const handleImageUpload = useCallback(async (input: FileList | File[]) => {
     if (!editing) return;
+    // A real array, taken before anything else: the picker's FileList is live
+    // and the input is reset right after the pick.
+    const files = Array.from(input);
     const availableSlots = Math.max(0, MAX_PRODUCT_IMAGE_COUNT - editing.images.length);
     if (availableSlots <= 0) {
       flash(`Maximum ${MAX_PRODUCT_IMAGE_COUNT} photos per product. Remove a photo before uploading another.`, false);
       return;
     }
-    const acceptedFiles = Array.from(files).slice(0, availableSlots);
+    const acceptedFiles = files.slice(0, availableSlots);
     const rejectedForCount = files.length - acceptedFiles.length;
     const oversizedFiles = acceptedFiles.filter((file) => file.size > MAX_PRODUCT_IMAGE_UPLOAD_BYTES);
     const uploadFiles = acceptedFiles.filter((file) => file.size <= MAX_PRODUCT_IMAGE_UPLOAD_BYTES);
-    if (rejectedForCount > 0) {
-      flash(`Only ${availableSlots} more photo(s) allowed. ${rejectedForCount} file(s) were skipped.`, false);
+    if (uploadFiles.length === 0) {
+      flash(listingPhotoUploadSummary({ received: files.length, added: 0, failed: [], overLimit: rejectedForCount, oversized: oversizedFiles.length, availableSlots }), false);
+      return;
     }
-    if (oversizedFiles.length > 0) {
-      flash(`Skipped ${oversizedFiles.length} oversized file(s). Each image must be 25 MB or less.`, false);
-    }
-    if (uploadFiles.length === 0) return;
     setUploading(true);
 
-    const [firstFile, ...restFiles] = uploadFiles;
-
+    // One photo at a time, each fully released before the next (see
+    // `shrinkPhotoFile`): iPad Safari's canvas-memory cap used to stop a batch
+    // partway, silently dropping that photo and every one after it. A photo that
+    // still fails is retried once, then NAMED in the summary — never skipped
+    // without a word (owner, 2026-10-25: "some are left out and skipped").
     async function processAndUpload(file: File): Promise<string | null> {
-      const bitmap = await createImageBitmap(file);
-      const canvas = document.createElement('canvas');
-      const MAX = 2048;
-      const scale = Math.min(1, MAX / Math.max(bitmap.width, bitmap.height));
-      canvas.width = Math.round(bitmap.width * scale);
-      canvas.height = Math.round(bitmap.height * scale);
-      const ctx = canvas.getContext('2d')!;
-      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-      // This is only the INTERMEDIATE the server re-encodes to WebP, so it is
-      // kept high quality; the browser's format no longer matters.
-      const encoded = await encodeCanvasForUpload(canvas, 0.92);
-      return uploadImageBlob(encoded.blob);
+      let prepared: File;
+      try {
+        prepared = await shrinkPhotoFile(file, LISTING_PHOTO_TIER);
+      } catch {
+        await new Promise((resolve) => window.setTimeout(resolve, 400));
+        prepared = await shrinkPhotoFile(file, LISTING_PHOTO_TIER);
+      }
+      return uploadImageBlob(prepared);
     }
 
     let successCount = 0;
+    const failedNames: string[] = [];
 
     // Add a freshly-uploaded photo to the editor, defaulting it to WHITE side
     // padding. New products already default their product-level padding to white
@@ -2838,26 +2840,36 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       };
     };
 
-    // Upload the first photo and add it to state immediately so the AI assistant
-    // becomes available while the remaining photos continue uploading in the background.
-    const firstUrl = await processAndUpload(firstFile);
-    if (firstUrl) {
-      successCount++;
-      setSessionUploadedImageUrls((current) => new Set(current).add(firstUrl));
-      setEditing((prev) => prev ? addUploadedImage(prev, firstUrl) : prev);
-    }
-
-    for (const file of restFiles) {
-      const url = await processAndUpload(file);
-      if (url) {
-        successCount++;
-        setSessionUploadedImageUrls((current) => new Set(current).add(url));
-        setEditing((prev) => prev ? addUploadedImage(prev, url) : prev);
+    // Each photo is added to the editor the moment it lands, so the AI assistant
+    // becomes available after the first while the rest keep uploading.
+    try {
+      for (const file of uploadFiles) {
+        try {
+          const url = await processAndUpload(file);
+          if (!url) {
+            failedNames.push(file.name || 'photo');
+            continue;
+          }
+          successCount++;
+          setSessionUploadedImageUrls((current) => new Set(current).add(url));
+          setEditing((prev) => prev ? addUploadedImage(prev, url) : prev);
+        } catch {
+          failedNames.push(file.name || 'photo');
+        }
       }
+    } finally {
+      setUploading(false);
     }
 
-    setUploading(false);
-    if (successCount) flash(`${successCount} image(s) uploaded`);
+    const summary = listingPhotoUploadSummary({
+      received: files.length,
+      added: successCount,
+      failed: failedNames,
+      overLimit: rejectedForCount,
+      oversized: oversizedFiles.length,
+      availableSlots,
+    });
+    flash(summary, failedNames.length === 0 && rejectedForCount === 0 && oversizedFiles.length === 0);
   }, [editing, uploadImageBlob]);
 
   async function saveCroppedImage() {
@@ -5194,14 +5206,22 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   }}
                 >
                   <input type="file" accept="image/*" multiple className="sr-only"
-                    onChange={(e) => e.target.files && handleImageUpload(e.target.files)} />
+                    onChange={(e) => {
+                      const picked = e.target.files ? Array.from(e.target.files) : [];
+                      e.target.value = ''; // so picking the same photo again still fires
+                      if (picked.length) void handleImageUpload(picked);
+                    }} />
                   <AppIcon name="add_photo_alternate" className="product-photo-dropzone-icon" aria-hidden="true" />
                   <strong>{uploading ? 'Uploading...' : 'Drag and drop, or click to choose from library'}</strong>
                   <span>{editing.images.length}/20 photos · JPG, PNG, WebP · compressed automatically</span>
                 </label>
                 <label className="product-photo-take-button">
                   <input type="file" accept="image/*" capture="environment" className="sr-only"
-                    onChange={(e) => e.target.files && handleImageUpload(e.target.files)} />
+                    onChange={(e) => {
+                      const picked = e.target.files ? Array.from(e.target.files) : [];
+                      e.target.value = '';
+                      if (picked.length) void handleImageUpload(picked);
+                    }} />
                   <AppIcon name="photo_camera"  aria-hidden="true" />
                   Take photos
                 </label>

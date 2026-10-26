@@ -97,28 +97,42 @@ async function decode(file: File): Promise<ImageBitmap | HTMLImageElement> {
   }
 }
 
-async function shrinkOne(file: File, tier: LeadPhotoTier): Promise<File> {
+/**
+ * Downsize ONE photo to `tier.maxEdge` as a JPEG intermediate (the server
+ * re-encodes to WebP). Shared by the lead forms and the admin listing editor.
+ *
+ * 🔴 Memory is released on EVERY path, success or failure: the decoded original
+ * (a 24–48 MP iPhone photo is 100–190 MB once decoded) is closed and the canvas
+ * shrunk to 0×0. iPad Safari has a hard cap on canvas memory; without this, a
+ * batch of photos ran out partway and the rest failed (owner, 2026-10-25:
+ * "some are left out and skipped").
+ */
+export async function shrinkPhotoFile(file: File, tier: LeadPhotoTier): Promise<File> {
   const source = await decode(file);
-  const width = 'naturalWidth' in source ? source.naturalWidth : source.width;
-  const height = 'naturalHeight' in source ? source.naturalHeight : source.height;
-  if (!width || !height) throw new Error('Image has no size');
-
-  const scale = Math.min(1, tier.maxEdge / Math.max(width, height));
   const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.round(width * scale));
-  canvas.height = Math.max(1, Math.round(height * scale));
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('No 2d canvas context');
-  ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
-  if ('close' in source) source.close();
+  try {
+    const width = 'naturalWidth' in source ? source.naturalWidth : source.width;
+    const height = 'naturalHeight' in source ? source.naturalHeight : source.height;
+    if (!width || !height) throw new Error('Image has no size');
 
-  const encoded = await encodeIntermediate(canvas, tier.quality);
-  canvas.width = 0;
-  canvas.height = 0;
-  return new File([encoded.blob], renameForEncodedType(file.name, encoded.extension), {
-    type: encoded.contentType,
-    lastModified: file.lastModified,
-  });
+    const scale = Math.min(1, tier.maxEdge / Math.max(width, height));
+    canvas.width = Math.max(1, Math.round(width * scale));
+    canvas.height = Math.max(1, Math.round(height * scale));
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('No 2d canvas context');
+    ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+    if ('close' in source) source.close();
+
+    const encoded = await encodeIntermediate(canvas, tier.quality);
+    return new File([encoded.blob], renameForEncodedType(file.name, encoded.extension), {
+      type: encoded.contentType,
+      lastModified: file.lastModified,
+    });
+  } finally {
+    if ('close' in source) source.close();
+    canvas.width = 0;
+    canvas.height = 0;
+  }
 }
 
 /**
@@ -142,7 +156,7 @@ async function shrinkAll(files: readonly File[], tier: LeadPhotoTier): Promise<F
   const out: File[] = [];
   for (const file of files) {
     try {
-      const shrunk = await shrinkOne(file, tier);
+      const shrunk = await shrinkPhotoFile(file, tier);
       out.push(shrunk.size < file.size ? shrunk : file);
     } catch {
       out.push(file);

@@ -28,14 +28,36 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-10-25 (16) — Customer Trade-in Price: "% off the asking price" choice — BUILT + STAGED, not pushed; ⛔ SQL first
+### 🟡 2026-10-25 (19) — Listing editor photo uploads: nothing dropped silently; "Received N photos · N added" — BUILT + STAGED, not pushed (one push with (18)); no SQL
+
+Record: `CHANGELOG.md` 2026-10-25 (19). Rule: `DECISIONS.md` top entry. Files: `src/components/admin/AdminShell.tsx`, `src/lib/lead-photo-prep.ts`, NEW `src/lib/listing-photo-upload.ts`, NEW `src/lib/__tests__/listing-photo-upload.test.ts`.
+
+Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **2000/2000** (176 files) · build 0.
+
+1. ◻ **Owner — push + deploy** (carries (18) too).
+2. ◻ **Owner — on the iPad:** Edit listing → Photos → choose 5–8 photos from the library → tap ✓ (grey is normal — Apple's) → the message reads "Received N photos · N added." Compare N with what you picked: fewer received = the picker kept some back (try again once they have finished downloading); "Couldn't add …" = tell Claude the names.
+
+**Staging (10-25 (19)):** ✅ synced 2026-10-25 ~9:55 PM. The dry run listed exactly the 8 touched files: 4 app (`AdminShell.tsx`, `lead-photo-prep.ts`, NEW `listing-photo-upload.ts`, NEW `listing-photo-upload.test.ts`) and 4 docs (CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS). 0 Extras, 1301 total. Real run copied 8, 0 FAILED; follow-up dry run 0, exit 0. Leak check 0; `.tsx` 265 = 265; SHA-256 MATCH on `AdminShell.tsx`, `lead-photo-prep.ts`, `listing-photo-upload.ts` and (18)'s `globals.css`. Staging holds (18) + (19). Docs-only re-sync after this line.
+
+### 🟡 2026-10-25 (18) — Short admin fields made short (`.form-field` width layered; 15 fields) + trade-in box and "%" on one line — BUILT + STAGED, not pushed; no SQL
+
+Record: `CHANGELOG.md` 2026-10-25 (18). Rule: `DECISIONS.md` top entry. Files: `src/app/globals.css`, `src/components/admin/AdminSpecialPricePanel.tsx`, NEW `src/lib/__tests__/form-field-width.test.ts`.
+
+Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1993/1993** (175 files) · build 0.
+
+1. ◻ **Owner — push + deploy.**
+2. ◻ **Owner — on the iPad:** Settings → Customer Trade-in Price → the box is short and the "%" sits right after it, on the same line, in both choices. While there: Settings → eBay and Etsy (the "%" boxes), Homepage carousel ("Cards visible at once"), and a marketplace review pencil (quantity / year / weight) — all short now. Anything that looks too tight → tell Claude which one.
+
+**Staging (10-25 (18)):** ✅ synced 2026-10-25 ~9:45 PM. The dry run listed exactly the 7 touched files: 3 app (`globals.css`, `AdminSpecialPricePanel.tsx`, NEW `form-field-width.test.ts`) and 4 docs (CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS). 0 Extras, 1299 total. Real run copied 7, 0 FAILED; follow-up dry run 0, exit 0. Leak check 0; `.tsx` 265 = 265; SHA-256 MATCH on all 3 app files. Docs-only re-sync after this line.
+
+### 🟢 2026-10-25 (16) — Customer Trade-in Price: "% off the asking price" choice — **DEPLOYED (owner), SQL run**; ◻ item 3 only (the owner's iPad check)
 
 Record: `CHANGELOG.md` 2026-10-25 (16). Rule: `DECISIONS.md` top entry. Files: `src/lib/shop-settings.ts`, `src/app/api/admin/shop-settings/route.ts`, `src/types/product.ts`, `src/app/[locale]/shop/[id]/page.tsx`, `src/components/admin/AdminSpecialPricePanel.tsx`, the two tests, NEW `supabase/shop-trade-in-asking-discount-2026-10.sql`.
 
 Gate: `tsc` 0 · lint 0 errors (the 4 old `<img>` warnings) · **1990/1990** (174 files) · build 0.
 
 1. ✅ **SQL RUN** (owner, 10-25: *"ran the sql, got this"* — the closing check listed `special_price_default_basis` text, not null, default `'melt'`; `special_price_default_discount_percent` numeric, nullable). Was: **Owner — run `supabase/shop-trade-in-asking-discount-2026-10.sql`** in the Supabase SQL editor (safe to re-run; the closing check lists `special_price_default_basis` and `special_price_default_discount_percent`). Before the push. Until it runs, only the new choice fails to save ("needs … run in Supabase first"); everything else works as today.
-2. ◻ **Owner — push + deploy.**
+2. ✅ **Owner — push + deploy** — DONE 10-25 (*"Pushed and deployed."*). Production not checked by Claude (not asked; the panel is behind the sign-in).
 3. ◻ **Owner — on the iPad:** Admin → Settings → Customer Trade-in Price → the box is still ticked with "Percent over melt value" chosen and 20 in it (nothing changed) → pick **Percent off the asking price** → type 20 → the example reads "$800.00" on $1,000 → **Save** → "Saved." → reload: still the asking choice with 20 → open a product within ~5 min: the trade-in line is about 80% of the price shown (e.g. $2,000 → $1,600). Switch back to melt → the 20 is still there.
 
 **Staging (10-25 (16)):** ✅ synced 2026-10-25 ~9:29 PM. The dry run listed exactly the 13 touched files: 7 app (1 NEW: `shop-settings-trade-in.test.ts`; changed: `shop-settings.ts`, `shop-settings/route.ts`, `product.ts`, `shop/[id]/page.tsx`, `AdminSpecialPricePanel.tsx`, `product.test.ts`), the NEW SQL, 5 docs (CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS, `features/live-metal-pricing.md`). 0 Extras, 1298 total. Real run copied 13, 0 FAILED; follow-up dry run 0, exit 0. Leak check 0; `.tsx` 265 = 265; SHA-256 MATCH on `product.ts`, `AdminSpecialPricePanel.tsx`, `shop-settings.ts` and the SQL. Docs-only re-sync after this line.
