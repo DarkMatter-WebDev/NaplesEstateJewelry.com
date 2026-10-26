@@ -4,7 +4,18 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-10-25 (29)**.
+> compaction. Last reconciled: **2026-10-26 (1)**.
+
+## In-store sale receipts can print on the desktop Print Station — the same station as buy receipts, its own queue table (2026-10-26)
+
+- **Owner:** *"record sale and print receipt from the print station (the same one that the buy receipts uses), if the user records the sale on the laptop"*; plan approved: *"1 copy, keep Print here, add Send to desktop printer on the recorded sale."*
+- **The rules:**
+  - ONE station (`PrintStation.tsx`) prints both. ⛔ Never a second station page or a second shortcut. Buy receipts go first; one job per check.
+  - Sales queue in their OWN table `sale_print_requests` (one row per send), never print columns on `orders`. The row carries the one-page paper built by the site at send time (`order-receipt-paper.ts`), so the station needs no site call — idle polling stays free, as for buy receipts.
+  - Same claim rules as buy receipts: compare-and-set claim, 90 s take-over, `printed_at` retried until written, never printed twice.
+  - One copy per send; every press of Send to desktop printer prints once more. "Record sale" and "Record & print receipt" (print here) are unchanged.
+  - The sale is recorded even when the send fails; the form says so and offers the button again. A missing table (SQL not run) never stops buy receipts printing.
+- Guard `lib/__tests__/sale-print-requests.test.ts`. Runbook `features/instant-sale.md` → *The desktop printer for sales*. Record `CHANGELOG.md` 2026-10-26 (1).
 
 ## Reviews band: product pages AND the homepage show one scrolling band that stops on hover and drags both ways; /reviews stays a list (2026-10-25)
 

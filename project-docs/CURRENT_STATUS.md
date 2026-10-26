@@ -2,7 +2,25 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-10-25 (29)**.
+> in `DECISIONS.md`. Last reconciled: **2026-10-26 (1)**.
+
+## Start Here (2026-10-26 (1) — 🟡 In-store sale receipts print on the desktop Print Station BUILT + STAGED, not pushed; ⛔ SQL `supabase/sale-print-requests-2026-10.sql` to run BEFORE the push; no env vars)
+
+- 🟡 **Waiting for the owner:** (1) run the SQL in Supabase, (2) push + deploy, (3) reload the Print Station window on the desktop once, (4) one test sale from the laptop (`TASKS.md` top block). Record `CHANGELOG.md` 2026-10-26 (1); rule `DECISIONS.md` top entry; runbook `features/instant-sale.md`.
+- Instant Sale → In-store sale gains **Record & send to desktop printer**, and the "Sale recorded" screen gains **Send to desktop printer** (one copy each press). The station prints them in the same loop as buy receipts and lists **Sale receipts today**.
+- Gate: `tsc` 0 · lint 0 errors · **2038/2038** (180 files) · build 0. ⛔ Not seen behind the sign-in, not printed on the real printer.
+- Everything older is deployed (block below).
+
+## Start Here (2026-10-25 (31) — session CLOSED; everything DEPLOYED; nothing staged-but-unpushed; no SQL, no env vars)
+
+- 🟢 Deployed this session (`CHANGELOG.md` 2026-10-25 (31) summarizes (16)–(30)): trade-in "% off the asking price"; short admin fields; listing photo uploads that never drop a photo silently (notice in the editor, retry + Try again keep the photo's place); shop Sort / Per page lists (Option B); one desktop product layout; "8k–24k" gold everywhere (IndexNow 200 for 16); the reviews band on product pages (stops on hover, drags).
+- ◻ **Open (owner's checks only):** `TASKS.md` top blocks. Dates: GBP Offer renewal ~Nov 1, Google Ads read ~Nov 7, Search Console ~Nov 12–19.
+- Last gate: `tsc` 0 · lint 0 errors · **2027/2027** (179 files) · build 0.
+
+## Start Here (2026-10-25 (30) — 🟢 everything DEPLOYED (owner): (26) dropdown lists, (27) one product layout, (28) 8k–24k, (29) reviews band; IndexNow 200 for 16; nothing staged-but-unpushed except docs; no SQL, no env vars)
+
+- 🟢 Owner: *"Pushed and deployed."* (`CHANGELOG.md` 2026-10-25 (30)). IndexNow 200 OK for the 16 "8k–24k" URLs.
+- ◻ Open — the owner's checks only (`TASKS.md` top blocks). Where the (26)–(29) blocks below say "STAGED" / "not pushed", read "deployed".
 
 ## Start Here (2026-10-25 (29) — 🟡 reviews band on product pages (stop on hover, drag both ways; homepage too) BUILT + STAGED, not pushed; one push carries (26)–(29); no SQL, no env vars)
 

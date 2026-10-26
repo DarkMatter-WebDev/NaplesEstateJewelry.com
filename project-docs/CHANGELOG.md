@@ -1,6 +1,40 @@
 
 # Changelog
 
+## 2026-10-26 (1) — In-store sale receipts print on the desktop Print Station ("Record & send to desktop printer") — BUILT + STAGED, not pushed; ⛔ SQL `supabase/sale-print-requests-2026-10.sql` to run BEFORE the push; no env vars
+
+- Owner: *"lets make it so that the admin can record sale and print receipt from the print station (the same one that the buy receipts uses), if the user records the sale on the laptop"*; on the plan: *"Yes, build it as described: 1 copy, keep Print here, add Send to desktop printer on the recorded sale."*
+- **Build:**
+  - NEW SQL `supabase/sale-print-requests-2026-10.sql`: table `sale_print_requests` (order, order number, customer, total, the one-page `paper` jsonb, requested/claimed/printed times), admin-only RLS + `authenticated` grant (the `buy_receipts` pattern), `on delete cascade` from `orders`. Closing checks: 1 policy, 4 grants, 0 for anon.
+  - NEW `src/lib/sale-print-requests.ts` (pure: columns, `nextSalePrint`, claim staleness = the buy receipts' 90 s, `salePrintWatchPhase` waiting/printed/stalled (30 s / 60 s), labels, messages, `isMissingSalePrintTable`) + `src/lib/sale-print-requests-server.ts` (`queueSalePrint`: order + paper read with the service client, the row written with the admin's own client under RLS).
+  - `api/admin/in-store-sales/route.ts`: `sendToStation: true` → the paper is loaded and queued; response adds `stationRequest` / `stationError` (the sale is recorded either way). NEW `api/admin/in-store-sales/[id]/print-request/route.ts` (POST, admin-only; `[id]` = order id; each press = one more print).
+  - `components/admin/buy-receipts/PrintStation.tsx`: the same 3-s loop also reads `sale_print_requests` (only when no buy receipt printed that check), claims (compare-and-set), prints the paper with `printPaperInFrame`, sets `printed_at` (retried if that write fails; never printed twice); a missing table (SQL not run) is skipped silently; "Printing sale receipt …" banner; NEW **Sale receipts today** list with **Print again** (local reprint).
+  - `components/admin/InStoreSaleForm.tsx`: third button **Record & send to desktop printer** under Record & print receipt; NEW `components/admin/instant-sale/SaleStationPrint.tsx` on the "Sale recorded" screen: **Send to desktop printer** + *Sent. Waiting for the desktop…* → *Printed on the desktop.* / the 30-s "Is the Print Station window open" line (watches its row from Supabase every 2 s, up to a minute).
+  - NEW guard `src/lib/__tests__/sale-print-requests.test.ts` (11: rules + SQL/station/form/route wiring).
+- **Gate:** `npx tsc --noEmit` 0 · `npm run lint` 0 errors (the 4 old `<img>` warnings) · `npx vitest run` **2038/2038** (180 files) · `npm run build` 0 (563/563; dev server stopped first). Dev server: signed-out POST to both routes → 401 "Sign in required."; the station page → 307 to sign-in.
+- ⛔ **Not verified behind the sign-in, not printed on the real printer** (the admin and the station need the owner's sign-in). Owner's checks: `TASKS.md` top block.
+
+## 2026-10-25 (31) — session CLOSED; everything DEPLOYED; nothing staged-but-unpushed; no SQL, no env vars
+
+- Owner: *"pushed and deployed.. update docs and end session"* (the docs-only sync after (30)). Nothing checked in production for this close (not asked).
+- **This session (10-25 (16) → (30)), all deployed:**
+  - (16)–(17) Customer Trade-in Price: new "Percent off the asking price" choice; SQL `supabase/shop-trade-in-asking-discount-2026-10.sql` run by the owner.
+  - (18) `.form-field` width moved into `@layer components` — 15 short admin fields finally short; trade-in box + "%" on one line.
+  - (19), (21)–(25) Listing photo uploads: shared memory-safe shrinker; the result shown INSIDE the editor; retry at the end + original-file fallback; Try again; a retried photo keeps its place (auto and Try again).
+  - (26) Shop Sort + Per page open lists styled to match the site (Option B, computers only).
+  - (27) One desktop product layout — 2000px+ uses the 1280–1999px layout.
+  - (28) "8k–24k" gold everywhere (+ the 333 stamp on the inherited-jewelry guide); IndexNow 200 for 16 (30).
+  - (29) Reviews band on product pages (grid gone); stops on hover, drags both ways; homepage too.
+- **Open (owner's checks only — `TASKS.md` top blocks):** a big photo batch on the iPad (and the reason text if one ever fails); the short admin boxes + trade-in "% off asking" on the iPad; the reviews band on a non-desk computer and a finger swipe on the iPhone/iPad; the Sort / Per page lists in Chrome; a product page on the wide screen zoomed out. Still open from before: the Meta reel's "View products", the cow creamer in stock in Instagram, first-week catalog Issues, the `/shop` iPhone look, the Text Deals test text. Dates: GBP Offer post renewal ~Nov 1; Google Ads read ~Nov 7; Search Console ~Nov 12–19.
+- **Last gate (the last code change, (29)):** `npx tsc --noEmit` 0 · `npm run lint` 0 errors (the 4 old `<img>` warnings) · `npx vitest run` **2027/2027** (179 files) · `npm run build` 0 (563/563 static pages; dev server stopped first). IndexNow: `npm run indexnow` 200 OK for 16 (+1 resubmit).
+- Folder: no stray files (mockups, screenshot scripts and build logs stayed in the session scratchpad, outside the project); `.next/dev` removed with the dev server stopped. Dev server stopped at close.
+
+## 2026-10-25 (30) — 🟢 (26)–(29) DEPLOYED (owner); IndexNow 200 for the 16 "8k–24k" URLs; nothing staged-but-unpushed except docs
+
+- Owner: *"Pushed and deployed."* — one push carried (26) shop dropdown lists, (27) one desktop product layout, (28) 8k–24k gold copy, (29) reviews band. Claude did not check production beyond IndexNow (not asked).
+- **IndexNow:** `npm run indexnow` → **200 OK for 16 URLs** (`/jewelry-appraisal`, `/estate-services/selling-inherited-jewelry`, `/sell/{naples,marco-island,bonita-springs,estero,fort-myers,cape-coral}`, each EN + `/es`). ⚠️ In Git Bash the first URL was rewritten to `C:/Program Files/Git/jewelry-appraisal` (MSYS path conversion; the rest of the list was fine), so `/jewelry-appraisal` was resubmitted with `MSYS_NO_PATHCONV=1` → 200 OK for 1. Run IndexNow from PowerShell or with that prefix.
+- ◻ Open — the owner's checks (`TASKS.md` top blocks): the reviews band on a computer (not the desk one — reduce-motion) and a finger swipe on the iPhone/iPad; the shop Sort / Per page lists in Chrome; a product page on the wide screen zoomed out.
+
 ## 2026-10-25 (29) — Reviews: product pages get the scrolling band (grid gone); the band now stops on hover and drags both ways (homepage too) — BUILT + STAGED, not pushed (one push with (26)–(28)); no SQL
 
 - Owner (screenshot of the product-page review grid): *"Let's replace this grid with a scrolling carousel of reviews. And let's make it the type that when the user hovers over it, it stops and they can click on it and drag it right and left to progress or go back on the scroll. Repeat to me the plan before you implement"* → plan (incl. the owner's desk Chrome has reduce-motion ON, so it will not self-scroll there; reverses the 2026-08-18 product-grid rule) → *"Yes, build the review carousel as planned."*

@@ -33,6 +33,38 @@
    dialog with the one-page receipt (date, how it was paid, the items with
    photos). **Print receipt** on the "Sale recorded" screen prints it again.
    Email copy still follows its own box.
+6. **Record & send to desktop printer** (2026-10-26) — for a sale recorded on
+   the laptop: it records the sale the same way and sends the same one-page
+   receipt (one copy) to the **Print Station** on the desktop PC — the window
+   that prints buy receipts (`features/buy-receipts.md` → *The print station*).
+   The screen then says *Sent. Waiting for the desktop…* → *Printed on the
+   desktop.*; after 30 s with nothing picking it up: *The desktop has not
+   picked this up. Is the Print Station window open on the printer PC?* The
+   "Sale recorded" screen also has **Send to desktop printer** — each press
+   prints one more copy. If the send fails, the sale is still recorded and the
+   red line says why (press Send to desktop printer to try again).
+
+### The desktop printer for sales — how it works (2026-10-26)
+
+- One row in `sale_print_requests` per send: the order and its one-page paper,
+  built by the site at that moment (`lib/sale-print-requests.ts`,
+  `lib/sale-print-requests-server.ts`, routes `api/admin/in-store-sales`
+  (`sendToStation: true`) and `api/admin/in-store-sales/[id]/print-request`).
+- The Print Station checks that table in the same 3-second loop as buy
+  receipts, straight from Supabase (no site calls while idle), claims a row
+  (compare-and-set, 90 s take-over like buy receipts), prints it through the
+  same hidden frame as **Record & print receipt**, then sets `printed_at`. Buy
+  receipts go first; one job per check. Its page lists **Sale receipts today**
+  with **Print again** (a local reprint; it changes nothing).
+- ⛔ SQL first: `supabase/sale-print-requests-2026-10.sql`. Until it runs, only
+  the two send buttons fail ("…needs supabase/sale-print-requests-2026-10.sql
+  run in Supabase first"); the station skips the missing table and keeps
+  printing buy receipts.
+- After a deploy, **reload the Print Station window** once (it is a page left
+  open all day; it does not load new code by itself).
+- A queued receipt is a snapshot: if the order is edited before it prints, the
+  station prints what was sent. Rows are tiny and kept (a deleted order takes
+  its rows with it).
 
 ## Remote sale — email an invoice
 

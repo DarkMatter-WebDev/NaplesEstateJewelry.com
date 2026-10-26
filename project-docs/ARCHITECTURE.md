@@ -847,6 +847,13 @@ Laptop (admin form)                      Supabase                         Deskto
   request-scoped client; the station uses the browser client. Both are the
   `authenticated` role, so the table carries the admin RLS policy and the grant.
   There is no service-role path for this feature.
+- **In-store sale receipts ride the same station (2026-10-26).** Instant Sale →
+  In-store sale → *Record & send to desktop printer* / *Send to desktop
+  printer* insert a `sale_print_requests` row (admin RLS, written with the
+  admin's request-scoped client) holding the order's one-page paper; the
+  station's same 3-s loop claims it, prints it with `printPaperInFrame` and
+  sets `printed_at`; the laptop watches the row. Buy receipts go first. Detail:
+  `features/instant-sale.md` → *The desktop printer for sales*.
 - **First private bucket.** `buy-receipt-ids` is not public; its four Storage
   policies are admin-only; rows hold the object path and the UI asks for a
   10-minute signed link. The Storage GC does not list this bucket.

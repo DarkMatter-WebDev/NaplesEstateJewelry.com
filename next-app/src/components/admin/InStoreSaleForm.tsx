@@ -30,6 +30,8 @@ import SaleItemsEditor, {
 import SaleDeliverySection, { type DeliveryMethod } from '@/components/admin/instant-sale/SaleDeliverySection';
 import { paperReceiptDocument, type PaperReceipt } from '@/lib/order-receipt-paper';
 import { printPaperInFrame } from '@/lib/print-paper';
+import { SALE_PRINT_MESSAGES, type SalePrintRequestRef } from '@/lib/sale-print-requests';
+import SaleStationPrint from '@/components/admin/instant-sale/SaleStationPrint';
 
 export type { InStoreProduct } from '@/components/admin/instant-sale/SaleItemsEditor';
 
@@ -42,12 +44,18 @@ type Recorded = {
   summary: string[];
   /** "Record & print receipt": the one-page paper the route returned. */
   paper: PaperReceipt | null;
+  /** "Record & send to desktop printer" (2026-10-26): the Print Station request, or why it was not sent. */
+  stationRequest: SalePrintRequestRef | null;
+  stationError: string | null;
   total: number;
   paidBy: InStorePaymentMethod;
   customer: string;
   /** Shipped sales only: the address lines and the charge chosen. */
   shipTo: { lines: string[]; shipping: string } | null;
 };
+
+/** "Record sale" · "Record & print receipt" (print here) · "Record & send to desktop printer" (the Print Station). */
+type RecordAction = 'record' | 'print' | 'station';
 
 const label = 'form-label';
 const labelStyle = { color: 'var(--color-primary)' } as const;
@@ -86,7 +94,7 @@ export default function InStoreSaleForm({
   const [customFee, setCustomFee] = useState('');
   const [paidBy, setPaidBy] = useState<InStorePaymentMethod>('zettle');
   const [note, setNote] = useState('');
-  const [busy, setBusy] = useState<'record' | 'print' | null>(null);
+  const [busy, setBusy] = useState<RecordAction | null>(null);
   const [printNote, setPrintNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [recorded, setRecorded] = useState<Recorded | null>(null);
@@ -126,7 +134,7 @@ export default function InStoreSaleForm({
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
-    await record(false);
+    await record('record');
   }
 
   /** Print the one-page receipt in place (a hidden frame — no pop-up to block). */
@@ -139,8 +147,9 @@ export default function InStoreSaleForm({
     }
   }
 
-  /** "Record sale", or "Record & print receipt" (owner, 2026-10-21) with `print`. */
-  async function record(print: boolean) {
+  /** "Record sale", "Record & print receipt" (owner, 2026-10-21) or "Record & send to desktop printer" (2026-10-26). */
+  async function record(action: RecordAction) {
+    const print = action === 'print';
     if (busy) return;
     setError(null);
     const problem = saleItemsProblem(items);
@@ -150,7 +159,7 @@ export default function InStoreSaleForm({
       setError(shipping === 'custom' ? 'Enter the shipping charge, e.g. 25.' : 'Express overnight is not offered at $5,000 and up. Pick another shipping charge.');
       return;
     }
-    setBusy(print ? 'print' : 'record');
+    setBusy(action);
     setPrintNote(null);
     try {
       const res = await fetch('/api/admin/in-store-sales', {
@@ -169,6 +178,7 @@ export default function InStoreSaleForm({
           paidBy,
           note,
           print,
+          sendToStation: action === 'station',
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -176,6 +186,10 @@ export default function InStoreSaleForm({
       const paper: PaperReceipt | null = data.paper ?? null;
       setRecorded({
         paper,
+        stationRequest: data.stationRequest ?? null,
+        stationError: action === 'station' && !data.stationRequest
+          ? `${SALE_PRINT_MESSAGES.notSent}${data.stationError ? ` (${data.stationError})` : ''}`
+          : null,
         orderId: data.orderId,
         orderNumber: data.orderNumber,
         receiptEmailed: Boolean(data.receiptEmailed),
@@ -249,6 +263,7 @@ export default function InStoreSaleForm({
           ) : (
             <Link href={`${adminBasePath}/orders/${recorded.orderId}/invoice`} target="_blank" rel="noopener noreferrer" className="outline-button text-xs">Print receipt</Link>
           )}
+          <SaleStationPrint orderId={recorded.orderId} initialRequest={recorded.stationRequest} initialError={recorded.stationError} />
           <Link href={`${adminBasePath}/orders/${recorded.orderId}`} className="outline-button text-xs">
             {recorded.shipTo ? 'Open order to ship it' : `Open order ${recorded.orderNumber}`}
           </Link>
@@ -402,8 +417,11 @@ export default function InStoreSaleForm({
           )}
           <div className="grid gap-2 pt-1">
             <button type="submit" className="gold-button text-xs" disabled={Boolean(busy)}>{busy === 'record' ? 'Recording…' : totals ? `Record sale · ${formatCurrency(totals.total)}` : 'Record sale'}</button>
-            <button type="button" className="outline-button text-xs" style={{ borderWidth: '1.5px', borderColor: '#b5890c' }} disabled={Boolean(busy)} onClick={() => void record(true)}>
+            <button type="button" className="outline-button text-xs" style={{ borderWidth: '1.5px', borderColor: '#b5890c' }} disabled={Boolean(busy)} onClick={() => void record('print')}>
               {busy === 'print' ? 'Recording…' : 'Record & print receipt'}
+            </button>
+            <button type="button" className="outline-button text-xs" style={{ borderWidth: '1.5px', borderColor: '#b5890c' }} disabled={Boolean(busy)} onClick={() => void record('station')}>
+              {busy === 'station' ? 'Recording…' : 'Record & send to desktop printer'}
             </button>
             <button type="button" className="text-xs underline justify-self-start" style={hintStyle} onClick={clearAll} disabled={Boolean(busy)}>Clear</button>
           </div>

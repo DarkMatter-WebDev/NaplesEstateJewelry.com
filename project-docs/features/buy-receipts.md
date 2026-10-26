@@ -940,6 +940,12 @@ default printer is "Microsoft Print to PDF" or none.
   to the sign-in page, then comes straight back.
 - Status pill: green *Connected*, red *Disconnected · retrying* (it backs off
   to every 30 seconds and recovers by itself).
+- **It also prints in-store SALE receipts (2026-10-26)** sent from Instant Sale
+  → In-store sale → *Record & send to desktop printer* / *Send to desktop
+  printer*: the same loop reads `sale_print_requests`, buy receipts first, one
+  job per check, same claim rules. The page lists them under **Sale receipts
+  today** with **Print again**. Runbook: `features/instant-sale.md` → *The
+  desktop printer for sales*. Nothing in the setup or the shortcut changed.
 
 ## Editing, voiding, duplicating
 

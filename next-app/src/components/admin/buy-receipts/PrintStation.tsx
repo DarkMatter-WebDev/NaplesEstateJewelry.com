@@ -23,6 +23,17 @@ import {
   type BuyReceiptRow,
 } from '@/lib/buy-receipts';
 import { formatCurrency } from '@/types/sales';
+import { paperReceiptDocument } from '@/lib/order-receipt-paper';
+import { printPaperInFrame } from '@/lib/print-paper';
+import {
+  isMissingSalePrintTable,
+  isPaperReceipt,
+  nextSalePrint,
+  SALE_PRINT_COLUMNS,
+  SALE_PRINT_TABLE,
+  salePrintLabel,
+  type SalePrintRequestRow,
+} from '@/lib/sale-print-requests';
 import { useReceiptPrinter } from './BuyReceiptPrintHost';
 import { printableIdPhoto, printableThumbprint, type PrintableIdPhoto } from './buy-receipt-client';
 import StationSetupHelp from './StationSetupHelp';
@@ -48,6 +59,11 @@ import StationSetupHelp from './StationSetupHelp';
  * - The clock comes from a Web Worker. Chrome slows page timers to once a
  *   minute in a window that is covered or minimised — and the station usually
  *   sits behind whatever else the desktop is doing. Worker timers keep time.
+ * - In-store SALE receipts (2026-10-26) come through the same loop from
+ *   `sale_print_requests` (`lib/sale-print-requests.ts`): the row carries the
+ *   one-page paper, printed through the same hidden frame as "Record & print
+ *   receipt". Buy receipts go first; one job per check. Until the SQL file is
+ *   run the sale table is simply skipped.
  */
 
 const STATION_EVENT = 'nej-buy-receipt-station-change';
@@ -118,7 +134,9 @@ export default function PrintStation({ adminBasePath, adminEmail }: { adminBaseP
   const armed = useSyncExternalStore<Armed>(subscribeStation, readStation, () => 'unknown');
   const [status, setStatus] = useState<Status>('starting');
   const [current, setCurrent] = useState<BuyReceiptRow | null>(null);
+  const [currentSale, setCurrentSale] = useState<SalePrintRequestRow | null>(null);
   const [today, setToday] = useState<BuyReceiptRow[]>([]);
+  const [todaySales, setTodaySales] = useState<SalePrintRequestRow[]>([]);
   const [lastCheckedAt, setLastCheckedAt] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const printer = useReceiptPrinter();
@@ -140,6 +158,8 @@ export default function PrintStation({ adminBasePath, adminEmail }: { adminBaseP
   const stoppedRef = useRef(false);
   /** Printed, but the "printed" write failed: retried every tick, and never printed again meanwhile. */
   const pendingMarksRef = useRef(new Map<string, { printed_at: string; print_count: number }>());
+  /** The same for sale receipts: row id → printed_at. */
+  const pendingSaleMarksRef = useRef(new Map<string, string>());
 
   const client = useCallback((): SupabaseClient => {
     if (!supabaseRef.current) supabaseRef.current = createClient();
@@ -168,7 +188,51 @@ export default function PrintStation({ adminBasePath, adminEmail }: { adminBaseP
     const todayKey = easternDayKey(new Date());
     const rows = ((data ?? []) as unknown as BuyReceiptRow[]).filter((row) => easternDayKey(row.created_at) === todayKey);
     setToday(rows);
+    // Sale receipts sent today. An error (e.g. the SQL not run yet) just leaves the list empty.
+    const { data: sales } = await client()
+      .from(SALE_PRINT_TABLE)
+      .select(SALE_PRINT_COLUMNS)
+      .gte('requested_at', since)
+      .order('requested_at', { ascending: false })
+      .limit(40);
+    setTodaySales(((sales ?? []) as unknown as SalePrintRequestRow[]).filter((row) => easternDayKey(row.requested_at) === todayKey));
   }, [client]);
+
+  /** Print one sale receipt (claimed by this station, or a local "Print again"), then record it. */
+  const runSalePrint = useCallback(
+    async (row: SalePrintRequestRow, claimed: boolean) => {
+      printingRef.current = true;
+      setCurrentSale(row);
+      setStatus('printing');
+      try {
+        if (!isPaperReceipt(row.paper)) {
+          setNotice(`Sale ${row.order_number}: the receipt could not be read. Open the order and print it from there.`);
+        } else {
+          await printPaperInFrame(paperReceiptDocument(row.paper));
+        }
+        if (!claimed) return;
+        // Marked printed even when the paper was unreadable, so one bad row cannot hold the queue.
+        const printedAt = new Date().toISOString();
+        const { error } = await client()
+          .from(SALE_PRINT_TABLE)
+          .update({ printed_at: printedAt })
+          .eq('id', row.id)
+          .eq('claimed_by', stationId());
+        if (error) {
+          pendingSaleMarksRef.current.set(row.id, printedAt);
+          setNotice(`Sale ${row.order_number} printed, but the log could not be updated yet. It will not print twice.`);
+        }
+      } catch {
+        setNotice(`Sale ${row.order_number}: printing did not start. Press Print again on its row.`);
+      } finally {
+        printingRef.current = false;
+        setCurrentSale(null);
+        if (!stoppedRef.current) setStatus('ready');
+        void refreshToday();
+      }
+    },
+    [client, refreshToday, stationId],
+  );
 
   /** Print one receipt this station has already claimed (or a local reprint), then record it. */
   const runPrint = useCallback(
@@ -235,6 +299,10 @@ export default function PrintStation({ adminBasePath, adminEmail }: { adminBaseP
           .eq('id', id);
         if (!error) pendingMarksRef.current.delete(id);
       }
+      for (const [id, printedAt] of pendingSaleMarksRef.current) {
+        const { error } = await supabase.from(SALE_PRINT_TABLE).update({ printed_at: printedAt }).eq('id', id);
+        if (!error) pendingSaleMarksRef.current.delete(id);
+      }
 
       const since = new Date(Date.now() - LOOKBACK_MS).toISOString();
       const { data, error } = await supabase
@@ -258,6 +326,7 @@ export default function PrintStation({ adminBasePath, adminEmail }: { adminBaseP
       setStatus('ready');
 
       const now = Date.now();
+      let printedBuyReceipt = false;
       // PostgREST cannot compare two columns, so "requested after it last printed" is decided here.
       const next = ((data ?? []) as unknown as BuyReceiptRow[]).find(
         (row) => isPrintPending(row) && isClaimStale(row, now) && !pendingMarksRef.current.has(row.id),
@@ -274,7 +343,39 @@ export default function PrintStation({ adminBasePath, adminEmail }: { adminBaseP
           .select('id');
         if (won && won.length > 0) {
           await runPrint(next, { plain: next.print_copies_plain, withId: next.print_copies_with_id, seller: next.print_copies_seller ?? 0 }, true);
+          printedBuyReceipt = true;
           delay = 250;
+        }
+      }
+
+      // In-store sale receipts, when no buy receipt went out this check.
+      if (!printedBuyReceipt) {
+        const { data: sales, error: salesError } = await supabase
+          .from(SALE_PRINT_TABLE)
+          .select(SALE_PRINT_COLUMNS)
+          .is('printed_at', null)
+          .gte('requested_at', since)
+          .order('requested_at', { ascending: true })
+          .limit(20);
+        if (salesError && isAuthError(salesError)) {
+          signedOut();
+          return;
+        }
+        if (salesError && !isMissingSalePrintTable(salesError)) throw new Error(salesError.message);
+        const sale = nextSalePrint((sales ?? []) as unknown as SalePrintRequestRow[], Date.now(), new Set(pendingSaleMarksRef.current.keys()));
+        if (sale) {
+          const staleBefore = new Date(Date.now() - BUY_RECEIPT_CLAIM_STALE_MS).toISOString();
+          const { data: wonSale } = await supabase
+            .from(SALE_PRINT_TABLE)
+            .update({ claimed_at: new Date().toISOString(), claimed_by: stationId() })
+            .eq('id', sale.id)
+            .is('printed_at', null)
+            .or(`claimed_at.is.null,claimed_at.lt.${staleBefore}`)
+            .select('id');
+          if (wonSale && wonSale.length > 0) {
+            await runSalePrint(sale, true);
+            delay = 250;
+          }
         }
       }
 
@@ -290,7 +391,7 @@ export default function PrintStation({ adminBasePath, adminEmail }: { adminBaseP
       nextPollAtRef.current = Date.now() + delay;
       tickingRef.current = false;
     }
-  }, [client, refreshToday, runPrint, signedOut, stationId]);
+  }, [client, refreshToday, runPrint, runSalePrint, signedOut, stationId]);
 
   useEffect(() => {
     if (armed !== 'armed') return;
@@ -331,6 +432,12 @@ export default function PrintStation({ adminBasePath, adminEmail }: { adminBaseP
     if (printingRef.current) return;
     setNotice(null);
     void runPrint(row, { plain: 1, withId: 0, seller: 0 }, false);
+  }
+
+  function printSaleAgain(row: SalePrintRequestRow) {
+    if (printingRef.current) return;
+    setNotice(null);
+    void runSalePrint(row, false);
   }
 
   const pageStyle = { minHeight: '100vh', background: 'var(--color-background, #fafaf8)', color: 'var(--color-on-surface)' } as const;
@@ -432,6 +539,20 @@ export default function PrintStation({ adminBasePath, adminEmail }: { adminBaseP
           </div>
         )}
 
+        {currentSale && (
+          <div className="border px-4 py-3" style={{ borderColor: '#ef9f27', background: '#faeeda', color: '#633806' }} role="status">
+            <p className="text-sm font-semibold">
+              Printing sale receipt {currentSale.order_number}
+              {currentSale.customer_name ? ` · ${currentSale.customer_name}` : ''}
+              {currentSale.total != null ? ` · ${formatCurrency(Number(currentSale.total))}` : ''}
+            </p>
+            <p className="text-xs" style={{ color: '#854f0b' }}>
+              Sent {formatReceiptTime(currentSale.requested_at)}
+              {currentSale.requested_by ? ` by ${currentSale.requested_by}` : ''}
+            </p>
+          </div>
+        )}
+
         {notice && (
           <p role="alert" className="border px-4 py-3 text-sm" style={{ borderColor: 'var(--color-error)', color: 'var(--color-error)' }}>
             {notice}
@@ -481,6 +602,30 @@ export default function PrintStation({ adminBasePath, adminEmail }: { adminBaseP
             </div>
           )}
         </div>
+
+        {todaySales.length > 0 && (
+          <div>
+            <p className="mb-2 text-sm" style={hintStyle}>Sale receipts today</p>
+            <div className="border bg-white" style={cardStyle}>
+              {todaySales.map((row, index) => (
+                <div
+                  key={row.id}
+                  className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-sm"
+                  style={{ borderTop: index === 0 ? 'none' : '1px solid var(--color-outline-variant)' }}
+                >
+                  <span className="w-24 font-semibold">{row.order_number}</span>
+                  <span className="w-20" style={hintStyle}>{formatReceiptTime(row.requested_at)}</span>
+                  <span className="min-w-[140px] flex-1">{row.customer_name ?? 'Sale'}</span>
+                  <span className="w-24 text-right">{row.total != null ? formatCurrency(Number(row.total)) : ''}</span>
+                  <span className="w-40 text-right text-xs" style={hintStyle}>{salePrintLabel(row)}</span>
+                  <button type="button" className="outline-button text-xs" disabled={status === 'printing'} onClick={() => printSaleAgain(row)}>
+                    Print again
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <StationSetupHelp open={printer.dialogSuspected} />
 

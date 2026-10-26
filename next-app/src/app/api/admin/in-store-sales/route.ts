@@ -11,6 +11,7 @@ import {
 } from '@/lib/in-store-sale';
 import { formatCurrency } from '@/types/sales';
 import { loadPaperReceipt } from '@/lib/order-receipt-paper-server';
+import { queueSalePrint } from '@/lib/sale-print-requests-server';
 
 /**
  * POST: record a sale made in the showroom (the card was taken on Zettle).
@@ -34,6 +35,8 @@ import { loadPaperReceipt } from '@/lib/order-receipt-paper-server';
  * Several items + a photo each + "Email copy" (owner, 2026-10-21). No new SQL.
  * `print: true` ("Record & print receipt", 2026-10-21) also returns the
  * one-page paper (`lib/order-receipt-paper.ts`) for the form to print.
+ * `sendToStation: true` ("Record & send to desktop printer", 2026-10-26) also
+ * queues that paper for the Print Station (`lib/sale-print-requests.ts`).
  */
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -122,12 +125,22 @@ export async function POST(req: Request) {
   });
   if (!paid.ok) return NextResponse.json({ error: paid.error, orderId }, { status: paid.status });
 
-  const wantsPaper = Boolean((body as Record<string, unknown> | null)?.print);
+  const flags = (body as Record<string, unknown> | null) ?? {};
+  const sendToStation = Boolean(flags.sendToStation);
+  const wantsPaper = Boolean(flags.print) || sendToStation;
+  const paper = wantsPaper ? await loadPaperReceipt(service, orderId) : null;
+  // "Record & send to desktop printer" (2026-10-26). The sale is recorded either
+  // way; a failed send comes back as `stationError` for the form to show.
+  const queued = sendToStation
+    ? await queueSalePrint(admin.supabase, service, { orderId, requestedBy: admin.user.email ?? null, paper })
+    : null;
   return NextResponse.json({
     orderId,
     orderNumber,
     receiptEmailed: paid.receiptEmailed,
     shipped,
-    paper: wantsPaper ? await loadPaperReceipt(service, orderId) : null,
+    paper,
+    stationRequest: queued && 'request' in queued ? queued.request : null,
+    stationError: queued && 'error' in queued ? queued.error : null,
   });
 }
