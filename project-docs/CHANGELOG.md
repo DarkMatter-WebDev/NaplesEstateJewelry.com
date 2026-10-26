@@ -1,6 +1,46 @@
 
 # Changelog
 
+## 2026-10-25 (16) — Customer Trade-in Price: new "% off the asking price" choice — BUILT + STAGED, not pushed; ⛔ SQL `supabase/shop-trade-in-asking-discount-2026-10.sql` to run BEFORE the push; no env vars
+
+- Owner: *"let's add an option for the admin to choose to set a site-wide trade-in price based on a percentage discount off of the asking price … Repeat back to me the plan"*; then, on the plan: *"Yes, build it as planned."*
+- **Admin → Settings → Customer Trade-in Price:** under "Set a site-wide trade-in price…", two choices — **Percent over melt value** (unchanged) and **Percent off the asking price** (new, 0–100). Each keeps its own number. The live example follows the choice ("On a $1,000 asking price, the line would read $800.00.").
+- **Product page:** asking basis = `getProductPriceValue` × (1 − discount/100). The per-item override still wins; the scrap-value box unchanged; no floor at melt; no numeric asking price → melt value; the line shows on exactly the same items as before (still needs a melt value). The amount on the page uses the existing `formatUsdPrice` (whole dollars, as today — e.g. $1,629); only the admin example shows cents.
+- **Not touched:** checkout, PayPal, Make an Offer, eBay, Etsy, Google / Meta feeds.
+- **SQL:** NEW `supabase/shop-trade-in-asking-discount-2026-10.sql` — `shop_settings.special_price_default_basis` (text, default `'melt'`, check melt|asking) + `special_price_default_discount_percent` (numeric, 0–100 check). Safe to re-run; closing check lists both columns. Before it runs: the site reads the melt setting as before, a melt save still works (retries without the new columns), an asking save says to run the SQL.
+- Files: `src/lib/shop-settings.ts`, `src/app/api/admin/shop-settings/route.ts`, `src/types/product.ts`, `src/app/[locale]/shop/[id]/page.tsx`, `src/components/admin/AdminSpecialPricePanel.tsx`, `src/types/__tests__/product.test.ts` (+8 asking-basis cases), NEW `src/lib/__tests__/shop-settings-trade-in.test.ts` (6); NEW SQL; docs `features/live-metal-pricing.md`, DECISIONS, CURRENT_STATUS, TASKS.
+- Gate: `npx tsc --noEmit` 0 · `npm run lint` 0 errors (the 4 old `<img>` warnings) · `npx vitest run` **1990/1990** (174 files) · `npm run build` 0 (dev server stopped first; 563/563 static pages generated). Dev (melt basis, SQL not run): 6 product pages render the trade-in line as before (e.g. byzantine bracelet $1,832 → $1,629).
+- ⛔ Not verified: the admin panel itself (behind the sign-in), a real save in either basis.
+- ✅ **SQL RUN** (owner, 10-25: *"ran the sql, got this.. good to push and deploy ?"*): the closing check listed `special_price_default_basis` (text, NOT NULL, default `'melt'`) and `special_price_default_discount_percent` (numeric, nullable). Staging re-verified before the go-ahead (docs-only re-sync, follow-up dry run 0).
+
+## 2026-10-25 (15) — session CLOSED; everything DEPLOYED; the Instagram / Facebook shop is LIVE; no SQL, no env vars
+
+- Owner: *"update docs and end session.."*. Nothing checked in production for this close (not asked).
+- **This session (10-25 (6) → (14)):**
+  - (6) Google Merchant Center read: the feed was never abandoned; 60/60 Approved, daily fetch running.
+  - (7)+(8) Meta catalog + `?channel=meta` feed (brand, JPEG photos via `/feed-image`), `.com` verified by a meta tag, hourly Replace feed; first upload 61 / 0 issues.
+  - (9)+(10) Shop created (owner ticked the Seller Agreement), shipping profile, the `/meta-checkout` checkout URL (built, deployed, Meta's test passed).
+  - (11) Published after the owner's yes on "website ratings/reviews"; both channels Active.
+  - (12)–(14) Instagram showed pieces out of stock → `quantity_to_sell_on_facebook` added; deployed; confirmed on nej-146 (0 → 1) and nej-95 (999999999 → 1); the 7:57 PM upload 61 / 0 failed / 0 issues.
+- The owner's IG answer, for the record: leave the tag's "affiliate or product URL" box empty.
+- **Open (owner):** the reel's "View products" button showing (tag on the Share screen if an edited reel won't keep it); the cow creamer reading in stock in Instagram; first-week catalog Issues + a sold piece dropping off within the hour; the iPhone look at `/shop` (sort / per page); the Text Deals test text. Dates: GBP Offer post renewal ~Nov 1; Google Ads read ~Nov 7; Search Console ~Nov 12–19.
+- Last gate (10-25 (12), the last code change): `npx tsc --noEmit` 0 · `npm run lint` 0 errors (4 old `<img>` warnings) · `npx vitest run --maxWorkers=4` **1977/1977** (173 files) · `npm run build` 0 · prerender 92 = 43 EN + 43 ES + 6 · no `.next/cache/turbopack`.
+- Folder: no stray files (no `zz-*`, no logs; `.next/dev` removed earlier with the dev server stopped); `next-env.d.ts` / `tsconfig.tsbuildinfo` are generated and excluded from staging. Dev servers stopped. One Commerce Manager tab (nej-146) left open in the desk Chrome at the owner's request.
+
+## 2026-10-25 (14) — ✅ cow creamer CONFIRMED "Quantity to sell: 1" in Commerce Manager
+
+- Owner: *"check again, and leave the tab open when done"*. At 7:57–7:58 PM: the data source still read "Last updated 6:57 PM / being uploaded", but the product filter "Product is any of these nej-146" showed the row **last updated Oct 25 at 7:57 PM**. Its attributes: **Quantity to sell 1**, Availability In stock, Source of last edit "Feed upload", Status shown. "Return policy days" 30 (unchanged; no feed field). The Commerce Manager tab was left open in the desk Chrome at the owner's request.
+- Owner: *"is the upload done?"* → yes. Data source "Last updated Oct 25 at 7:57 PM"; session 7:57 PM: **61 updated or added · 0 removed · 0 failed · 0 issues**; next 8:57 PM. Read in a second tab, then closed; the owner's tab was left as it was.
+- Owner: *"is the unlimited quantity issue fixed now?"* → yes. nej-95 (Whiting tablespoon, 999999999 before) now **Quantity to sell 1**, In stock, source "Feed upload". Both odd defaults (0 and 999999999) are replaced by the real count.
+
+## 2026-10-25 (13) — quantity fix DEPLOYED (owner); live Meta feed sends it; Meta's re-upload still running at 7:55 PM, so the cow creamer is ◻ not yet confirmed
+
+- Owner: *"Pushed and deployed. Check that the cow creamer shows Quantity to sell 1 in Commerce Manager."*
+- **Production (curl):** the first `/api/merchant-feed?channel=meta` read → **503** (the fail-closed live-spot stop; `/spot-prices` 200 at the same time). Seconds later → 200, **61 items, 61 `quantity_to_sell_on_facebook`** (60 × 1, 1 × 5). The Google feed has no quantity line (unchanged).
+- **Commerce Manager, data source `1894112751752820`:** "Last updated 6:57 PM", "Your data file is being uploaded", next scheduled 8:57 PM. **Update** → *"Another Upload Already in Progress"*. Still running at 7:55 PM (Claude's clock). The in-progress upload is probably the one that met the 503 (Meta retries). Not forced further.
+- **Found while looking:** nej-95 (Whiting tablespoon, last updated 6:57 PM, before the fix) carries **"Quantity to sell: 999999999"** (Meta's unlimited default), while nej-146 (last updated 1:58 PM) carried **0**, and both have "Return policy days: 30". The explicit quantity now makes every item the same.
+- ◻ **Next:** after the upload finishes (by the 8:57 PM run at the latest), Commerce Manager → Products → filter Content ID `nej-146` → Show more attributes → "Quantity to sell" = **1**; then Instagram shows the cow creamer in stock.
+
 ## 2026-10-25 (12) — Instagram shop showed pieces OUT OF STOCK: the Meta feed now sends `quantity_to_sell_on_facebook` — BUILT + STAGED, not pushed; no SQL, no env vars
 
 - Owner: the cow creamer was taggable in Instagram but showed out of stock. Then: *"Yes, add the quantity and the 5-day return window to the Meta feed, test it, and stage it."*

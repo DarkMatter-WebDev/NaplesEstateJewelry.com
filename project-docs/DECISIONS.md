@@ -4,7 +4,18 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-10-25 (7)**.
+> compaction. Last reconciled: **2026-10-25 (16)**.
+
+## The site-wide trade-in line can be a % off the ASKING price as well as a % over melt; the admin picks one, each keeps its own number (2026-10-25)
+
+- **Owner:** *"allow them to choose to instead set it based on a percentage discount off of the asking price"*; approved the plan: *"Yes, build it as planned."*
+- **The rules:**
+  - `shop_settings.special_price_default_basis` = `'melt'` (default, the original signed % over melt) or `'asking'` (`special_price_default_discount_percent`, 0–100, off the asking price). Switching keeps both numbers.
+  - The asking price is `getProductPriceValue` — THE chargeable price, never a second calculation.
+  - Precedence unchanged: per-item override → site-wide default → plain melt. Both bases still need a computable melt value, so the line appears on the same items as before. No numeric asking price ("Contact for price") → melt value. ⛔ No floor at melt (owner accepted the plan saying so).
+  - The line is advertising only. ⛔ Never let checkout, offers, marketplaces or feeds read it.
+  - Degrades: before the SQL, reads fall back to the melt-only columns (never to "off"), and a melt save retries without the new columns.
+- Code `types/product.ts` → `resolveAdvertisedTradeInPrice`; `lib/shop-settings.ts`; `components/admin/AdminSpecialPricePanel.tsx`. Guards `types/__tests__/product.test.ts`, `lib/__tests__/shop-settings-trade-in.test.ts`. SQL `supabase/shop-trade-in-asking-discount-2026-10.sql`. Record `CHANGELOG.md` 2026-10-25 (16).
 
 ## The Meta catalog (Instagram shop) reads the SAME merchant feed with `?channel=meta`: brand added, photos converted to JPEG on request; Google's feed never changes for Meta (2026-10-25)
 

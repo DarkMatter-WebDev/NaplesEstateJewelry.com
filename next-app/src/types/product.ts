@@ -323,18 +323,28 @@ export function resolveSpecialTradeInPrice(
   return getSpecialPriceOverrideAmount(product);
 }
 
-/** The site-wide default trade-in price (a signed % over the item's melt value). */
+/**
+ * The site-wide default trade-in price: a signed % over the item's melt value
+ * (basis 'melt', also when basis is absent) or a % off its asking price
+ * (basis 'asking').
+ */
 export interface SiteTradeInDefault {
   enabled: boolean;
+  basis?: 'melt' | 'asking' | null;
   percent: number | null;
+  discountPercent?: number | null;
 }
 
 // The actual trade-in price to advertise on a product page, resolving the full
 // precedence in one place:
 //   1. the per-item override (resolveSpecialTradeInPrice) — always wins;
-//   2. else the SITE-WIDE default (meltValue * (1 + percent/100)) when enabled;
+//   2. else the SITE-WIDE default when enabled:
+//        basis 'melt'   → meltValue * (1 + percent/100) (percent may be negative)
+//        basis 'asking' → askingPrice * (1 - discountPercent/100) (0–100)
 //   3. else the plain computed melt value (or null when it can't be computed).
-// The site default percent may be negative (advertise below spot) or positive.
+// Both site-wide bases need a computable melt value, so the line appears on
+// exactly the items it always did; an item with no numeric asking price
+// ("Contact for price") falls back to its melt value. No floor at melt.
 export function resolveAdvertisedTradeInPrice(
   product: Pick<
     Product,
@@ -345,16 +355,29 @@ export function resolveAdvertisedTradeInPrice(
   >,
   meltValue: number | null,
   siteDefault: SiteTradeInDefault | null | undefined,
+  askingPrice: number | null = null,
 ): number | null {
   const perItem = resolveSpecialTradeInPrice(product, meltValue);
   if (perItem != null) return perItem;
-  if (
-    siteDefault?.enabled &&
-    meltValue != null &&
-    Number.isFinite(meltValue) &&
-    typeof siteDefault.percent === 'number' &&
-    Number.isFinite(siteDefault.percent)
-  ) {
+  if (!siteDefault?.enabled || meltValue == null || !Number.isFinite(meltValue)) return meltValue;
+
+  if (siteDefault.basis === 'asking') {
+    const discount = siteDefault.discountPercent;
+    if (
+      askingPrice != null &&
+      Number.isFinite(askingPrice) &&
+      askingPrice > 0 &&
+      typeof discount === 'number' &&
+      Number.isFinite(discount) &&
+      discount >= 0 &&
+      discount <= 100
+    ) {
+      return askingPrice * (1 - discount / 100);
+    }
+    return meltValue;
+  }
+
+  if (typeof siteDefault.percent === 'number' && Number.isFinite(siteDefault.percent)) {
     return meltValue * (1 + siteDefault.percent / 100);
   }
   return meltValue;

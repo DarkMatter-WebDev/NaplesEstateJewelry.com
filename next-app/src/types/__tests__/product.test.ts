@@ -58,6 +58,51 @@ describe('resolveAdvertisedTradeInPrice', () => {
       special_price_override_percent: 25,
     };
     expect(resolveAdvertisedTradeInPrice(pct, 1000, { enabled: true, percent: 10 })).toBe(1250);
+    expect(
+      resolveAdvertisedTradeInPrice(pct, 1000, { enabled: true, basis: 'asking', percent: null, discountPercent: 20 }, 2000),
+    ).toBe(1250);
+  });
+
+  describe('site-wide basis "asking" (% off the asking price)', () => {
+    const asking = (discountPercent: number | null) =>
+      ({ enabled: true, basis: 'asking', percent: 10, discountPercent }) as const;
+
+    it('takes the discount off the asking price, ignoring the melt percent', () => {
+      expect(resolveAdvertisedTradeInPrice(noOverride, 1000, asking(20), 2000)).toBe(1600);
+      expect(resolveAdvertisedTradeInPrice(noOverride, 1000, asking(0), 2000)).toBe(2000);
+      expect(resolveAdvertisedTradeInPrice(noOverride, 1000, asking(12.5), 1247)).toBeCloseTo(1091.125);
+    });
+
+    it('has no floor at melt value', () => {
+      expect(resolveAdvertisedTradeInPrice(noOverride, 1000, asking(50), 1200)).toBe(600);
+    });
+
+    it('falls back to melt when there is no numeric asking price ("Contact for price")', () => {
+      expect(resolveAdvertisedTradeInPrice(noOverride, 1000, asking(20), null)).toBe(1000);
+      expect(resolveAdvertisedTradeInPrice(noOverride, 1000, asking(20))).toBe(1000);
+      expect(resolveAdvertisedTradeInPrice(noOverride, 1000, asking(20), 0)).toBe(1000);
+    });
+
+    it('falls back to melt when the discount is missing or out of range', () => {
+      expect(resolveAdvertisedTradeInPrice(noOverride, 1000, asking(null), 2000)).toBe(1000);
+      expect(resolveAdvertisedTradeInPrice(noOverride, 1000, asking(-5), 2000)).toBe(1000);
+      expect(resolveAdvertisedTradeInPrice(noOverride, 1000, asking(101), 2000)).toBe(1000);
+    });
+
+    it('still needs a computable melt value, so the line shows on the same items as before', () => {
+      expect(resolveAdvertisedTradeInPrice(noOverride, null, asking(20), 2000)).toBeNull();
+    });
+
+    it('is ignored while the site-wide default is off', () => {
+      expect(resolveAdvertisedTradeInPrice(noOverride, 1000, { ...asking(20), enabled: false }, 2000)).toBe(1000);
+    });
+
+    it('basis "melt" (or absent) keeps the % over melt even with a discount stored', () => {
+      expect(
+        resolveAdvertisedTradeInPrice(noOverride, 1000, { enabled: true, basis: 'melt', percent: 10, discountPercent: 20 }, 2000),
+      ).toBe(1100);
+      expect(resolveAdvertisedTradeInPrice(noOverride, 1000, { enabled: true, percent: 10, discountPercent: 20 }, 2000)).toBe(1100);
+    });
   });
 });
 

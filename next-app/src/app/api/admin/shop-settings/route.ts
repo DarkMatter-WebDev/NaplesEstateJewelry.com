@@ -8,6 +8,7 @@ import {
   saveHideSoldItemPrices,
   fetchSpecialPriceDefault,
   saveSpecialPriceDefault,
+  normalizeSpecialPriceDefaultBasis,
 } from '@/lib/shop-settings';
 
 export const runtime = 'nodejs';
@@ -54,9 +55,15 @@ export async function PUT(req: Request) {
       touched = true;
     }
 
-    // Site-wide trade-in default — either field present means "update it".
-    if ('specialPriceDefaultEnabled' in body || 'specialPriceDefaultPercent' in body) {
+    // Site-wide trade-in default — any of its fields present means "update it".
+    if (
+      'specialPriceDefaultEnabled' in body ||
+      'specialPriceDefaultPercent' in body ||
+      'specialPriceDefaultBasis' in body ||
+      'specialPriceDefaultDiscountPercent' in body
+    ) {
       const enabled = Boolean(body.specialPriceDefaultEnabled);
+      const basis = normalizeSpecialPriceDefaultBasis(body.specialPriceDefaultBasis);
       const raw = body.specialPriceDefaultPercent;
       let percent: number | null = null;
       if (raw !== null && raw !== undefined && raw !== '') {
@@ -66,7 +73,16 @@ export async function PUT(req: Request) {
         }
         percent = n;
       }
-      await saveSpecialPriceDefault(service, { enabled, percent });
+      const rawDiscount = body.specialPriceDefaultDiscountPercent;
+      let discountPercent: number | null = null;
+      if (rawDiscount !== null && rawDiscount !== undefined && rawDiscount !== '') {
+        const n = Number(rawDiscount);
+        if (!Number.isFinite(n) || n < 0 || n > 100) {
+          return NextResponse.json({ error: 'The discount must be a number from 0 to 100 (e.g. 20 for 20% off).' }, { status: 400 });
+        }
+        discountPercent = n;
+      }
+      await saveSpecialPriceDefault(service, { enabled, basis, percent, discountPercent });
       touched = true;
     }
 

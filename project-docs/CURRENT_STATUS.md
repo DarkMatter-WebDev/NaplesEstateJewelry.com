@@ -2,7 +2,29 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-10-25 (12)**.
+> in `DECISIONS.md`. Last reconciled: **2026-10-25 (16)**.
+
+## Start Here (2026-10-25 (16) — 🟡 Customer Trade-in Price "% off the asking price" choice BUILT + STAGED, not pushed; ⛔ SQL `supabase/shop-trade-in-asking-discount-2026-10.sql` to run BEFORE the push; no env vars)
+
+- ✅ **SQL RUN** (owner, 10-25; the check listed both columns, basis default `'melt'`). Only the push + deploy is left; staging re-verified 10-25 (dry run 0).
+- 🟡 **Waiting for the owner:** push + deploy (`TASKS.md` top block). Record `CHANGELOG.md` 2026-10-25 (16); rule `DECISIONS.md` top entry; runbook `features/live-metal-pricing.md` → *Customer trade-in price*.
+- Admin → Settings → Customer Trade-in Price now offers **Percent over melt value** (unchanged) or **Percent off the asking price** (new). Product pages: asking price × (1 − %); per-item override still wins; same items show the line.
+- Gate: `tsc` 0 · lint 0 errors · **1990/1990** (174 files) · build 0. ⛔ The admin panel is not seen behind the sign-in.
+- Everything in the 10-25 (15) block below still applies (Meta shop live; the owner's open checks).
+
+## Start Here (2026-10-25 (15) — session CLOSED; everything DEPLOYED; Instagram / Facebook shop LIVE; nothing staged-but-unpushed except docs; no SQL, no env vars)
+
+- 🟢 **Meta shop live** (`CHANGELOG.md` 2026-10-25 (15) summarizes (6)–(14)): catalog `28466931839669076` reads `/api/merchant-feed?channel=meta` hourly (Replace) — 61 pieces with brand, quantity, JPEG photos; `.com` verified; checkout → `/meta-checkout` → `/checkout`; shop `997292439422811` Active on the Facebook Page + @naples_estate_jewelry. Rules: `DECISIONS.md` top entry. Map: `STRUCTURE.md` → *Product feeds* row.
+- ◻ **Open (owner):** the tagged reel's "View products" + the cow creamer in stock in Instagram; first-week catalog Issues; the iPhone look at `/shop` (sort / per page); the Text Deals test text. Dates: GBP Offer renewal ~Nov 1, Google Ads read ~Nov 7, Search Console ~Nov 12–19.
+- Last gate: `tsc` 0 · lint 0 errors · **1977/1977** (173 files) · build 0 · 92 = 43 + 43 + 6.
+
+## Start Here (2026-10-25 (14) — 🟢 everything DEPLOYED; Meta quantity CONFIRMED on the cow creamer (Quantity to sell 1, In stock); nothing staged-but-unpushed except docs; no SQL, no env vars)
+
+- `CHANGELOG.md` 2026-10-25 (14). Open: the owner sees the cow creamer in stock in Instagram; first tagged reel; first-week catalog checks (`TASKS.md` top block).
+
+## Start Here (2026-10-25 (13) — 🟢 everything DEPLOYED, incl. the Meta quantity fix; ◻ confirm "Quantity to sell: 1" on the cow creamer once Meta's upload finishes; nothing staged-but-unpushed except docs; no SQL, no env vars)
+
+- Live Meta feed sends `quantity_to_sell_on_facebook` on all 61 items. Meta's re-upload was still running at 7:55 PM 10-25 (`CHANGELOG.md` 2026-10-25 (13); `TASKS.md` top block, 5e). Where the 10-25 (12) block says "STAGED" / "not pushed", read "deployed".
 
 ## Start Here (2026-10-25 (12) — 🟡 Instagram "out of stock" fix (Meta feed sends `quantity_to_sell_on_facebook`) BUILT + STAGED, not pushed; no SQL, no env vars)
 

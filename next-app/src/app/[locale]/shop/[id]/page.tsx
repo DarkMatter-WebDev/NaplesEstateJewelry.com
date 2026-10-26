@@ -386,12 +386,18 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
   // melt value computed off the full item weight would overstate scrap value.
   const showSpotPrice = shouldShowSpotPrice(p);
   // The "Own gold or silver?" trade-in line resolves in precedence order: a
-  // per-item override wins; else the SITE-WIDE default (a % over/under melt,
-  // set once in Admin → Settings → Customer Trade-in Price) applies to every
-  // item; else it falls back to the plain computed melt value. The scrap-value
-  // box above stays tied to the real computed value either way.
+  // per-item override wins; else the SITE-WIDE default (a % over/under melt, or
+  // a % off the asking price — set once in Admin → Settings → Customer Trade-in
+  // Price) applies to every item; else it falls back to the plain computed melt
+  // value. The scrap-value box above stays tied to the real computed value
+  // either way. The asking price is THE chargeable price (getProductPriceValue).
   const siteTradeInDefault = await fetchSpecialPriceDefault(publicSettingsClient);
-  const specialTradeInPrice = resolveAdvertisedTradeInPrice(p, meltValue, siteTradeInDefault);
+  const specialTradeInPrice = resolveAdvertisedTradeInPrice(
+    p,
+    meltValue,
+    siteTradeInDefault,
+    getProductPriceValue(p, spotData),
+  );
   const tradeInValue = specialTradeInPrice != null ? formatUsdPrice(specialTradeInPrice) : scrapValue;
   const spotPerOz = p.category === 'Silver'
     ? spotData?.silverPerTroyOz

@@ -71,21 +71,35 @@ dash totals when entered as a plain number.
 
 A separate, marketing-only line on `shop/[id]`, independent of the sale price
 and the scrap-value box (which always shows the real melt value).
-`resolveAdvertisedTradeInPrice(product, meltValue, siteDefault)` in
+`resolveAdvertisedTradeInPrice(product, meltValue, siteDefault, askingPrice)` in
 `types/product.ts` resolves it in strict precedence:
 
 1. **Per-item override** (`products.special_price_override_*` — a flat dollar
    amount or a signed % over melt) — always wins.
-2. **Site-wide default** — `shop_settings.special_price_default_enabled` +
-   `special_price_default_percent` (signed; negative = below spot). Set once in
+2. **Site-wide default** — `shop_settings.special_price_default_enabled` plus a
+   **basis** (`special_price_default_basis`, added 2026-10-25). Set once in
    Admin → Settings → **Customer Trade-in Price** (`AdminSpecialPricePanel.tsx`,
-   via the `shop-settings` route + `fetchSpecialPriceDefault`). Applies
-   `meltValue * (1 + percent/100)` to every item at once.
+   via the `shop-settings` route + `fetchSpecialPriceDefault`), applied to every
+   item at once:
+   - `'melt'` (default) — `meltValue * (1 + special_price_default_percent/100)`
+     (signed; negative = below spot).
+   - `'asking'` — `askingPrice * (1 - special_price_default_discount_percent/100)`
+     (0–100). The asking price is `getProductPriceValue` (THE chargeable price).
+     An item with no numeric asking price ("Contact for price") shows its melt
+     value. No floor at melt.
+   Each basis keeps its own number. Both still need a computable melt value, so
+   the line appears on exactly the items it always did.
 3. **Plain melt value** — the historical default when neither is set.
 
-Reads degrade to "off" pre-migration. **Migration:
-`supabase/shop-special-price-default-2026-07.sql`.** Changes propagate to
-product pages within ~5 min (ISR), like the spot values they show.
+The line is advertising only: checkout, PayPal, Make an Offer, eBay, Etsy and
+the feeds never read it. Reads degrade to the melt-only setting before the
+basis migration and to "off" before the original one; a melt-basis save still
+works before the basis migration. **Migrations:
+`supabase/shop-special-price-default-2026-07.sql`, then
+`supabase/shop-trade-in-asking-discount-2026-10.sql`.** Guards:
+`types/__tests__/product.test.ts`, `lib/__tests__/shop-settings-trade-in.test.ts`.
+Changes propagate to product pages within ~5 min (ISR), like the spot values
+they show.
 
 ## Source And Fallback
 
