@@ -79,8 +79,8 @@ export default async function InheritedJewelryGuidePage({ params }: Props) {
     {
       kEn: 'Jewelry',
       kEs: 'Joyería',
-      descEn: 'Anything stamped 10k–24k, 585 or 750 is gold and has a floor value by weight. Signed pieces (Tiffany, Cartier, David Yurman), antique pieces, and anything with diamonds are priced as pieces, not as metal. Costume can wait — it is identified free, and it rarely changes the total.',
-      descEs: 'Todo lo sellado 10k–24k, 585 o 750 es oro y tiene un valor mínimo por peso. Las piezas firmadas (Tiffany, Cartier, David Yurman), las antiguas y todo lo que tenga diamantes se valoran como piezas, no como metal. La bisutería puede esperar — se identifica gratis y rara vez cambia el total.',
+      descEn: 'Anything stamped 8k–24k, 333, 585 or 750 is gold and has a floor value by weight. Signed pieces (Tiffany, Cartier, David Yurman), antique pieces, and anything with diamonds are priced as pieces, not as metal. Costume can wait — it is identified free, and it rarely changes the total.',
+      descEs: 'Todo lo sellado 8k–24k, 333, 585 o 750 es oro y tiene un valor mínimo por peso. Las piezas firmadas (Tiffany, Cartier, David Yurman), las antiguas y todo lo que tenga diamantes se valoran como piezas, no como metal. La bisutería puede esperar — se identifica gratis y rara vez cambia el total.',
     },
     {
       kEn: 'Silver',

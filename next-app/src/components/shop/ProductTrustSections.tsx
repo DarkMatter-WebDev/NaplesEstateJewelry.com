@@ -217,10 +217,7 @@ export function ProductTrustBadges({ isEs, pickupHoursLine }: Pick<Props, 'isEs'
         // a centered stack reads best (owner request 2026-08-04).
         <div key={badge.icon} className="flex flex-col items-center gap-2 text-center">
           <span
-            // `product-trust-badge-icon` is a styling hook only: globals.css
-            // shrinks the disc when this strip is compacted under the gallery at
-            // 2000px+. The h-9/w-9 utilities remain the default everywhere else.
-            className="product-trust-badge-icon flex h-9 w-9 items-center justify-center rounded-full"
+            className="flex h-9 w-9 items-center justify-center rounded-full"
             style={{ background: 'rgba(212, 175, 55, 0.14)', color: 'var(--color-primary)' }}
           >
             <AppIcon name={badge.icon} style={{ fontSize: '18px' }} />

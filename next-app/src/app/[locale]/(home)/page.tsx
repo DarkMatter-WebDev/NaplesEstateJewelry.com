@@ -570,7 +570,7 @@ export default async function HomePage({ params }: Props) {
 
         {/* Testimonials — real Google reviews (verbatim), shared with product
             pages via src/lib/testimonials.ts */}
-        <TestimonialsSection locale={locale} variant="marquee" />
+        <TestimonialsSection locale={locale} />
 
         {/* CTA — also the hero's "Visit Us" destination.
             ⚠️ `scroll-margin-top` is not optional: the header is fixed, so

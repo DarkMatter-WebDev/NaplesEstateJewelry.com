@@ -1,6 +1,50 @@
 
 # Changelog
 
+## 2026-10-25 (29) — Reviews: product pages get the scrolling band (grid gone); the band now stops on hover and drags both ways (homepage too) — BUILT + STAGED, not pushed (one push with (26)–(28)); no SQL
+
+- Owner (screenshot of the product-page review grid): *"Let's replace this grid with a scrolling carousel of reviews. And let's make it the type that when the user hovers over it, it stops and they can click on it and drag it right and left to progress or go back on the scroll. Repeat to me the plan before you implement"* → plan (incl. the owner's desk Chrome has reduce-motion ON, so it will not self-scroll there; reverses the 2026-08-18 product-grid rule) → *"Yes, build the review carousel as planned."*
+- **Build:**
+  - `TestimonialMarqueeBand.tsx` rewritten: one rAF loop moves the track (no CSS animation) — self-scrolls at the old speed (7 s per card); stops on mouse hover, during a drag, on keyboard focus (`:focus-visible`), offscreen; drag both ways with mouse/pen/finger (6 px threshold, capture only after it, the ending click swallowed, `dragstart` prevented); a finger pauses it 3 s after release; reduced motion = still, but draggable; endless loop both ways (wrap modulo one half); keyboard focus slides the focused card into view.
+  - `TestimonialsSection.tsx`: one presentation (the `variant` prop and the grid branch removed); product pages render it with the compact heading. Homepage call updated.
+  - `globals.css`: `@keyframes testimonial-marquee-scroll` + the animation/hover/focus/offscreen/reduced-motion CSS removed; `cursor: grab` / `grabbing`, `touch-action: pan-y`, `will-change: transform` added; `.testimonial-grid` (2/4 ladder) deleted. /reviews unchanged.
+- **Measured in dev (Chrome, the real pages):** homepage + Victorian bracelet product page — the band self-scrolls (~49 px/s); hover → stopped (transform unchanged 1.5 s); drag left 289 px → offset +289; drag right → wrapped back 177 px to the end of the loop; mouse leaves → resumes, crossing the seam without a jump; a plain click → the page opened the Google reviews link (the pane blocks new tabs); the ending click of a drag swallowed. Phone (375 px): self-scrolls, cards 293 px, no sideways page scroll. Headless Chrome with reduce-motion: transform stays 0 for 2.5 s; a real 250 px mouse drag → exactly -250 px. ⚠️ One of four drags in the pane did not register (log showed nothing unusual on the retries); not reproduced.
+- Files: `src/components/home/TestimonialMarqueeBand.tsx`, `src/components/home/TestimonialsSection.tsx`, `src/components/home/TestimonialCard.tsx` (comment), `src/app/[locale]/(home)/page.tsx`, `src/app/globals.css`, NEW `src/lib/__tests__/testimonial-band.test.ts` (5); docs DECISIONS (top entry + 3 older rules marked superseded), STRUCTURE (2 rows).
+- Gate: `npx tsc --noEmit` 0 · `npm run lint` 0 errors (the 4 old `<img>` warnings) · `npx vitest run` **2027/2027** (179 files) · `npm run build` 0 (dev stopped first; 563/563).
+- ⛔ Not tried: a real finger on an iPhone/iPad (touch drag), Safari.
+
+## 2026-10-25 (28) — "8k–24k" gold everywhere (was 10k–24k): product page line + `/jewelry-appraisal`, `/sell/[city]`, the inherited-jewelry guide (+ the 333 stamp), EN + ES — BUILT + STAGED, not pushed (one push with (26) + (27)); no SQL
+
+- Owner: *"near the bottom of the page it says "Have gold like this? We buy 10k–24k gold jewelry, chains, and coins — sell your gold in Naples or get a free appraisal.".. adjust that to reflect that we buy 8k-24k gold"*.
+- `src/app/[locale]/shop/[id]/page.tsx`: EN *"We buy 8k–24k gold jewelry, chains, and coins"*; ES *"Compramos joyería, cadenas y monedas de oro de 8k–24k"*. Dev curl of the Victorian bracelet page (EN + ES) shows both.
+- ✅ **The other three pages too** (owner: *"Yes, change the other three pages to 8k–24k as well (add the 333 stamp on the inherited-jewelry page)."*): `/jewelry-appraisal` card *"8k–24k chains, rings, and bracelets…"*; `/sell/[city]` gold card *"Gold buyers in {city} for 8k–24k jewelry…"* (all 6 cities); `/estate-services/selling-inherited-jewelry` *"Anything stamped 8k–24k, 333, 585 or 750 is gold…"* — each EN + ES. Dev curl of 7 pages (EN + ES, Naples + Marco Island): "8k–24k" ×2 each (visible + page data), "10k–24k" 0; the guide shows "8k–24k, 333" in both languages. No "10k–24k" left anywhere in `src/` or `messages/`.
+- ◻ **After the push:** IndexNow for the 16 changed URLs (Claude runs it): `/jewelry-appraisal`, `/estate-services/selling-inherited-jewelry`, `/sell/{naples,marco-island,bonita-springs,estero,fort-myers,cape-coral}`, each EN + `/es`.
+- Gate: `npx tsc --noEmit` 0 · `npm run lint` 0 errors (the 4 old `<img>` warnings) · `npx vitest run` **2022/2022** (178 files) · `npm run build` 0 (dev stopped first; 563/563).
+
+## 2026-10-25 (27) — Product page: 2000px+ screens now use the SAME layout as 1280–1999px (the ultrawide arrangement removed) — BUILT + STAGED, not pushed; no SQL
+
+- Owner (screenshot): *"on some viewport sizes, we have a large blank space below the image lineup on the product details page... can we eliminate that space and move up the triple category area... mock it up first"* → mockup v1 (real headless-Chrome renders of the Victorian slide charm bracelet, before/after at 2133 and 1920 px) → *"i like today's layout for 1280-1999px... can we apply that layout to the 2000px and wider screens too?"*
+- **Cause (measured, dev):** at 2000px+ the 2026-08-14 ultrawide arrangement put the trust strip under the gallery and notes + policy accordions under the specs; row 1 was as tall as the long description, so the photo column stood empty **462 px** under the thumbnails (2133 px wide). A 1920 screen gets this width when the browser is zoomed out.
+- **Fix:** the `@media (min-width: 2000px)` product-layout block in `globals.css` (91 lines) is gone, replaced by a note; 2000px+ now uses the md+ layout (gallery → notes + policies in column 1, info in column 2, the three badges as a full-width band after both). The `product-trust-badge-icon` hook (used only by that block) was removed from `ProductTrustSections.tsx`; the page comment updated. The page canvas still widens at 2000px+ (`ultrawide-page-medium`, untouched).
+- **Rendered after (headless Chrome, the real page):** 2133 and 2560 px → notes + Shipping/Condition/Payment directly under the photos, the badges full width below; the product area 1408 px tall (was 1500). 1920 px unchanged (1579).
+- Files: `src/app/globals.css`, `src/components/shop/ProductTrustSections.tsx`, `src/app/[locale]/shop/[id]/page.tsx`, NEW `src/lib/__tests__/product-detail-layout.test.ts` (2).
+- Gate: `npx tsc --noEmit` 0 · `npm run lint` 0 errors (the 4 old `<img>` warnings) · `npx vitest run` **2022/2022** (178 files) · `npm run build` 0 (dev stopped first; 563/563; the built CSS has no 2000px `.product-detail-layout` rule) · `.next/dev` cleared before each dev restart.
+
+## 2026-10-25 (26) — Shop Sort + "Per page" open lists styled to match the site (Option B), computers only — BUILT + STAGED, not pushed; no SQL
+
+- Owner (screenshot of the open Sort list): *"the text has no margin buffer on the left side and looks a little cramped.. can we mock up a fix before we implement?"* → mockup v1 (Today / Option A plain with room / Option B matches the site; static, site font embedded, rendered under the preview's content policy) → *"Build Option B, and give the Products per page list the same look."*
+- **Why it looked cramped:** the open list was the browser's own drawing of a native `<select>`; the site's styles never reached it.
+- **Fix:** NEW `lib/shop-select-picker.ts` → `shopSelectPickerCss(scope)`: Chrome/Edge customizable select (`appearance: base-select`) — list with 6px inner padding, rows `8px 12px 8px 8px`, soft gold 1px edge, 8px corners, soft shadow, the box's width at least (`anchor-size(width)`), 0.86rem 600 Hanken, a gold ✓ on the current choice (gold, 800), a gold-tint highlight on hover/keyboard focus. Wrapped in `@media (hover: hover)` + `@supports (appearance: base-select)`: phones/tablets keep their own picker and the 16px no-zoom rule; other browsers keep today's list. Appended LAST in the Sort block (`shop-page-renderer.tsx`) and the pagination block (`ShopPagination.tsx`), so it wins over their `appearance: none` by order.
+- **Measured in dev (Chrome 152, the real page):** Sort box → the list opens under the box with the ✓ on the current choice and the gold hover; picking "Price: low to high" → `/shop?sort=price-asc`, the box reads it. "Per page" → the same look, ✓ on 24. At the phone preset (375 px, hover: none) both selects stay `appearance: none`, 16px, opacity 0 — unchanged.
+- Files: NEW `src/lib/shop-select-picker.ts`, `src/app/[locale]/shop/(list)/shop-page-renderer.tsx`, `src/components/shop/ShopPagination.tsx`, NEW `src/lib/__tests__/shop-select-picker.test.ts` (3).
+- Gate: `npx tsc --noEmit` 0 · `npm run lint` 0 errors (the 4 old `<img>` warnings) · `npx vitest run` **2020/2020** (177 files) · `npm run build` 0 (dev stopped first; 563/563).
+- ⛔ Not seen: Safari or Firefox on a computer (expected: today's list, unchanged), or the owner's own Chrome in production.
+
+## 2026-10-25 (25) — 🟢 (24) "Try again" keeps a photo's place DEPLOYED (owner); nothing staged-but-unpushed except docs
+
+- Owner: *"Pushed and deployed."* Claude did not check production (behind the sign-in; not asked).
+- ◻ Open: on the next failed photo, Try again should land it in its place; its reason text is still the clue to the 10-25 failure (`TASKS.md` top block).
+
 ## 2026-10-25 (24) — "Try again" puts a photo back into its place too (it continues the original batch) — BUILT + STAGED, not pushed; no SQL
 
 - Owner (iPad, after (21)+(22) were live): *"worked well, except when i hit "retry" to get the final photo to add, it added to the end rather than where it shouldve been … the auto-retry feature placed the photos where they should go, but the manual button "retry" placed them at the end"*.

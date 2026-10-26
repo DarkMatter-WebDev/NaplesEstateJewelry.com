@@ -2,7 +2,31 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-10-25 (24)**.
+> in `DECISIONS.md`. Last reconciled: **2026-10-25 (29)**.
+
+## Start Here (2026-10-25 (29) — 🟡 reviews band on product pages (stop on hover, drag both ways; homepage too) BUILT + STAGED, not pushed; one push carries (26)–(29); no SQL, no env vars)
+
+- 🟡 **Waiting for the owner's push** of four changes: (26) shop dropdown lists, (27) one desktop product layout, (28) 8k–24k gold copy, (29) reviews band (`CHANGELOG.md`; `TASKS.md` top blocks). After the push Claude runs IndexNow for (28)'s 16 URLs.
+- Gate (29): `tsc` 0 · lint 0 errors · **2027/2027** · build 0. ⛔ Touch drag not tried on a real iPhone/iPad.
+
+## Start Here (2026-10-25 (28) — 🟡 "8k–24k" gold on the product page + `/jewelry-appraisal`, `/sell/<city>`, the inherited-jewelry guide (+333) BUILT + STAGED, not pushed; one push carries (26) + (27) + (28); no SQL, no env vars)
+
+- 🟡 **Waiting for the owner's push** (`CHANGELOG.md` 2026-10-25 (28); `TASKS.md` top). Gate: `tsc` 0 · lint 0 errors · **2022/2022** · build 0. After the push: IndexNow for 16 URLs (Claude).
+
+## Start Here (2026-10-25 (27) — 🟡 product page: 2000px+ uses the 1280–1999px layout BUILT + STAGED, not pushed; one push carries (26) + (27); no SQL, no env vars)
+
+- 🟡 **Waiting for the owner's push** (`CHANGELOG.md` 2026-10-25 (27); rule `DECISIONS.md` top entry; `TASKS.md` top). Rendered at 2133/2560 px: notes + policies under the photos, badges full width below. Gate: `tsc` 0 · lint 0 errors · **2022/2022** · build 0.
+- (26) — the shop Sort / Per page lists (Option B) — is staged too, also not pushed.
+
+## Start Here (2026-10-25 (26) — 🟡 shop Sort + "Per page" open lists styled to match the site (Option B, computers only) BUILT + STAGED, not pushed; no SQL, no env vars)
+
+- 🟡 **Waiting for the owner's push** (`CHANGELOG.md` 2026-10-25 (26); rule `DECISIONS.md` → the shop-select entry; `TASKS.md` top). Measured in dev Chrome: both lists open with the new look, sorting still works; phones unchanged. Gate: `tsc` 0 · lint 0 errors · **2020/2020** · build 0.
+- Everything else is deployed (10-25 (25) block below).
+
+## Start Here (2026-10-25 (25) — 🟢 everything DEPLOYED (owner), incl. (24) "Try again" keeps a photo's place; nothing staged-but-unpushed except docs; no SQL, no env vars)
+
+- 🟢 Owner: *"Pushed and deployed."* (`CHANGELOG.md` 2026-10-25 (25)). Claude did not check production (behind the sign-in; not asked).
+- ◻ Open — the owner's iPad checks only (`TASKS.md` top blocks): Try again on the next failed photo; any failure's reason text → Claude (the clue to the 10-25 failure); the short admin boxes; the trade-in "% off the asking price" choice. Where the (24) block below says "STAGED" / "not pushed", read "deployed". The 10-25 (15) open checks still apply.
 
 ## Start Here (2026-10-25 (24) — 🟡 "Try again" puts photos back into their place BUILT + STAGED, not pushed; no SQL, no env vars)
 

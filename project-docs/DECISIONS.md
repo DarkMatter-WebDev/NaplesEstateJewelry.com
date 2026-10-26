@@ -4,7 +4,26 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-10-25 (19)**.
+> compaction. Last reconciled: **2026-10-25 (29)**.
+
+## Reviews band: product pages AND the homepage show one scrolling band that stops on hover and drags both ways; /reviews stays a list (2026-10-25)
+
+- **Owner:** *"replace this grid with a scrolling carousel of reviews … when the user hovers over it, it stops and they can click on it and drag it right and left to progress or go back"*; on the plan: *"Yes, build the review carousel as planned."*
+- **The rules:**
+  - `TestimonialsSection` has ONE presentation (no `variant`): the full-bleed band, homepage + product pages (`compact` heading there). The /reviews page keeps its full list (`.reviews-grid`). ⛔ This reverses the 2026-08-18 "product pages keep the grid" rule — owner's call.
+  - Moved by `TestimonialMarqueeBand` (one rAF loop), not CSS: self-scrolls at `durationSeconds` per half; stops on mouse hover, while dragged, on KEYBOARD focus (`:focus-visible` only — a mouse press focuses the link in Chrome), and offscreen; a finger pauses it 3 s after letting go; `prefers-reduced-motion` = never self-scrolls, still drags. The loop runs only while it has work.
+  - Drag: a press becomes a drag past 6 px; pointer capture only then (capturing on press steals the "Read on Google" click); the click ending a drag is swallowed; `dragstart` prevented; `touch-action: pan-y` keeps vertical page swipes. Two identical halves, position wrapped modulo one half → endless both ways. ⛔ Card spacing stays `margin-inline-end`, never `gap`; ⛔ keep `data-customer-reveal-skip`.
+- Guard `lib/__tests__/testimonial-band.test.ts`. Record `CHANGELOG.md` 2026-10-25 (29).
+
+## The gold karat range we buy is 8k–24k, never "10k–24k" (2026-10-25)
+
+- **Owner:** *"adjust that to reflect that we buy 8k-24k gold"*, then *"change the other three pages to 8k–24k as well (add the 333 stamp on the inherited-jewelry page)."*
+- **The rule:** any copy naming the karat range says **8k–24k** (EN + ES). Where stamps are listed, 8k's **333** goes with 585 and 750. ⛔ Never write 10k–24k again. Places today: the product page gold line, `/jewelry-appraisal`, `/sell/[city]`, `/estate-services/selling-inherited-jewelry`. Record `CHANGELOG.md` 2026-10-25 (28).
+
+## The product page has ONE desktop layout from 768px up — 2000px+ included; the 2026-08-14 ultrawide arrangement is gone (2026-10-25)
+
+- **Owner:** on a 2000px+ screen (a 1920 screen zoomed out) the photo column stood empty under the thumbnails (462 px on the Victorian slide bracelet); after the mockup: *"i like today's layout for 1280-1999px... can we apply that layout to the 2000px and wider screens too?"*
+- **The rule:** column 1 = gallery, then notes + Shipping/Condition/Payment; column 2 = purchase panel, description, specs; the three badges = a full-width band after both, at every width ≥ 768px. The canvas still widens at 2000px+ (`ultrawide-page-medium`). ⛔ No `@media (min-width: 2000px)` rule may rearrange `.product-detail-layout` without the owner's say-so (guard `lib/__tests__/product-detail-layout.test.ts`). The older "Ultrawide (2000px+)" rules in the product-layout entry below are marked superseded. Record `CHANGELOG.md` 2026-10-25 (27).
 
 ## Browser photo prep is ONE shared shrinker that releases memory on every path; a batch upload never drops a photo without naming it, and always says how many it received (2026-10-25)
 
@@ -55,6 +74,7 @@
 - **The rule:** the sitewide 16px touch-screen rule ("Accidental zoom" entry) stays absolute. Where a design needs smaller words in a select (the shop toolbar sort, 0.78rem / 800), the words are a `aria-hidden` label + ▾ and the real `<select>` covers the box at `opacity: 0` — it keeps 16px, so iOS does not zoom, and a tap opens the phone's own picker. A visible focus ring goes on the wrapper (`:has(select:focus-visible)`). Applies at every width; iPads match `(hover: none)` too.
 - Pattern: `components/shop/ShopSortSelect.tsx` + `.shop-gallery-sort-control` in `shop-page-renderer.tsx`; the same for "Products per page" in `components/shop/ShopPagination.tsx` (`.shop-pagination-size-control`, owner: *"give the Products per page box the same treatment"*). Guard `lib/__tests__/shop-sort-select.test.ts`. Record `CHANGELOG.md` 2026-10-25 (3) + (4).
 - On a phone a field's label sits beside its box, never pushed to the far edge of a full-width row (owner, 10-25: *"make sure the 'per page' label is right next to the number selection"*).
+- **The OPEN list (2026-10-25 (26), owner: "Build Option B, and give the Products per page list the same look"):** on computers the two shop dropdowns' lists are styled to match the site through Chrome/Edge's customizable select (`lib/shop-select-picker.ts`: room on the left, soft gold edge, gold hover, gold ✓). ⛔ Only inside `@media (hover: hover)` + `@supports (appearance: base-select)` — never on phones/tablets (their picker and the 16px rule stay). ⛔ Keep it LAST in each style block (it overrides `appearance: none` by order). Guard `lib/__tests__/shop-select-picker.test.ts`. Record `CHANGELOG.md` 2026-10-25 (26).
 
 ## Text deals: photos can go first; Metal + Purity are must-pick and build the line on the pictures; the comparable price is words only, "Comparable retail"; the text is a LIST (layout B) up to 1,500 characters (2026-10-24)
 
@@ -3292,6 +3312,11 @@ into a grey list.
 
 ### The reviews marquee is CSS-only, and four details in it are load-bearing
 
+⛔ **SUPERSEDED 2026-10-25** — the band is now moved by `TestimonialMarqueeBand`
+(rAF, hover-stop, drag) on BOTH the homepage and product pages; see the top
+entry *"Reviews band"*. Still true from below: verbatim quotes, margin-not-gap
+spacing, `data-customer-reveal-skip`. Kept for history.
+
 The homepage review band scrolls continuously (`variant="marquee"`); product
 pages keep the 2/4 grid, because a page about one item should not have a moving
 element competing with its photography.
@@ -5373,6 +5398,11 @@ Rules that must hold:
    and reopen a gap under the photo.
    The aside is ONE wrapper, not two grid items: a product with no Notes would
    otherwise leave an empty track whose gutter still prints under the gallery.
+   ⛔ **SUPERSEDED 2026-10-25 — items 4, 4b, 4d and every "at ultrawide" note
+   below no longer apply.** 2000px+ now uses the md+ arrangement above (owner:
+   *"i like today's layout for 1280-1999px... can we apply that layout to the
+   2000px and wider screens too?"*; see the top entry and `CHANGELOG.md`
+   2026-10-25 (27)). Kept for history only.
 4. **Ultrawide (2000px+) is a DIFFERENT arrangement of the same four blocks**
    (owner request 2026-08-14), on the `ultrawide-page-medium` tier:
 
@@ -5592,7 +5622,8 @@ when a machine proves it cannot keep up. Rules to keep:
 7. **The testimonial marquee pauses offscreen by attribute + CSS rule**
    (`data-marquee-paused`), never by inline `animationPlayState` — an inline
    `'running'` would override the hover/focus pause rules that share that
-   property.
+   property. ⛔ SUPERSEDED 2026-10-25: no CSS animation any more; the band's
+   script stops its own loop offscreen (top entry *"Reviews band"*).
 
 ### Product-page label type has an 11px floor
 
@@ -5624,6 +5655,9 @@ compress — it punches straight out of its track. That is why the spot pill's
 LABEL is allowed to wrap while its PRICE is not.
 
 ### The reviews band is never one column, and the card compacts to allow it
+
+⛔ **SUPERSEDED 2026-10-25** — no reviews grid remains (product pages now show
+the scrolling band; `.testimonial-grid` is deleted). Kept for history.
 
 Owner rule 2026-08-09: the client review blocks are a **minimum of 2-up** at
 every width. The ladder is `.testimonial-grid` = **2 / 4 columns** (4 from

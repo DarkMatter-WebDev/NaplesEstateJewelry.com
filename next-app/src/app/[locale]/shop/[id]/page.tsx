@@ -993,12 +993,11 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
 
             </div>
 
-            {/* Trust strip. It lives INSIDE the layout grid (moved 2026-08-14) so
-                that ultrawide can place it under the gallery. Below 2000px it
-                spans both columns in a third row and is visually unchanged from
-                when it was a sibling of this grid. Placement is entirely in
-                `.product-detail-layout` CSS — do not add position utilities
-                here. */}
+            {/* Trust strip. It lives INSIDE the layout grid (moved 2026-08-14)
+                and spans both columns in a third row at every desktop width —
+                2000px+ included since 2026-10-25 (owner: the same layout as
+                1280–1999px). Placement is entirely in `.product-detail-layout`
+                CSS — do not add position utilities here. */}
             <ProductTrustBadges isEs={isEs} pickupHoursLine={pickupHoursLine} />
           </div>
         </div>
@@ -1030,13 +1029,13 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                 )
               ) : isEs ? (
                 <>
-                  ¿Tiene oro como este? Compramos joyería, cadenas y monedas de oro de 10k–24k —{' '}
+                  ¿Tiene oro como este? Compramos joyería, cadenas y monedas de oro de 8k–24k —{' '}
                   <Link href="/es/gold-services" className="font-semibold text-[#735c00] underline underline-offset-2">venda su oro en Naples</Link>{' '}
                   o solicite una <Link href="/es/jewelry-appraisal" className="font-semibold text-[#735c00] underline underline-offset-2">tasación gratuita</Link>.
                 </>
               ) : (
                 <>
-                  Have gold like this? We buy 10k–24k gold jewelry, chains, and coins —{' '}
+                  Have gold like this? We buy 8k–24k gold jewelry, chains, and coins —{' '}
                   <Link href="/gold-services" className="font-semibold text-[#735c00] underline underline-offset-2">sell your gold in Naples</Link>{' '}
                   or get a <Link href="/jewelry-appraisal" className="font-semibold text-[#735c00] underline underline-offset-2">free appraisal</Link>.
                 </>

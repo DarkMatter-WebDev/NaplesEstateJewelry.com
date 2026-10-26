@@ -73,8 +73,8 @@ export default async function JewelryAppraisalPage({ params }: Props) {
       href: p('/gold-services'),
       titleEn: 'Gold jewelry',
       titleEs: 'Joyería de oro',
-      descEn: '10k–24k chains, rings, and bracelets — worn or broken included.',
-      descEs: 'Cadenas, anillos y pulseras de 10k–24k — incluso gastadas o rotas.',
+      descEn: '8k–24k chains, rings, and bracelets — worn or broken included.',
+      descEs: 'Cadenas, anillos y pulseras de 8k–24k — incluso gastadas o rotas.',
     },
     {
       mark: 'sterling-flatware' as ClayMarkName,

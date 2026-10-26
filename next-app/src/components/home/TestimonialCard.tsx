@@ -2,15 +2,15 @@ import { GOOGLE_REVIEWS_URL, type Testimonial } from '@/lib/testimonials';
 
 /**
  * One review card — the single rendering of a testimonial. Shared by the
- * homepage marquee and the product-page grid (both through
+ * scrolling reviews band (homepage and product pages, through
  * `TestimonialsSection`) and by the /reviews page (2026-09-08), which is why
  * it was lifted out of the section: a review must look and link the same
  * wherever it appears, and the "Read on Google" link is part of that.
  *
  * `isRepeat` marks a duplicate rendered only to fill the loop. Those are
  * hidden from assistive tech and taken out of the tab order — a screen reader
- * reading the same four reviews four times would be worse than not having the
- * band — and CSS removes them entirely under `prefers-reduced-motion`.
+ * reading the same reviews several times would be worse than not having the
+ * band.
  */
 type Props = {
   review: Testimonial;

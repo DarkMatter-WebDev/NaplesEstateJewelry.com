@@ -6,6 +6,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { useShopNavigation, LinkPendingBridge } from '@/components/shop/ShopNavigationProgress';
 import { buildShopPaginationHref, getShopPaginationItems } from '@/lib/shop-pagination';
 import { AppIcon } from '@/components/AppIcon';
+import { shopSelectPickerCss } from '@/lib/shop-select-picker';
 
 const GOLD = '#735c00';
 const BRIGHT_GOLD_GRADIENT = 'linear-gradient(135deg, #dcb336, #b5890c)';
@@ -384,6 +385,9 @@ export default function ShopPagination({
             line-height: 1;
           }
         }
+        /* The "Per page" box's open list, the same look as the Sort list
+           (computers only; lib/shop-select-picker.ts). Last, so it wins by order. */
+        ${shopSelectPickerCss('.shop-pagination-size-control')}
       `}</style>
     </nav>
   );

@@ -28,11 +28,51 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-10-25 (24) — "Try again" puts a photo back into its place (continues the original batch) — BUILT + STAGED, not pushed; no SQL
+### 🟡 2026-10-25 (29) — Reviews band on product pages (grid gone); stops on hover, drags both ways (homepage too) — BUILT + STAGED, not pushed (one push with (26)–(28)); no SQL
+
+Record: `CHANGELOG.md` 2026-10-25 (29). Rule: `DECISIONS.md` top entry. Files: `TestimonialMarqueeBand.tsx`, `TestimonialsSection.tsx`, `TestimonialCard.tsx`, `(home)/page.tsx`, `globals.css`, NEW `testimonial-band.test.ts`. Gate: `tsc` 0 · lint 0 errors · **2027/2027** · build 0.
+
+1. ◻ **Owner — push + deploy** (carries (26), (27), (28) too).
+2. ◻ **Owner — on a computer (not the desk one — reduce-motion there keeps it still by design):** a product page → the reviews scroll by themselves; mouse over → stop; click-hold-drag left/right → moves; let go → stays; mouse away → carries on; a plain click → Google reviews open.
+3. ◻ **Owner — on the iPhone / iPad:** swipe the reviews left/right; they pause and start again a few seconds later; swiping up/down still scrolls the page.
+
+**Staging (10-25 (29)):** ✅ synced 2026-10-25 ~11:21 PM. The dry run listed exactly the 11 touched files: 6 app (`globals.css`, `(home)/page.tsx`, `TestimonialCard.tsx`, `TestimonialMarqueeBand.tsx`, `TestimonialsSection.tsx`, NEW `testimonial-band.test.ts`) and 5 docs (CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS). 0 Extras, 1305 total. Real run copied 11, 0 FAILED; follow-up dry run 0, exit 0. Leak check 0; `.tsx` 265 = 265; SHA-256 MATCH on 5 app files. Staging holds (26)–(29). Docs-only re-sync after this line.
+
+### 🟡 2026-10-25 (28) — "8k–24k" gold: product page line + `/jewelry-appraisal`, `/sell/<city>`, the inherited-jewelry guide (+ 333), EN + ES — BUILT + STAGED, not pushed (one push with (26) + (27)); no SQL
+
+Record: `CHANGELOG.md` 2026-10-25 (28). Files: `src/app/[locale]/shop/[id]/page.tsx`, `src/app/[locale]/jewelry-appraisal/page.tsx`, `src/app/[locale]/sell/[city]/page.tsx`, `src/app/[locale]/estate-services/selling-inherited-jewelry/page.tsx`. Gate: `tsc` 0 · lint 0 errors · **2022/2022** · build 0.
+
+1. ◻ **Owner — push + deploy** (carries (26) + (27) too).
+2. ✅ The other three pages — done on the owner's yes (was: owner's call).
+3. ◻ **Claude, after the push:** `npm run indexnow -- --urls=` the 16 URLs (`/jewelry-appraisal`, `/estate-services/selling-inherited-jewelry`, `/sell/{naples,marco-island,bonita-springs,estero,fort-myers,cape-coral}`, each EN + `/es`).
+
+**Staging (10-25 (28), the other three pages):** ✅ synced 2026-10-25 ~11:06 PM. The dry run listed exactly the 7 touched files (3 app: `jewelry-appraisal/page.tsx`, `sell/[city]/page.tsx`, `selling-inherited-jewelry/page.tsx`; 4 docs: CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS), 0 Extras, 1304 total; real run copied 7, 0 FAILED; follow-up dry run 0, exit 0; leak 0; `.tsx` 265 = 265; SHA-256 MATCH on the 3 pages + `shop/[id]/page.tsx`. Docs-only re-sync after this line.
+
+**Staging (10-25 (28), product page line):** ✅ synced 2026-10-25 ~11:03 PM. The dry run listed exactly the 4 touched files (`shop/[id]/page.tsx`; CHANGELOG, CURRENT_STATUS, TASKS), 0 Extras, 1304 total; real run copied 4, 0 FAILED; follow-up dry run 0, exit 0; leak 0; `.tsx` 265 = 265; SHA-256 MATCH on `page.tsx` plus (26)/(27)'s `shop-select-picker.ts` and `globals.css`. Staging holds (26) + (27) + (28). Docs-only re-sync after this line.
+
+### 🟡 2026-10-25 (27) — Product page: 2000px+ uses the SAME layout as 1280–1999px — BUILT + STAGED, not pushed (one push with (26)); no SQL
+
+Record: `CHANGELOG.md` 2026-10-25 (27). Rule: `DECISIONS.md` top entry. Files: `src/app/globals.css`, `src/components/shop/ProductTrustSections.tsx`, `src/app/[locale]/shop/[id]/page.tsx`, NEW `src/lib/__tests__/product-detail-layout.test.ts`. Gate: `tsc` 0 · lint 0 errors · **2022/2022** · build 0.
+
+1. ◻ **Owner — push + deploy** (carries (26) too).
+2. ◻ **Owner — on the wide screen (zoomed out as in the screenshot):** a product page → Notes and Shipping / Condition / Payment sit right under the photos; the three badges run full width below both columns — same as at normal zoom.
+
+**Staging (10-25 (27)):** ✅ synced 2026-10-25 ~10:59 PM. The dry run listed exactly the 8 touched files: 4 app (`globals.css`, `shop/[id]/page.tsx`, `ProductTrustSections.tsx`, NEW `product-detail-layout.test.ts`) and 4 docs (CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS). 0 Extras, 1304 total. Real run copied 8, 0 FAILED; follow-up dry run 0, exit 0. Leak check 0; `.tsx` 265 = 265; SHA-256 MATCH on the 4 app files and on (26)'s `shop-select-picker.ts`. Staging holds (26) + (27). Docs-only re-sync after this line.
+
+### 🟡 2026-10-25 (26) — Shop Sort + "Per page" open lists styled to match the site (Option B, computers only) — BUILT + STAGED, not pushed; no SQL
+
+Record: `CHANGELOG.md` 2026-10-25 (26). Rule: `DECISIONS.md` → the shop-select entry. Files: NEW `src/lib/shop-select-picker.ts`, `src/app/[locale]/shop/(list)/shop-page-renderer.tsx`, `src/components/shop/ShopPagination.tsx`, NEW `src/lib/__tests__/shop-select-picker.test.ts`. Gate: `tsc` 0 · lint 0 errors · **2020/2020** · build 0.
+
+1. ◻ **Owner — push + deploy.**
+2. ◻ **Owner — in Chrome on the computer:** `/shop` → click Sort → the list has room on the left, a gold ✓ by the current choice, a gold highlight under the mouse; pick one → the shop re-sorts. Bottom of the page → "Per page" → the same look. (iPhone / iPad: unchanged, Apple's picker.)
+
+**Staging (10-25 (26)):** ✅ synced 2026-10-25 ~10:46 PM. The dry run listed exactly the 8 touched files: 4 app (NEW `shop-select-picker.ts` + its NEW test; `shop-page-renderer.tsx`, `ShopPagination.tsx`) and 4 docs (CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS). 0 Extras, 1303 total. Real run copied 8, 0 FAILED; follow-up dry run 0, exit 0. Leak check 0; `.tsx` 265 = 265; SHA-256 MATCH on all 4 app files. The mockup stayed in the session scratchpad (not in the project). Docs-only re-sync after this line.
+
+### 🟢 2026-10-25 (24) — "Try again" puts a photo back into its place (continues the original batch) — **DEPLOYED (owner)**; ◻ item 2 only
 
 Record: `CHANGELOG.md` 2026-10-25 (24). Files: `src/lib/listing-photo-upload.ts`, `src/components/admin/AdminShell.tsx`, `src/lib/__tests__/listing-photo-upload.test.ts`. Gate: `tsc` 0 · lint 0 errors · **2017/2017** · build 0.
 
-1. ◻ **Owner — push + deploy.**
+1. ✅ **Owner — push + deploy** — DONE 10-25 (*"Pushed and deployed."*). Production not checked by Claude (behind the sign-in; not asked).
 2. ◻ **Owner — on the iPad, next time a photo fails:** tap **Try again** → it lands where it was in the pick, not last. (The red notice stays until Dismiss, a new upload, or closing the editor.)
 
 **Staging (10-25 (24)):** ✅ synced 2026-10-25 ~10:31 PM. The dry run listed exactly the 7 touched files (3 app: `AdminShell.tsx`, `listing-photo-upload.ts`, its test; 4 docs), 0 Extras, 1301 total; real run copied 7, 0 FAILED; follow-up dry run 0, exit 0; leak 0; `.tsx` 265 = 265; SHA-256 MATCH on the 3 app files. Docs-only re-sync after this line.

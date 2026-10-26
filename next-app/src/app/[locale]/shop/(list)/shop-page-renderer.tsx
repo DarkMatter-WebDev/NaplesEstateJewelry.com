@@ -47,6 +47,7 @@ import {
   productMatchesShopWidthRanges,
 } from '@/lib/shop-filter-state';
 import { AppIcon } from '@/components/AppIcon';
+import { shopSelectPickerCss } from '@/lib/shop-select-picker';
 
 export async function generateShopMetadata({ params }: ShopPageProps): Promise<Metadata> {
   const { locale } = await params;
@@ -1502,6 +1503,9 @@ export async function renderShopPage({
               transform: none;
               filter: none;
             }
+            /* The Sort box's open list, styled to match the site (computers
+               only; lib/shop-select-picker.ts). Last, so it wins by order. */
+            ${shopSelectPickerCss('.shop-gallery-sort-control')}
           `}</style>
         </div>
       </main>

@@ -78,8 +78,8 @@ export default async function SellCityPage({ params }: Props) {
       href: p('/gold-services'),
       titleEn: `Sell Gold in ${area.city}`,
       titleEs: `Vender Oro en ${area.city}`,
-      descEn: `Gold buyers in ${area.city} for 10k–24k jewelry, chains, class rings, dental gold, coins, and bullion — paid by live gold-spot weight, not a flat lowball.`,
-      descEs: `Compradores de oro en ${area.city} para joyería de 10k–24k, cadenas, anillos, oro dental, monedas y lingotes — pagado por peso al precio spot en vivo, sin ofertas bajas.`,
+      descEn: `Gold buyers in ${area.city} for 8k–24k jewelry, chains, class rings, dental gold, coins, and bullion — paid by live gold-spot weight, not a flat lowball.`,
+      descEs: `Compradores de oro en ${area.city} para joyería de 8k–24k, cadenas, anillos, oro dental, monedas y lingotes — pagado por peso al precio spot en vivo, sin ofertas bajas.`,
     },
     {
       mark: 'chain',

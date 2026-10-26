@@ -333,32 +333,8 @@ table {
   gap: clamp(0.85rem, 2vw, 1.5rem);
 }
 
-/* Reviews grid (2026-08-05). Column counts are pinned to 2 / 4 rather than left
-   to the shared auto-fit, which chose 3 in the ~850-1150px band and stranded the
-   fourth review alone on a second row. Skipping 3 keeps the four cards balanced
-   at every width: 2x2, then a single row of four.
-
-   TWO IS THE FLOOR (owner, 2026-08-09). The ladder used to start at one column
-   below 600px; a single full-width review read as a lone testimonial rather than
-   a body of them, so the reviews now stay side by side at every width. That
-   makes a 320px phone the tight case — a 137px card — which is why
-   `.testimonial-card` below compacts its padding, type and gaps instead of
-   keeping the desktop values. Do not reintroduce a one-column band.
-
-   This ladder assumes an EVEN review count. Adding a fifth brings the orphan
-   back — at that point either add a sixth or move to a layout that centres a
-   partial last row. */
-.testimonial-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-@media (min-width: 1160px) {
-  .testimonial-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
 /* Homepage services strip (2026-09-01, when it went from three cards to four).
-   Same shape as the reviews ladder above, and for the same reason: the shared
+   Same reason as the old 2/4 reviews ladder (removed 2026-10-25): the shared
    auto-fit picks THREE columns in the ~850-1150px band, which strands the
    fourth card alone on a second row (measured: 3 tracks at 900px).
 
@@ -528,15 +504,19 @@ table {
   font-size: 0.9rem;
 }
 
-/* Reviews marquee — the homepage presentation (2026-08-18). The grid above is
-   still what product pages render; only the homepage band scrolls.
+/* Reviews band — homepage (2026-08-18) and, since 2026-10-25, product pages.
 
-   It is CSS-only on purpose: no measurement, no rAF, no client component. The
-   homepage has an open first-paint budget, and a marquee that costs JS to move
-   would be paying for decoration. The track is a plain flex row translated by
-   exactly one half of itself, forever. */
+   Moved by TestimonialMarqueeBand (one rAF loop, only while on screen and not
+   paused), no longer by a CSS animation: the owner wanted it to stop on hover
+   and be dragged left/right ("click on it and drag it right and left to
+   progress or go back"), which a CSS animation cannot do. The track is a flex
+   row of two identical halves; the script sets its transform and wraps it
+   modulo one half. The /reviews page keeps its full list (`.reviews-grid`). */
 .testimonial-marquee {
   overflow: hidden;
+  cursor: grab;
+  /* Horizontal drags belong to the band; vertical swipes still scroll the page. */
+  touch-action: pan-y;
   /* Cards fade in and out at the edges instead of being guillotined by the
      viewport, which is what makes it read as a continuous band rather than a
      clipped row. Masking does NOT create a containing block, so the cards'
@@ -556,23 +536,20 @@ table {
     transparent
   );
 }
+.testimonial-marquee[data-dragging] {
+  cursor: grabbing;
+  user-select: none;
+  -webkit-user-select: none;
+}
 .testimonial-marquee-track {
   display: flex;
   width: max-content;
-  animation: testimonial-marquee-scroll var(--testimonial-marquee-duration, 56s) linear infinite;
-}
-@keyframes testimonial-marquee-scroll {
-  from {
-    transform: translate3d(0, 0, 0);
-  }
-  to {
-    transform: translate3d(-50%, 0, 0);
-  }
+  will-change: transform;
 }
 /* ⚠️ THE SPACING IS `margin-inline-end`, NOT flex `gap`, and that is load-bearing.
    With `gap`, the track's width is `2n*card + (2n-1)*gap` — one gap short of two
-   identical halves — so `translate(-50%)` lands slightly off the seam and the
-   loop visibly jerks once per cycle. Giving every card its own trailing margin
+   identical halves — so wrapping at half the width lands slightly off the seam
+   and the loop visibly jerks once per cycle. Giving every card its own trailing margin
    makes each slot `card + gap`, the total exactly `2n*(card+gap)`, and -50%
    exactly one half. Do not "tidy" this into `gap`. */
 .testimonial-marquee .testimonial-card {
@@ -600,44 +577,10 @@ table {
 .testimonial-marquee .testimonial-card .testimonial-stars {
   font-size: 0.875rem;
 }
-/* Offscreen pause (2026-08-24): TestimonialMarqueeBand's IntersectionObserver
-   stamps this attribute while the band is scrolled out of view. The infinite
-   track animation otherwise re-composites this masked, viewport-wide band
-   every frame for the life of the page — waste that weak GPUs actually feel.
-   Attribute + rule rather than an inline style, because an inline 'running'
-   would override the hover/focus pause rules below. */
-.testimonial-marquee[data-marquee-paused] .testimonial-marquee-track {
-  animation-play-state: paused;
-}
-/* Pointer-only, matching the card hover rule above: on touch this would latch
-   after a tap and leave the band frozen with no way to restart it. */
-@media (hover: hover) {
-  .testimonial-marquee:hover .testimonial-marquee-track {
-    animation-play-state: paused;
-  }
-}
-/* Keyboard users must be able to read a card they have tabbed to. */
-.testimonial-marquee-track:focus-within {
-  animation-play-state: paused;
-}
-@media (prefers-reduced-motion: reduce) {
-  /* Not just "stop the animation" — a stopped marquee is a row with most of its
-     content unreachable. The repeats are removed so exactly one copy of each
-     review remains, and the band becomes an ordinary horizontal scroller the
-     reader drives themselves. */
-  .testimonial-marquee {
-    overflow-x: auto;
-    -webkit-mask-image: none;
-    mask-image: none;
-  }
-  .testimonial-marquee-track {
-    animation: none;
-    width: auto;
-  }
-  .testimonial-marquee-repeat {
-    display: none;
-  }
-}
+/* Pausing (hover, drag, keyboard focus, offscreen, a finger) and
+   prefers-reduced-motion (no self-scrolling, still draggable) are handled in
+   TestimonialMarqueeBand, not here. The repeats stay under reduced motion:
+   dragging loops through them the same way. */
 
 .responsive-form-grid {
   display: grid;
@@ -1080,96 +1023,14 @@ button:focus-visible > .hover-underline-grow,
   }
 }
 
-/* ULTRAWIDE (2000px+): a different arrangement of the same four blocks, on the
-   `ultrawide-page-medium` tier (owner request 2026-08-14).
-
-       row 1 |  gallery        |  purchase panel / description / specs
-       row 2 |  trust strip    |  notes + policy accordions
-
-   Why this shape rather than the md+ one. Ultrawide is the width at which the
-   info column RUNS OUT of content: it gets wider, its text stops wrapping, and
-   it ends well above the gallery column. Stacking the accordions under the
-   gallery there (the md+ arrangement) puts them on the side that is already
-   long and leaves the short side emptier still. Moving them under the specs
-   they belong to, and giving the gallery the compact trust strip instead,
-   spends the surplus on the column that actually has it.
-
-   The trust strip is COMPACTED here because it is no longer a full-width band:
-   its generous `mt-12 pt-8` exists to separate it from two columns ending just
-   above it, which is not what it is doing in a 736px column under a photo.
-   Those utilities are overridden below — this rule is un-layered and Tailwind's
-   are in `@layer utilities`, so it wins without `!important`.
-
-   Do not reintroduce the old 2000px+ role inversion (gallery spanning both rows
-   with the aside mirrored). It existed for the `ultrawide-page-wide` tier, where
-   the uncapped square gallery was the TALLER column (~1120px); the medium tier
-   caps the column at 736px, so the gallery is the short column again and that
-   mirror would now stack the aside onto the tallest column. */
-@media (min-width: 2000px) {
-  .product-detail-layout {
-    grid-template-rows: auto auto;
-    /* The band used to end on the trust strip's own mb-10, which is zeroed here.
-       Without this the last accordion's bottom rule sits ~2px off the next
-       section's divider (owner, 2026-08-14). Padding on the LAYOUT rather than
-       margin on either column, so both get the same space and the two columns
-       still end level. */
-    padding-bottom: 2.5rem;
-  }
-  .product-detail-layout > .product-detail-media {
-    grid-column: 1;
-    grid-row: 1;
-  }
-  .product-detail-layout > .product-detail-column-info {
-    grid-column: 2;
-    grid-row: 1;
-  }
-  .product-detail-layout > .product-detail-column-aside {
-    grid-column: 2;
-    grid-row: 2;
-  }
-  .product-detail-layout > .product-trust-badges {
-    grid-column: 1;
-    grid-row: 2;
-    /* Compacted: the band's full-width breathing room is wrong under a photo. */
-    margin-top: 0;
-    margin-bottom: 0;
-    /* Zero, NOT the compact 1.25rem it started as. `align-content` centres
-       within the CONTENT box, so any padding-top offsets the badges by exactly
-       that much (measured: 81.6px above vs 60.6px below with 20px of padding).
-       Centring supplies the separation from the top rule on its own — there is
-       ~71px of it — so the padding has no job left here. */
-    padding-top: 0;
-    column-gap: 0.75rem;
-    /* The row is as tall as the accordions opposite, so the badges would
-       otherwise sit at the top with a long empty tail beneath them (owner,
-       2026-08-14). Two properties, and both are needed:
-
-       `align-self: stretch` overrides the grid's `align-items: start` so the
-       BOX fills the row — that is what keeps its top rule level with the NOTES
-       rule in column 2, which centring the whole box would have dropped out of
-       alignment. `align-content: center` then centres the badge row inside that
-       now-taller box, so the leftover space is split above and below instead of
-       all landing underneath. */
-    align-self: stretch;
-    align-content: center;
-    /* Closes the block at the bottom. Because the box stretches to the row, this
-       rule lands exactly level with the last accordion's bottom border in
-       column 2, so the two columns read as a matched pair bounded top and bottom
-       rather than one bounded block beside one floating cluster. Verified level
-       to the pixel; if the stretch is ever removed, remove this with it or it
-       will sit somewhere arbitrary. */
-    border-bottom: 1px solid var(--color-outline-variant);
-  }
-  /* Tighter badge internals so three still sit across a 736px column without
-     the descriptions running to three lines. */
-  .product-detail-layout > .product-trust-badges > * {
-    gap: 0.375rem;
-  }
-  .product-detail-layout > .product-trust-badges .product-trust-badge-icon {
-    height: 2rem;
-    width: 2rem;
-  }
-}
+/* 2000px and wider use the SAME layout as 768–1999px above (owner, 2026-10-25:
+   "i like today's layout for 1280-1999px... can we apply that layout to the
+   2000px and wider screens too?"). The ultrawide arrangement of 2026-08-14 —
+   trust strip under the gallery, notes + policy accordions under the specs — is
+   gone: with a long description it left the photo column empty for ~460px under
+   the thumbnails (measured on the Victorian slide bracelet at 2133px).
+   ⛔ Do not reintroduce a separate 2000px+ product arrangement without the
+   owner's say-so. The page canvas still widens there (`ultrawide-page-medium`). */
 
 /* Product purchase panel (2026-08-04).
 
