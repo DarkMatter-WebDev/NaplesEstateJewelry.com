@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { formatCurrency } from '@/types/sales';
 import {
+  PAPER_COPY_MIME,
   TAX_CERT_TYPE_LABELS,
   TAX_EXEMPT_SOURCE_LABELS,
   formatCertDate,
@@ -24,6 +25,7 @@ export default function OrderTaxExemptionPanel({ snapshot, adminBasePath }: { sn
     ['Name', snapshot.businessName ?? 'Not recorded'],
     ['Number', snapshot.certNumber ?? 'Not recorded'],
     ['Valid through', formatCertDate(snapshot.expiresOn) ?? '—'],
+    ['Copy on file', snapshot.photoPath ? 'Photo' : snapshot.photoMime === PAPER_COPY_MIME ? 'Paper copy (filed in store)' : 'None'],
     ['Physical copy seen', snapshot.physicalCopySeen ? 'Yes' : 'No'],
     ['Florida auth #', snapshot.flAuthNumber ?? '—'],
     ['Approved', [TAX_EXEMPT_SOURCE_LABELS[snapshot.approvedVia], snapshot.requestRef, paperDateLine(snapshot.approvedAt)].filter(Boolean).join(' · ')],
@@ -50,7 +52,13 @@ export default function OrderTaxExemptionPanel({ snapshot, adminBasePath }: { sn
             View certificate
           </a>
         ) : (
-          <span className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>No photo — the physical copy was seen in store.</span>
+          <span className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+            {snapshot.photoMime === PAPER_COPY_MIME
+              ? "No photo — the customer's paper copy is filed in the store."
+              : snapshot.flAuthNumber
+                ? 'No copy — documented by the Florida authorization number above.'
+                : 'No photo — the physical copy was seen in store.'}
+          </span>
         )}
         <Link href={`${adminBasePath}/tax-exempt`} className="text-xs underline self-center" style={{ color: GOLD }}>All certificates</Link>
       </div>

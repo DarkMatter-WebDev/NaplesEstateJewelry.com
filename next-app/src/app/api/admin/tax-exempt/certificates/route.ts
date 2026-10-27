@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { createServiceClient } from '@/lib/supabase/service';
 import { listCertificatesForPicker } from '@/lib/tax-exempt-server';
-import { certificateSummary } from '@/lib/tax-exempt';
+import { certificateSummary, hasCopyOnFile } from '@/lib/tax-exempt';
 
 /** GET ?q=… — Instant Sale's "Certificate on file" picker: approved, saved for reuse, still usable. */
 export const runtime = 'nodejs';
@@ -19,6 +19,8 @@ export async function GET(req: Request) {
       summary: certificateSummary(row),
       customer: [row.customer_name, row.customer_email].filter(Boolean).join(' · ') || null,
       hasPhoto: Boolean(row.photo_path),
+      // A photo or a filed paper copy. Without one the sale box asks for this sale's FL authorization number.
+      hasCopy: hasCopyOnFile(row),
       physicalCopySeen: row.physical_copy_seen,
     })),
   });

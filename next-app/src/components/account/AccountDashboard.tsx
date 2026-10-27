@@ -38,7 +38,7 @@ export default function AccountDashboard({
   isAdmin,
   memberSince,
   orders,
-  taxExempt = { certificate: null, pending: false },
+  taxExempt = { certificate: null, expired: null, request: null, defaultPhone: null, startOpen: false },
 }: Props) {
   const isEs = locale === 'es';
   const [activeTab, setActiveTab] = useState<AccountTab>('overview');

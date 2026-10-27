@@ -2,11 +2,18 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-10-27 (2)** (tax-exempt sales BUILT + STAGED, not pushed; ⛔ SQL first — block below). Before that, **2026-10-27 (1)** (Google's "untagged landing pages" email = `/jewelry-appraisal` with 0 ad clicks so far, ad-click-only tag; no action — `CHANGELOG.md` 2026-10-27 (1)).
+> in `DECISIONS.md`. Last reconciled: **2026-10-27 (5)** (in-store exempt sales need a copy OR a Florida authorization number; "I kept a paper copy" overrides the photo; Verify buttons → floridarevenue.com/taxes/certificates; staged, not pushed). Before that, **2026-10-27 (4)** (verify a tax-exempt certificate from My Account + homepage line BUILT + STAGED, not pushed; no SQL — block below). Before that, **2026-10-27 (3)** (tax-exempt sales LIVE — owner ran the SQL + pushed + deployed). Before that, **2026-10-27 (1)** (Google's "untagged landing pages" email = `/jewelry-appraisal` with 0 ad clicks so far, ad-click-only tag; no action — `CHANGELOG.md` 2026-10-27 (1)).
 
-## Start Here (2026-10-27 (2) — 🟡 Tax-exempt sales BUILT + STAGED, not pushed; ⛔ SQL `supabase/tax-exempt-2026-10.sql` to run BEFORE the push; no env vars)
+## Start Here (2026-10-27 (4) — 🟡 Verify from My Account BUILT + STAGED, NOT pushed; no SQL, no env vars)
 
-- 🟡 **Waiting for the owner:** (1) run the SQL, (2) push + deploy, (3) the first uses in `TASKS.md` top block (in-store photo + physical copy, a website request approved from the text, the account card). Record `CHANGELOG.md` 2026-10-27 (2); rule `DECISIONS.md` top entry; runbook `features/tax-exempt.md`.
+- Customers can send their Florida certificate from **My Account → Tax-exempt status** before shopping (also reached from a new homepage line in *Why Buy Estate Gold?*). You get the usual text marked "for their account, no order yet"; approving saves it to their account and checkout drops the tax automatically. Checkout shows "still waiting" while you haven't approved; guests see a line pointing to My Account. Customer AI reads are now capped (5/account/day, 30/day site-wide); past a cap the upload reaches you unread.
+- 🟡 **Waiting for the owner:** push + deploy, then the first uses in `TASKS.md` top blocks. Record `CHANGELOG.md` 2026-10-27 (4) + (5).
+- (5) In store with no photo: tick *Customer showed me the physical certificate*, then *I kept a paper copy for our files* OR enter the Florida authorization # — Florida needs a copy or that number (Rules 12A-1.039(3) / 12A-1.038(3)).
+- Gate: `tsc` 0 · lint 0 errors · **2072/2072** · build 0. ⛔ Signed-in card states and the account text not seen by Claude.
+
+## Start Here (2026-10-27 (2)–(3) — 🟡 Tax-exempt sales LIVE: owner ran `supabase/tax-exempt-2026-10.sql`, pushed + deployed 10-27; first uses pending; no env vars)
+
+- 🟡 **Waiting for the owner:** ~~(1) run the SQL, (2) push + deploy~~ ✅ done 10-27; **live-checked 10-27** (admin page, both boxes, checkout link, forged codes keep tax, AI refuses a non-certificate — `CHANGELOG.md` 2026-10-27 (3)), (3) the first uses in `TASKS.md` top block (in-store photo + physical copy, a website request approved from the text, the account card). Record `CHANGELOG.md` 2026-10-27 (2); rule `DECISIONS.md` top entry; runbook `features/tax-exempt.md`.
 - What it does: Instant Sale (in-store + remote) gets a *Tax-exempt sale* box — AI reads a photo of the Florida certificate, or tick "physical copy seen"; website checkout lets a buyer upload a Florida certificate in the same cart, you approve from a text, their total drops to no tax and they pay right there; signed-in buyers can save it to their account; everything is noted on the order and listed in **Admin → Tax Exempt**.
 - Gate: `tsc` 0 · lint 0 errors · **2064/2064** (181 files) · build 0. ⛔ Admin screens, the AI read, the text and the approval round-trip not seen yet (need the SQL + admin sign-in).
 

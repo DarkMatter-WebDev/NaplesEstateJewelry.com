@@ -477,6 +477,21 @@ export default async function HomePage({ params }: Props) {
             >
               {isEs ? 'Ver la colección →' : 'Browse the collection →'}
             </Link>
+            {/* Tax-exempt buyers (owner, 2026-10-27: "allow them to add the cert
+                in their account from the homepage before they ever go through
+                checkout"). One quiet line, no new button: it opens the upload
+                on the My Account card (sign-in first, then straight back). */}
+            <p className="mt-6 text-xs leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
+              {isEs ? '¿Compra para reventa o para una organización exenta? ' : 'Buying for resale or for an exempt organization? '}
+              <Link
+                href={isEs ? '/es/account?taxExempt=start' : '/account?taxExempt=start'}
+                prefetch={false}
+                className="font-bold underline underline-offset-2"
+                style={{ color: 'var(--color-primary)' }}
+              >
+                {isEs ? 'Verifique su certificado de Florida →' : 'Get your Florida tax-exempt certificate verified →'}
+              </Link>
+            </p>
           </PageContainer>
         </Section>
 

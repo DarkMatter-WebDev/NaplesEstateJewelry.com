@@ -38,11 +38,12 @@ export type SaleItemDraft = {
 };
 
 let keySeed = 0;
+/** A blank item line. Starts on "Not listed" in both In-store and Remote sale (owner, 2026-10-27). */
 export function newSaleItem(): SaleItemDraft {
   keySeed += 1;
   return {
     key: `item-${Date.now()}-${keySeed}`,
-    mode: 'listed',
+    mode: 'unlisted',
     query: '',
     selected: null,
     title: '',

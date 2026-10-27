@@ -22,11 +22,15 @@ Instant Sale → section **2. Customer** → tick **Tax-exempt sale (Florida cer
   unsure of a digit the number box turns orange and recording waits for the
   **Number checked** tick. A non-Florida certificate blocks the sale until the
   box is unticked.
-- **Customer showed me the physical certificate** — tick it and the photo is
-  not needed; the details become optional (add the number if you can — it is
-  what proves the exemption later). The order records that the physical copy
-  was seen, by whom and when.
-- **Florida authorization #** (optional) + **Verify with FL Revenue ↗**.
+- **Customer showed me the physical certificate** — tick it when there is no
+  photo, then EITHER **I kept a paper copy for our files** (file their paper
+  copy with the sale records; no photo or number needed) OR enter the
+  **Florida authorization #** from **Verify with FL Revenue ↗**. Florida
+  documents an exempt sale only by a copy of the certificate OR that number
+  (Rules 12A-1.039(3) / 12A-1.038(3)); a certificate number alone is not
+  enough. The other details stay optional. A certificate picked from "on
+  file" that has no copy asks for this sale's authorization number.
+- **Florida authorization #** (optional with a photo or a kept paper copy, required otherwise) + **Verify with FL Revenue ↗** (floridarevenue.com/taxes/certificates, or the FL Tax-Verify app, or 1-877-357-3725). Receipts print the number.
 - The Total card reads **FL sales tax · exempt** and $0.00. Tax comes off the
   whole sale (items + shipping).
 - Remote sale: the invoice email shows "Tax · exempt", and the customer's pay
@@ -75,6 +79,11 @@ The shop never holds pieces: during the wait the item is still for sale to
 anyone (same as any cart).
 
 ## 3. Repeat buyers — saved to the account
+
+- **Verify before shopping (2026-10-27 (4)):** My Account → *Tax-exempt status* → **Verify my certificate** (also reached from the homepage line *"Get your Florida tax-exempt certificate verified →"* in *Why Buy Estate Gold?*, which opens the upload; signed-out visitors sign in first and come straight back). Photo → the same AI read and refusals → *Is this right?* → **Mobile number** (prefilled, required) → certify → **Send for verification**. Your text reads *"…for their account, no order yet…"*; the approve page says the same instead of showing a cart. Approve → saved to their account, the card turns *Approved* within ~5 s, and they get *"Your tax-exempt status is approved"* with a Shop now button. Decline → the reason shows on the card and by email.
+- While it waits, checkout (signed in) says *"Your certificate (TX-…) is waiting for our approval"* and drops the tax by itself when you approve; they can pay with tax meanwhile. Guests see *"Have an account? Verify it once in My Account…"* in the checkout upload panel.
+- **Replace with a new certificate** (renewals): the old one keeps applying until you approve the new one. An expired one shows *"Expired …: upload your new certificate"*.
+- **AI limits (checkout AND My Account):** the AI reads at most 5 customer uploads per account per day and 30 per day for the whole site (plus 6 uploads an hour per connection). Past that, the upload is kept **unread**: the customer sees *"Certificate received. We'll read it ourselves…"*, your text says *"NOT read by AI (daily limit), check the photo"*, the approve page shows a *Not read by AI* note, and you type the name and number before Approve. Instant Sale reads are never capped.
 
 - A **signed-in** buyer whose approved certificate is saved to their account
   sees *"Your Florida certificate is on file"* at checkout and the tax comes

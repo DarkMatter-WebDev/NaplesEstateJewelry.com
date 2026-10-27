@@ -14,6 +14,9 @@ import {
   normalizeTaxExemptSaleInput,
   opensAtLabel,
   ownerApprovalTextBody,
+  FL_CERT_VERIFY_URL,
+  PAPER_COPY_MIME,
+  hasCopyOnFile,
   parseCertificateReadJson,
   parseTaxExemptSnapshot,
   requestRefLabel,
@@ -96,7 +99,11 @@ describe('Instant Sale box → the choice the route records', () => {
 
   it('takes a certificate on file by id', () => {
     expect(normalizeTaxExemptSaleInput({ enabled: true, certificateId: '0b6f2a4e-1d3c-4a5b-9c7d-112233445566' })).toEqual({
-      value: { kind: 'on_file', certificateId: '0b6f2a4e-1d3c-4a5b-9c7d-112233445566' },
+      value: { kind: 'on_file', certificateId: '0b6f2a4e-1d3c-4a5b-9c7d-112233445566', flAuthNumber: null },
+    });
+    // A certificate on file with no copy needs this sale's number; the route checks the photo, the input carries it.
+    expect(normalizeTaxExemptSaleInput({ enabled: true, certificateId: '0b6f2a4e-1d3c-4a5b-9c7d-112233445566', flAuthNumber: ' 1234567890123 ' })).toEqual({
+      value: { kind: 'on_file', certificateId: '0b6f2a4e-1d3c-4a5b-9c7d-112233445566', flAuthNumber: '1234567890123' },
     });
   });
 
@@ -105,9 +112,44 @@ describe('Instant Sale box → the choice the route records', () => {
     expect('error' in result && result.error).toMatch(/photo|physical/);
   });
 
-  it('with only the physical copy, the details are optional (owner: "allow bypass of the photo, info fill")', () => {
-    const result = normalizeTaxExemptSaleInput({ enabled: true, physicalCopySeen: true }, NOW);
-    expect('value' in result && result.value).toMatchObject({ kind: 'new', physicalCopySeen: true, photoPath: null, certNumber: null });
+  it('with only the physical copy seen, the Florida authorization number is required; the other details stay optional', () => {
+    // Florida documents the sale by a copy OR an authorization number (Rules 12A-1.039(3) / 12A-1.038(3)).
+    const noNumber = normalizeTaxExemptSaleInput({ enabled: true, physicalCopySeen: true }, NOW);
+    expect('error' in noNumber && noNumber.error).toMatch(/authorization number/);
+    const badNumber = normalizeTaxExemptSaleInput({ enabled: true, physicalCopySeen: true, flAuthNumber: 'abc' }, NOW);
+    expect('error' in badNumber && badNumber.error).toMatch(/authorization number/);
+    const result = normalizeTaxExemptSaleInput({ enabled: true, physicalCopySeen: true, flAuthNumber: '1234567890123' }, NOW);
+    expect('value' in result && result.value).toMatchObject({ kind: 'new', physicalCopySeen: true, paperCopyKept: false, photoPath: null, photoMime: null, certNumber: null, flAuthNumber: '1234567890123' });
+  });
+
+  it('a kept paper copy overrides the photo: no photo and no authorization number needed (owner: "might not have time for photo")', () => {
+    const result = normalizeTaxExemptSaleInput({ enabled: true, physicalCopySeen: true, paperCopyKept: true }, NOW);
+    expect('value' in result && result.value).toMatchObject({ kind: 'new', paperCopyKept: true, photoPath: null, photoMime: PAPER_COPY_MIME, flAuthNumber: null });
+    // "Kept a paper copy" means nothing without the physical-copy tick, and a photo wins over it.
+    expect('error' in normalizeTaxExemptSaleInput({ enabled: true, paperCopyKept: true }, NOW)).toBe(true);
+    const withPhoto = normalizeTaxExemptSaleInput({ enabled: true, photoPath: PHOTO, businessName: 'A', certNumber: '78-8012345678-9', physicalCopySeen: true, paperCopyKept: true }, NOW);
+    expect('value' in withPhoto && withPhoto.value).toMatchObject({ paperCopyKept: false, photoMime: 'image/webp' });
+  });
+
+  it('knows when the store holds a copy: a photo or a filed paper copy', () => {
+    expect(hasCopyOnFile({ photo_path: PHOTO, photo_mime: 'image/webp' })).toBe(true);
+    expect(hasCopyOnFile({ photo_path: null, photo_mime: PAPER_COPY_MIME })).toBe(true);
+    expect(hasCopyOnFile({ photo_path: null, photo_mime: null })).toBe(false);
+  });
+
+  it("a certificate on file with no copy needs this sale's authorization number (server)", () => {
+    const server = readFileSync(join(process.cwd(), 'src', 'lib', 'tax-exempt-server.ts'), 'utf8');
+    expect(server).toContain('if (!hasCopyOnFile(row)) {');
+    expect(server).toContain('if (!choice.flAuthNumber) {');
+  });
+
+  it("points the Verify buttons at Florida's Certificate Verification System", () => {
+    expect(FL_CERT_VERIFY_URL).toBe('https://floridarevenue.com/taxes/certificates');
+    for (const file of [['components', 'admin', 'instant-sale', 'TaxExemptSaleBox.tsx'], ['components', 'admin', 'tax-exempt', 'TaxExemptReviewActions.tsx']]) {
+      const source = readFileSync(join(process.cwd(), 'src', ...file), 'utf8');
+      expect(source).toContain('href={FL_CERT_VERIFY_URL}');
+      expect(source).not.toContain('eservices/Pages');
+    }
   });
 
   it('with a photo, the name and number are required', () => {
@@ -119,7 +161,7 @@ describe('Instant Sale box → the choice the route records', () => {
 
   it('refuses a non-Florida read, an expired date and a path outside the private folder', () => {
     expect('error' in normalizeTaxExemptSaleInput({ enabled: true, photoPath: PHOTO, businessName: 'A', certNumber: '78-8012345678-9', aiState: 'GA' }, NOW)).toBe(true);
-    expect('error' in normalizeTaxExemptSaleInput({ enabled: true, physicalCopySeen: true, expiresOn: '2025-01-01' }, NOW)).toBe(true);
+    expect('error' in normalizeTaxExemptSaleInput({ enabled: true, physicalCopySeen: true, flAuthNumber: '1234567890123', expiresOn: '2025-01-01' }, NOW)).toBe(true);
     expect('error' in normalizeTaxExemptSaleInput({ enabled: true, photoPath: 'https://evil.example/x.webp', businessName: 'A', certNumber: '78-8012345678-9' }, NOW)).toBe(true);
   });
 });
@@ -133,7 +175,7 @@ describe('the tax comes off the whole sale', () => {
   };
 
   it('in store: tax 0, and the 6% it would have been is kept as "tax not charged"', () => {
-    const result = normalizeInStoreSaleInput({ ...base, taxExempt: { enabled: true, physicalCopySeen: true } });
+    const result = normalizeInStoreSaleInput({ ...base, taxExempt: { enabled: true, physicalCopySeen: true, paperCopyKept: true } });
     expect('value' in result && result.value).toMatchObject({ tax: 0, total: 1000, taxNotCharged: 60 });
   });
 
@@ -192,6 +234,11 @@ describe('words', () => {
     expect(exemptReceiptLine(snapshot)).toBe('Tax-exempt sale · Florida Annual Resale Certificate · 78-8012345678-9 · Coastal Jewelers LLC · valid through 12/31/2026');
     expect(exemptReceiptLine({ ...snapshot, photoPath: null, physicalCopySeen: true, certNumber: null, businessName: null, certType: null, expiresOn: null }))
       .toBe('Tax-exempt sale · Florida certificate · physical copy seen');
+    // The paper-copy override and the authorization number are printed (the rule wants the number on the invoice).
+    expect(exemptReceiptLine({ ...snapshot, photoPath: null, photoMime: PAPER_COPY_MIME, physicalCopySeen: true }))
+      .toContain('paper copy on file');
+    expect(exemptReceiptLine({ ...snapshot, photoPath: null, photoMime: null, physicalCopySeen: true, flAuthNumber: '1234567890123' }))
+      .toContain('physical copy seen · FL auth 1234567890123');
   });
 
   it('read a stored snapshot back defensively', () => {
@@ -211,6 +258,33 @@ describe('words', () => {
     expect(body).toContain('https://naplesestatejewelry.com/admin/tax-exempt/abc');
     expect(body).not.toContain('8099887766');
     expect(body.length).toBeLessThan(400);
+  });
+
+  it('say "for their account, no order yet" for a My Account request (mockup v3)', () => {
+    const body = ownerApprovalTextBody({
+      ref: 'TX-1043', businessName: 'Bell & Sons Jewelry Inc', certType: 'resale', certNumber: '78-8099887766-4', expiresOn: '2026-12-31',
+      cartTotal: null, tax: null, customerName: 'Marcus Bell', customerPhone: '+19415550188', url: 'https://naplesestatejewelry.com/admin/tax-exempt/abc',
+      forAccount: true,
+    });
+    expect(body).toContain('for their account, no order yet');
+    expect(body).toContain('TX-1043');
+    expect(body).toContain('··7664');
+    expect(body).not.toContain('waiting at checkout');
+    expect(body).not.toContain('Cart');
+    expect(body).not.toContain('8099887766');
+    expect(body).toContain('https://naplesestatejewelry.com/admin/tax-exempt/abc');
+  });
+
+  it('never claim "AI checks passed" for an upload past the daily AI limit', () => {
+    const body = ownerApprovalTextBody({
+      ref: 'TX-1044', businessName: null, certType: null, certNumber: null, expiresOn: null,
+      cartTotal: 1219, tax: 73.14, customerName: 'Marcus Bell', customerPhone: '+19415550188', url: 'https://naplesestatejewelry.com/admin/tax-exempt/abc',
+      aiRead: false,
+    });
+    expect(body).toContain('NOT read by AI');
+    expect(body).not.toContain('AI checks passed');
+    expect(body).toContain('$1,219.00');
+    expect(body).toContain('https://naplesestatejewelry.com/admin/tax-exempt/abc');
   });
 
   it('say when the store opens', () => {
@@ -242,5 +316,24 @@ describe('guards in the code and the SQL', () => {
   it('the certificate photo is verified to be WebP before it is stored as WebP', () => {
     const server = read('src', 'lib', 'tax-exempt-server.ts');
     expect(server).toContain("if (produced.format !== 'webp')");
+  });
+
+  it('the customer AI read is capped per account and site-wide BEFORE the AI is called (owner, abuse limits)', () => {
+    const route = read('src', 'app', 'api', 'tax-exempt', 'read', 'route.ts');
+    const caps = route.indexOf("checkRateLimit('tax-exempt-ai-site'");
+    const perAccount = route.indexOf('tax-exempt-ai-user:');
+    const ai = route.indexOf('readCertificateWithAi(buffer)');
+    expect(perAccount).toBeGreaterThan(0);
+    expect(caps).toBeGreaterThan(perAccount);
+    expect(ai).toBeGreaterThan(caps);
+    expect(route).toContain('if (aiAllowed)');
+  });
+
+  it('only a signed-in customer can send from My Account, and it never carries a cart', () => {
+    const route = read('src', 'app', 'api', 'tax-exempt', 'account', 'route.ts');
+    expect(route).toContain("{ status: 401 }");
+    expect(route).toContain('cart: null');
+    expect(route).toContain('save_to_account: true');
+    expect(route).not.toContain('resolveCheckoutExemption(');
   });
 });

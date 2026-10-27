@@ -15,6 +15,12 @@ import { STORE_TEXT_HREF, STORE_TEXT_NUMBER, TAX_CERT_MAX_BYTES, TAX_EXEMPT_TEXT
  * approved: the parent re-quotes with the token and the tax line reads
  * "exempt". A signed-in buyer with a saved certificate skips all of it.
  *
+ * Mockup v3 (verify from My Account first): a signed-in buyer whose account
+ * request still waits sees "waiting for our approval" here instead of the
+ * upload; when the owner approves, the saved certificate applies by itself
+ * (this checks every few seconds). They can pay with tax meanwhile. Guests
+ * get one line pointing to My Account.
+ *
  * ⛔ Nothing here changes a price. It only hands the parent a token (or "use my
  * saved certificate"); the quote and create-order routes decide on the server.
  */
@@ -23,6 +29,7 @@ export type CheckoutExemptionChoice = { token?: string; useSaved?: boolean } | n
 
 type SavedView = { id: string; businessName: string | null; typeLabel: string; masked: string; validThrough: string | null };
 type ReadView = { businessName: string | null; typeLabel: string | null; certNumber: string | null; validThrough: string | null };
+type AccountPending = { ref: string | null; submittedAt: string | null; storeOpen: boolean | null; opensLabel: string | null };
 type Phase = 'idle' | 'open' | 'reading' | 'read' | 'sending' | 'pending' | 'approved' | 'declined' | 'rejected';
 
 const STORAGE_KEY = 'nej-tax-exempt-token';
@@ -71,6 +78,7 @@ export default function CheckoutTaxExempt({
   const [saveToAccount, setSaveToAccount] = useState(true);
   const [saved, setSaved] = useState<SavedView | null>(null);
   const [useSaved, setUseSaved] = useState(true);
+  const [accountPending, setAccountPending] = useState<AccountPending | null>(null);
   const [status, setStatus] = useState<{ ref: string | null; email: string | null; tag: string; businessName: string | null; submittedAt: string | null; storeOpen: boolean | null; opensLabel: string | null; declineReason: string | null }>({
     ref: null, email: null, tag: '', businessName: null, submittedAt: null, storeOpen: null, opensLabel: null, declineReason: null,
   });
@@ -134,17 +142,49 @@ export default function CheckoutTaxExempt({
         }
       }
       try {
-        const res = await fetch('/api/tax-exempt/saved', { cache: 'no-store' });
+        const res = await fetch(`/api/tax-exempt/saved?locale=${locale}`, { cache: 'no-store' });
         const data = await res.json().catch(() => null);
         if (cancelled || !data) return;
         setSignedIn(Boolean(data.signedIn));
         setSaved(data.certificate ?? null);
+        setAccountPending(!data.certificate && data.request?.status === 'pending' ? data.request : null);
       } catch {
         /* no saved certificate */
       }
     })();
     return () => { cancelled = true; };
-  }, [fetchStatus]);
+  }, [fetchStatus, locale]);
+
+  // A request sent from My Account still waits: check every 5 s (15 s after
+  // 15 minutes) until the certificate is saved, then it applies by itself.
+  const watchingAccount = Boolean(accountPending) && !saved && phase === 'idle';
+  useEffect(() => {
+    if (!watchingAccount) return;
+    const started = Date.now();
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = async () => {
+      setNow(Date.now());
+      try {
+        const res = await fetch(`/api/tax-exempt/saved?locale=${locale}`, { cache: 'no-store' });
+        const data = await res.json().catch(() => null);
+        if (data?.certificate) {
+          setUseSaved(true);
+          setSaved(data.certificate);
+          setAccountPending(null);
+          return;
+        }
+        if (data && data.request?.status !== 'pending') {
+          setAccountPending(null);
+          return;
+        }
+      } catch {
+        /* try again on the next tick */
+      }
+      timer = setTimeout(tick, Date.now() - started > 15 * 60_000 ? 15_000 : 5_000);
+    };
+    timer = setTimeout(tick, 5_000);
+    return () => clearTimeout(timer);
+  }, [watchingAccount, locale]);
 
   // Waiting: check every 5 s for 15 minutes, then every 15 s.
   useEffect(() => {
@@ -292,6 +332,35 @@ export default function CheckoutTaxExempt({
     ));
   }
 
+  // Verified from My Account, waiting for the owner (mockup v3, decision 2).
+  if (accountPending && phase === 'idle') {
+    if (!taxApplies) return null;
+    const waited = accountPending.submittedAt ? (now - new Date(accountPending.submittedAt).getTime()) / 60_000 : 0;
+    return panel('gold', (
+      <>
+        <div className="flex items-start gap-3" role="status">
+          <span className="mt-1 inline-block h-5 w-5 flex-shrink-0 animate-spin rounded-full border-[3px]" style={{ borderColor: '#f1e4b3', borderTopColor: '#b5890c' }} aria-hidden="true" />
+          <span>
+            <strong>{isEs ? `Su certificado${accountPending.ref ? ` (${accountPending.ref})` : ''} está esperando nuestra aprobación.` : `Your certificate${accountPending.ref ? ` (${accountPending.ref})` : ''} is waiting for our approval.`}</strong>{' '}
+            {accountPending.storeOpen === false
+              ? (isEs
+                ? `Ahora estamos cerrados; lo aprobaremos cuando abramos${accountPending.opensLabel ? ` (${accountPending.opensLabel})` : ''}.`
+                : `We're closed right now; we'll approve it when we open${accountPending.opensLabel ? ` at ${accountPending.opensLabel}` : ''}.`)
+              : (isEs
+                ? 'Su total se actualizará aquí solo cuando lo aprobemos, normalmente en pocos minutos.'
+                : 'Your total will update here by itself when we approve it, usually within a few minutes.')}
+          </span>
+        </div>
+        <div className="text-sm" style={{ borderLeft: '3px solid #d4af37', background: waited >= TAX_EXEMPT_TEXT_US_MINUTES ? '#fff3cf' : '#fbf7e8', padding: '0.6rem 0.75rem', borderRadius: 10 }}>
+          {isEs ? `¿No se aprobó en ${TAX_EXEMPT_TEXT_US_MINUTES} minutos? Envíenos un mensaje de texto al ` : `Not approved within ${TAX_EXEMPT_TEXT_US_MINUTES} minutes? Text us at `}
+          {textUs}
+          {accountPending.ref ? <>{isEs ? ' y mencione ' : ' and mention '}<strong>{accountPending.ref}</strong></> : null}.
+        </div>
+        <span className="text-xs" style={hint}>{isEs ? '¿No quiere esperar? Puede pagar con impuesto ahora.' : "Don't want to wait? You can pay with tax now."}</span>
+      </>
+    ));
+  }
+
   if (phase === 'idle') {
     if (!taxApplies) return null;
     return (
@@ -336,6 +405,15 @@ export default function CheckoutTaxExempt({
             : 'Florida accepts only Florida-issued certificates. Kept private, used only for your purchase and our records. '}
           <button type="button" className="underline" onClick={() => void cancel()}>{isEs ? 'Cancelar' : 'Cancel'}</button>
         </span>
+        {!signedIn && (
+          <span className="text-xs" style={hint}>
+            {isEs ? '¿Tiene cuenta? ' : 'Have an account? '}
+            <a href={`${isEs ? '/es' : ''}/account?taxExempt=start`} className="underline" style={{ color: 'var(--color-primary)' }}>
+              {isEs ? 'Verifíquelo una vez en Mi Cuenta' : 'Verify it once in My Account'}
+            </a>
+            {isEs ? ' y sáltese este paso la próxima vez. Su carrito se queda guardado.' : ' and skip this next time. Your cart stays saved.'}
+          </span>
+        )}
       </>
     ));
   }
@@ -344,13 +422,23 @@ export default function CheckoutTaxExempt({
     return panel('gold', (
       <>
         {inputs}
-        <strong style={{ fontFamily: 'var(--font-headline)', fontSize: '1rem' }}>{isEs ? 'Leímos su certificado' : 'We read your certificate'}</strong>
-        <div className="grid gap-0.5 rounded-xl border bg-white p-3" style={{ borderColor: 'var(--color-outline-variant)' }}>
-          <strong>{read?.businessName ?? (isEs ? 'Nombre no legible' : 'Name not readable')}</strong>
-          {read?.typeLabel && <span>{read.typeLabel}</span>}
-          <span>{[read?.certNumber, read?.validThrough ? `${isEs ? 'válido hasta' : 'valid through'} ${read.validThrough}` : null].filter(Boolean).join(' · ')}</span>
-        </div>
-        <span style={{ color: GREEN }}>✓ {isEs ? 'Certificado de Florida' : 'Florida certificate'}{read?.validThrough ? ` · ✓ ${isEs ? 'Vigente' : 'Still valid'}` : ''}</span>
+        {read ? (
+          <>
+            <strong style={{ fontFamily: 'var(--font-headline)', fontSize: '1rem' }}>{isEs ? 'Leímos su certificado' : 'We read your certificate'}</strong>
+            <div className="grid gap-0.5 rounded-xl border bg-white p-3" style={{ borderColor: 'var(--color-outline-variant)' }}>
+              <strong>{read.businessName ?? (isEs ? 'Nombre no legible' : 'Name not readable')}</strong>
+              {read.typeLabel && <span>{read.typeLabel}</span>}
+              <span>{[read.certNumber, read.validThrough ? `${isEs ? 'válido hasta' : 'valid through'} ${read.validThrough}` : null].filter(Boolean).join(' · ')}</span>
+            </div>
+            <span style={{ color: GREEN }}>✓ {isEs ? 'Certificado de Florida' : 'Florida certificate'}{read.validThrough ? ` · ✓ ${isEs ? 'Vigente' : 'Still valid'}` : ''}</span>
+          </>
+        ) : (
+          // Past the daily AI limit: received unread, the owner reads it.
+          <>
+            <strong style={{ fontFamily: 'var(--font-headline)', fontSize: '1rem' }}>{isEs ? 'Certificado recibido' : 'Certificate received'}</strong>
+            <span style={hint}>{isEs ? 'Lo leeremos nosotros al revisarlo. Florida solo acepta certificados emitidos por Florida.' : "We'll read it ourselves when we review it. Florida accepts only Florida-issued certificates."}</span>
+          </>
+        )}
         <span className="text-xs" style={hint}>
           {isEs ? '¿No es correcto? ' : 'Not right? '}
           <button type="button" className="underline" onClick={() => fileRef.current?.click()} disabled={phase === 'sending'}>{isEs ? 'Subir otro' : 'Retake or upload another'}</button>

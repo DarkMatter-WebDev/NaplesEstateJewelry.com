@@ -17,6 +17,7 @@ import {
   certificateUsableThrough,
   exemptShortTag,
   formatCertDate,
+  hasCopyOnFile,
   maskCertNumber,
   opensAtLabel,
   ownerApprovalTextBody,
@@ -222,7 +223,17 @@ export async function resolveSaleCertificate(
     const row = await findCertificate(service, choice.certificateId);
     if (!row) return { error: 'That certificate is no longer on file. Pick it again.' };
     if (!certificateIsUsable(row)) return { error: 'That certificate has expired or was withdrawn. Take a photo of the current one.' };
-    return row;
+    // No copy on file (no photo and no filed paper copy — it was only seen):
+    // Florida then needs an authorization number for THIS sale — a transaction
+    // number is good for one sale (Rule 12A-1.039(3)(b)3).
+    if (!hasCopyOnFile(row)) {
+      if (!choice.flAuthNumber) {
+        return { error: 'That certificate has no copy on file. Verify it with FL Revenue and enter the Florida authorization number for this sale (or take a photo of the certificate as a new one).' };
+      }
+      // The order's snapshot carries this sale's number; the stored certificate is unchanged.
+      return { ...row, fl_auth_number: choice.flAuthNumber };
+    }
+    return choice.flAuthNumber ? { ...row, fl_auth_number: choice.flAuthNumber } : row;
   }
   return insertCertificate(service, {
     certType: choice.certType,
@@ -362,6 +373,95 @@ export async function sweepAbandonedDrafts(service: SupabaseClient): Promise<voi
     await service.from('tax_exempt_requests').delete().eq('id', row.id).eq('status', 'draft');
     await removeUnreferencedCertificateFile(service, row.photo_path);
   }
+}
+
+// ---------------------------------------------------------------------------
+// My Account: verify before shopping (owner, mockup v3 2026-10-27)
+// ---------------------------------------------------------------------------
+
+/** A request sent from My Account carries no cart (checkout always stores one). */
+export function isAccountRequest(row: Pick<TaxExemptRequestRow, 'cart'>): boolean {
+  return row.cart == null;
+}
+
+/** A declined request stays on the account card this long (then the card is plain again). */
+const ACCOUNT_DECLINE_SHOWN_DAYS = 14;
+
+export type AccountRequestView = {
+  token: string;
+  status: 'pending' | 'declined';
+  ref: string | null;
+  businessName: string | null;
+  tag: string;
+  submittedAt: string | null;
+  declineReason: string | null;
+  storeOpen: boolean | null;
+  opensLabel: string | null;
+};
+
+export type AccountTaxExemptState = {
+  /** The usable certificate saved to this account (checkout applies it). */
+  certificate: SavedCertificateView | null;
+  /** The newest saved certificate when none is usable any more — "Expired: upload your new one". */
+  expired: SavedCertificateView | null;
+  /** A request saved to this account still waiting, or recently declined. */
+  request: AccountRequestView | null;
+};
+
+/**
+ * What My Account (and checkout, for "still waiting") shows for one signed-in
+ * customer. Reads only rows linked to `userId`; the token it returns belongs
+ * to that customer's own request (it lets the card cancel it).
+ */
+export async function accountTaxExemptState(service: SupabaseClient, userId: string, isEs = false): Promise<AccountTaxExemptState> {
+  const [certificates, requests] = await Promise.all([
+    service
+      .from('tax_exempt_certificates')
+      .select(CERTIFICATE_COLUMNS)
+      .eq('user_id', userId)
+      .eq('status', 'approved')
+      .order('approved_at', { ascending: false })
+      .limit(5),
+    service
+      .from('tax_exempt_requests')
+      .select(REQUEST_COLUMNS)
+      .eq('user_id', userId)
+      .eq('save_to_account', true)
+      .in('status', ['pending', 'declined'])
+      .order('submitted_at', { ascending: false })
+      .limit(1),
+  ]);
+  const rows = (certificates.error ? [] : (certificates.data ?? [])) as unknown as CertificateRow[];
+  const usable = rows.find((row) => certificateIsUsable(row)) ?? null;
+  const expired = !usable && rows[0] ? rows[0] : null;
+
+  let request: AccountRequestView | null = null;
+  const latest = ((requests.error ? [] : (requests.data ?? [])) as unknown as TaxExemptRequestRow[])[0];
+  if (latest) {
+    const decidedMs = latest.decided_at ? new Date(latest.decided_at).getTime() : 0;
+    const showDecline = latest.status === 'declined'
+      && Date.now() - decidedMs < ACCOUNT_DECLINE_SHOWN_DAYS * 86_400_000
+      && (!usable || decidedMs > new Date(usable.approved_at).getTime());
+    if (latest.status === 'pending' || showDecline) {
+      const window = latest.status === 'pending' ? await storeApprovalWindow(new Date(), isEs) : null;
+      request = {
+        token: latest.token,
+        status: latest.status as 'pending' | 'declined',
+        ref: requestRefLabel(latest.ref),
+        businessName: latest.business_name,
+        tag: exemptShortTag({ certType: latest.cert_type, certNumber: latest.cert_number }),
+        submittedAt: latest.submitted_at,
+        declineReason: latest.status === 'declined' ? latest.decline_reason : null,
+        storeOpen: window?.open ?? null,
+        opensLabel: window?.opensLabel ?? null,
+      };
+    }
+  }
+  return {
+    certificate: usable ? savedCertificateView(usable) : null,
+    expired: expired ? savedCertificateView(expired) : null,
+    request,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -533,6 +633,8 @@ export async function notifyOwnerOfRequest(service: SupabaseClient, request: Tax
     customerName: request.customer_name,
     customerPhone: request.customer_phone,
     url,
+    forAccount: isAccountRequest(request),
+    aiRead: Boolean(request.ai_checks),
   });
   let texted = false;
   try {
@@ -552,7 +654,7 @@ export async function notifyOwnerOfRequest(service: SupabaseClient, request: Tax
   const emailed = await sendEmail({
     to: ownerNotificationRecipient(),
     replyTo: request.customer_email ?? undefined,
-    subject: `Tax-exempt approval needed · ${ref} · ${request.business_name ?? 'website buyer'}`,
+    subject: `Tax-exempt approval needed · ${ref} · ${request.business_name ?? 'website buyer'}${isAccountRequest(request) ? ' · for their account' : ''}`,
     html: simpleEmailHtml('Tax-exempt approval needed', [body.replace(` ${url}`, '')], { label: 'Review the certificate', url }),
     text: body,
     idempotencyKey: `tax-exempt-${request.id}-owner`,
@@ -560,9 +662,17 @@ export async function notifyOwnerOfRequest(service: SupabaseClient, request: Tax
   if (emailed) await service.from('tax_exempt_requests').update({ owner_emailed_at: new Date().toISOString() }).eq('id', request.id);
 }
 
-/** The buyer's email after the owner decided: approved (with the link back to checkout) or declined (with the reason). */
+/**
+ * The buyer's email after the owner decided: approved (with the link back to
+ * checkout) or declined (with the reason). A request sent from My Account has
+ * no checkout to go back to: its emails point to the shop / My Account.
+ */
 export async function emailBuyerDecision(service: SupabaseClient, request: TaxExemptRequestRow, certificate: CertificateRow | null): Promise<void> {
   if (!request.customer_email) return;
+  if (isAccountRequest(request)) {
+    await emailAccountDecision(service, request, certificate);
+    return;
+  }
   const isEs = request.locale === 'es';
   const checkoutUrl = `${getSiteUrl()}${isEs ? '/es' : ''}/checkout?taxExempt=${encodeURIComponent(request.token)}`;
   const firstName = (request.customer_name ?? '').split(' ')[0] || (isEs ? 'hola' : 'there');
@@ -607,6 +717,63 @@ export async function emailBuyerDecision(service: SupabaseClient, request: TaxEx
       subject: isEs ? 'Su certificado de exención' : 'Your tax-exempt certificate',
       html: simpleEmailHtml(heading, paragraphs, { label: isEs ? 'Volver al pago' : 'Back to checkout', url: `${getSiteUrl()}${isEs ? '/es' : ''}/checkout` }),
       text: [heading, '', ...paragraphs].join('\n'),
+      idempotencyKey: `tax-exempt-${request.id}-declined`,
+    });
+  }
+  if (sent) await service.from('tax_exempt_requests').update({ buyer_emailed_at: new Date().toISOString() }).eq('id', request.id);
+}
+
+/** Approved / declined email for a certificate sent from My Account (mockup v3). */
+async function emailAccountDecision(service: SupabaseClient, request: TaxExemptRequestRow, certificate: CertificateRow | null): Promise<void> {
+  if (!request.customer_email) return;
+  const isEs = request.locale === 'es';
+  const site = `${getSiteUrl()}${isEs ? '/es' : ''}`;
+  const firstName = (request.customer_name ?? '').split(' ')[0] || (isEs ? 'hola' : 'there');
+  let sent = false;
+  if (request.status === 'approved' && certificate) {
+    const type = certificate.cert_type ? TAX_CERT_TYPE_LABELS[certificate.cert_type] : null;
+    const typeName = type ? (isEs ? type.es : `Florida ${type.long}`) : (isEs ? 'certificado de Florida' : 'Florida certificate');
+    const through = formatCertDate(certificateUsableThrough(certificate));
+    const detail = [maskCertNumber(certificate.cert_number), through ? `${isEs ? 'válido hasta' : 'valid through'} ${through}` : null].filter(Boolean).join(', ');
+    const heading = isEs ? 'Su exención de impuesto está aprobada' : 'Your tax-exempt status is approved';
+    const paragraphs = isEs
+      ? [
+        `Hola ${firstName}: verificamos su ${typeName}${certificate.business_name ? ` de ${certificate.business_name}` : ''}${detail ? ` (${detail})` : ''}.`,
+        'Quedó guardado en su cuenta: cuando pague con su sesión iniciada, el impuesto de Florida se quita solo.',
+        'Puede verlo o quitarlo cuando quiera en Mi Cuenta.',
+      ]
+      : [
+        `Hi ${firstName}, we verified your ${typeName}${certificate.business_name ? ` for ${certificate.business_name}` : ''}${detail ? ` (${detail})` : ''}.`,
+        "It's saved to your account: when you check out signed in, Florida sales tax comes off automatically.",
+        'You can see or remove it anytime in My Account.',
+      ];
+    const label = isEs ? 'Ver la tienda' : 'Shop now';
+    sent = await sendEmail({
+      to: request.customer_email,
+      subject: heading,
+      html: simpleEmailHtml(heading, paragraphs, { label, url: `${site}/shop` }),
+      text: [heading, '', ...paragraphs, '', `${label}: ${site}/shop`, '', `${isEs ? 'Preguntas' : 'Questions'}: ${STORE_TEXT_NUMBER}`].join('\n'),
+      idempotencyKey: `tax-exempt-${request.id}-approved`,
+    });
+  } else if (request.status === 'declined') {
+    const heading = isEs ? 'No pudimos aprobar su certificado' : "We couldn't approve your certificate";
+    const paragraphs = isEs
+      ? [
+        `Hola ${firstName}: no pudimos aprobar el certificado que envió desde su cuenta.`,
+        ...(request.decline_reason ? [`Motivo: ${request.decline_reason}`] : []),
+        `Puede enviar otro desde Mi Cuenta, o enviarnos un mensaje de texto al ${STORE_TEXT_NUMBER}.`,
+      ]
+      : [
+        `Hi ${firstName}, we couldn't approve the certificate you sent from your account.`,
+        ...(request.decline_reason ? [`Reason: ${request.decline_reason}`] : []),
+        `You can send another one from My Account, or text us at ${STORE_TEXT_NUMBER}.`,
+      ];
+    const label = isEs ? 'Ir a Mi Cuenta' : 'Go to My Account';
+    sent = await sendEmail({
+      to: request.customer_email,
+      subject: isEs ? 'Su certificado de exención' : 'Your tax-exempt certificate',
+      html: simpleEmailHtml(heading, paragraphs, { label, url: `${site}/account` }),
+      text: [heading, '', ...paragraphs, '', `${label}: ${site}/account`].join('\n'),
       idempotencyKey: `tax-exempt-${request.id}-declined`,
     });
   }

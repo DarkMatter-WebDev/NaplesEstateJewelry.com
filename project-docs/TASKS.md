@@ -28,18 +28,35 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-10-27 (2) — Tax-exempt sales BUILT + STAGED, not pushed — ⛔ SQL first; then the owner's first uses; **check-up ~Mon Nov 10**
+### 🟡 2026-10-27 (5) — In-store: copy OR Florida authorization # (Florida law), "I kept a paper copy" override, Verify buttons fixed — BUILT + STAGED, NOT pushed; no SQL
+
+Record `CHANGELOG.md` 2026-10-27 (5). Ships with the (4) push below.
+
+1. After the push: one in-store sale with *Customer showed me the physical certificate* + *I kept a paper copy for our files* (no photo) → records exempt, receipt says *paper copy on file*. File the paper copy with the sale.
+2. Optional: confirm with your accountant that a filed paper copy + the authorization-number route fit how you keep records (research, not legal advice).
+
+### 🟡 2026-10-27 (4) — Verify from My Account + homepage line BUILT + STAGED, NOT pushed — no SQL, no env vars; **check-up ~Mon Nov 10** (with the block below)
+
+Record `CHANGELOG.md` 2026-10-27 (4) · runbook `features/tax-exempt.md` §3.
+
+1. **Push + deploy** (no SQL, no env vars).
+2. **First use (your phone, signed in to a customer account, a real FL certificate):** homepage → *Get your Florida tax-exempt certificate verified →* → the My Account card opens the upload → photo → check the read → mobile number → Send for verification → **your text says "for their account, no order yet"** → Approve → the card turns *Approved* within ~5 s and the email arrives. Then add a piece, pickup → checkout shows *Your Florida certificate is on file* and no tax. Optional: send one, open checkout BEFORE approving → *waiting for our approval* → approve → the total drops by itself.
+3. **Check-up ~Mon Nov 10:** Admin → Tax Exempt — how many requests came "for their account" vs from checkout, and how many arrived *"Not read by AI"*. Rules: if none from My Account in 2 weeks, leave it; if account requests often wait > 10 min, revisit the wording; if real customers hit "Not read by AI" on a normal day, raise the 30/day cap (owner's call); if junk uploads show up, lower it.
+
+⛔ Not verified by Claude: the signed-in card states, a real send, the account text, approval → card/checkout update (no customer sign-in in the pane).
+
+### 🟡 2026-10-27 (2) — Tax-exempt sales LIVE (owner ran the SQL + deployed 10-27) — the owner's first uses next; **check-up ~Mon Nov 10**
 
 Record `CHANGELOG.md` 2026-10-27 (2) · runbook `features/tax-exempt.md` · rule `DECISIONS.md` top entry.
 
-1. ⛔ **Run `supabase/tax-exempt-2026-10.sql`** in the Supabase SQL editor (safe to re-run; check the verify queries at the bottom: RLS on ×2, 8 service_role grants, 0 anon/authenticated rows, 3 order columns, bucket `tax-certificates` public = false).
-2. **Push + deploy** (no env vars).
+1. ✅ 2026-10-27 (owner-reported) — ran `supabase/tax-exempt-2026-10.sql` in the Supabase SQL editor (safe to re-run; check the verify queries at the bottom: RLS on ×2, 8 service_role grants, 0 anon/authenticated rows, 3 order columns, bucket `tax-certificates` public = false).
+2. ✅ 2026-10-27 (owner-reported) — pushed + deployed (no env vars).
 3. **In store (iPad):** Instant Sale → In-store sale → tick *Tax-exempt sale* → Take photo of a real Florida certificate → the boxes fill; the Total reads *FL sales tax · exempt*. Record (a $1 test or a real sale) → the receipt prints the certificate line; the order page shows the *Tax exemption* card; **Admin → Tax Exempt** lists it with View certificate. Also try *Customer showed me the physical certificate* with no photo.
 4. **Website (own phone, a real FL certificate):** add a piece → checkout → Local pickup → *Use your Florida certificate →* → upload → Send for approval → **your text arrives** → open the link → Approve → the phone's checkout shows *FL Sales Tax · exempt* within ~5 s. Don't pay (or pay + refund). Also try an out-of-state certificate → instant refusal, no text.
 5. **Account:** sign in before step 4 and keep *Save to my account* ticked → My Account shows *Tax-exempt status · Approved*; *Remove from my account* clears it.
 6. **Check-up ~Mon Nov 10:** Admin → Tax Exempt — how many website requests, minutes to approve, any buyer who texted, any decline reason that should become an automatic check. Rule: if buyers wait > 10 min often, revisit the wording or the closed-hours line; if no website requests in 2 weeks, leave it as is.
 
-⛔ Not verified by Claude: admin screens in a browser (no admin sign-in in the pane), a real AI read, the text, approval → checkout end to end, emails. Gate: tsc 0 · lint 0 errors · 2064/2064 · build 0.
+✅ Live check 10-27 (`CHANGELOG.md` 2026-10-27 (3)): admin page (SQL confirmed), both Instant Sale boxes, checkout link + panel, forged codes keep tax, AI read refuses a non-certificate, privacy EN/ES, account card. ⛔ Still not verified by Claude (needs a real FL certificate): an accepted AI read, admin screens in a browser (no admin sign-in in the pane), a real AI read, the text, approval → checkout end to end, emails. Gate: tsc 0 · lint 0 errors · 2064/2064 · build 0.
 
 ### 🟡 2026-10-26 (7) — Google Ads "free evaluation" changes APPLIED — **check-up ~Mon Nov 9** (2 weeks); reverse what did not help
 

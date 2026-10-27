@@ -13,18 +13,27 @@ import {
 } from '@/lib/tax-exempt-server';
 import {
   TAX_CERT_MAX_BYTES,
+  TAX_EXEMPT_AI_READS_PER_ACCOUNT_DAY,
+  TAX_EXEMPT_AI_READS_PER_DAY,
   TAX_EXEMPT_UPLOADS_PER_HOUR,
   TAX_CERT_TYPE_LABELS,
   certificateProblemMessage,
   checkCertificateRead,
   formatCertDate,
+  type CertificateChecks,
+  type CertificateRead,
 } from '@/lib/tax-exempt';
 
 /**
- * Checkout → "Use your Florida certificate" → the buyer's photo or PDF.
+ * Checkout / My Account → the buyer's certificate photo or PDF.
+ *
+ * Abuse limits (owner, 2026-10-27): 6 uploads an hour per connection, and the
+ * AI read itself is capped per signed-in account per day and for the whole
+ * site per day (`TAX_EXEMPT_AI_READS_*`). Past an AI cap the upload is kept
+ * UNREAD (`unread: true`): no instant refusal, the owner reads the photo.
  *
  * POST (multipart: `certificate`, optional `replaceToken`, `locale`):
- *   1. the AI reads it (`tax-exempt-ai.ts`);
+ *   1. the AI reads it (`tax-exempt-ai.ts`), when under the caps;
  *   2. the checks run (`checkCertificateRead`): Florida-issued, a resale or
  *      exemption certificate, not expired, readable. Any "no" → 422 with the
  *      plain reason, NOTHING stored and nothing sent to the owner;
@@ -50,34 +59,45 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: isEs ? 'El archivo es muy grande (máximo 5 MB).' : 'That file is too large (5 MB at most).' }, { status: 413 });
   }
   const buffer = Buffer.from(await file.arrayBuffer());
+  const user = await getVerifiedUser(await createClient()).catch(() => null);
 
-  let read;
-  try {
-    read = await readCertificateWithAi(buffer);
-  } catch (error) {
-    if (!(error instanceof CertificateUnreadableFileError)) {
-      console.error('[tax-exempt] buyer read failed', error instanceof Error ? error.message : error);
+  // AI caps (owner, 2026-10-27): per account per day, then site-wide per day.
+  // Short-circuit order matters: a capped account does not use up the site's
+  // allowance. A limiter outage counts as "capped" (no AI), never as an error.
+  const aiAllowed = (!user || await checkRateLimit(`tax-exempt-ai-user:${user.id}`, TAX_EXEMPT_AI_READS_PER_ACCOUNT_DAY, 86_400))
+    && await checkRateLimit('tax-exempt-ai-site', TAX_EXEMPT_AI_READS_PER_DAY, 86_400);
+
+  let read: CertificateRead | null = null;
+  let checks: CertificateChecks | null = null;
+  if (aiAllowed) {
+    try {
+      read = await readCertificateWithAi(buffer);
+    } catch (error) {
+      if (!(error instanceof CertificateUnreadableFileError)) {
+        console.error('[tax-exempt] buyer read failed', error instanceof Error ? error.message : error);
+        return NextResponse.json(
+          { error: isEs ? 'No pudimos leer el certificado ahora mismo. Intente de nuevo en un momento.' : "We couldn't read the certificate just now. Please try again in a moment." },
+          { status: 502 },
+        );
+      }
+      read = null;
+    }
+    checks = read ? checkCertificateRead(read) : null;
+    if (!read || !checks || !checks.ok) {
+      const problem = checks?.problem ?? 'unreadable';
       return NextResponse.json(
-        { error: isEs ? 'No pudimos leer el certificado ahora mismo. Intente de nuevo en un momento.' : "We couldn't read the certificate just now. Please try again in a moment." },
-        { status: 502 },
+        { problem, error: certificateProblemMessage(problem, { issuingState: read?.issuingState ?? null }, isEs) },
+        { status: 422 },
       );
     }
-    read = null;
-  }
-  const checks = read ? checkCertificateRead(read) : null;
-  if (!read || !checks || !checks.ok) {
-    const problem = checks?.problem ?? 'unreadable';
-    return NextResponse.json(
-      { problem, error: certificateProblemMessage(problem, { issuingState: read?.issuingState ?? null }, isEs) },
-      { status: 422 },
-    );
   }
 
   const service = createServiceClient();
+  // Unread uploads still have to be a real picture or PDF: storing re-encodes
+  // (and so rejects) anything else.
   const stored = await storeCertificateFile(service, buffer, 'requests');
   if ('error' in stored) return NextResponse.json({ error: stored.error }, { status: stored.status });
 
-  const user = await getVerifiedUser(await createClient()).catch(() => null);
   const token = newRequestToken();
   const { error } = await service.from('tax_exempt_requests').insert({
     token,
@@ -87,10 +107,10 @@ export async function POST(req: Request) {
     photo_mime: stored.mime,
     ai_read: read,
     ai_checks: checks,
-    cert_type: read.certType === 'resale' || read.certType === 'exemption' ? read.certType : null,
-    business_name: read.businessName,
-    cert_number: read.certNumber,
-    expires_on: read.expiresOn,
+    cert_type: read?.certType === 'resale' || read?.certType === 'exemption' ? read.certType : null,
+    business_name: read?.businessName ?? null,
+    cert_number: read?.certNumber ?? null,
+    expires_on: read?.expiresOn ?? null,
     user_id: user?.id ?? null,
   });
   if (error) {
@@ -109,6 +129,9 @@ export async function POST(req: Request) {
     }
   }
   await sweepAbandonedDrafts(service).catch(() => undefined);
+
+  // Over the AI cap: received, unread — the owner reads the photo.
+  if (!read) return NextResponse.json({ token, read: null, checks: null, unread: true });
 
   const type = read.certType === 'resale' || read.certType === 'exemption' ? TAX_CERT_TYPE_LABELS[read.certType] : null;
   return NextResponse.json({

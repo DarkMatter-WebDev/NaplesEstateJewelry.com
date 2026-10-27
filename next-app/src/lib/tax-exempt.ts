@@ -30,6 +30,15 @@ export const TAX_EXEMPT_TEXT_US_MINUTES = 10;
 export const TAX_EXEMPT_UNDATED_REUSE_DAYS = 365;
 /** Uploads per buyer IP per hour (each one costs an AI read). */
 export const TAX_EXEMPT_UPLOADS_PER_HOUR = 6;
+/**
+ * Customer-side AI reads (owner, 2026-10-27: limit abuse "by bots or
+ * customers"): at most this many per day for the whole site, and per signed-in
+ * account. Past a cap the upload still goes through UNREAD — the owner reads
+ * the photo on the approve page — so the worst-case AI cost per day is fixed.
+ * Admin reads (Instant Sale) are not counted.
+ */
+export const TAX_EXEMPT_AI_READS_PER_DAY = 30;
+export const TAX_EXEMPT_AI_READS_PER_ACCOUNT_DAY = 5;
 /** Largest certificate file accepted (Netlify's request body tops out near 6 MB). */
 export const TAX_CERT_MAX_BYTES = 5 * 1024 * 1024;
 export const TAX_EXEMPT_DECLINE_MAX = 300;
@@ -130,6 +139,45 @@ export function cleanCertNumber(value: unknown): string | null {
   const text = collapse(value).toUpperCase().replace(/\s*-\s*/g, '-').replace(/[^A-Z0-9-]/g, '');
   const characters = text.replace(/-/g, '');
   if (characters.length < 6 || text.length > 30) return null;
+  return text;
+}
+
+/**
+ * Florida's Certificate Verification System — the page Rule 12A-1.039(3)(b)
+ * and 12A-1.038(3)(g) name for getting a transaction authorization number
+ * (it redirects to verify-taxcerts.floridarevenue.com). Also: the FL
+ * Tax-Verify app, or 1-877-357-3725.
+ */
+export const FL_CERT_VERIFY_URL = 'https://floridarevenue.com/taxes/certificates';
+
+/**
+ * `photo_mime` with no `photo_path` = the customer handed over a paper copy and
+ * the store filed it (owner, 2026-10-27: "customer might hand over a physical
+ * copy and i might not have time for photo"). A kept paper copy is "a copy of
+ * the certificate" under Rules 12A-1.039(3)(a) / 12A-1.038(3), the same as a
+ * photo — so no authorization number is needed. Stored in the existing column
+ * on purpose: no SQL.
+ */
+export const PAPER_COPY_MIME = 'paper-copy';
+
+/** The store holds a copy of this certificate: a photo/PDF, or a filed paper copy. */
+export function hasCopyOnFile(row: { photo_path?: string | null; photo_mime?: string | null }): boolean {
+  return Boolean(row.photo_path) || row.photo_mime === PAPER_COPY_MIME;
+}
+
+/**
+ * A Florida transaction / vendor authorization number as typed: letters,
+ * digits and dashes, at least 6 characters. Null when it does not look like one.
+ *
+ * Why it matters (owner, 2026-10-27, after the Florida-law research): a sale
+ * is documented ONLY by a copy of the certificate OR an authorization number
+ * (Rules 12A-1.039(3) / 12A-1.038(3)) — a certificate number alone is not
+ * enough. So a sale with no photo needs this number.
+ */
+export function cleanAuthNumber(value: unknown): string | null {
+  const text = collapse(value).toUpperCase().replace(/\s*-\s*/g, '-').replace(/[^A-Z0-9-]/g, '');
+  const characters = text.replace(/-/g, '');
+  if (characters.length < 6 || text.length > 40) return null;
   return text;
 }
 
@@ -301,7 +349,9 @@ export function exemptReceiptLine(snapshot: TaxExemptSnapshot): string {
     snapshot.certNumber,
     snapshot.businessName,
     snapshot.expiresOn ? `valid through ${formatCertDate(snapshot.expiresOn)}` : null,
-    !snapshot.photoPath && snapshot.physicalCopySeen ? 'physical copy seen' : null,
+    !snapshot.photoPath && snapshot.photoMime === PAPER_COPY_MIME ? 'paper copy on file' : null,
+    !snapshot.photoPath && snapshot.photoMime !== PAPER_COPY_MIME && snapshot.physicalCopySeen ? 'physical copy seen' : null,
+    snapshot.flAuthNumber ? `FL auth ${snapshot.flAuthNumber}` : null,
   ].filter(Boolean);
   return `Tax-exempt sale · ${parts.join(' · ')}`;
 }
@@ -411,7 +461,8 @@ export function certificateSummary(row: Pick<CertificateRow, 'business_name' | '
 // ---------------------------------------------------------------------------
 
 export type TaxExemptSaleChoice =
-  | { kind: 'on_file'; certificateId: string }
+  /** `flAuthNumber`: this sale's number — required when the certificate on file has no copy (no photo). */
+  | { kind: 'on_file'; certificateId: string; flAuthNumber: string | null }
   | {
     kind: 'new';
     certType: TaxCertType | null;
@@ -421,6 +472,8 @@ export type TaxExemptSaleChoice =
     photoPath: string | null;
     photoMime: string | null;
     physicalCopySeen: boolean;
+    /** No photo, but the customer's paper copy was kept on file (`PAPER_COPY_MIME`). */
+    paperCopyKept: boolean;
     flAuthNumber: string | null;
     saveForNextTime: boolean;
   };
@@ -447,18 +500,26 @@ function optionalText(value: unknown, max: number): string | null {
  * A new certificate needs a photo OR the owner's "physical copy seen" tick
  * (owner, 2026-10-27: "allow bypass of the photo, info fill"). With a photo the
  * name and number are required (the AI fills them; the owner can type them).
- * With only the physical copy the details are optional — the order still
- * records who saw it and when.
+ * Without a photo, Florida still needs a copy OR an authorization number
+ * (owner, same day, after the Florida-law research): either "I kept a paper
+ * copy for our files" (`paperCopyKept` — the photo override for a busy
+ * counter) or the Florida authorization number (`cleanAuthNumber`). The other
+ * details stay optional. A certificate on file with no copy needs this sale's
+ * number the same way (the server checks that, it knows what is on file).
  */
 export function normalizeTaxExemptSaleInput(raw: unknown, now: Date = new Date()): { value: TaxExemptSaleChoice | null } | { error: string } {
   if (!raw || typeof raw !== 'object') return { value: null };
   const source = raw as Record<string, unknown>;
   if (source.enabled !== true) return { value: null };
 
+  const authText = optionalText(source.flAuthNumber, 40);
+  const flAuthNumber = authText ? cleanAuthNumber(authText) : null;
+  if (authText && !flAuthNumber) return { error: 'Tax-exempt sale: the Florida authorization number does not look right (letters, digits and dashes).' };
+
   const certificateId = String(source.certificateId ?? '').trim();
   if (certificateId) {
     if (!/^[0-9a-f-]{36}$/i.test(certificateId)) return { error: 'Pick the certificate on file again.' };
-    return { value: { kind: 'on_file', certificateId } };
+    return { value: { kind: 'on_file', certificateId, flAuthNumber } };
   }
 
   const photoPath = String(source.photoPath ?? '').trim() || null;
@@ -485,6 +546,10 @@ export function normalizeTaxExemptSaleInput(raw: unknown, now: Date = new Date()
   if (photoPath && (!businessName || !certNumber)) {
     return { error: 'Tax-exempt sale: fill in the name and the certificate number (or retake the photo).' };
   }
+  const paperCopyKept = !photoPath && physicalCopySeen && source.paperCopyKept === true;
+  if (!photoPath && !paperCopyKept && !flAuthNumber) {
+    return { error: 'Tax-exempt sale: with no photo, tick "I kept a paper copy for our files", or verify it with FL Revenue and enter the Florida authorization number (Florida needs a copy or that number).' };
+  }
   return {
     value: {
       kind: 'new',
@@ -493,9 +558,10 @@ export function normalizeTaxExemptSaleInput(raw: unknown, now: Date = new Date()
       certNumber,
       expiresOn,
       photoPath,
-      photoMime: photoPath ? (photoPath.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/webp') : null,
+      photoMime: photoPath ? (photoPath.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/webp') : paperCopyKept ? PAPER_COPY_MIME : null,
       physicalCopySeen,
-      flAuthNumber: optionalText(source.flAuthNumber, 40),
+      paperCopyKept,
+      flAuthNumber,
       saveForNextTime: source.saveForNextTime !== false,
     },
   };
@@ -509,7 +575,11 @@ function money(value: number): string {
   return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-/** The text to the owner's cell when a website buyer is waiting. */
+/**
+ * The text to the owner's cell when a certificate waits for approval — a
+ * buyer waiting at checkout, or (`forAccount`, mockup v3) a customer verifying
+ * it from My Account with no order yet.
+ */
 export function ownerApprovalTextBody(input: {
   ref: string;
   businessName: string | null;
@@ -521,16 +591,29 @@ export function ownerApprovalTextBody(input: {
   customerName: string | null;
   customerPhone: string | null;
   url: string;
+  forAccount?: boolean;
+  /** False when the daily AI cap was reached: nothing was read or checked. */
+  aiRead?: boolean;
 }): string {
+  if (input.aiRead === false) {
+    const buyer = [input.customerName, input.customerPhone].filter(Boolean).join(' ');
+    const where = input.forAccount
+      ? 'for their account, no order yet'
+      : `buyer waiting at checkout${input.cartTotal != null ? `, cart ${money(input.cartTotal)}${input.tax != null ? `, tax ${money(input.tax)}` : ''}` : ''}`;
+    return `Tax-exempt approval needed (${input.ref}), ${where}: NOT read by AI (daily limit), check the photo.${buyer ? ` ${buyer}.` : ''} ${input.url}`;
+  }
   const cert = [
     input.businessName ?? 'Business name not read',
     `FL ${input.certType ? TAX_CERT_TYPE_LABELS[input.certType].short.toLowerCase() : 'certificate'} ${maskCertNumber(input.certNumber)}`.trim(),
     input.expiresOn ? `valid to ${formatCertDate(input.expiresOn)}` : 'no expiry read',
   ].join(', ');
+  const buyer = [input.customerName, input.customerPhone].filter(Boolean).join(' ');
+  if (input.forAccount) {
+    return `Tax-exempt approval needed (${input.ref}), for their account, no order yet: ${cert} (AI checks passed).${buyer ? ` ${buyer}.` : ''} ${input.url}`;
+  }
   const cart = input.cartTotal != null
     ? ` Cart ${money(input.cartTotal)}${input.tax != null ? `, tax ${money(input.tax)}` : ''}.`
     : '';
-  const buyer = [input.customerName, input.customerPhone].filter(Boolean).join(' ');
   return `Tax-exempt approval needed (${input.ref}): ${cert} (AI checks passed).${cart} Buyer is waiting at checkout${buyer ? `: ${buyer}` : ''}. ${input.url}`;
 }
 

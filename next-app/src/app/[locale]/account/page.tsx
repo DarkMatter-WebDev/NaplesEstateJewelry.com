@@ -8,7 +8,7 @@ import SiteFooter from '@/components/layout/SiteFooter';
 import type { Order, OrderItem } from '@/types/sales';
 import { getAccountMetadata } from '@/lib/account-metadata';
 import { createServiceClient } from '@/lib/supabase/service';
-import { savedCertificateForUser, savedCertificateView } from '@/lib/tax-exempt-server';
+import { accountTaxExemptState } from '@/lib/tax-exempt-server';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -71,17 +71,22 @@ function isMissingItemYearColumnError(error: { message?: string | null } | null 
 
 interface Props {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{ taxExempt?: string }>;
 }
 
-export default async function AccountPage({ params }: Props) {
+export default async function AccountPage({ params, searchParams }: Props) {
   const { locale } = await params;
   const isEs = locale === 'es';
+  // "?taxExempt=start" (the homepage link, mockup v3): open the certificate
+  // upload on the Tax-exempt card, and come back here after signing in.
+  const startTaxExempt = (await searchParams).taxExempt === 'start';
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect(isEs ? '/es/account/sign-in' : '/account/sign-in');
+    const signIn = isEs ? '/es/account/sign-in' : '/account/sign-in';
+    redirect(startTaxExempt ? `${signIn}?next=${encodeURIComponent(`${isEs ? '/es' : ''}/account?taxExempt=start`)}` : signIn);
   }
 
   const { data: profile } = await supabase
@@ -157,20 +162,16 @@ export default async function AccountPage({ params }: Props) {
     }),
   }));
 
-  // Tax-exempt status (owner, 2026-10-27): the saved Florida certificate, or a
-  // request saved to this account that still waits for approval. Read with the
-  // service client (the tables have no customer access) for THIS user only.
-  const taxService = createServiceClient();
-  const [savedCertificate, pendingRequest] = await Promise.all([
-    savedCertificateForUser(taxService, user.id).catch(() => null),
-    taxService.from('tax_exempt_requests').select('id').eq('user_id', user.id).eq('status', 'pending').eq('save_to_account', true).limit(1),
-  ]);
-  const savedView = savedCertificate ? savedCertificateView(savedCertificate) : null;
+  // Tax-exempt status (owner, 2026-10-27; verify from here, mockup v3): the
+  // saved Florida certificate, an expired one, or a request saved to this
+  // account that waits / was declined. Read with the service client (the
+  // tables have no customer access) for THIS user only.
+  const taxState = await accountTaxExemptState(createServiceClient(), user.id, isEs)
+    .catch(() => ({ certificate: null, expired: null, request: null }));
   const taxExempt = {
-    certificate: savedView
-      ? { businessName: savedView.businessName, typeLabel: savedView.typeLabel, masked: savedView.masked, validThrough: savedView.validThrough, approvedOn: savedView.approvedOn }
-      : null,
-    pending: !savedView && (pendingRequest.data ?? []).length > 0,
+    ...taxState,
+    defaultPhone: profileData.phone ?? null,
+    startOpen: startTaxExempt,
   };
 
   return (
@@ -736,6 +737,11 @@ export default async function AccountPage({ params }: Props) {
           font-size: 0.86rem;
           line-height: 1.45;
           margin-bottom: 1.35rem;
+        }
+        /* Tax-exempt card: its pieces stack in a grid (one per line); the
+           grid gap does the spacing, so paragraphs drop their margin. */
+        .account-side-card .tax-exempt-body p {
+          margin-bottom: 0;
         }
         .account-admin-card {
           display: grid;

@@ -76,6 +76,14 @@ store's record stays). While it is valid, checkout applies it automatically.
 Read server-side with the service client for the signed-in user only (the
 tables have no customer access). Runbook `features/tax-exempt.md`.
 
+**Verify from My Account (2026-10-27 (4)):** the same card also lets a
+signed-in customer send a certificate before shopping (*Verify my
+certificate* → photo → AI read → mobile number + certify →
+`POST /api/tax-exempt/account`), shows *Waiting for verification* (polling
+`GET /api/tax-exempt/saved`), a declined reason, *Replace with a new
+certificate* and *Expired*. `/account?taxExempt=start` (homepage link) opens
+the upload; signed out it goes to sign-in with `next` and comes back.
+
 ## Admin Account Deletion
 
 The Admin Users table exposes account deletion only for non-admin rows. Its

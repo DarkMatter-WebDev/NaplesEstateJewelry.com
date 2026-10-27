@@ -6,6 +6,7 @@ import IdPhotoCapture from '@/components/admin/buy-receipts/IdPhotoCapture';
 import { prepareLeadPhotos } from '@/lib/lead-photo-prep';
 import { prefersNativeCamera } from './sale-client';
 import {
+  FL_CERT_VERIFY_URL,
   TAX_CERT_MAX_BYTES,
   TAX_CERT_TYPE_LABELS,
   TAX_CERT_TYPES,
@@ -31,8 +32,10 @@ import {
 
 export type TaxExemptBoxState = {
   enabled: boolean;
-  /** A certificate on file was picked (then the fields below are ignored). */
+  /** A certificate on file was picked (then the fields below are ignored, except the FL authorization #). */
   certificateId: string | null;
+  /** The picked certificate has a copy on file (photo or filed paper copy). Without one, this sale needs an FL authorization #. */
+  pickedHasCopy: boolean;
   certType: TaxCertType | '';
   businessName: string;
   certNumber: string;
@@ -42,6 +45,8 @@ export type TaxExemptBoxState = {
   photoPath: string | null;
   photoMime: string | null;
   physicalCopySeen: boolean;
+  /** No photo: the customer's paper copy was kept for the store's files (the photo override). */
+  paperCopyKept: boolean;
   saveForNextTime: boolean;
   /** The issuing state the AI read (blocks a non-Florida certificate). */
   aiState: string | null;
@@ -53,6 +58,7 @@ export function newTaxExemptBox(): TaxExemptBoxState {
   return {
     enabled: false,
     certificateId: null,
+    pickedHasCopy: true,
     certType: '',
     businessName: '',
     certNumber: '',
@@ -61,6 +67,7 @@ export function newTaxExemptBox(): TaxExemptBoxState {
     photoPath: null,
     photoMime: null,
     physicalCopySeen: false,
+    paperCopyKept: false,
     saveForNextTime: true,
     aiState: null,
     numberNeedsCheck: false,
@@ -70,7 +77,7 @@ export function newTaxExemptBox(): TaxExemptBoxState {
 /** What the sale routes receive (`normalizeTaxExemptSaleInput`). */
 export function taxExemptPayload(box: TaxExemptBoxState) {
   if (!box.enabled) return { enabled: false };
-  if (box.certificateId) return { enabled: true, certificateId: box.certificateId };
+  if (box.certificateId) return { enabled: true, certificateId: box.certificateId, flAuthNumber: box.flAuthNumber };
   return {
     enabled: true,
     certType: box.certType || null,
@@ -80,6 +87,7 @@ export function taxExemptPayload(box: TaxExemptBoxState) {
     flAuthNumber: box.flAuthNumber,
     photoPath: box.photoPath,
     physicalCopySeen: box.physicalCopySeen,
+    paperCopyKept: !box.photoPath && box.physicalCopySeen && box.paperCopyKept,
     saveForNextTime: box.saveForNextTime,
     aiState: box.aiState,
   };
@@ -87,10 +95,16 @@ export function taxExemptPayload(box: TaxExemptBoxState) {
 
 /** Why the sale cannot be recorded exempt yet, or null. Mirrors the server's rule. */
 export function taxExemptProblem(box: TaxExemptBoxState): string | null {
-  if (!box.enabled || box.certificateId) return null;
+  if (!box.enabled) return null;
+  // Florida documents the sale by a copy OR an authorization number (Rules 12A-1.039(3) / 12A-1.038(3)).
+  const noAuth = !box.flAuthNumber.trim();
+  if (box.certificateId) {
+    return !box.pickedHasCopy && noAuth ? 'Tax-exempt sale: that certificate has no copy on file. Verify it with FL Revenue and enter the Florida authorization number for this sale.' : null;
+  }
   if (box.aiState && box.aiState !== 'FL') return 'Tax-exempt sale: that is not a Florida certificate. Untick the box to charge the tax.';
   if (!box.photoPath && !box.physicalCopySeen) return 'Tax-exempt sale: take a photo of the certificate, or tick "Customer showed me the physical certificate".';
   if (box.photoPath && (!box.businessName.trim() || !box.certNumber.trim())) return 'Tax-exempt sale: fill in the name and the certificate number.';
+  if (!box.photoPath && !box.paperCopyKept && noAuth) return 'Tax-exempt sale: with no photo, tick "I kept a paper copy for our files", or verify it with FL Revenue and enter the Florida authorization number.';
   if (box.numberNeedsCheck) return 'Tax-exempt sale: check the certificate number against the certificate, then tick "Number checked".';
   if (box.expiresOn && box.expiresOn < easternDateKey()) return 'Tax-exempt sale: that certificate has expired.';
   return null;
@@ -98,10 +112,10 @@ export function taxExemptProblem(box: TaxExemptBoxState): string | null {
 
 /** The tax comes off once the box is complete. */
 export function taxExemptApplies(box: TaxExemptBoxState): boolean {
-  return box.enabled && (Boolean(box.certificateId) || (Boolean(box.photoPath || box.physicalCopySeen) && taxExemptProblem(box) === null));
+  return box.enabled && taxExemptProblem(box) === null && (Boolean(box.certificateId) || Boolean(box.photoPath || box.physicalCopySeen));
 }
 
-type PickerRow = { id: string; summary: string; customer: string | null };
+type PickerRow = { id: string; summary: string; customer: string | null; hasCopy?: boolean };
 
 const label = 'form-label';
 const labelStyle = { color: 'var(--color-primary)' } as const;
@@ -219,7 +233,10 @@ export default function TaxExemptSaleBox({ box, onChange }: { box: TaxExemptBoxS
             <select
               className="form-field"
               value={box.certificateId ?? ''}
-              onChange={(e) => set({ certificateId: e.target.value || null })}
+              onChange={(e) => {
+                const id = e.target.value || null;
+                set({ certificateId: id, pickedHasCopy: (picker ?? []).find((row) => row.id === id)?.hasCopy !== false });
+              }}
             >
               <option value="">New certificate</option>
               {(picker ?? []).map((row) => (
@@ -230,6 +247,19 @@ export default function TaxExemptSaleBox({ box, onChange }: { box: TaxExemptBoxS
               {picker === null ? 'Loading certificates on file…' : picker.length > 0 ? 'Or pick one on file — one pick, nothing to retype.' : 'None on file yet. Each new one is saved for next time.'}
             </span>
           </label>
+
+          {box.certificateId && !box.pickedHasCopy && (
+            <div className="grid gap-2 rounded-xl border bg-white p-3" style={{ borderColor: '#e9a400' }}>
+              <span className="text-xs" style={{ color: '#7a5600' }}>
+                <strong>No copy of this certificate on file.</strong> Florida needs a copy or an authorization number for each sale: verify it and enter the number (or choose “New certificate” and take a photo).
+              </span>
+              <label className="block">
+                <span className={label} style={labelStyle}>Florida authorization # for this sale</span>
+                <input className="form-field" value={box.flAuthNumber} onChange={(e) => set({ flAuthNumber: e.target.value })} placeholder="From the Revenue check" autoComplete="off" />
+              </label>
+              <a href={FL_CERT_VERIFY_URL} target="_blank" rel="noopener noreferrer" className="outline-button text-xs justify-self-start">Verify with FL Revenue ↗</a>
+            </div>
+          )}
 
           {!box.certificateId && (
             <>
@@ -271,10 +301,19 @@ export default function TaxExemptSaleBox({ box, onChange }: { box: TaxExemptBoxS
                 <span>
                   <strong>Customer showed me the physical certificate</strong>
                   <span className="block text-xs" style={hintStyle}>
-                    {box.photoPath ? 'Noted on the order with the photo.' : 'No photo needed. The details below become optional — add the number if you can; it is what proves the exemption later.'}
+                    {box.photoPath ? 'Noted on the order with the photo.' : 'No time for a photo? Keep their paper copy, or verify it with FL Revenue and enter the Florida authorization number below. Florida needs a copy or that number. The other details are optional.'}
                   </span>
                 </span>
               </label>
+              {box.physicalCopySeen && !box.photoPath && (
+                <label className="ml-6 flex items-start gap-2 text-sm cursor-pointer">
+                  <input type="checkbox" checked={box.paperCopyKept} onChange={(e) => set({ paperCopyKept: e.target.checked })} className="mt-0.5 h-4 w-4" style={{ accentColor: 'var(--color-primary)' }} />
+                  <span>
+                    <strong>I kept a paper copy for our files</strong>
+                    <span className="block text-xs" style={hintStyle}>A filed paper copy counts as the copy Florida asks for: no photo or authorization number needed. Keep it with the sale records (3 years).</span>
+                  </span>
+                </label>
+              )}
 
               {!notFlorida && (
                 <>
@@ -318,11 +357,11 @@ export default function TaxExemptSaleBox({ box, onChange }: { box: TaxExemptBoxS
                       <input type="date" className="form-field" value={box.expiresOn} onChange={(e) => set({ expiresOn: e.target.value })} />
                     </label>
                     <label className="block">
-                      <span className={label} style={labelStyle}>Florida authorization #<span style={{ ...hintStyle, letterSpacing: '0.06em' }}> optional</span></span>
+                      <span className={label} style={labelStyle}>Florida authorization #<span style={{ ...hintStyle, letterSpacing: '0.06em' }}>{box.photoPath || box.paperCopyKept ? ' optional' : ' required — no copy'}</span></span>
                       <input className="form-field" value={box.flAuthNumber} onChange={(e) => set({ flAuthNumber: e.target.value })} placeholder="From the Revenue check" autoComplete="off" />
                     </label>
                     <div className="self-end">
-                      <a href="https://floridarevenue.com/taxes/eservices/Pages/default.aspx" target="_blank" rel="noopener noreferrer" className="outline-button text-xs">Verify with FL Revenue ↗</a>
+                      <a href={FL_CERT_VERIFY_URL} target="_blank" rel="noopener noreferrer" className="outline-button text-xs">Verify with FL Revenue ↗</a>
                     </div>
                   </div>
                   <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer w-fit">

@@ -16,7 +16,8 @@
 
 1. **Items.** One card per item: **Listed item** (type the inventory # or part
    of the title, pick it) or **Not listed** (describe it, metal, price; weight
-   and purity optional). **＋ Add another item** for more (up to 20). **Remove**
+   and purity optional). Every new card starts on **Not listed** (owner,
+   2026-10-27, both In-store and Remote). **＋ Add another item** for more (up to 20). **Remove**
    on any card when there is more than one.
 2. **Photo (optional), per item.** **Take photo** opens the iPad's / phone's
    camera, or on a computer the same webcam window as Buy Receipts. **Choose

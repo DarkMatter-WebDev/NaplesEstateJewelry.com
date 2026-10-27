@@ -4,9 +4,10 @@ import AdminHeader from '@/components/admin/AdminHeader';
 import CertificateStatusButton from '@/components/admin/tax-exempt/CertificateStatusButton';
 import { loadInstantSalePage } from '@/components/admin/instant-sale/load-instant-sale-page';
 import { createServiceClient } from '@/lib/supabase/service';
-import { REQUEST_COLUMNS, type TaxExemptRequestRow } from '@/lib/tax-exempt-server';
+import { isAccountRequest, REQUEST_COLUMNS, type TaxExemptRequestRow } from '@/lib/tax-exempt-server';
 import {
   CERTIFICATE_COLUMNS,
+  PAPER_COPY_MIME,
   TAX_CERT_TYPE_LABELS,
   TAX_EXEMPT_SOURCE_LABELS,
   certificateIsUsable,
@@ -104,7 +105,7 @@ export default async function AdminTaxExemptPage({ params }: Props) {
           <section className="grid gap-3">
             <div className="flex items-baseline justify-between gap-3">
               <h2 className={h2} style={h2Style}>Waiting for approval · {pending.length}</h2>
-              <span className="text-xs" style={hint}>Website buyers at checkout</span>
+              <span className="text-xs" style={hint}>Website buyers at checkout or in My Account</span>
             </div>
             {pending.length === 0 ? (
               <p className={`${card} text-sm`} style={{ ...cardStyle, ...hint }}>None waiting. When a buyer sends a certificate you get a text, and it shows here.</p>
@@ -115,7 +116,7 @@ export default async function AdminTaxExemptPage({ params }: Props) {
                   {badge(`Waiting ${minutesAgo(request.submitted_at)} min`, 'warn')}
                 </div>
                 <span className="text-sm" style={hint}>
-                  {[request.customer_name, request.customer_phone, request.cart?.total != null ? `cart ${formatCurrency(request.cart.total)}` : null, request.cart?.tax != null ? `tax ${formatCurrency(request.cart.tax)}` : null].filter(Boolean).join(' · ')}
+                  {[request.customer_name, request.customer_phone, isAccountRequest(request) ? 'for their account, no order yet' : null, request.cart?.total != null ? `cart ${formatCurrency(request.cart.total)}` : null, request.cart?.tax != null ? `tax ${formatCurrency(request.cart.tax)}` : null].filter(Boolean).join(' · ')}
                 </span>
                 <span className="text-sm font-bold" style={{ color: 'var(--color-primary)' }}>Review and approve →</span>
               </Link>
@@ -161,7 +162,7 @@ export default async function AdminTaxExemptPage({ params }: Props) {
                           <td className="p-3">
                             <span className="block">{TAX_EXEMPT_SOURCE_LABELS[row.source]} · {formatCertDate(row.approved_at)}</span>
                             {row.approved_by_email && <span className="block text-xs" style={hint}>by {row.approved_by_email}</span>}
-                            <span className="block text-xs" style={hint}>{[row.photo_path ? 'Photo' : null, row.physical_copy_seen ? 'Physical copy seen' : null, row.user_id ? 'Saved to their account' : null].filter(Boolean).join(' · ') || '—'}</span>
+                            <span className="block text-xs" style={hint}>{[row.photo_path ? 'Photo' : null, !row.photo_path && row.photo_mime === PAPER_COPY_MIME ? 'Paper copy filed' : null, row.physical_copy_seen ? 'Physical copy seen' : null, !row.photo_path && row.photo_mime !== PAPER_COPY_MIME && row.fl_auth_number ? `FL auth ${row.fl_auth_number}` : null, row.user_id ? 'Saved to their account' : null].filter(Boolean).join(' · ') || '—'}</span>
                             {row.photo_path && (
                               <a href={`/api/admin/tax-exempt/photo?path=${encodeURIComponent(row.photo_path)}`} target="_blank" rel="noopener noreferrer" className="text-xs font-bold underline" style={{ color: 'var(--color-primary)' }}>View certificate</a>
                             )}

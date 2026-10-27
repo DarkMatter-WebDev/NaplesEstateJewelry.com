@@ -63,6 +63,10 @@ export async function POST(req: Request, context: Context) {
   if (typeof body.certNumber === 'string' && body.certNumber.trim() && !typedNumber) {
     return NextResponse.json({ error: 'The certificate number does not look right.' }, { status: 400 });
   }
+  // An upload past the daily AI cap was never read: the owner types the number from the photo.
+  if (!typedNumber && !request.cert_number) {
+    return NextResponse.json({ error: 'Type the certificate number from the photo first.' }, { status: 400 });
+  }
   const typedName = typeof body.businessName === 'string' ? body.businessName.replace(/\s+/g, ' ').trim().slice(0, 120) : '';
   const certificate = await insertCertificate(service, {
     certType: request.cert_type,

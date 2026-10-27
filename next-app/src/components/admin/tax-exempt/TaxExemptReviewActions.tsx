@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { TAX_EXEMPT_DECLINE_MAX, TAX_EXEMPT_DECLINE_REASONS } from '@/lib/tax-exempt';
+import { FL_CERT_VERIFY_URL, TAX_EXEMPT_DECLINE_MAX, TAX_EXEMPT_DECLINE_REASONS } from '@/lib/tax-exempt';
 
 /**
  * Approve / Decline on the review page the owner's text links to. Big,
@@ -62,7 +62,7 @@ export default function TaxExemptReviewActions({
         <input className="form-field" value={number} onChange={(e) => setNumber(e.target.value)} autoComplete="off" />
         <span className="mt-1 block text-xs" style={hint}>Read by AI — glance at it against the photo.</span>
       </label>
-      <a href="https://floridarevenue.com/taxes/eservices/Pages/default.aspx" target="_blank" rel="noopener noreferrer" className="outline-button text-xs justify-center">Verify with FL Revenue ↗</a>
+      <a href={FL_CERT_VERIFY_URL} target="_blank" rel="noopener noreferrer" className="outline-button text-xs justify-center">Verify with FL Revenue ↗</a>
       <label className="block">
         <span className={label} style={labelStyle}>Florida authorization #<span style={{ ...hint, letterSpacing: '0.06em' }}> optional</span></span>
         <input className="form-field" value={auth} onChange={(e) => setAuth(e.target.value)} placeholder="Paste it after checking" autoComplete="off" />
@@ -77,7 +77,7 @@ export default function TaxExemptReviewActions({
         </button>
       ) : (
         <div className="grid gap-2 rounded-xl border p-3" style={{ borderColor: '#e6b4b4', background: '#fdf4f4' }}>
-          <span className="text-xs font-bold" style={{ color: 'var(--color-error)' }}>Why? The buyer sees this on their checkout and by email.</span>
+          <span className="text-xs font-bold" style={{ color: 'var(--color-error)' }}>Why? The buyer sees this on their checkout (or My Account card) and by email.</span>
           <div className="flex flex-wrap gap-2">
             {TAX_EXEMPT_DECLINE_REASONS.map((pick) => (
               <button key={pick} type="button" onClick={() => setReason(pick)} className="rounded-full border bg-white px-3 py-1.5 text-xs text-left" style={{ borderColor: reason === pick ? 'var(--color-error)' : 'var(--color-outline-variant)' }}>
