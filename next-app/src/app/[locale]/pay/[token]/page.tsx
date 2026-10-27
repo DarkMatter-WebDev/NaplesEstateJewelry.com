@@ -9,6 +9,8 @@ import { formatRemoteDue, remoteOtherWays } from '@/lib/remote-sale';
 import { parseFullName } from '@/lib/person-name';
 import { formatPublicPurity } from '@/types/sales';
 import { isProductPurchasable } from '@/types/product';
+import { loadOrderTaxExemption } from '@/lib/tax-exempt-server';
+import { exemptShortTag } from '@/lib/tax-exempt';
 
 interface Props {
   params: Promise<{ locale: string; token: string }>;
@@ -64,6 +66,7 @@ export default async function PayInvoicePage({ params }: Props) {
     const { invoice, order, items } = found;
     const name = parseFullName(order.customer_name);
     const address = order.shipping_address ?? {};
+    const exemption = await loadOrderTaxExemption(service, order.id);
     const data: PayInvoiceData = {
       token: invoice.pay_token,
       orderNumber: order.order_number,
@@ -85,6 +88,10 @@ export default async function PayInvoicePage({ params }: Props) {
       shippingLabel: Number(order.shipping_fee) > 0 ? (isEs ? 'Envío' : 'Shipping') : (isEs ? 'Envío · sin cargo' : 'Shipping · no charge'),
       otherWays: remoteOtherWays({ ...payOptionsOf(invoice), online: false }, order.order_number),
       message: invoice.message,
+      // A tax-exempt invoice (owner, 2026-10-27): no Florida tax at any address.
+      taxExempt: exemption
+        ? { businessName: exemption.businessName, tag: exemptShortTag(exemption) }
+        : null,
       prefill: {
         first_name: name.first,
         last_name: name.last,

@@ -20,6 +20,8 @@ export type PayInvoiceData = {
   shippingLabel: string;
   otherWays: string[];
   message: string | null;
+  /** The invoice is tax-exempt (a Florida certificate is on file): no tax at any address. */
+  taxExempt?: { businessName: string | null; tag: string } | null;
   prefill: {
     first_name: string;
     last_name: string;
@@ -54,7 +56,7 @@ export default function PayInvoiceClient({ data, locale, paypalClientId }: { dat
   const set = (patch: Partial<typeof form>) => setForm((current) => ({ ...current, ...patch }));
 
   const stateCode = data.ships ? normalizeUsState(form.state) : null;
-  const totals = payPageTotals({ subtotal: data.subtotal, shipping_fee: data.shippingFee, shipping_method: data.ships ? 'shipping' : 'pickup' }, stateCode);
+  const totals = payPageTotals({ subtotal: data.subtotal, shipping_fee: data.shippingFee, shipping_method: data.ships ? 'shipping' : 'pickup', tax_exempt: Boolean(data.taxExempt) }, stateCode);
 
   const missing: string[] = [];
   if (!form.first_name.trim()) missing.push(isEs ? 'nombre' : 'first name');
@@ -148,12 +150,24 @@ export default function PayInvoiceClient({ data, locale, paypalClientId }: { dat
       <section className="rounded-[1.25rem] border p-5 grid gap-2.5" style={{ ...cardStyle, background: 'var(--color-surface-container-low)' }}>
         <div className="flex justify-between text-sm"><span>{isEs ? `Artículos · ${data.items.length}` : `Items · ${data.items.length}`}</span><span>{formatCheckoutCurrency(totals.subtotal)}</span></div>
         {data.ships && <div className="flex justify-between text-sm"><span>{data.shippingLabel}</span><span>{formatCheckoutCurrency(totals.shippingFee)}</span></div>}
+        {data.taxExempt && (
+          <div className="text-sm" style={{ borderLeft: '3px solid #d4af37', background: '#fbf7e8', padding: '0.6rem 0.8rem', borderRadius: 10 }}>
+            <strong>{isEs ? 'Venta exenta de impuesto.' : 'Tax-exempt sale.'}</strong>{' '}
+            {isEs
+              ? `El certificado de Florida ${data.taxExempt.tag}${data.taxExempt.businessName ? ` de ${data.taxExempt.businessName}` : ''} está registrado, así que no se cobra impuesto.`
+              : `Florida certificate ${data.taxExempt.tag}${data.taxExempt.businessName ? ` for ${data.taxExempt.businessName}` : ''} is on file, so no sales tax is charged.`}
+          </div>
+        )}
         <div className="flex justify-between text-sm gap-3">
+          {data.taxExempt ? (
+            <span>{isEs ? 'Impuesto de FL · ' : 'FL sales tax · '}<strong style={{ color: '#16653c' }}>{isEs ? 'exento' : 'exempt'}</strong></span>
+          ) : (
           <span>
             {isEs ? 'Impuesto de FL' : 'FL sales tax'}{totals.tax > 0 ? ` · ${FL_TAX_RATE_LABEL}` : ''}
             {data.ships && totals.tax === 0 && <span className="text-xs" style={hintStyle}>{isEs ? ` · ninguno fuera de Florida` : ' · none outside Florida'}</span>}
             {data.ships && !stateCode && <span className="text-xs" style={hintStyle}>{isEs ? ' · sale del total fuera de Florida' : ' · comes off outside Florida'}</span>}
           </span>
+          )}
           <span>{formatCheckoutCurrency(totals.tax)}</span>
         </div>
         <div className="flex justify-between border-t pt-3 text-2xl font-bold" style={{ ...cardStyle, fontFamily: 'var(--font-headline)' }}>

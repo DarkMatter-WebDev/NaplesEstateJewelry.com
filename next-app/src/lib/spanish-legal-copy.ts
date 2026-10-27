@@ -13,6 +13,8 @@ const UPDATED = '19 de junio de 2026';
 // Privacy + Cookie Preferences: Google Ads measurement for visitors who arrive
 // from an ad (2026-10-02, lib/ads-tracking.ts). Mirrors the English pages.
 const UPDATED_ADS_MEASUREMENT = '2 de octubre de 2026';
+// 2026-10-27: Anthropic reads an uploaded tax-exempt certificate (privacy only).
+const UPDATED_TAX_EXEMPT = '27 de octubre de 2026';
 
 /**
  * The shipping-policy sections as a FACTORY, because bullet one prints the
@@ -36,7 +38,7 @@ export function spanishShippingSections(hoursLineEs: string): LegalSection[] {
 export const SPANISH_LEGAL_COPY: Record<LegalPageKey, SpanishLegalPageCopy> = {
   privacy: {
     title: 'Política de Privacidad',
-    updated: UPDATED_ADS_MEASUREMENT,
+    updated: UPDATED_TAX_EXEMPT,
     intro: [
       'Naples Estate Jewelry, operada por Naples Antiques LLC, respeta su privacidad. Esta política explica cómo recopilamos y utilizamos información cuando visita nuestro sitio web, crea una cuenta, envía un artículo, realiza una consulta, se suscribe a novedades o hace un pedido en línea.',
       'Esta política corresponde a nuestro sitio web actual de pequeña empresa. No afirma el cumplimiento de ninguna certificación o marco de privacidad que no hayamos obtenido por separado.',
@@ -81,6 +83,7 @@ export const SPANISH_LEGAL_COPY: Record<LegalPageKey, SpanishLegalPageCopy> = {
           'Google Maps para el mapa del salón incrustado en nuestras páginas de inicio y de contacto. El mapa se carga desde Google cuando se desplaza hasta él, y Google puede recibir su dirección IP y guardar sus propias cookies conforme a sus propios términos. Nada de lo que escribe en nuestro sitio se le envía, y la dirección, los horarios y el enlace de indicaciones también se muestran como texto sin él.',
           'Google Ads para medir los resultados de nuestra publicidad, como se describe arriba, solo para los visitantes que llegan desde uno de nuestros anuncios. Google trata esos datos conforme a sus propios términos.',
           'TradingView para las gráficas en vivo de los precios del oro, la plata y el platino en nuestras páginas de oro, plata, lingotes y precios en vivo. Las gráficas se cargan desde TradingView, que puede recibir su dirección IP y guardar sus propias cookies conforme a sus propios términos. Nada de lo que escribe en nuestro sitio se le envía.',
+          'Anthropic, un servicio de inteligencia artificial, para leer los datos impresos de un certificado de exención de impuestos de Florida que usted sube al pagar, para que no tenga que escribirlos. Anthropic procesa la imagen conforme a sus propios términos. Nosotros guardamos el certificado en privado para nuestros registros de impuestos.',
           'Procesadores de pago cuando se habilitan pagos en línea; la información de pago es gestionada por el procesador conforme a sus propios términos.',
           'Proveedores de envío cuando se coordina un envío o una entrega asegurada.',
           'Asesores profesionales, servicios de prevención de fraude o autoridades cuando sea razonablemente necesario por motivos legales, de seguridad, contabilidad, impuestos o cumplimiento.',

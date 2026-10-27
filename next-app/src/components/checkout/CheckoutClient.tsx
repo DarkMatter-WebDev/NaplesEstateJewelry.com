@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { startRouteProgress } from '@/components/layout/RouteProgressBar';
@@ -27,7 +27,8 @@ import {
   getShippingServiceNote,
   isShippingMethodAvailable,
 } from '@/lib/checkout-shipping';
-import { formatCheckoutCurrency } from '@/lib/checkout-pricing';
+import { chargesFlSalesTax, formatCheckoutCurrency } from '@/lib/checkout-pricing';
+import CheckoutTaxExempt, { type CheckoutExemptionChoice } from '@/components/checkout/CheckoutTaxExempt';
 import {
   isUnitedStatesCountry,
   normalizeUsState,
@@ -107,6 +108,15 @@ export default function CheckoutClient({ locale, paypalClientId, pickupHoursLine
   // Previewed discount, for display only — the code string is what gets sent
   // with the order and the server recomputes the amount from it.
   const [appliedDiscount, setAppliedDiscount] = useState<AppliedDiscount | null>(null);
+  // Tax-exempt (components/checkout/CheckoutTaxExempt.tsx): the approved
+  // request token or "use my saved certificate", and whether payment waits
+  // while a certificate is being read or approved. The server decides.
+  const [exemption, setExemption] = useState<CheckoutExemptionChoice>(null);
+  const [exemptBusy, setExemptBusy] = useState(false);
+  const onExemptionChange = useCallback((choice: CheckoutExemptionChoice, busy: boolean) => {
+    setExemption((current) => (JSON.stringify(current) === JSON.stringify(choice) ? current : choice));
+    setExemptBusy(busy);
+  }, []);
   // Authoritative live prices from /api/checkout/quote, TAGGED with the cart
   // state they were computed for. Storing the tag lets `quote` below be a
   // derived value: a quote whose tag no longer matches the current cart is
@@ -233,9 +243,10 @@ export default function CheckoutClient({ locale, paypalClientId, pickupHoursLine
   // checkout with a clear message instead of letting it fail at PayPal.
   const unavailableItems = findUnavailableCartItems(items);
   const hasUnavailableItem = unavailableItems.length > 0;
-  const payReady = items.length > 0 && contactReady && shippingAddressReady && infoConfirmed && !hasUnavailableItem;
+  const payReady = items.length > 0 && contactReady && shippingAddressReady && infoConfirmed && !hasUnavailableItem && !exemptBusy;
 
   const missingFieldLabels = [
+    exemptBusy ? (isEs ? 'Aprobación de exención (o cancélela)' : 'Tax-exempt approval (or cancel it)') : null,
     needsShipping && customer.address_line1.trim() === '' ? (isEs ? 'Dirección' : 'Street Address') : null,
     needsShipping && customer.city.trim() === '' ? (isEs ? 'Ciudad' : 'City') : null,
     needsShipping && normalizedShippingState === null ? (isEs ? 'Estado válido de EE. UU.' : 'Valid U.S. State') : null,
@@ -279,6 +290,9 @@ export default function CheckoutClient({ locale, paypalClientId, pickupHoursLine
       // compares, and refuses with `price_changed` if its own figure differs,
       // so the buyer can never be billed an amount they were not shown.
       quotedTotal: displayedTotals.total,
+      // Only the approved request's token, or "use my saved certificate". The
+      // server re-checks both before it drops any tax.
+      taxExempt: exemption,
       orderId: orderIdRef.current,
     };
   }
@@ -409,7 +423,10 @@ export default function CheckoutClient({ locale, paypalClientId, pickupHoursLine
   const quoteKey = `${items
     .map((i) => `${i.id}:${Math.max(1, Math.floor(i.purchaseQuantity ?? 1))}`)
     .sort()
-    .join(',')}|${effectiveShippingMethod}|${normalizeUsState(customer.state) ?? ''}|${appliedDiscount?.code ?? ''}`;
+    .join(',')}|${effectiveShippingMethod}|${normalizeUsState(customer.state) ?? ''}|${appliedDiscount?.code ?? ''}|${
+    // An approved token counts only for the email it was approved for, so the
+    // email joins the key only while an exemption is in play.
+    exemption ? `${exemption.token ?? 'saved'}:${customer.email.trim().toLowerCase()}` : ''}`;
 
   // Only honour a quote computed for the CURRENT cart. Falls back to the
   // stored labels for the moment between a change and its fresh quote.
@@ -425,7 +442,9 @@ export default function CheckoutClient({ locale, paypalClientId, pickupHoursLine
     hideSoldItemPrices,
     appliedDiscount,
     quote,
+    taxExempt: Boolean(exemption),
   });
+  const taxApplies = cartSubtotal > 0 && chargesFlSalesTax(effectiveShippingMethod, customer.state);
 
   useEffect(() => {
     let cancelled = false;
@@ -441,6 +460,7 @@ export default function CheckoutClient({ locale, paypalClientId, pickupHoursLine
             shippingState: customer.state,
             discountCode: appliedDiscount?.code ?? null,
             email: customer.email || null,
+            taxExempt: exemption,
           }),
         });
         if (cancelled) return;
@@ -990,6 +1010,25 @@ export default function CheckoutClient({ locale, paypalClientId, pickupHoursLine
               hideSoldItemPrices={hideSoldItemPrices}
               appliedDiscount={appliedDiscount}
               quote={quote}
+              taxExempt={Boolean(exemption)}
+            />
+
+            <CheckoutTaxExempt
+              isEs={isEs}
+              locale={locale}
+              taxApplies={taxApplies}
+              customer={{
+                name: formatFullName(customer.first_name, customer.last_name),
+                email: customer.email,
+                phone: normalizedPhone ?? customer.phone,
+              }}
+              cart={{
+                items: items.map((i) => ({ id: i.id, quantity: Math.max(1, Math.floor(i.purchaseQuantity ?? 1)) })),
+                shippingMethod: effectiveShippingMethod,
+                shippingState: customer.state,
+                discountCode: appliedDiscount?.code ?? null,
+              }}
+              onChange={onExemptionChange}
             />
 
             <p className="text-xs leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>

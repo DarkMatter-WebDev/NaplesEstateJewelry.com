@@ -63,6 +63,7 @@ export function computeOrderTotals({
   hideSoldItemPrices = false,
   appliedDiscount = null,
   quote = null,
+  taxExempt = false,
 }: {
   items: CartItem[];
   shippingMethod: string;
@@ -71,6 +72,9 @@ export function computeOrderTotals({
   /** Discount previewed by /api/checkout/discount-code. Display only — the
    *  server recomputes it from the code at order time. */
   appliedDiscount?: AppliedDiscount | null;
+  /** An approved Florida tax-exempt certificate is in play (lib/tax-exempt.ts).
+   *  Display only until the quote confirms it — the server decides. */
+  taxExempt?: boolean;
   /**
    * Authoritative figures from /api/checkout/quote. When present these are
    * rendered VERBATIM rather than recomputed from the cart's stored price
@@ -92,6 +96,7 @@ export function computeOrderTotals({
       total: quote.total,
       hasUnknown: false,
       selectedShipping: selected,
+      taxExempted: (quote.taxExempted ?? 0) > 0,
     };
   }
   const lineTotals = items.map((i) => {
@@ -117,11 +122,13 @@ export function computeOrderTotals({
     ? calculateDiscountAmount(appliedDiscount.type, appliedDiscount.value, subtotal)
     : 0;
   const discountedMerchandise = round2(subtotal - discount);
-  const tax = chargesFlSalesTax(shippingMethod, shippingState)
+  const owedTax = chargesFlSalesTax(shippingMethod, shippingState)
     ? calculateFlSalesTax(discountedMerchandise, shipping)
     : 0;
+  const taxExempted = taxExempt && owedTax > 0;
+  const tax = taxExempted ? 0 : owedTax;
   const total = round2(discountedMerchandise + tax + shipping);
-  return { subtotal, discount, shipping, tax, total, hasUnknown, selectedShipping };
+  return { subtotal, discount, shipping, tax, total, hasUnknown, selectedShipping, taxExempted };
 }
 
 /**
@@ -137,6 +144,7 @@ export function OrderTotals({
   hideSoldItemPrices = false,
   appliedDiscount = null,
   quote = null,
+  taxExempt = false,
 }: {
   items: CartItem[];
   isEs: boolean;
@@ -145,14 +153,16 @@ export function OrderTotals({
   hideSoldItemPrices?: boolean;
   appliedDiscount?: AppliedDiscount | null;
   quote?: OrderQuote | null;
+  taxExempt?: boolean;
 }) {
-  const { subtotal, discount, shipping, tax, total, hasUnknown, selectedShipping } = computeOrderTotals({
+  const { subtotal, discount, shipping, tax, total, hasUnknown, selectedShipping, taxExempted } = computeOrderTotals({
     items,
     shippingMethod,
     shippingState,
     hideSoldItemPrices,
     appliedDiscount,
     quote,
+    taxExempt,
   });
   const serviceNote = getShippingServiceNote(selectedShipping.value, subtotal, isEs);
 
@@ -191,9 +201,11 @@ export function OrderTotals({
           shipping cost makes that base visually obvious. */}
       <div className="checkout-total-row">
         <span>
-          {tax > 0
-            ? (isEs ? `Impuesto FL (${FL_TAX_RATE_LABEL})` : `FL Sales Tax (${FL_TAX_RATE_LABEL})`)
-            : (isEs ? 'Impuesto FL' : 'FL Sales Tax')}
+          {taxExempted
+            ? <>{isEs ? 'Impuesto FL · ' : 'FL Sales Tax · '}<strong style={{ color: '#16653c' }}>{isEs ? 'exento' : 'exempt'}</strong></>
+            : tax > 0
+              ? (isEs ? `Impuesto FL (${FL_TAX_RATE_LABEL})` : `FL Sales Tax (${FL_TAX_RATE_LABEL})`)
+              : (isEs ? 'Impuesto FL' : 'FL Sales Tax')}
         </span>
         <span>{subtotal > 0 ? formatCheckoutCurrency(tax) : '-'}</span>
       </div>

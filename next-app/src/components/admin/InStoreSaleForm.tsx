@@ -32,6 +32,13 @@ import { paperReceiptDocument, type PaperReceipt } from '@/lib/order-receipt-pap
 import { printPaperInFrame } from '@/lib/print-paper';
 import { SALE_PRINT_MESSAGES, type SalePrintRequestRef } from '@/lib/sale-print-requests';
 import SaleStationPrint from '@/components/admin/instant-sale/SaleStationPrint';
+import TaxExemptSaleBox, {
+  newTaxExemptBox,
+  taxExemptApplies,
+  taxExemptPayload,
+  taxExemptProblem,
+} from '@/components/admin/instant-sale/TaxExemptSaleBox';
+import { exemptShortTag } from '@/lib/tax-exempt';
 
 export type { InStoreProduct } from '@/components/admin/instant-sale/SaleItemsEditor';
 
@@ -52,6 +59,8 @@ type Recorded = {
   customer: string;
   /** Shipped sales only: the address lines and the charge chosen. */
   shipTo: { lines: string[]; shipping: string } | null;
+  /** "Tax-exempt · Resale ··6789", or null for a taxed sale. */
+  exempt: string | null;
 };
 
 /** "Record sale" · "Record & print receipt" (print here) · "Record & send to desktop printer" (the Print Station). */
@@ -94,6 +103,8 @@ export default function InStoreSaleForm({
   const [customFee, setCustomFee] = useState('');
   const [paidBy, setPaidBy] = useState<InStorePaymentMethod>('zettle');
   const [note, setNote] = useState('');
+  // "Tax-exempt sale" (owner, 2026-10-27): Florida certificate, AI-read photo or physical copy.
+  const [taxBox, setTaxBox] = useState(newTaxExemptBox);
   const [busy, setBusy] = useState<RecordAction | null>(null);
   const [printNote, setPrintNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -108,7 +119,9 @@ export default function InStoreSaleForm({
   const stateCode = normalizeUsState(shipState);
   // Same rules the route records with (lib/in-store-sale.ts). Until a valid
   // state is typed a shipment is shown taxed, so the total never drops on a typo.
-  const chargesTax = shipped && stateCode ? inStoreChargesTax('ship', stateCode) : true;
+  const owesTax = shipped && stateCode ? inStoreChargesTax('ship', stateCode) : true;
+  const exempt = taxExemptApplies(taxBox);
+  const chargesTax = owesTax && !exempt;
   const shippingFee = !shipped
     ? 0
     : shipping === 'custom'
@@ -129,6 +142,7 @@ export default function InStoreSaleForm({
     setFirstName(''); setLastName(''); setPhone(''); setEmail(''); setEmailCopy(false); setPaidBy('zettle'); setNote('');
     setDelivery('pickup'); setMailingOn(false); setLine1(''); setLine2(''); setCity(''); setShipState(''); setZip('');
     setShipping('insured'); setCustomFee('');
+    setTaxBox(newTaxExemptBox());
     setError(null); setRecorded(null); setPrintNote(null);
   }
 
@@ -155,6 +169,8 @@ export default function InStoreSaleForm({
     const problem = saleItemsProblem(items);
     if (problem) { setError(problem.charAt(0).toUpperCase() + problem.slice(1)); return; }
     if (priceValue == null) { setError('Enter the price sold, e.g. 1460.'); return; }
+    const exemptProblem = taxExemptProblem(taxBox);
+    if (exemptProblem) { setError(exemptProblem); return; }
     if (!totals) {
       setError(shipping === 'custom' ? 'Enter the shipping charge, e.g. 25.' : 'Express overnight is not offered at $5,000 and up. Pick another shipping charge.');
       return;
@@ -177,6 +193,7 @@ export default function InStoreSaleForm({
           },
           paidBy,
           note,
+          taxExempt: taxExemptPayload(taxBox),
           print,
           sendToStation: action === 'station',
         }),
@@ -207,6 +224,9 @@ export default function InStoreSaleForm({
             shipping: shipping === 'none' ? 'No shipping charge' : `${IN_STORE_SHIPPING_LABELS[shipping]} · ${formatCurrency(totals.shippingFee)}`,
           }
           : null,
+        exempt: exempt
+          ? `Tax-exempt · ${taxBox.certificateId ? 'certificate on file' : exemptShortTag({ certType: taxBox.certType || null, certNumber: taxBox.certNumber })}`
+          : null,
       });
       if (print) {
         if (paper) void printReceipt(paper);
@@ -236,6 +256,7 @@ export default function InStoreSaleForm({
           </div>
           <div className="flex justify-between gap-3"><span style={hintStyle}>Customer</span><span className="text-right">{recorded.customer}</span></div>
           <div className="flex justify-between gap-3"><span style={hintStyle}>Paid by</span><span>{IN_STORE_PAYMENT_LABELS[recorded.paidBy]}</span></div>
+          {recorded.exempt && <div className="flex justify-between gap-3"><span style={hintStyle}>Tax</span><span className="font-bold" style={{ color: '#16653c' }}>{recorded.exempt}</span></div>}
           {recorded.shipTo && (
             <div className="flex justify-between gap-3">
               <span style={hintStyle}>Ship to</span>
@@ -324,6 +345,7 @@ export default function InStoreSaleForm({
               </span>
             </div>
           </div>
+          <TaxExemptSaleBox box={taxBox} onChange={(next) => { setTaxBox(next); setError(null); }} />
         </section>
 
         <SaleDeliverySection
@@ -395,8 +417,10 @@ export default function InStoreSaleForm({
           )}
           <div className="flex justify-between text-sm gap-3">
             <span>
-              {chargesTax ? 'FL sales tax · 6%' : 'FL sales tax'}
-              {shipped && (
+              {exempt && owesTax
+                ? <>FL sales tax · <strong style={{ color: '#16653c' }}>exempt</strong></>
+                : chargesTax ? 'FL sales tax · 6%' : 'FL sales tax'}
+              {shipped && !exempt && (
                 <span className="text-xs" style={hintStyle}>
                   {chargesTax ? (shippingFee ? ' (item + shipping)' : '') : ` · none, ships to ${stateCode}`}
                 </span>

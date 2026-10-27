@@ -2,7 +2,25 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-10-26 (1)**.
+> in `DECISIONS.md`. Last reconciled: **2026-10-27 (2)** (tax-exempt sales BUILT + STAGED, not pushed; ⛔ SQL first — block below). Before that, **2026-10-27 (1)** (Google's "untagged landing pages" email = `/jewelry-appraisal` with 0 ad clicks so far, ad-click-only tag; no action — `CHANGELOG.md` 2026-10-27 (1)).
+
+## Start Here (2026-10-27 (2) — 🟡 Tax-exempt sales BUILT + STAGED, not pushed; ⛔ SQL `supabase/tax-exempt-2026-10.sql` to run BEFORE the push; no env vars)
+
+- 🟡 **Waiting for the owner:** (1) run the SQL, (2) push + deploy, (3) the first uses in `TASKS.md` top block (in-store photo + physical copy, a website request approved from the text, the account card). Record `CHANGELOG.md` 2026-10-27 (2); rule `DECISIONS.md` top entry; runbook `features/tax-exempt.md`.
+- What it does: Instant Sale (in-store + remote) gets a *Tax-exempt sale* box — AI reads a photo of the Florida certificate, or tick "physical copy seen"; website checkout lets a buyer upload a Florida certificate in the same cart, you approve from a text, their total drops to no tax and they pay right there; signed-in buyers can save it to their account; everything is noted on the order and listed in **Admin → Tax Exempt**.
+- Gate: `tsc` 0 · lint 0 errors · **2064/2064** (181 files) · build 0. ⛔ Admin screens, the AI read, the text and the approval round-trip not seen yet (need the SQL + admin sign-in).
+
+## Start Here (2026-10-26 (3)–(10) — session CLOSED; Google Ads: audit, 2 Google-AI sitelinks removed, click-jump explained, "free evaluation" changes APPLIED and corrected on the owner's word; **check-ups dated** ~Oct 28 / ~Oct 30 / ~Nov 9; no code, no SQL, no env vars)
+
+- 🟢 Applied 10-26 ~10 PM (owner: *"do whatever you recommend"*): a "Free … Evaluation" headline **pinned at position 2** in all 6 Sellers RSAs (four headlines replaced — table in `CHANGELOG.md` 2026-10-26 (7)) + NEW sitelink **Showroom or Home Visit → /free-evaluation** (reworded on the owner's word: store first, home visit second) + NEW callout **Free Appraisals**; every ad now has BOTH a "Free … Evaluation" and a "Free … Appraisal" headline pinned at position 2, rotating per search ((8)–(9)). Reversal recipes in (7)–(8); decision rules + baseline in `TASKS.md` top block (**~Nov 9**).
+- 🟢 Removed 10-26 9:31 PM: the 2 Google-AI sitelinks (Coins and Bullion, both campaigns); no switch exists to stop them (every control was already off) → **re-check ~Oct 30**, ticket text in `TASKS.md` if they return ((4)).
+- 📖 Reads: account $1,000.82 / 455 clicks / 19 conv to date ((3)); the Oct 25–26 click jump = Gold group top-of-page placement, not the sitelinks ((5)); appraisal searches ≈ 6 clicks in 5 weeks → no appraisals ad group ((6)).
+- Owner's standing rule from this session: every change gets a dated record + a dated check-up with reversal steps (memory `record-changes-with-dated-checkups`).
+
+## Start Here (2026-10-26 (2) — 🟢 desktop printer for in-store sales DEPLOYED (owner), SQL run; nothing staged-but-unpushed except docs; no env vars)
+
+- 🟢 Owner: *"pushed and deployed"*, then *"Yes, I ran sale-print-requests-2026-10.sql before the push."* (`CHANGELOG.md` 2026-10-26 (2)). Claude did not check production (behind the sign-in; not asked).
+- ◻ **Open (`TASKS.md` top block):** reload the Print Station window on the desktop once; the first laptop sale with **Record & send to desktop printer**. Where the (1) block below says "STAGED" / "not pushed", read "deployed".
 
 ## Start Here (2026-10-26 (1) — 🟡 In-store sale receipts print on the desktop Print Station BUILT + STAGED, not pushed; ⛔ SQL `supabase/sale-print-requests-2026-10.sql` to run BEFORE the push; no env vars)
 

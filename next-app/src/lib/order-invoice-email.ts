@@ -16,6 +16,7 @@ import {
 import { describeOrderShippingService } from '@/lib/checkout-shipping';
 import { IN_STORE_PAYMENT_LABELS, type InStorePaymentMethod } from '@/lib/in-store-sale';
 import { paperDateLine } from '@/lib/order-receipt-paper';
+import { exemptReceiptLine, type TaxExemptSnapshot } from '@/lib/tax-exempt';
 
 export type InvoiceEmailOrder = Order & { order_items: OrderItem[] };
 
@@ -86,6 +87,10 @@ export interface InvoiceEmailContent {
     subtotal: string;
     discount: string | null;
     tax: string;
+    /** "Tax", or "Tax · exempt" on a tax-exempt sale (owner, 2026-10-27). */
+    taxLabel: string;
+    /** The certificate line under the totals on a tax-exempt sale, else null. */
+    exemptLine: string | null;
     shipping: string;
     total: string;
   };
@@ -152,7 +157,7 @@ export function formatPickupHours(schedule: StoreHoursSchedule): string {
 export function buildInvoiceEmailContent(
   order: InvoiceEmailOrder,
   fallbackInvoiceNumber?: string | null,
-  opts?: { pickupHours?: string; payment?: InvoicePaymentBlock | null },
+  opts?: { pickupHours?: string; payment?: InvoicePaymentBlock | null; taxExempt?: TaxExemptSnapshot | null },
 ): InvoiceEmailContent {
   const invoiceNumber = invoiceNumberForOrder(order, fallbackInvoiceNumber);
   const paid = isOrderPaid(order);
@@ -202,6 +207,8 @@ export function buildInvoiceEmailContent(
     subtotal: formatCurrency(order.subtotal),
     discount: order.discount > 0 ? `-${formatCurrency(order.discount)}` : null,
     tax: formatCurrency(order.tax),
+    taxLabel: opts?.taxExempt ? 'Tax · exempt' : 'Tax',
+    exemptLine: opts?.taxExempt ? exemptReceiptLine(opts.taxExempt) : null,
     shipping: formatCurrency(order.shipping_fee),
     total: formatCurrency(order.total),
   };
@@ -293,9 +300,10 @@ export function buildInvoiceEmailContent(
       '',
       `Subtotal: ${totals.subtotal}`,
       ...(totals.discount ? [`Discount: ${totals.discount}`] : []),
-      `Tax: ${totals.tax}`,
+      `${totals.taxLabel}: ${totals.tax}`,
       ...(carriedOut ? [] : [`Shipping: ${totals.shipping}`]),
       `Total: ${totals.total}`,
+      ...(totals.exemptLine ? [totals.exemptLine] : []),
       ...(payment?.payUrl
         ? ['', `${payment.payLabel.toUpperCase()}:`, payment.payUrl, payment.payHint, ...(payment.taxHint ? [payment.taxHint] : [])]
         : []),
@@ -426,10 +434,11 @@ function buildInvoiceEmailHtml({
                   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 22px;">
                     ${totalRow('Subtotal', totals.subtotal)}
                     ${totals.discount ? totalRow('Discount', totals.discount) : ''}
-                    ${totalRow('Tax', totals.tax)}
+                    ${totalRow(totals.taxLabel, totals.tax)}
                     ${hideShipping ? '' : totalRow('Shipping', totals.shipping)}
                     ${totalRow(paid ? 'Total Paid' : 'Total', totals.total, true)}
                   </table>
+                  ${totals.exemptLine ? `<p style="margin:-10px 0 22px;padding:8px 12px;background:#fbf5dd;border-left:3px solid #d4af37;font-size:13px;line-height:1.5;color:#1d1a14;">${escapeHtml(totals.exemptLine)}</p>` : ''}
                   ${payment ? paymentBlockHtml(payment) : ''}
 
                   ${hideShipping ? '' : `<div style="margin:0 0 22px;padding:14px 16px;background:#fbfaf5;border:1px solid #eadfbd;color:#746b5b;font-size:13px;line-height:1.5;">

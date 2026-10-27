@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { getVerifiedUser } from '@/lib/auth-claims';
 import OrderDetailPanel from '@/components/admin/OrderDetailPanel';
+import { loadOrderTaxExemption } from '@/lib/tax-exempt-server';
 import { formatPickupHours } from '@/lib/order-invoice-email';
 import { getStoreHours } from '@/lib/store-hours';
 import AdminHeader from '@/components/admin/AdminHeader';
@@ -238,6 +239,7 @@ export default async function AdminOrderDetailPage({ params }: Props) {
         locale={locale}
         recycleBinSupported={recycleBinSupported}
         trackingSupported={trackingSupported}
+        taxExemption={await loadOrderTaxExemption(supabase, id)}
       />
     </div>
   );

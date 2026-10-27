@@ -4,7 +4,33 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-10-26 (1)**.
+> compaction. Last reconciled: **2026-10-27 (2)**.
+
+## Tax-exempt sales: Florida certificates only; the owner approves every website certificate; the record lives on the order and in Admin → Tax Exempt (2026-10-27)
+
+- **Owner:** *"I don't think we should just allow them to enter a tax exempt number by themselves, because then they could just make it up"*; *"(fl only accepts fl)"*; *"complete the sale at the same sitting… in the same flow / cart"*; *"notify me (admin) via text message"*; *"allow me to check that tax id was physically provided… (allow bypass of the photo, info fill)"*; *"allow customers to save tax ID status in their account… if they want"*. Record `CHANGELOG.md` 2026-10-27 (2); runbook `features/tax-exempt.md`. Supersedes the 2026-09-16 "no tax-exempt option until the owner asks".
+- **The rules:**
+  - ⛔ Typing a number never drops tax, and the AI read is never the approval. Checkout drops tax ONLY through `resolveCheckoutExemption`: an owner-approved request, within 24 h, for the same email — or the signed-in buyer's saved, unexpired certificate. Re-checked at PayPal order creation. Guests are never auto-exempt.
+  - ⛔ Florida-issued DR-13 / DR-14 only, everywhere (website check refuses; the Instant Sale box blocks a non-Florida read).
+  - The AI check filters BEFORE the owner is bothered: a failing upload stores nothing and sends no text. The owner's text comes from the offers' Twilio number; email only as a fallback.
+  - The buyer's wait wording keeps "usually" and the 10-minute "Text us at (239) 404-8505" line; closed hours say when the store opens instead (admin store hours).
+  - In store: a photo (AI fills the fields) OR "physical copy seen" (details optional). Every accepted certificate is stored; "Save for next time" only controls the picker.
+  - Saving to the account is the buyer's choice (a visible box, ticked by default, untickable), signed-in only, removable from My Account. Removing unlinks; the store's record stays.
+  - The exemption is noted ON the order as a snapshot (`tax_exempt_snapshot`) so it stays readable if the certificate is withdrawn later. Certificates are withdrawn, never deleted; certificate files are never auto-deleted once used (only unsent website uploads after 7 days).
+  - Offers (hold/capture), counter-offer links and the Instagram/Facebook checkout stay taxed.
+- Guard `lib/__tests__/tax-exempt.test.ts` (rules, words, the single door in both routes, the SQL grants/bucket, WebP verification).
+
+## Google Ads say "free evaluation" AND "free appraisal" on every ad; the showroom leads, home visits are secondary (2026-10-26)
+
+- **Owner:** *"those [free evaluations / free appraisals] are what typically bring the most profitable sellers"*; *"i often get people wanting a free appraisal that actually just mean evaluation… they had searched appraisal"*; *"we want all bases covered.. not just appraisal"*; *"i find more people like to come to me than have me go to their house"*. Record: `CHANGELOG.md` 2026-10-26 (6)–(9).
+- **The rules:** every Sellers RSA keeps one "Free … Evaluation" and one "Free … Appraisal" headline pinned at position 2 (Google rotates the pair per search); the Free Appraisal sitelink and the Free Evaluation + Free Appraisals callouts stay on every ad. ⛔ Never switch the wording wholesale to one word. ⛔ Never lead with home visits — a store-first line ("Showroom or Home Visit / Walk in, no appointment needed") with the house call second. ⛔ No appraisals ad group / appraisal keyword expansion (≈ 6 clicks in 5 weeks, `"jewelry appraisal"` 23 clicks / 0 conv) — the lever is the promise on seller searches, not appraisal searches. Ad strength reading "Average" after pinning is accepted; results are judged on the dated check-up (`TASKS.md`), and a dead word is unpinned singly, never both.
+- **Why:** unpinned, Google buried the free-evaluation headlines (2–27 impressions each vs hundreds for "Sell Gold Near You") — the pin is the only way the promise shows on every impression; the two-headline pin is the only way each searcher can see their own word.
+
+## Google-AI sitelinks: remove on sight, never re-create, never trust the tooltip (2026-10-26)
+
+- **Owner:** *"remove the two Google AI sitelinks from both Coins and Bullion groups"* after the 10-26 audit found a second pair (one with broken text, "Schedule A"); the first pair was removed 10-22. Record: `CHANGELOG.md` 2026-10-26 (3)–(4).
+- **The rules:** any asset with Added by **Google AI** on this account is removed on sight (tick → Remove → Confirm; no passkey) — Google's text is not the pages' text, and the owner's rule is *an ad says what its landing page says*. ⛔ Never re-create Google's versions; the campaign-level sitelinks already cover the same pages. ⛔ Do not turn anything ON to "fix" it (AI Max, Asset optimization, Automatically created assets are all Off and stay Off). Google's tooltip blaming "asset optimization" is a canned message — the panel itself says asset optimization needs AI Max, which is Off.
+- **Why it keeps happening is unknown:** every documented control is off; both creations were early-morning batch jobs ~30 h apart from the opt-out. Re-check ~10-30 (`TASKS.md`); if it recurs, the owner files the ticket there — nobody re-audits the switches again.
 
 ## In-store sale receipts can print on the desktop Print Station — the same station as buy receipts, its own queue table (2026-10-26)
 
@@ -839,6 +865,7 @@ https://claude.ai/artifact/5o6VdpQjChYp11JJPCqS8X.
   with the next number" was dropped for this reason.
 - **Tax is always the 6% Florida rate**, the same rule local pickup uses
   online (`calculateFlSalesTax`); no tax-exempt option until the owner asks.
+  ⚠️ Superseded 2026-10-27: a tax-exempt sale exists now — see *"Tax-exempt sales"* at the top.
   ⚠️ Since 2026-10-20 this holds for PICKUP sales only. A shipped sale follows
   the web rule (FL address taxed on item + shipping, out of state none) — see
   the 2026-10-20 entry at the top.

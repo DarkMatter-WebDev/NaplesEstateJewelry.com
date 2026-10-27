@@ -17,6 +17,8 @@ import { paymentMethodLabel } from '@/lib/in-store-sale';
 import { describeShippingService } from '@/lib/shipping-service';
 import { adminUpdateProductsStatus } from '@/app/actions/admin-products';
 import { AppIcon } from '@/components/AppIcon';
+import OrderTaxExemptionPanel from '@/components/admin/OrderTaxExemptionPanel';
+import type { TaxExemptSnapshot } from '@/lib/tax-exempt';
 
 const GOLD = '#735c00';
 const BORDER = 'var(--color-outline-variant)';
@@ -76,6 +78,8 @@ interface Props {
    * mailer will actually send.
    */
   pickupHours: string;
+  /** The tax exemption noted on this order (lib/tax-exempt.ts), or null. */
+  taxExemption?: TaxExemptSnapshot | null;
 }
 
 export default function OrderDetailPanel({
@@ -88,6 +92,7 @@ export default function OrderDetailPanel({
   recycleBinSupported = true,
   trackingSupported = true,
   pickupHours,
+  taxExemption = null,
 }: Props) {
   const router = useRouter();
   const supabase = createClient();
@@ -1117,7 +1122,7 @@ export default function OrderDetailPanel({
             <div className="border-t mt-4 pt-4" style={{ borderColor: BORDER }}>
               <MoneyRow label="Subtotal" value={order.subtotal} />
               {order.discount > 0 && <MoneyRow label="Discount" value={-order.discount} />}
-              <MoneyRow label="Tax" value={order.tax} />
+              <MoneyRow label={taxExemption ? 'Tax · exempt' : 'Tax'} value={order.tax} />
               <MoneyRow label="Shipping" value={order.shipping_fee} />
               <div className="border-t mt-3 pt-3" style={{ borderColor: BORDER }}>
                 <MoneyRow label="Total" value={order.total} strong />
@@ -1146,6 +1151,8 @@ export default function OrderDetailPanel({
               })()}
             </div>
           </aside>
+
+          {taxExemption && <OrderTaxExemptionPanel snapshot={taxExemption} adminBasePath={adminBasePath} />}
 
           <section className="border p-5" style={{ borderColor: BORDER, background: 'white' }}>
             <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>Email History</h2>

@@ -30,6 +30,12 @@ import {
 import { normalizePhoneNumber } from '@/lib/phone';
 import { normalizePersonName } from '@/lib/person-name';
 import { findCounterByToken } from '@/lib/offers-server';
+import {
+  applyOrderExemption,
+  checkoutExemptionSnapshot,
+  parseCheckoutExemptionInput,
+  resolveCheckoutExemption,
+} from '@/lib/tax-exempt-server';
 
 export const runtime = 'nodejs';
 
@@ -218,6 +224,27 @@ export async function POST(req: Request) {
 
   const discountResolver = counterOfferId ? null : makeDiscountResolver(service, discountCode, customer.email);
 
+  // ---- Tax-exempt (lib/tax-exempt.ts). ⛔ The only way checkout drops the
+  // tax: an owner-approved request held by this buyer for THIS email, or the
+  // signed-in buyer's saved certificate. Re-checked here at payment, never
+  // taken from the browser's say-so. A counter-offer link stays taxed as before.
+  const exemptionInput = counterOfferId ? null : parseCheckoutExemptionInput(body.taxExempt);
+  const exemption = exemptionInput
+    ? await resolveCheckoutExemption(service, exemptionInput, {
+      email: String(customer.email),
+      userId: (await supabase.auth.getUser()).data.user?.id ?? null,
+    })
+    : null;
+  if (exemption) draftOptions = { ...draftOptions, taxExempt: true };
+  /** Note the exemption on the order (or clear a stale one on a reused order). */
+  const noteExemption = async (orderId: string, draft: OrderDraft) => {
+    if (exemption && draft.taxExempted > 0) {
+      await applyOrderExemption(service, orderId, checkoutExemptionSnapshot(exemption, draft.taxExempted));
+    } else {
+      await service.from('orders').update({ tax_exempt: false, tax_exempt_certificate_id: null, tax_exempt_snapshot: null }).eq('id', orderId).eq('tax_exempt', true);
+    }
+  };
+
   // ---- Retry path: reuse an existing unpaid order, re-create its PayPal order.
   // Only reuse when the stored order still matches what the buyer is paying for
   // NOW — same product set and same recomputed totals. The buyer may have edited
@@ -280,6 +307,7 @@ export async function POST(req: Request) {
         draft.shippingFee === Number(order.shipping_fee) &&
         draft.discount === Number(order.discount ?? 0) &&
         (draft.appliedDiscount?.code ?? null) === (order.discount_code ?? null) &&
+        draft.tax === Number(order.tax) &&
         draft.total === Number(order.total);
     }
 
@@ -328,6 +356,7 @@ export async function POST(req: Request) {
         if (updateError || !associatedOrder) {
           throw new Error(`Could not associate the PayPal order: ${updateError?.message ?? 'order row was not updated'}`);
         }
+        if (reuseDraft) await noteExemption(order.id, reuseDraft);
         return NextResponse.json({ paypalOrderId: paypalOrder.id, orderId: order.id });
       } catch (err) {
         console.error('PayPal create-order (reuse) error:', err);
@@ -434,6 +463,10 @@ export async function POST(req: Request) {
       .maybeSingle();
     if (associationError || !associatedOrder) {
       throw new Error(`Could not associate the PayPal order: ${associationError?.message ?? 'order row was not updated'}`);
+    }
+    // Before the invoice row, so the receipt reads the exemption.
+    if (exemption && draft.taxExempted > 0) {
+      await applyOrderExemption(service, orderId, checkoutExemptionSnapshot(exemption, draft.taxExempted));
     }
     await upsertOrderInvoice(service, orderId);
 

@@ -12,6 +12,7 @@ import { isCheckoutShippingMethod } from '@/lib/checkout-shipping';
 import { normalizeDiscountCode } from '@/lib/discount-codes';
 import { makeDiscountResolver } from '@/lib/discount-codes-server';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { parseCheckoutExemptionInput, resolveCheckoutExemption } from '@/lib/tax-exempt-server';
 
 export const runtime = 'nodejs';
 
@@ -78,12 +79,23 @@ export async function POST(req: Request) {
     ? makeDiscountResolver(createServiceClient(), discountCode, body.email ?? null)
     : null;
 
+  // Tax-exempt (lib/tax-exempt.ts): only an owner-approved request for this
+  // email, or the signed-in buyer's saved certificate, ever drops the tax.
+  const exemptionInput = parseCheckoutExemptionInput(body.taxExempt);
+  const exemption = exemptionInput
+    ? await resolveCheckoutExemption(createServiceClient(), exemptionInput, {
+      email: typeof body.email === 'string' ? body.email : null,
+      userId: (await supabase.auth.getUser()).data.user?.id ?? null,
+    })
+    : null;
+
   const draft = await buildOrderDraft(
     supabase,
     orderLines,
     shippingMethod,
     body.shippingState ?? null,
     discountResolver,
+    { taxExempt: Boolean(exemption) },
   );
 
   if (isOrderDraftError(draft)) {

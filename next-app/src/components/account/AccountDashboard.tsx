@@ -15,6 +15,7 @@ import { formatCurrency, formatOrderAddress, formatOrderDate, formatPublicPurity
 import { isProductSold, productImagePaddingBackground } from '@/types/product';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 import { AppIcon } from '@/components/AppIcon';
+import AccountTaxExemptCard, { type AccountTaxExempt } from '@/components/account/AccountTaxExemptCard';
 
 type AccountTab = 'overview' | 'orders' | 'wishlist';
 type AccountSection = AccountTab | 'security';
@@ -26,6 +27,8 @@ interface Props {
   isAdmin: boolean;
   memberSince: string;
   orders: Order[];
+  /** The saved tax-exempt certificate (owner, 2026-10-27). */
+  taxExempt?: AccountTaxExempt;
 }
 
 export default function AccountDashboard({
@@ -35,6 +38,7 @@ export default function AccountDashboard({
   isAdmin,
   memberSince,
   orders,
+  taxExempt = { certificate: null, pending: false },
 }: Props) {
   const isEs = locale === 'es';
   const [activeTab, setActiveTab] = useState<AccountTab>('overview');
@@ -85,7 +89,7 @@ export default function AccountDashboard({
           {activeTab === 'wishlist' && <WishlistTab locale={locale} />}
         </div>
 
-        <AccountSideRail locale={locale} fallbackEmail={fallbackEmail} isAdmin={isAdmin} memberSince={memberSince} />
+        <AccountSideRail locale={locale} fallbackEmail={fallbackEmail} isAdmin={isAdmin} memberSince={memberSince} taxExempt={taxExempt} />
       </section>
 
       <AccountSupportStrip locale={locale} />
@@ -192,11 +196,14 @@ export function AccountSideRail({
   fallbackEmail,
   isAdmin,
   memberSince,
+  taxExempt,
 }: {
   locale: string;
   fallbackEmail: string | null;
   isAdmin: boolean;
   memberSince: string;
+  /** Omitted where the account side rail is reused without it (profile / security pages). */
+  taxExempt?: AccountTaxExempt;
 }) {
   const isEs = locale === 'es';
   const shopHref = isEs ? '/es/shop' : '/shop';
@@ -227,6 +234,8 @@ export function AccountSideRail({
           locale={locale}
         />
       </div>
+
+      {taxExempt && <AccountTaxExemptCard locale={locale} initial={taxExempt} />}
 
       <div className="account-card account-side-card account-shop-card">
         <div>

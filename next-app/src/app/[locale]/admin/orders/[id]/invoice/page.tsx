@@ -6,6 +6,7 @@ import { invoiceNumberForOrder } from '@/lib/order-invoice-email';
 import { buildPaperReceipt, isPaidStatus } from '@/lib/order-receipt-paper';
 import { hoursLine } from '@/lib/business-location';
 import { getStoreHours } from '@/lib/store-hours';
+import { loadOrderTaxExemption } from '@/lib/tax-exempt-server';
 import type { Order, OrderItem } from '@/types/sales';
 import CustomerModeTabGuard from '@/components/admin/buy-receipts/CustomerModeTabGuard';
 import PrintInvoiceClient from './PrintInvoiceClient';
@@ -96,6 +97,7 @@ export default async function AdminOrderInvoicePrintPage({ params }: Props) {
   const paper = buildPaperReceipt(typedOrder, {
     invoiceNumber: invoiceNumberForOrder(typedOrder, latestInvoiceNumber),
     hoursLine: hoursLine(await getStoreHours(), false),
+    taxExempt: await loadOrderTaxExemption(supabase, id),
   });
 
   return (

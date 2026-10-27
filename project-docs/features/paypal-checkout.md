@@ -245,6 +245,16 @@ the capture RPC then marks the order paid + `completed` (fulfillment still reads
 `cancelled`), so the owner sees a paid order and ships or refunds it by hand. Runbook: `features/instant-sale.md`.
 Rules: `DECISIONS.md` → *"Instant Sale"* (2026-10-21).
 
+## Tax-exempt checkout (2026-10-27)
+
+The quote and create-order routes accept `taxExempt: { token } | { useSaved: true }`
+and pass `{ taxExempt: true }` to `buildOrderDraft` ONLY when
+`resolveCheckoutExemption` (`lib/tax-exempt-server.ts`) finds an owner-approved
+request (24 h, same email) or the signed-in buyer's saved certificate. The
+draft then carries `tax: 0` and `taxExempted` (noted on the order as
+`tax_exempt_snapshot` before the invoice row). A reused unpaid order is rebuilt
+when its tax differs. Counter-offer links stay taxed. Runbook `features/tax-exempt.md`.
+
 ## Admin refunds
 
 `POST /api/admin/orders/[id]/refund` is the only path that moves money for an

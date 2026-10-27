@@ -1,4 +1,5 @@
 import 'server-only';
+import { loadOrderTaxExemption } from '@/lib/tax-exempt-server';
 import { randomBytes } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { sendOrderInvoiceEmail } from '@/lib/order-invoice-mailer';
@@ -98,9 +99,11 @@ export function payUrlOf(row: Pick<RemoteInvoiceRow, 'pay_token'>): string {
 export function invoicePaymentBlock(
   row: RemoteInvoiceRow,
   order: Pick<RemoteOrderRow, 'order_number' | 'total' | 'shipping_method' | 'shipping_address'>,
+  options: { taxExempt?: boolean } = {},
 ): InvoicePaymentBlock {
   const pay = payOptionsOf(row);
-  const shipsWithoutAddress = order.shipping_method === 'shipping' && !order.shipping_address;
+  // A tax-exempt invoice has no tax to come off, so it never says it will.
+  const shipsWithoutAddress = !options.taxExempt && order.shipping_method === 'shipping' && !order.shipping_address;
   return {
     payUrl: pay.online ? payUrlOf(row) : null,
     payLabel: `Pay ${formatCurrency(order.total)} securely`,
@@ -128,7 +131,7 @@ export async function sendRemoteInvoiceEmail(
     orderId: order.id,
     recipient: order.customer_email,
     sentBy,
-    payment: invoicePaymentBlock(row, order),
+    payment: invoicePaymentBlock(row, order, { taxExempt: Boolean(await loadOrderTaxExemption(service, order.id)) }),
   });
   return result.ok ? { ok: true } : { ok: false, error: result.error };
 }

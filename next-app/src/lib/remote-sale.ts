@@ -35,6 +35,7 @@ import { normalizePersonName } from '@/lib/person-name';
 import { normalizePhoneNumber } from '@/lib/phone';
 import { cityLine, streetLine } from '@/lib/business-location';
 import { validateUsShippingAddress } from '@/lib/us-address';
+import { normalizeTaxExemptSaleInput, type TaxExemptSaleChoice } from '@/lib/tax-exempt';
 
 /**
  * Zelle (owner, 2026-10-21): the owner's own number "for now" — the business
@@ -61,6 +62,10 @@ export type RemoteSaleInput = {
   linkDays: RemoteLinkDays;
   message: string | null;
   note: string | null;
+  /** "Tax-exempt sale" (owner, 2026-10-27): no Florida tax on the invoice or the pay page. */
+  taxExempt: TaxExemptSaleChoice | null;
+  /** The Florida tax the certificate took off, as the invoice stands (no address = taxed). */
+  taxNotCharged: number;
   subtotal: number;
   shippingFee: number;
   tax: number;
@@ -78,10 +83,16 @@ export function remoteChargesTax(method: 'pickup' | 'ship', state: string | null
   return inStoreChargesTax('ship', state);
 }
 
-export function remoteTotals(subtotal: number, delivery: Pick<InStoreDelivery, 'method'> & { shippingFee?: number }, state: string | null | undefined) {
+export function remoteTotals(
+  subtotal: number,
+  delivery: Pick<InStoreDelivery, 'method'> & { shippingFee?: number },
+  state: string | null | undefined,
+  /** A tax-exempt invoice (owner, 2026-10-27): no Florida tax, whatever the address. */
+  taxExempt = false,
+) {
   return inStoreTotals(subtotal, {
     shippingFee: delivery.method === 'ship' ? delivery.shippingFee ?? 0 : 0,
-    chargesTax: remoteChargesTax(delivery.method, state),
+    chargesTax: !taxExempt && remoteChargesTax(delivery.method, state),
   });
 }
 
@@ -118,7 +129,11 @@ export function normalizeRemoteSaleInput(body: unknown): { value: RemoteSaleInpu
   const message = String(source.message ?? '').trim();
   if (message.length > REMOTE_MESSAGE_MAX) return { error: `Keep the message under ${REMOTE_MESSAGE_MAX} characters.` };
 
-  const totals = remoteTotals(subtotal, delivery.value, delivery.value.address?.state);
+  const taxExempt = normalizeTaxExemptSaleInput(source.taxExempt);
+  if ('error' in taxExempt) return taxExempt;
+
+  const owed = remoteTotals(subtotal, delivery.value, delivery.value.address?.state);
+  const totals = taxExempt.value ? remoteTotals(subtotal, delivery.value, delivery.value.address?.state, true) : owed;
   return {
     value: {
       items: items.value,
@@ -129,6 +144,8 @@ export function normalizeRemoteSaleInput(body: unknown): { value: RemoteSaleInpu
       // Line breaks are kept in the message; runs of spaces are not.
       message: message ? message.replace(/[ \t]+/g, ' ') : null,
       note: text(source.note, IN_STORE_NOTE_MAX),
+      taxExempt: taxExempt.value,
+      taxNotCharged: taxExempt.value ? owed.tax : 0,
       ...totals,
     },
   };
@@ -346,10 +363,11 @@ export function normalizePayPageCustomer(
  * shipment shows WITH Florida tax — the figure the invoice email printed — so
  * the number only ever goes down (out of state), never up.
  */
-export function payPageTotals(order: { subtotal: number; shipping_fee: number; shipping_method: string | null }, state: string | null) {
+export function payPageTotals(order: { subtotal: number; shipping_fee: number; shipping_method: string | null; tax_exempt?: boolean }, state: string | null) {
   const ships = order.shipping_method === 'shipping';
   return inStoreTotals(round2(order.subtotal), {
     shippingFee: ships ? order.shipping_fee : 0,
-    chargesTax: ships ? remoteChargesTax('ship', state) : true,
+    // A tax-exempt invoice carries no Florida tax at any address.
+    chargesTax: !order.tax_exempt && (ships ? remoteChargesTax('ship', state) : true),
   });
 }

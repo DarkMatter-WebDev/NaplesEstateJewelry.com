@@ -15,6 +15,8 @@ import {
   type RemoteInvoiceRow,
 } from '@/lib/remote-sale-server';
 import { formatCurrency } from '@/types/sales';
+import { applyOrderExemption, resolveSaleCertificate } from '@/lib/tax-exempt-server';
+import { exemptShortTag, snapshotFromCertificate } from '@/lib/tax-exempt';
 
 /**
  * POST: Instant Sale → Remote sale → "Email invoice" (owner, mockup v2,
@@ -41,12 +43,23 @@ export async function POST(req: Request) {
   const lines = await buildSaleItemPayloads(service, sale.items);
   if ('error' in lines) return NextResponse.json({ error: lines.error }, { status: lines.status });
 
+  // "Tax-exempt sale" (owner, 2026-10-27): settled before the order exists.
+  const certificate = sale.taxExempt
+    ? await resolveSaleCertificate(service, sale.taxExempt, {
+      source: 'remote_sale',
+      approvedBy: admin.user.email ?? null,
+      customer: { name: sale.customer.name, email: sale.customer.email, phone: sale.customer.phone },
+    })
+    : null;
+  if (certificate && 'error' in certificate) return NextResponse.json({ error: certificate.error }, { status: 400 });
+
   const { delivery } = sale;
   const shipped = delivery.method === 'ship';
   const deliveryNote = delivery.method === 'ship'
     ? `Ship · ${IN_STORE_SHIPPING_LABELS[delivery.shipping]} ${formatCurrency(delivery.shippingFee)}${delivery.address ? '' : ' · address from the customer'}`
     : null;
-  const internalNotes = [`Remote sale · invoice · sent by ${admin.user.email ?? 'admin'}`, deliveryNote, sale.note]
+  const exemptNote = certificate ? `Tax-exempt · ${exemptShortTag({ certType: certificate.cert_type, certNumber: certificate.cert_number })}` : null;
+  const internalNotes = [`Remote sale · invoice · sent by ${admin.user.email ?? 'admin'}`, deliveryNote, exemptNote, sale.note]
     .filter(Boolean)
     .join(' | ');
   const orderNumber = generateOrderNumber();
@@ -89,6 +102,15 @@ export async function POST(req: Request) {
   const createdRow = Array.isArray(created) ? created[0] : created;
   const orderId = createdRow?.order_id as string | undefined;
   if (!orderId) return NextResponse.json({ error: 'Could not create the order.' }, { status: 500 });
+
+  // Noted before the invoice email, so the email and the pay page drop the tax.
+  if (certificate) {
+    await applyOrderExemption(service, orderId, snapshotFromCertificate(certificate, {
+      approvedVia: 'remote_sale',
+      taxNotCharged: sale.taxNotCharged,
+      approvedBy: admin.user.email ?? null,
+    }));
+  }
 
   const now = new Date();
   const { data: invoice, error: invoiceError } = await service

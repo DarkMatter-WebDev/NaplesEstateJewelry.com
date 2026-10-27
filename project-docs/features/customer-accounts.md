@@ -65,6 +65,17 @@ triggers auto-creation of a profile + empty cart.
 `profiles.is_vip` can be set manually in Supabase for future private pricing
 flows. `profiles.is_admin` grants access to the admin routes.
 
+## Saved tax-exempt certificate (2026-10-27)
+
+A signed-in buyer can save an owner-approved Florida certificate to their
+account from checkout ("Save this certificate to my account…", ticked,
+untickable). My Account's side rail then shows **Tax-exempt status** (business,
+type, last four, valid through) with **Remove from my account**
+(`DELETE /api/tax-exempt/saved` unlinks `tax_exempt_certificates.user_id`; the
+store's record stays). While it is valid, checkout applies it automatically.
+Read server-side with the service client for the signed-in user only (the
+tables have no customer access). Runbook `features/tax-exempt.md`.
+
 ## Admin Account Deletion
 
 The Admin Users table exposes account deletion only for non-admin rows. Its

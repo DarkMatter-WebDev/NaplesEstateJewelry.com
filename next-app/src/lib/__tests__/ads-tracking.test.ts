@@ -420,8 +420,10 @@ describe('ads tracking: the notice, the switch and the legal pages say what the 
       // No forwarding number is used (owner, 2026-10-02 evening), so the pages must not say one is.
       expect(source).not.toMatch(/forwarding/);
       expect(source).toMatch(/dials our regular number/);
-      expect(source).toContain('October 2, 2026');
     }
+    expect(cookiesEn).toContain('October 2, 2026');
+    // Privacy was dated again 2026-10-27 (the tax-exempt certificate read).
+    expect(privacyEn).toContain('October 27, 2026');
     expect(privacyEn).toContain('Visitors who do not arrive from an ad do not load the Google tag.');
     expect(privacyEn).toContain('TradingView');
     expect(cookiesEn).toContain('nej_gclid');
@@ -433,7 +435,8 @@ describe('ads tracking: the notice, the switch and the legal pages say what the 
     expect(spanish).toContain('TradingView');
     expect(spanish).toContain('nej_gclid');
     expect(spanish).toContain("updated: UPDATED_ADS_MEASUREMENT");
-    expect(spanish.match(/UPDATED_ADS_MEASUREMENT/g)?.length).toBe(3); // the constant + privacy + cookie-preferences
+    expect(spanish.match(/UPDATED_ADS_MEASUREMENT/g)?.length).toBe(2); // the constant + cookie-preferences
+    expect(spanish).toContain('updated: UPDATED_TAX_EXEMPT'); // privacy, 2026-10-27
   });
 });
 

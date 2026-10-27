@@ -1,6 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import TaxExemptSaleBox, {
+  newTaxExemptBox,
+  taxExemptApplies,
+  taxExemptPayload,
+  taxExemptProblem,
+} from '@/components/admin/instant-sale/TaxExemptSaleBox';
 import Link from 'next/link';
 import type { SpotData } from '@/types/product';
 import { formatCurrency } from '@/types/sales';
@@ -114,6 +120,8 @@ export default function RemoteSaleForm({
         ? { text: `Item ${restored.gone.join(', ')}: the listed piece is no longer for sale — pick another or remove it.`, ok: false }
         : null,
   );
+  // "Tax-exempt sale" (owner, 2026-10-27). Not kept in a saved draft: tick it when sending.
+  const [taxBox, setTaxBox] = useState(newTaxExemptBox);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<{ invoice: RemoteInvoiceCardData; emailed: boolean; emailError: string | null } | null>(null);
@@ -130,8 +138,9 @@ export default function RemoteSaleForm({
       ? parseInStoreShippingFee(customFee)
       : priceValue != null ? inStoreTableShippingFee(shipping, priceValue) : null;
   // The route's rule (lib/remote-sale.ts): no address yet = drawn with Florida tax.
-  const totals = priceValue != null && shippingFee != null ? remoteTotals(priceValue, { method: delivery, shippingFee }, shipped ? stateCode : null) : null;
-  const outOfStateTotal = shipped && !stateCode && totals ? round2(totals.subtotal + totals.shippingFee) : null;
+  const exempt = taxExemptApplies(taxBox);
+  const totals = priceValue != null && shippingFee != null ? remoteTotals(priceValue, { method: delivery, shippingFee }, shipped ? stateCode : null, exempt) : null;
+  const outOfStateTotal = !exempt && shipped && !stateCode && totals ? round2(totals.subtotal + totals.shippingFee) : null;
 
   /** The form as typed — what "Save draft" keeps (`sanitizeRemoteDraft` on the server). */
   function draftForm(): RemoteDraftForm {
@@ -198,6 +207,7 @@ export default function RemoteSaleForm({
     setFirstName(''); setLastName(''); setEmail(''); setPhone('');
     setDelivery('pickup'); setMailingOn(false); setAddress(EMPTY_SALE_ADDRESS); setShipping('insured'); setCustomFee('');
     setPayOnline(true); setPayZelle(true); setPayCheck(false); setPayPhone(false); setLinkDays(REMOTE_LINK_DAYS_DEFAULT); setMessage('');
+    setTaxBox(newTaxExemptBox());
     setError(null); setSent(null);
   }
 
@@ -212,6 +222,8 @@ export default function RemoteSaleForm({
       return;
     }
     if (!payOnline && !payZelle && !payCheck && !payPhone) { setError('Tick at least one way for the customer to pay.'); return; }
+    const exemptProblem = taxExemptProblem(taxBox);
+    if (exemptProblem) { setError(exemptProblem); return; }
     setBusy(true);
     try {
       const res = await fetch('/api/admin/remote-sales', {
@@ -229,6 +241,7 @@ export default function RemoteSaleForm({
           pay: { online: payOnline, zelle: payZelle, check: payCheck, phone: payPhone },
           linkDays,
           message,
+          taxExempt: taxExemptPayload(taxBox),
           draftId,
         }),
       });
@@ -311,6 +324,7 @@ export default function RemoteSaleForm({
               <span className="mt-1 block text-xs" style={hintStyle}>Left blank, the customer fills it in when paying.</span>
             </label>
           </div>
+          <TaxExemptSaleBox box={taxBox} onChange={(next) => { setTaxBox(next); setError(null); }} />
         </section>
 
         <SaleDeliverySection
@@ -378,10 +392,14 @@ export default function RemoteSaleForm({
             </div>
           )}
           <div className="flex justify-between text-sm gap-3">
+            {exempt ? (
+              <span>FL sales tax · <strong style={{ color: '#16653c' }}>exempt</strong> <span className="text-xs" style={hintStyle}>(any address)</span></span>
+            ) : (
             <span>
               {totals && totals.tax === 0 ? 'FL sales tax' : 'FL sales tax · 6%'}
               {shipped && <span className="text-xs" style={hintStyle}>{totals && totals.tax === 0 ? ` · none, ships to ${stateCode}` : stateCode ? ' (FL address)' : ' (until an address is in)'}</span>}
             </span>
+            )}
             <span>{totals ? formatCurrency(totals.tax) : '—'}</span>
           </div>
           <div className="flex justify-between border-t pt-3 text-2xl font-bold" style={{ ...cardStyle, fontFamily: 'var(--font-headline)' }}><span>Total</span><span>{totals ? formatCurrency(totals.total) : '—'}</span></div>

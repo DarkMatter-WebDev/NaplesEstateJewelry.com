@@ -11,8 +11,9 @@ describe('Spanish legal policy copy', () => {
     for (const [key, page] of Object.entries(SPANISH_LEGAL_COPY)) {
       expect(page.title).toBeTruthy();
       // Privacy + Cookie Preferences were rewritten 2026-10-02 for the Google
-      // Ads measurement (lib/ads-tracking.ts); the other four are unchanged.
-      expect(page.updated).toBe(key === 'privacy' || key === 'cookie-preferences' ? '2 de octubre de 2026' : '19 de junio de 2026');
+      // Ads measurement (lib/ads-tracking.ts); Privacy again 2026-10-27 for the
+      // tax-exempt certificate read; the other four are unchanged.
+      expect(page.updated).toBe(key === 'privacy' ? '27 de octubre de 2026' : key === 'cookie-preferences' ? '2 de octubre de 2026' : '19 de junio de 2026');
       expect(page.sections.length).toBeGreaterThan(0);
       for (const section of page.sections) {
         expect(section.title).toBeTruthy();

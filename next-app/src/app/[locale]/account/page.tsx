@@ -7,6 +7,8 @@ import { type CustomerProfile } from '@/components/account/AccountProfileForm';
 import SiteFooter from '@/components/layout/SiteFooter';
 import type { Order, OrderItem } from '@/types/sales';
 import { getAccountMetadata } from '@/lib/account-metadata';
+import { createServiceClient } from '@/lib/supabase/service';
+import { savedCertificateForUser, savedCertificateView } from '@/lib/tax-exempt-server';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -155,6 +157,22 @@ export default async function AccountPage({ params }: Props) {
     }),
   }));
 
+  // Tax-exempt status (owner, 2026-10-27): the saved Florida certificate, or a
+  // request saved to this account that still waits for approval. Read with the
+  // service client (the tables have no customer access) for THIS user only.
+  const taxService = createServiceClient();
+  const [savedCertificate, pendingRequest] = await Promise.all([
+    savedCertificateForUser(taxService, user.id).catch(() => null),
+    taxService.from('tax_exempt_requests').select('id').eq('user_id', user.id).eq('status', 'pending').eq('save_to_account', true).limit(1),
+  ]);
+  const savedView = savedCertificate ? savedCertificateView(savedCertificate) : null;
+  const taxExempt = {
+    certificate: savedView
+      ? { businessName: savedView.businessName, typeLabel: savedView.typeLabel, masked: savedView.masked, validThrough: savedView.validThrough, approvedOn: savedView.approvedOn }
+      : null,
+    pending: !savedView && (pendingRequest.data ?? []).length > 0,
+  };
+
   return (
     <>
       <SiteHeader />
@@ -190,6 +208,7 @@ export default async function AccountPage({ params }: Props) {
           isAdmin={isAdmin}
           memberSince={memberSince}
           orders={ordersWithInventory}
+          taxExempt={taxExempt}
         />
       </main>
       <SiteFooter locale={locale} />

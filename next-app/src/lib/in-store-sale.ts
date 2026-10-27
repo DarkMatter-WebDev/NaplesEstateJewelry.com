@@ -33,6 +33,7 @@ import { normalizePersonName } from '@/lib/person-name';
 import { normalizePhoneNumber } from '@/lib/phone';
 import { PRODUCT_IMAGES_BUCKET, PRODUCT_IMAGES_PREFIX } from '@/lib/product-image-storage';
 import { validateUsShippingAddress } from '@/lib/us-address';
+import { normalizeTaxExemptSaleInput, type TaxExemptSaleChoice } from '@/lib/tax-exempt';
 
 // Cash App, Venmo and store credit added 2026-10-20 (owner). Store credit is
 // recorded as paid like the rest: the credit was issued earlier, outside the site.
@@ -162,6 +163,10 @@ export type InStoreSaleInput = {
   note: string | null;
   /** "Email copy" (owner, 2026-10-21): send the receipt to the customer's email now. */
   emailCopy: boolean;
+  /** "Tax-exempt sale" (owner, 2026-10-27): the Florida certificate, or null for a taxed sale. */
+  taxExempt: TaxExemptSaleChoice | null;
+  /** The Florida tax the certificate took off (0 when none, or when the sale owed none). */
+  taxNotCharged: number;
   subtotal: number;
   shippingFee: number;
   tax: number;
@@ -373,10 +378,13 @@ export function normalizeInStoreSaleInput(body: unknown): { value: InStoreSaleIn
   const delivery = normalizeSaleDelivery(source.delivery, subtotal);
   if ('error' in delivery) return delivery;
 
-  const totals = inStoreTotals(subtotal, {
-    shippingFee: delivery.value.method === 'ship' ? delivery.value.shippingFee : 0,
-    chargesTax: inStoreChargesTax(delivery.value.method, delivery.value.address?.state),
-  });
+  const taxExempt = normalizeTaxExemptSaleInput(source.taxExempt);
+  if ('error' in taxExempt) return taxExempt;
+
+  const shippingFee = delivery.value.method === 'ship' ? delivery.value.shippingFee : 0;
+  const owes = inStoreChargesTax(delivery.value.method, delivery.value.address?.state);
+  const totals = inStoreTotals(subtotal, { shippingFee, chargesTax: owes && !taxExempt.value });
+  const taxNotCharged = owes && taxExempt.value ? inStoreTotals(subtotal, { shippingFee, chargesTax: true }).tax : 0;
   return {
     value: {
       items: items.value,
@@ -386,6 +394,8 @@ export function normalizeInStoreSaleInput(body: unknown): { value: InStoreSaleIn
       note: optionalText(source.note, IN_STORE_NOTE_MAX),
       // A request without the box (before 2026-10-21) kept the old rule: an email means a receipt.
       emailCopy: Boolean(email) && source.emailCopy !== false,
+      taxExempt: taxExempt.value,
+      taxNotCharged,
       ...totals,
     },
   };

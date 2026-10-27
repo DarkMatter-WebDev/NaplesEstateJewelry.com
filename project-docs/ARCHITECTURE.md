@@ -980,6 +980,23 @@ Visitor lands with ?gclid=… (auto-tagging)      Visitor lands without one
   Ads hosts in both header files; the cookie notice has two buttons and one
   more sentence; Privacy + Cookie Preferences were rewritten.
 
+## Tax-exempt sales (2026-10-27)
+
+- Tables `tax_exempt_certificates` + `tax_exempt_requests`, order columns
+  `tax_exempt` / `tax_exempt_certificate_id` / `tax_exempt_snapshot`, private
+  bucket `tax-certificates` — all service-role only (`supabase/tax-exempt-2026-10.sql`).
+- Website flow: upload → AI read + checks (`lib/tax-exempt-ai.ts`,
+  `checkCertificateRead`) → pending request → owner text (Twilio, email
+  fallback) → owner approves on `/admin/tax-exempt/[id]` → the buyer's checkout
+  polls `/api/tax-exempt/status`, re-quotes with the token → `buildOrderDraft({ taxExempt })`.
+  ⛔ `resolveCheckoutExemption` is the single gate in both the quote and the
+  PayPal create-order route.
+- Instant Sale: the box resolves/stores the certificate before the order, the
+  route records tax 0 and writes the snapshot before the receipt email.
+- Readers (order page, paper receipt, emails, pay page) use the tolerant
+  `loadOrderTaxExemption`, so nothing breaks before the SQL runs.
+- Runbook `features/tax-exempt.md`.
+
 ## Site Shop Offers — "Make an Offer" (2026-10-15)
 
 - **Data:** `products.accepts_offers` (per item; anon/authenticated column grant so the shop page can read it); `product_offers` (service-role only: amount, the order snapshot to write on Accept, totals, contact, PayPal order/authorization ids, `hold_status`, 72-h `expires_at`, counter amount/note/token hash/expiry, `order_id`, notification markers); `orders.offer_id`.

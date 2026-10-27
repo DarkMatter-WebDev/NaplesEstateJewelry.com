@@ -149,6 +149,12 @@ export type OrderDraft = {
   /** Which code produced `discount`, for the order snapshot. */
   appliedDiscount: AppliedDiscount | null;
   tax: number;
+  /**
+   * The Florida tax an approved tax-exempt certificate took off (0 when none
+   * applied, or when the sale owed no tax anyway). Kept so the order can record
+   * "tax not charged".
+   */
+  taxExempted: number;
   shippingFee: number;
   total: number;
 };
@@ -208,6 +214,8 @@ export type OrderQuote = {
   subtotal: number;
   discount: number;
   tax: number;
+  /** Tax an approved exemption took off (0 = none applied). Optional: older quotes lack it. */
+  taxExempted?: number;
   shippingFee: number;
   total: number;
 };
@@ -224,6 +232,7 @@ export function toOrderQuote(draft: OrderDraft): OrderQuote {
     subtotal: draft.subtotal,
     discount: draft.discount,
     tax: draft.tax,
+    taxExempted: draft.taxExempted,
     shippingFee: draft.shippingFee,
     total: draft.total,
   };
@@ -263,6 +272,12 @@ export type OrderDraftOptions = {
    * runs exactly as for any order, keyed off the agreed price.
    */
   unitPriceOverride?: { productId: string; unitPrice: number } | null;
+  /**
+   * An approved Florida tax-exempt certificate applies (lib/tax-exempt.ts).
+   * The caller has already proved it through `resolveCheckoutExemption`; this
+   * function only drops the tax and reports how much it dropped.
+   */
+  taxExempt?: boolean;
 };
 
 export async function buildOrderDraft(
@@ -438,10 +453,12 @@ export async function buildOrderDraft(
 
   // Florida taxes the DISCOUNTED merchandise plus charged shipping — a discount
   // reduces the taxable base, which is the standard treatment.
-  const tax = chargesFlSalesTax(shippingMethod, shippingState)
+  const owedTax = chargesFlSalesTax(shippingMethod, shippingState)
     ? calculateFlSalesTax(discountedMerchandise, shippingFee)
     : 0;
+  const taxExempted = options.taxExempt ? owedTax : 0;
+  const tax = round2(owedTax - taxExempted);
   const total = round2(discountedMerchandise + tax + shippingFee);
 
-  return { items, subtotal, discount, appliedDiscount, tax, shippingFee, total };
+  return { items, subtotal, discount, appliedDiscount, tax, taxExempted, shippingFee, total };
 }

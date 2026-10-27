@@ -119,6 +119,15 @@
 - A remote **pickup** stays "Fulfillment: Pending" until you mark it picked up.
 - The payment page (`/pay/<link>`) is private: never indexed, no referrer.
 
+## Tax-exempt sale (2026-10-27)
+
+Both forms have a **Tax-exempt sale (Florida certificate)** box in *2. Customer*:
+a certificate on file, or Take photo / Choose photo or PDF (the AI fills the
+details), or "Customer showed me the physical certificate" (no photo needed).
+Tax comes off the whole sale; the certificate is noted on the order, the
+receipt and **Admin → Tax Exempt**. A Remote sale draft does not keep the box.
+Full runbook: `features/tax-exempt.md` (⛔ needs `supabase/tax-exempt-2026-10.sql`).
+
 ## Setup — ⛔ one SQL file before the first Remote sale
 
 Run **`supabase/remote-sales-2026-10.sql`** in the Supabase SQL Editor (safe to

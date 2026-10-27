@@ -22,6 +22,7 @@ import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 import { cityLine, landmarkPhrase, SHOWROOM_TIME_ZONE, streetLine } from '@/lib/business-location';
 import { BUSINESS_PHONE, SITE_DOMAIN_LABEL } from '@/lib/order-email-branding';
 import { paymentMethodLabel } from '@/lib/in-store-sale';
+import { exemptReceiptLine, type TaxExemptSnapshot } from '@/lib/tax-exempt';
 
 export type PaperReceiptOrder = Pick<
   Order,
@@ -80,7 +81,7 @@ export function isPaidStatus(status: string | null | undefined): boolean {
  */
 export function buildPaperReceipt(
   order: PaperReceiptOrder,
-  opts: { invoiceNumber?: string | null; hoursLine?: string | null } = {},
+  opts: { invoiceNumber?: string | null; hoursLine?: string | null; taxExempt?: TaxExemptSnapshot | null } = {},
 ): PaperReceipt {
   const paid = isPaidStatus(order.payment_status);
   const status = String(order.payment_status ?? '').toLowerCase();
@@ -132,7 +133,7 @@ ${anyPhoto ? `<td class="ph">${image ? `<img src="${esc(image)}" alt="">` : ''}<
     `<div><span>Subtotal · ${count} item${count === 1 ? '' : 's'}</span><span>${esc(formatCurrency(order.subtotal))}</span></div>`,
     Number(order.discount) > 0 ? `<div><span>Discount</span><span>−${esc(formatCurrency(order.discount))}</span></div>` : '',
     ships ? `<div><span>Shipping${Number(order.shipping_fee) > 0 ? '' : ' · no charge'}</span><span>${esc(formatCurrency(order.shipping_fee))}</span></div>` : '',
-    `<div><span>${Number(order.tax) > 0 ? 'FL sales tax · 6%' : 'Sales tax'}</span><span>${esc(formatCurrency(order.tax))}</span></div>`,
+    `<div><span>${opts.taxExempt ? 'FL sales tax · exempt' : Number(order.tax) > 0 ? 'FL sales tax · 6%' : 'Sales tax'}</span><span>${esc(formatCurrency(order.tax))}</span></div>`,
     `<div class="big"><span>${paid ? 'Total paid' : 'Total due'}</span><span>${esc(formatCurrency(order.total))}</span></div>`,
   ].join('');
 
@@ -148,7 +149,8 @@ ${anyPhoto ? `<td class="ph">${image ? `<img src="${esc(image)}" alt="">` : ''}<
   <div>${delivery}</div>
 </div>
 <table><thead><tr><th></th>${anyPhoto ? '<th></th>' : ''}<th>Item</th><th class="m">Price</th></tr></thead><tbody>${rows}</tbody></table>
-<div class="totals">${totals}</div>
+<div class="totals">${totals}</div>${opts.taxExempt ? `
+<div class="exempt">${esc(exemptReceiptLine(opts.taxExempt))}</div>` : ''}
 <div class="foot">
   <strong>Thank you!</strong> Questions? Call or text ${esc(BUSINESS_PHONE)} · View this order anytime at ${esc(SITE_DOMAIN_LABEL)}/order-lookup${opts.hoursLine ? `<br>Showroom: ${esc(opts.hoursLine)} · ${esc(landmarkPhrase(false))}` : ''}
 </div>
@@ -184,6 +186,7 @@ ${anyPhoto ? `<td class="ph">${image ? `<img src="${esc(image)}" alt="">` : ''}<
 .nej-paper .totals{margin-left:auto;width:270px;margin-top:8px;break-inside:avoid}
 .nej-paper .totals div{display:flex;justify-content:space-between;padding:2px 0}
 .nej-paper .totals .big{border-top:1px solid #735c00;margin-top:4px;padding-top:6px;font:700 16px Georgia,'Times New Roman',serif;color:#735c00}
+.nej-paper .exempt{margin-top:8px;padding:6px 10px;background:#fbf5dd;border-left:3px solid #d4af37;font-size:11.5px;break-inside:avoid}
 .nej-paper .foot{margin-top:14px;padding-top:10px;border-top:1px solid #d5c697;font-size:11px;color:#5b5446;text-align:center;line-height:1.55;break-inside:avoid}
 .nej-paper .foot strong{color:#1d1a14}`;
 

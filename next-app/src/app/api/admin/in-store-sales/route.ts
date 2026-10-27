@@ -12,6 +12,8 @@ import {
 import { formatCurrency } from '@/types/sales';
 import { loadPaperReceipt } from '@/lib/order-receipt-paper-server';
 import { queueSalePrint } from '@/lib/sale-print-requests-server';
+import { applyOrderExemption, resolveSaleCertificate } from '@/lib/tax-exempt-server';
+import { exemptShortTag, snapshotFromCertificate } from '@/lib/tax-exempt';
 
 /**
  * POST: record a sale made in the showroom (the card was taken on Zettle).
@@ -56,6 +58,17 @@ export async function POST(req: Request) {
   const lines = await buildSaleItemPayloads(service, sale.items);
   if ('error' in lines) return NextResponse.json({ error: lines.error }, { status: lines.status });
 
+  // "Tax-exempt sale" (owner, 2026-10-27): the certificate is settled BEFORE
+  // any order exists, so a problem with it leaves nothing half-recorded.
+  const certificate = sale.taxExempt
+    ? await resolveSaleCertificate(service, sale.taxExempt, {
+      source: 'in_store',
+      approvedBy: admin.user.email ?? null,
+      customer: { name: sale.customer.name, email: sale.customer.email, phone: sale.customer.phone },
+    })
+    : null;
+  if (certificate && 'error' in certificate) return NextResponse.json({ error: certificate.error }, { status: 400 });
+
   const orderNumber = generateOrderNumber();
   const { delivery } = sale;
   const shipped = delivery.method === 'ship';
@@ -64,7 +77,8 @@ export async function POST(req: Request) {
   const deliveryNote = delivery.method === 'ship'
     ? `Ship · ${IN_STORE_SHIPPING_LABELS[delivery.shipping]} ${formatCurrency(delivery.shippingFee)}`
     : null;
-  const internalNotes = [`In-store sale · ${paidByLabel} · recorded by ${admin.user.email ?? 'admin'}`, deliveryNote, sale.note]
+  const exemptNote = certificate ? `Tax-exempt · ${exemptShortTag({ certType: certificate.cert_type, certNumber: certificate.cert_number })}` : null;
+  const internalNotes = [`In-store sale · ${paidByLabel} · recorded by ${admin.user.email ?? 'admin'}`, deliveryNote, exemptNote, sale.note]
     .filter(Boolean)
     .join(' | ');
   const shippingAddress = delivery.address
@@ -108,6 +122,16 @@ export async function POST(req: Request) {
   const createdRow = Array.isArray(created) ? created[0] : created;
   const orderId = createdRow?.order_id as string | undefined;
   if (!orderId) return NextResponse.json({ error: 'Could not create the order.' }, { status: 500 });
+
+  // Noted on the order BEFORE the payment step emails the receipt, so the
+  // receipt carries the certificate line.
+  if (certificate) {
+    await applyOrderExemption(service, orderId, snapshotFromCertificate(certificate, {
+      approvedVia: 'in_store',
+      taxNotCharged: sale.taxNotCharged,
+      approvedBy: admin.user.email ?? null,
+    }));
+  }
 
   const paid = await recordOfflinePayment(service, {
     orderId,

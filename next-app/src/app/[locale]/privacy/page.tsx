@@ -14,8 +14,9 @@ interface Props {
 
 // 2026-10-02: Google Ads measurement for visitors who arrive from an ad
 // (lib/ads-tracking.ts) replaced the "no Google tag was found" statement.
+// 2026-10-27: Anthropic reads an uploaded tax-exempt certificate (lib/tax-exempt-ai.ts).
 // Not exported: a page file may only export what Next.js knows.
-const PRIVACY_UPDATED = 'October 2, 2026';
+const PRIVACY_UPDATED = 'October 27, 2026';
 
 export default async function PrivacyPage({ params }: Props) {
   const { locale } = await params;
@@ -76,6 +77,7 @@ export default async function PrivacyPage({ params }: Props) {
             'Google Maps for the embedded showroom map on our home and contact pages. The map loads from Google when you scroll to it, and Google may receive your IP address and set its own cookies under its own terms. Nothing you enter on our site is sent to it, and every address, hour, and directions link is also shown as plain text without it.',
             'Google Ads for measuring the results of our advertising, as described above, only for visitors who arrive from one of our ads. Google processes that data under its own terms.',
             'TradingView for the live gold, silver, and platinum price charts on our gold, silver, bullion, and live-prices pages. The charts load from TradingView, which may receive your IP address and set its own cookies under its own terms. Nothing you enter on our site is sent to it.',
+            'Anthropic, an AI service, to read the printed details from a Florida tax-exempt certificate you upload at checkout, so you do not have to type them. Anthropic processes the picture under its own terms. The certificate itself is kept privately by us for our tax records.',
             'Payment processors if online payment processing is enabled; payment information is handled by the processor under its own terms.',
             'Shipping providers when shipment or insured delivery is arranged.',
             'Professional advisers, fraud-prevention services, or authorities when reasonably necessary for legal, security, accounting, tax, or compliance purposes.',
