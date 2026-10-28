@@ -173,6 +173,15 @@ export default async function DiamondBuyersPage({ params }: Props) {
                 </div>
               ))}
             </div>
+            {/* 2026-10-27: the seller-framed diamond guide, with the full color
+                and clarity chart, lives at /diamond-buyers/what-is-my-diamond-worth. */}
+            <p className="mt-6 max-w-2xl text-sm leading-relaxed text-[#4d4635]">
+              {isEs ? (
+                <>¿Quiere la explicación completa? Nuestra guía <Link href={p('/diamond-buyers/what-is-my-diamond-worth')} className="font-semibold text-[#735c00] underline underline-offset-2">¿Cuánto vale mi anillo de diamante al venderlo?</Link> recorre la tasación frente a la oferta, las 4C, la forma, natural o de laboratorio — y la tabla completa de color y claridad.</>
+              ) : (
+                <>Want the whole explanation? Our guide <Link href={p('/diamond-buyers/what-is-my-diamond-worth')} className="font-semibold text-[#735c00] underline underline-offset-2">What is my diamond ring worth when I sell it?</Link> walks through appraisal vs. offer, the 4Cs, shape, natural or lab-grown — and the full color and clarity chart.</>
+              )}
+            </p>
           </div>
         </section>
 

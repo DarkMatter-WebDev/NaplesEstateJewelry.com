@@ -345,6 +345,7 @@ export default function SiteHeader() {
   const ABOUT_ITEMS = [
     { key: 'aboutUs' as const, path: '/about' },
     { key: 'reviews' as const, path: '/reviews' },
+    { key: 'guides' as const, path: '/guides' },
     { key: 'livePrices' as const, path: '/spot-prices' },
     { key: 'otherServices' as const, path: '/services' },
   ];

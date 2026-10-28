@@ -295,9 +295,9 @@ export default async function HallmarksGuidePage({ params }: Props) {
           </div>
           <p className="mt-8 text-center text-sm leading-relaxed text-[#4d4635]">
             {isEs ? (
-              <>¿Ya sabe qué tiene? Vea <Link href={p('/gold-services/what-is-my-gold-worth')} className="font-semibold text-[#735c00] underline underline-offset-2">cuánto vale su oro</Link> o <Link href={p('/silver-services/flatware-value')} className="font-semibold text-[#735c00] underline underline-offset-2">cuánto vale su cubertería de plata</Link>.</>
+              <>¿Ya sabe qué tiene? Vea <Link href={p('/gold-services/what-is-my-gold-worth')} className="font-semibold text-[#735c00] underline underline-offset-2">cuánto vale su oro</Link>, <Link href={p('/silver-services/flatware-value')} className="font-semibold text-[#735c00] underline underline-offset-2">cuánto vale su cubertería de plata</Link> o <Link href={p('/diamond-buyers/what-is-my-diamond-worth')} className="font-semibold text-[#735c00] underline underline-offset-2">cuánto vale su anillo de diamante</Link>.</>
             ) : (
-              <>Know what you have now? See <Link href={p('/gold-services/what-is-my-gold-worth')} className="font-semibold text-[#735c00] underline underline-offset-2">what your gold is worth</Link> or <Link href={p('/silver-services/flatware-value')} className="font-semibold text-[#735c00] underline underline-offset-2">what your silver flatware is worth</Link>.</>
+              <>Know what you have now? See <Link href={p('/gold-services/what-is-my-gold-worth')} className="font-semibold text-[#735c00] underline underline-offset-2">what your gold is worth</Link>, <Link href={p('/silver-services/flatware-value')} className="font-semibold text-[#735c00] underline underline-offset-2">what your silver flatware is worth</Link> or <Link href={p('/diamond-buyers/what-is-my-diamond-worth')} className="font-semibold text-[#735c00] underline underline-offset-2">what your diamond ring is worth</Link>.</>
             )}
           </p>
         </section>

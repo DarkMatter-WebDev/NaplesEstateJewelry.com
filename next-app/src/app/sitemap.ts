@@ -33,7 +33,9 @@ const BASE = 'https://naplesestatejewelry.com';
 // 2026-10-22: /estate-jewelry gained "Signed & Designer Jewelry" and the
 // eras / stones / sterling wording; new guide
 // /estate-jewelry/native-american-jewelry, linked from it and /silver-services.
-const CONTENT_LAST_MODIFIED = new Date('2026-10-22');
+// 2026-10-27: /guides — one index of the guides (About menu + footer) — and
+// the seller-framed diamond guide /diamond-buyers/what-is-my-diamond-worth.
+const CONTENT_LAST_MODIFIED = new Date('2026-10-27');
 
 // Both locale prefixes the app serves. EVERY public page exists in both, so each
 // language version gets its OWN <url> entry — Google's documented pattern —
@@ -75,6 +77,7 @@ const STATIC_PAGES = [
   { path: '/gold-services/gold-marks', priority: 0.6, changeFrequency: 'monthly' },
   { path: '/gold-services/what-is-my-gold-worth', priority: 0.6, changeFrequency: 'monthly' },
   { path: '/jewelry-appraisal/hallmarks', priority: 0.6, changeFrequency: 'monthly' },
+  { path: '/diamond-buyers/what-is-my-diamond-worth', priority: 0.6, changeFrequency: 'monthly' },
   { path: '/estate-services/selling-inherited-jewelry', priority: 0.6, changeFrequency: 'monthly' },
   { path: '/estate-jewelry/native-american-jewelry', priority: 0.6, changeFrequency: 'monthly' },
   { path: '/sell/dont-melt-it', priority: 0.6, changeFrequency: 'monthly' },
@@ -85,6 +88,9 @@ const STATIC_PAGES = [
   // 2026-09-08: the full review list (About menu, footer, /card). Same low
   // priority as /spot-prices — a destination, not a ranking page.
   { path: '/reviews', priority: 0.5, changeFrequency: 'monthly' },
+  // 2026-10-27: the index of the seven guides (About menu, footer). Same low
+  // priority — the guides rank on their own URLs; this page only points.
+  { path: '/guides', priority: 0.5, changeFrequency: 'monthly' },
   { path: '/trade-in', priority: 0.8, changeFrequency: 'monthly' },
   { path: '/faq', priority: 0.6, changeFrequency: 'monthly' },
   { path: '/estate-services', priority: 0.8, changeFrequency: 'monthly' },
