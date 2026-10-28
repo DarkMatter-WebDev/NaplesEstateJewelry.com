@@ -158,18 +158,21 @@ export default async function DiamondWorthGuidePage({ params }: Props) {
     { band: 'si', nameEn: 'Slightly included (SI1 · SI2)', nameEs: 'Inclusiones leves (SI1 · SI2)', offerEn: 'Usually eye-clean at SI1, sometimes not at SI2 — the eye decides the price more than the letters.', offerEs: 'Normalmente limpia a simple vista en SI1, a veces no en SI2 — el ojo decide el precio más que las letras.' },
     { band: 'i', nameEn: 'Included (I1 · I2 · I3)', nameEs: 'Con inclusiones (I1 · I2 · I3)', offerEn: 'Visible to the naked eye; priced near the floor for the carat weight, the mounting often matters as much.', offerEs: 'Visibles a simple vista; cerca del piso para ese peso, y la montura suele importar tanto como la piedra.' },
   ];
-  const clarityGrades: { g: string; band: ClarityBand; en: string; es: string }[] = [
-    { g: 'FL', band: 'fl', en: 'Flawless — no inclusions or blemishes visible at 10× magnification.', es: 'Flawless — sin inclusiones ni marcas visibles a 10 aumentos.' },
-    { g: 'IF', band: 'fl', en: 'Internally flawless — no inclusions at 10×; only minor surface blemishes.', es: 'Internally flawless — sin inclusiones a 10×; solo marcas superficiales menores.' },
-    { g: 'VVS1', band: 'vvs', en: 'Inclusions so slight they are very difficult for a skilled grader to see at 10×.', es: 'Inclusiones tan leves que a un gradador experto le cuesta mucho verlas a 10×.' },
-    { g: 'VVS2', band: 'vvs', en: 'Very, very slight inclusions, still difficult to see at 10×.', es: 'Inclusiones muy, muy leves, todavía difíciles de ver a 10×.' },
-    { g: 'VS1', band: 'vs', en: 'Minor inclusions a grader finds with some effort at 10×; never visible to the eye.', es: 'Inclusiones menores que un gradador encuentra con algo de esfuerzo a 10×; nunca visibles a simple vista.' },
-    { g: 'VS2', band: 'vs', en: 'Minor inclusions somewhat easier to see at 10×; still eye-clean.', es: 'Inclusiones menores algo más fáciles de ver a 10×; todavía limpia a simple vista.' },
-    { g: 'SI1', band: 'si', en: 'Inclusions noticeable at 10×; usually eye-clean, which is why SI1 prices close to VS2.', es: 'Inclusiones notables a 10×; normalmente limpia a simple vista, por eso SI1 se valora cerca de VS2.' },
-    { g: 'SI2', band: 'si', en: 'Inclusions easy to see at 10×; sometimes visible to the naked eye, especially in larger stones.', es: 'Inclusiones fáciles de ver a 10×; a veces visibles a simple vista, sobre todo en piedras grandes.' },
-    { g: 'I1', band: 'i', en: 'Inclusions obvious at 10× and often visible to the eye; may affect brilliance.', es: 'Inclusiones evidentes a 10× y a menudo visibles a simple vista; pueden afectar el brillo.' },
-    { g: 'I2', band: 'i', en: 'Obvious inclusions visible to the naked eye; brilliance clearly affected.', es: 'Inclusiones evidentes a simple vista; el brillo claramente afectado.' },
-    { g: 'I3', band: 'i', en: 'Large, obvious inclusions; can affect durability. The bottom of the scale.', es: 'Inclusiones grandes y evidentes; pueden afectar la durabilidad. El final de la escala.' },
+  // nameEn/nameEs = what the abbreviation stands for; it is the first thing a
+  // tapped clarity chip shows (owner, 10-28). The GIA terms stay in English in
+  // the Spanish name, followed by their meaning.
+  const clarityGrades: { g: string; band: ClarityBand; en: string; es: string; nameEn: string; nameEs: string }[] = [
+    { g: 'FL', band: 'fl', en: 'No inclusions or blemishes visible at 10× magnification.', es: 'Sin inclusiones ni marcas visibles a 10 aumentos.', nameEn: 'Flawless', nameEs: 'Flawless — sin defectos' },
+    { g: 'IF', band: 'fl', en: 'No inclusions at 10×; only minor surface blemishes.', es: 'Sin inclusiones a 10×; solo marcas superficiales menores.', nameEn: 'Internally Flawless', nameEs: 'Internally Flawless — sin defectos internos' },
+    { g: 'VVS1', band: 'vvs', en: 'Inclusions so slight they are very difficult for a skilled grader to see at 10×.', es: 'Inclusiones tan leves que a un gradador experto le cuesta mucho verlas a 10×.', nameEn: 'Very, Very Slightly Included 1', nameEs: 'Very, Very Slightly Included 1 — inclusiones muy, muy leves' },
+    { g: 'VVS2', band: 'vvs', en: 'Very, very slight inclusions, still difficult to see at 10×.', es: 'Inclusiones muy, muy leves, todavía difíciles de ver a 10×.', nameEn: 'Very, Very Slightly Included 2', nameEs: 'Very, Very Slightly Included 2 — inclusiones muy, muy leves' },
+    { g: 'VS1', band: 'vs', en: 'Minor inclusions a grader finds with some effort at 10×; never visible to the eye.', es: 'Inclusiones menores que un gradador encuentra con algo de esfuerzo a 10×; nunca visibles a simple vista.', nameEn: 'Very Slightly Included 1', nameEs: 'Very Slightly Included 1 — inclusiones muy leves' },
+    { g: 'VS2', band: 'vs', en: 'Minor inclusions somewhat easier to see at 10×; still eye-clean.', es: 'Inclusiones menores algo más fáciles de ver a 10×; todavía limpia a simple vista.', nameEn: 'Very Slightly Included 2', nameEs: 'Very Slightly Included 2 — inclusiones muy leves' },
+    { g: 'SI1', band: 'si', en: 'Inclusions noticeable at 10×; usually eye-clean, which is why SI1 prices close to VS2.', es: 'Inclusiones notables a 10×; normalmente limpia a simple vista, por eso SI1 se valora cerca de VS2.', nameEn: 'Slightly Included 1', nameEs: 'Slightly Included 1 — inclusiones leves' },
+    { g: 'SI2', band: 'si', en: 'Inclusions easy to see at 10×; sometimes visible to the naked eye, especially in larger stones.', es: 'Inclusiones fáciles de ver a 10×; a veces visibles a simple vista, sobre todo en piedras grandes.', nameEn: 'Slightly Included 2', nameEs: 'Slightly Included 2 — inclusiones leves' },
+    { g: 'I1', band: 'i', en: 'Inclusions obvious at 10× and often visible to the eye; may affect brilliance.', es: 'Inclusiones evidentes a 10× y a menudo visibles a simple vista; pueden afectar el brillo.', nameEn: 'Included 1', nameEs: 'Included 1 — con inclusiones' },
+    { g: 'I2', band: 'i', en: 'Obvious inclusions visible to the naked eye; brilliance clearly affected.', es: 'Inclusiones evidentes a simple vista; el brillo claramente afectado.', nameEn: 'Included 2', nameEs: 'Included 2 — con inclusiones' },
+    { g: 'I3', band: 'i', en: 'Large, obvious inclusions; can affect durability. The bottom of the scale.', es: 'Inclusiones grandes y evidentes; pueden afectar la durabilidad. El final de la escala.', nameEn: 'Included 3', nameEs: 'Included 3 — con inclusiones' },
   ];
 
   const labCards = [
@@ -284,7 +287,9 @@ export default async function DiamondWorthGuidePage({ params }: Props) {
       <main className="site-header-offset">
 
         {/* Hero */}
-        <section className="relative flex min-h-[440px] items-center overflow-hidden bg-[#1a1c1c]">
+        {/* py: on phones the text is taller than min-h, so without it the
+            breadcrumb and the buttons touch the dark band's edges (owner, 10-28). */}
+        <section className="relative flex min-h-[440px] items-center overflow-hidden bg-[#1a1c1c] py-12 md:py-16">
           <div className="ultrawide-page relative z-10 mx-auto w-full max-w-[1440px] px-4 md:px-8">
             <div className="max-w-3xl">
               <BreadcrumbTrailFromLd ld={breadcrumbLd} />
@@ -399,7 +404,7 @@ export default async function DiamondWorthGuidePage({ params }: Props) {
             <div className="mt-6">
               <GradeChartScale
                 title={isEs ? 'Claridad — de FL (sin defectos) a I3 (con inclusiones)' : 'Clarity — FL (flawless) to I3 (included)'}
-                grades={clarityGrades.map((c) => ({ g: c.g, band: c.band, line: isEs ? c.es : c.en }))}
+                grades={clarityGrades.map((c) => ({ g: c.g, band: c.band, line: isEs ? c.es : c.en, name: isEs ? c.nameEs : c.nameEn }))}
                 bands={clarityBands.map((b) => ({ band: b.band, name: isEs ? b.nameEs : b.nameEn, offer: isEs ? b.offerEs : b.offerEn }))}
                 bandStyle={BAND_STYLE}
                 storageKey="nej.diamond-chart.clarity.expanded"

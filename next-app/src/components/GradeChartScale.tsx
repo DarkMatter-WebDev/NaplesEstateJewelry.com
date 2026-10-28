@@ -6,6 +6,8 @@ export interface GradeChartGrade {
   g: string;
   band: string;
   line: string;
+  /** What the abbreviation stands for (clarity: "Very Slightly Included 1"); shown first. */
+  name?: string;
 }
 
 export interface GradeChartBand {
@@ -91,14 +93,26 @@ export default function GradeChartScale({ title, grades, bands, bandStyle, stora
         })}
       </div>
 
-      <div className="mb-4 min-h-[2.75rem] rounded-xl border border-dashed border-[#d0c5af] bg-[#fbf7ea] px-3 py-2 text-sm leading-relaxed text-[#4d4635]" aria-live="polite">
+      {/* flex + justify-center: the starting hint sits centred in the box
+          instead of top-left with empty space under it (owner, 10-28). */}
+      <div className="mb-4 flex min-h-[2.75rem] flex-col justify-center rounded-xl border border-dashed border-[#d0c5af] bg-[#fbf7ea] px-3 py-2 text-sm leading-relaxed text-[#4d4635]" aria-live="polite">
         {pickedGrade ? (
-          <p className="m-0">
-            <span className="mr-2 font-bold text-[#1a1c1c]" style={{ fontFamily: 'var(--font-label)' }}>{pickedGrade.g}</span>
-            {pickedGrade.line}
-          </p>
+          <>
+            {pickedGrade.name ? (
+              <p className="m-0 font-bold text-[#1a1c1c]">
+                <span className="mr-2" style={{ fontFamily: 'var(--font-label)' }}>{pickedGrade.g}</span>
+                {pickedGrade.name}
+              </p>
+            ) : null}
+            <p className="m-0">
+              {pickedGrade.name ? null : (
+                <span className="mr-2 font-bold text-[#1a1c1c]" style={{ fontFamily: 'var(--font-label)' }}>{pickedGrade.g}</span>
+              )}
+              {pickedGrade.line}
+            </p>
+          </>
         ) : (
-          <p className="m-0 text-xs text-[#7a7360]">{isEs ? 'Toque un grado para leerlo.' : 'Tap a grade to read it.'}</p>
+          <p className="m-0 text-center text-xs text-[#7a7360]">{isEs ? 'Toque un grado para leerlo.' : 'Tap a grade to read it.'}</p>
         )}
       </div>
 
@@ -115,7 +129,10 @@ export default function GradeChartScale({ title, grades, bands, bandStyle, stora
                   {grades.filter((c) => c.band === b.band).map((c) => (
                     <tr key={c.g} className="border-b border-[#e3dccd] last:border-b-0">
                       <td className="w-14 py-1.5 pr-3 align-top font-bold text-[#1a1c1c]" style={{ fontFamily: 'var(--font-label)' }}>{c.g}</td>
-                      <td className="py-1.5 text-[#4d4635]">{c.line}</td>
+                      <td className="py-1.5 text-[#4d4635]">
+                        {c.name ? <span className="font-semibold text-[#1a1c1c]">{c.name}. </span> : null}
+                        {c.line}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

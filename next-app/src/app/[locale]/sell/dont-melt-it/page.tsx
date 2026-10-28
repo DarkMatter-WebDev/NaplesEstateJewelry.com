@@ -166,7 +166,7 @@ export default async function DontMeltItPage({ params }: Props) {
       <main className="site-header-offset">
 
         {/* Hero */}
-        <section className="relative flex min-h-[440px] items-center overflow-hidden bg-[#1a1c1c]">
+        <section className="relative flex min-h-[440px] items-center overflow-hidden bg-[#1a1c1c] py-12 md:py-16">
           <div className="ultrawide-page relative z-10 mx-auto w-full max-w-[1440px] px-4 md:px-8">
             <div className="max-w-3xl">
               <BreadcrumbTrailFromLd ld={crumbs} />

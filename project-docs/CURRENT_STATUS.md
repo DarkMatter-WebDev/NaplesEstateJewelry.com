@@ -4,7 +4,42 @@
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
 > in `DECISIONS.md`. Last reconciled: **2026-10-27 (10)** (NEW `/guides` index page of the seven guides + About menu / footer links BUILT + STAGED, not pushed; diamond-grading guide recommended against, owner's call open — block below). Before that, **2026-10-27 (9)** (session closed: live check of today's tax-exempt work done — `CHANGELOG.md` (8); eBay "Price stalled" explained, #1 cleared by the owner, Rolex "Price failed" chip left as is — (9); no code). Before that, **2026-10-27 (7)** (owner pushed + deployed (4) verify-from-My-Account + AI caps, (5) copy-or-authorization-number + paper-copy override, (6) "Not listed" default; production not checked by Claude). Before that, **2026-10-27 (5)** (in-store exempt sales need a copy OR a Florida authorization number; "I kept a paper copy" overrides the photo; Verify buttons → floridarevenue.com/taxes/certificates; staged, not pushed). Before that, **2026-10-27 (4)** (verify a tax-exempt certificate from My Account + homepage line BUILT + STAGED, not pushed; no SQL — block below). Before that, **2026-10-27 (3)** (tax-exempt sales LIVE — owner ran the SQL + pushed + deployed). Before that, **2026-10-27 (1)** (Google's "untagged landing pages" email = `/jewelry-appraisal` with 0 ad clicks so far, ad-click-only tag; no action — `CHANGELOG.md` 2026-10-27 (1)).
 
-## Start Here (2026-10-27 (10)–(12) + 2026-10-28 (1) — 🟡 NEW `/guides` index page (About menu + footer links) + NEW diamond guide with the COLLAPSIBLE color/clarity chart (chart B) — BUILT + STAGED, not pushed; no SQL, no env vars)
+## Start Here (2026-10-28 (11) — 🟡 Diamond guide polish BUILT + STAGED, not pushed: hero padding on phones, chart result box centred, clarity chips name their abbreviation; no SQL, no env vars)
+
+- 🟡 **Waiting for the owner's push** (`CHANGELOG.md` 2026-10-28 (11); `TASKS.md` top block). Files: `src/app/[locale]/diamond-buyers/what-is-my-diamond-worth/page.tsx`, `src/components/GradeChartScale.tsx`, `src/lib/__tests__/diamond-guide.test.ts`.
+- ✅ **(12) the same hero padding on the other 11 dark-hero pages** (owner: *"Yes, fix all 11"*; `CHANGELOG.md` 2026-10-28 (12)) — all 48px / 48px at 375px; same push. Gate after (12): `tsc` 0 · lint 0 errors · **2084/2084** · build 0.
+- The (10) block below still holds for Google Ads.
+
+## Start Here (2026-10-28 (10) — 🔴 SESSION CLOSED — **next thing to do: the Google Ads performance read ~Sat Oct 31 and the budget call ~Tue Nov 4** (Sellers $45, Lee $5, account $54/day); no code, no SQL, no env vars)
+
+- `TASKS.md` top block = the reminder + the budget rulebook (hold / raise / reverse per campaign, with the numbers); `CHANGELOG.md` 2026-10-28 (10). Nothing staged-but-unpushed except docs. The owner's words: *"check up on the performance soon and possibly adjust budgets"*.
+
+## Start Here (2026-10-28 (9) — 🟢 Google Ads: "NEJ Lee County - Search" reviewed and **ENABLED** at $5/day (10-28 ~3:40 PM); account $54/day; **check-ups ~Oct 30 + ~Nov 4**; no code, no SQL, no env vars)
+
+- `CHANGELOG.md` 2026-10-28 (8) = the build, (9) = the review + enable; `TASKS.md` top block = the Oct 30 ad-review/search-terms look and the Nov 4 continue-or-pause read. Fort Myers + Cape Coral + North Fort Myers (presence), Search only, Maximize clicks $6 cap, three groups (Gold / Sterling / Estate & Inherited), 29 phrase keywords (the 6 Cape Coral ones land on `/sell/cape-coral`), **127 negatives** (the Sellers list + coins/bullion/bars/pawn/prices/mail-in/plate/estate-sale). Sellers $45 + Coins $4 + Lee $5. ⛔ The "Drafts in progress: 1" row on the Campaigns table is the empty wizard draft — ignore.
+
+## Start Here (2026-10-28 (7) — 🟢 Google Ads: NEJ Sellers budget **$45.00/day** since 10-28 ~1:50 PM (was $33; owner's yes + passkey; verified); account $49/day; **check-up ~Wed Nov 11**; no code, no SQL, no env vars)
+
+- `CHANGELOG.md` 2026-10-28 (7); the check-up rule + reversal in `TASKS.md` top block item 1. Recommendations #2–#5 (free-evaluation experiment, Spanish keywords, Lee County campaign, Gold copy) still await the owner's call.
+
+## Start Here (2026-10-28 (6) — 🟡 Google Ads: five ranked recommendations await the owner's call; nothing applied; no code, no SQL, no env vars)
+
+- 📖 `CHANGELOG.md` 2026-10-28 (6); the list with check-up rules = `TASKS.md` top block. #1 **Sellers budget $33 → $45/day** (22–28% of eligible searches lost to budget; needs the owner's passkey), #2 Estate → `/free-evaluation` experiment, #3 five Spanish keywords, #4 a Lee County campaign, #5 Gold ad copy. Hour-of-day: noon–4 PM = 12 of 18 conv on 34% of spend; 8–11 AM = 1 conv on 31% — noted, not acted on.
+
+## Start Here (2026-10-28 (5) — 📖 Google Ads: the impressions drop explained — ads steady, DEMAND fell; nothing changed; no code, no SQL, no env vars)
+
+- 📖 `CHANGELOG.md` 2026-10-28 (5). Impression share 30–40% and lost-to-rank ~40% every week incl. after the pins; all keywords Eligible; no competitor surge; change history clean. The eligible-search pool/day fell from an Oct 23–24 peak (526–551) back to ~280–345, in step with US "sell gold" searches (Trends: lowest of 90 days on Oct 27–28) and gold's steepest weekly drop since June (~$4,052/oz). GBP October ≈ September (monthly only). ⛔ No bid/budget/keyword move for a demand dip (09-23 rule). Nov 9 pin rule now = impression share, not raw impressions (`TASKS.md`). Six IS columns left on the owner's campaigns-table view (harmless; removable on request).
+
+## Start Here (2026-10-28 (4) — 📖 Google Ads AUDIT, read-only, nothing changed; no code, no SQL, no env vars)
+
+- 📖 `CHANGELOG.md` 2026-10-28 (4). No account changes since the 10-26 pins. Life: 472 clicks / $1,038.97 / 20 conv. Both campaigns now "Limited by search volume"; Oct 27 (first full day after the pins) = 85 impr (14-day low) but 14% CTR → watched at ~Nov 9 (`TASKS.md` 10-26 (7) item 1). Last 14 days: 9 of 11 conv are website "Get directions" taps (7) + call taps; **Spanish group 5 conv at $10.37 = best**; Gold 26 clicks / 0 conv; Diamond's first conversion. New sitelink + callout **Eligible**; **no new Google-AI sitelinks**. Brand term 26 clicks / $55.54 (≈ 11% of spend; owner's "leave" stands).
+
+## Start Here (2026-10-28 (2) — 🟢 `/guides` index + the diamond guide with the collapsible color/clarity chart (chart B) DEPLOYED by the owner; live-checked at five widths; IndexNow 200 ×4; Search Console requested 4/4; nothing staged-but-unpushed except docs; no SQL, no env vars)
+
+- 🟢 **Deployed 10-28** (`CHANGELOG.md` 2026-10-28 (2)). Live checks: all four URLs 200 with chart B markup; in the owner's Chrome the tap → expand → reload-remembered cycle works on production (key cleared afterwards); 320/375/768/1024/~1044 px with no horizontal overflow; `/guides` 8 cards. IndexNow 200 ×4; Search Console "Indexing requested" 4/4. Open: the owner's counter check on a real phone + a read of the page (`TASKS.md` top block 4–5); check-ups ~Nov 12–19 (Search Console) and ~Nov 26 (`/guides`). Where the lines below say "waiting for the push" / "BUILT + STAGED, not pushed", read "deployed".
+- 🔒 **Session CLOSED 2026-10-28 (3)** (`CHANGELOG.md` 2026-10-28 (3)): the owner asked about a GIA / Rapaport chart sheet on the diamond guide → advised against (Rapaport = paid copyrighted list + wholesale asking price sellers would anchor to; GIA artwork = copyright/trademark; the scale itself is already on the page in our words) → owner *"skip that"*; ⛔ recorded in `DECISIONS.md`. No app change; no SQL; nothing to push except docs.
+
+### Earlier the same day (2026-10-27 (10)–(12) + 2026-10-28 (1) — as written before the push)
 
 - 🟡 **Waiting for the owner's push + deploy** (`CHANGELOG.md` 2026-10-27 (10); rule `DECISIONS.md` top entry; `TASKS.md` top block). After the push Claude runs IndexNow for `/guides` + `/es/guides` and asks Search Console to index both.
 - What it is: `/guides` lists the seven existing guides (one card each: clay mark, section, the guide's own title, one line, link) and ends with the Free Appraisal + Call band; "Guides" sits in the About menu (between Reviews and Live Metal Prices) and the footer's Company column. Nothing on the guides themselves changed; ⛔ it is an index, never a copy (owner asked about duplicating — advised against).

@@ -34,10 +34,21 @@ describe('diamond guide', () => {
     expect(gradesIn('clarityGrades')).toEqual(CLARITY);
     expect(PAGE).toContain('id="color-clarity-chart"');
     // Every grade has a non-empty EN and ES line.
-    for (const m of PAGE.matchAll(/\{ g: '[^']+', band: '[^']+', en: '([^']*)', es: '([^']*)' \}/g)) {
+    const lines = [...PAGE.matchAll(/\{ g: '[^']+', band: '[^']+', en: '([^']*)', es: '([^']*)'(?:, [^}]*)? \}/g)];
+    expect(lines.length).toBe(COLOR.length + CLARITY.length);
+    for (const m of lines) {
       expect(m[1].length).toBeGreaterThan(3);
       expect(m[2].length).toBeGreaterThan(3);
     }
+  });
+
+  it('names what every clarity abbreviation stands for, shown first when tapped (owner, 2026-10-28)', () => {
+    const names = [...PAGE.matchAll(/\{ g: '([^']+)', band: '[^']+', en: '[^']*', es: '[^']*', nameEn: '([^']+)', nameEs: '([^']+)' \}/g)];
+    expect(names.map((m) => m[1])).toEqual(CLARITY);
+    expect(names.find((m) => m[1] === 'VS1')?.[2]).toBe('Very Slightly Included 1');
+    expect(names.find((m) => m[1] === 'VVS2')?.[2]).toBe('Very, Very Slightly Included 2');
+    expect(PAGE).toContain('name: isEs ? c.nameEs : c.nameEn');
+    expect(read('src', 'components', 'GradeChartScale.tsx')).toContain('{pickedGrade.name}');
   });
 
   it('renders both scales through the collapsible GradeChartScale (chart B, 2026-10-28)', () => {
