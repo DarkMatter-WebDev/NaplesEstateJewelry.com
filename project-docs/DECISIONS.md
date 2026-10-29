@@ -4,7 +4,18 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-10-29 (3)**.
+> compaction. Last reconciled: **2026-10-29 (7)**.
+
+## A checkout gift ships under the RECIPIENT's name with a price-free gift slip; the buyer keeps the priced receipt; card billing never defaults to the gift address (2026-10-29)
+
+- **Owner:** *"Build as recommended"* on gift mockup 1. Record `CHANGELOG.md` 2026-10-29 (7).
+- **Rules:** one optional **🎁 This is a gift** box after the buyer's contact details (main `/checkout` only; offers / counter Buy-now / `/pay` links not yet). Shipped gift = recipient's first + last name required, message ≤ 250, and the recipient's name goes to PayPal as the shipping name (⛔ never ship a gift to an address/name PayPal doesn't have — Seller Protection). Pickup gift = message only. Card billing on a shipped gift is always typed (`separateBilling`) — ⛔ never default it to the recipient's address. The gift slip (admin) shows item names + message + order number + phone — ⛔ never prices or the buyer's contact details (test-guarded). The buyer's emailed receipt is the priced record and names the recipient. No gift wrap (owner may add later). Columns `orders.is_gift / gift_recipient_name / gift_message`; until they exist a gift falls back to `customer_notes`, never a failed sale.
+
+## Appointments are REQUESTED on the contact form and confirmed by a call or text — never self-booked; days follow the admin hours up to 12 months ahead, times are 10 AM–5 PM (2026-10-29)
+
+- **Owner:** *"Build as recommended"* on the appointment mockup, then *"include hours from 10am - 5pm"*. Record `CHANGELOG.md` 2026-10-29 (5).
+- **Rules:** no Calendly, no booking calendar, no availability store — two people may ask for the same time and the call sorts it out (keeps a phone call in every appointment). Days = the admin showroom schedule's open days (a day closed in admin is struck out); times = `APPOINTMENT_HOURS` in `lib/appointment-request.ts` (10:00–17:00, last start 16:30) — deliberately WIDER than walk-in hours and NOT admin-editable (change the constant). Today is never pickable (same-day = call); the window is tomorrow → the end of the 12th month after this one, shown one month at a time with ‹ › arrows (owner 10-29 (6): *"allow the customer to choose any month in the future"*; `APPOINTMENT_MONTHS_AHEAD`). The picked day posts from a hidden input so it survives paging months. A request that no longer fits is still delivered with a note — ⛔ never refuse a lead over it. The fields post only while the box is ticked; with it ticked the message is optional.
+- **Not done (owner's call later):** the same box on the product "Inquire about this item" form.
 
 ## Make an Offer's hold step uses the new pay box — PayPal + card boxes, "Send offer · Hold $…"; NO Venmo, Apple Pay or Google Pay on offers until one real Apple Pay hold is proven (2026-10-29)
 

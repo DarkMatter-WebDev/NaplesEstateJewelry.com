@@ -520,3 +520,12 @@ dev server (env is read at boot).
    `item_conflict` 409, flagged for refund), amount mismatch (flagged, not sold),
    partial refund, same-target refund retry, and full remaining refund.
 5. Swap to a live PayPal app, set `PAYPAL_ENV=live`, redeploy, re-test once.
+
+## "This is a gift" (2026-10-29)
+
+- Checkout box after Contact details (`components/checkout/GiftOptionField.tsx`). Shipping: recipient first + last name (required while ticked) + optional message (max 250). Local Pickup: message only.
+- `create-order` reads `body.gift` via `normalizeGift` (`lib/order-gift.ts`); a shipped gift without the recipient's full name -> 400 `gift_recipient`. PayPal's shipping name = the recipient. `saveOrderGift` writes `orders.is_gift / gift_recipient_name / gift_message` on both the new and the resumed-order paths; if the columns are missing (SQL `supabase/order-gift-2026-10.sql` not run) a gift goes into `customer_notes` instead.
+- Card billing on a shipped gift is always typed by the buyer (`PayPalCheckoutButton separateBilling` -> `CardBillingInputs separateOnly`); the "same as shipping" box is hidden because that address is the recipient's.
+- Buyer receipt email: gift line in the paid note (`buildInvoiceEmailContent(..., { gift })`, loaded by `loadOrderGift` in the mailer).
+- Admin: Gift tag, recipient, message, Print Gift Slip -> `/admin/orders/<id>/gift-slip` (no prices, no buyer contact details; test-guarded).
+- Record: `CHANGELOG.md` 2026-10-29 (7); rule `DECISIONS.md`.

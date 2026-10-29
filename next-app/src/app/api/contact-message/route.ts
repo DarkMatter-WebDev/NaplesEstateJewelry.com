@@ -26,6 +26,15 @@ import {
   parseAdClickIds,
   type AdClickIds,
 } from '@/lib/ads-tracking';
+import {
+  appointmentInvalidMessage,
+  appointmentIssue,
+  formatAppointment,
+  parseAppointmentRequest,
+  showroomTodayIso,
+  type AppointmentRequest,
+} from '@/lib/appointment-request';
+import { getStoreHours } from '@/lib/store-hours';
 
 export const runtime = 'nodejs';
 
@@ -54,6 +63,19 @@ interface MessagePreferences {
   preferredContact: PreferredContact | null;
 }
 
+/** "Request an appointment" ticked (2026-10-29). `issue` = why it no longer fits the hours. */
+interface AppointmentAsk {
+  request: AppointmentRequest;
+  issue: string | null;
+}
+
+function appointmentLines(appt: AppointmentAsk): string[] {
+  return [
+    `Appointment requested: ${formatAppointment(appt.request, false, 'long')} (not confirmed — call or text to confirm)`,
+    ...(appt.issue ? [`Note: ${appt.issue}.`] : []),
+  ];
+}
+
 /** Best-effort owner notification email. Returns true if an email was sent. */
 async function sendOwnerEmail(
   name: string,
@@ -63,6 +85,7 @@ async function sendOwnerEmail(
   imageUrls: string[],
   prefs: MessagePreferences,
   adClick: AdClickIds,
+  appt: AppointmentAsk | null,
 ): Promise<boolean> {
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) return false;
@@ -83,16 +106,24 @@ async function sendOwnerEmail(
     // The Google Ads click the sender arrived with, when there was one.
     const source = adClickSummary(adClick);
     const sourceHtml = source ? `<p><strong>Source:</strong> ${esc(source)}</p>` : '';
+    // The appointment leads the email — it is the thing to act on.
+    const apptHtml = appt
+      ? `<p style="background:#fbf5e7;border-left:4px solid #b5890c;padding:8px 12px">📅 <strong>Appointment requested: ${esc(formatAppointment(appt.request, false, 'long'))}</strong><br><small>Not confirmed — call or text to confirm.</small>${appt.issue ? `<br><strong>Note:</strong> ${esc(appt.issue)}.` : ''}</p>`
+      : '';
+    const subjectLead = appt
+      ? `📅 Appointment request — ${formatAppointment(appt.request, false)} — ${sender}`
+      : `New website message from ${sender}`;
     const emailOpts: Parameters<InstanceType<typeof Resend>['emails']['send']>[0] = {
       from: FROM,
       to: OWNER_EMAIL,
-      subject: `New website message from ${sender}${inquirySubjectSuffix(prefs.locationArea, prefs.locationDetail, prefs.preferredContact)}${adClickSubjectSuffix(adClick)}`,
-      html: `<p><strong>Name:</strong> ${name ? esc(name) : 'Not provided'}</p>
+      subject: `${subjectLead}${inquirySubjectSuffix(prefs.locationArea, prefs.locationDetail, prefs.preferredContact)}${adClickSubjectSuffix(adClick)}`,
+      html: `${apptHtml}
+             <p><strong>Name:</strong> ${name ? esc(name) : 'Not provided'}</p>
              <p><strong>Email:</strong> ${email ? esc(email) : 'Not provided'}</p>
              <p><strong>Phone:</strong> ${esc(phone)}</p>
              ${prefHtml}
              <p><strong>Message:</strong></p>
-             <p>${esc(message).replace(/\n/g, '<br>')}</p>
+             <p>${message ? esc(message).replace(/\n/g, '<br>') : '(none)'}</p>
              ${photoHtml}
              ${sourceHtml}`,
     };
@@ -122,7 +153,13 @@ export async function POST(req: Request) {
   const phone = String(form.get('phone') ?? '').trim().slice(0, MAX_PHONE);
   const message = String(form.get('message') ?? '').trim().slice(0, MAX_MESSAGE);
 
-  if (!phone || !message) {
+  // Ticked appointment box: the day and time ARE the message, so the text is
+  // optional. A ticked box without a usable day/time is a visible 400.
+  const appointment = parseAppointmentRequest((field) => form.get(field));
+  if (appointment === 'invalid') {
+    return NextResponse.json({ error: appointmentInvalidMessage(false) }, { status: 400 });
+  }
+  if (!phone || (!message && !appointment)) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
   // Was a local "10 to 15 digits" count, duplicated in MessageUsForm. Both now
@@ -151,6 +188,11 @@ export async function POST(req: Request) {
   // table row of its own, so the click rides in the message-center body and
   // the owner's email (validated; anything that is not a click ID is dropped).
   const adClick = parseAdClickIds((param) => form.get(param));
+  // Never refused for not fitting the hours (they may have changed since the
+  // page loaded) — the owner sees the note and sorts it out on the call.
+  const appt: AppointmentAsk | null = appointment
+    ? { request: appointment, issue: appointmentIssue(appointment, showroomTodayIso(), await getStoreHours()) }
+    : null;
 
   // Service-role client: required to upload photos (Storage RLS) and to write the
   // admin_notifications row (admin-only RLS). Runs server-side so the key is never
@@ -198,8 +240,8 @@ export async function POST(req: Request) {
   // is required and validated above, so the empty branch this used to have was
   // unreachable.
   const notificationBody = [
-    message,
-    '',
+    ...(appt ? [...appointmentLines(appt), ''] : []),
+    ...(message ? [message, ''] : []),
     `Phone: ${normalizedPhone}`,
     ...inquiryPreferenceLines(prefs.locationArea, prefs.locationDetail, prefs.preferredContact),
     ...adClickLines(adClick),
@@ -210,7 +252,9 @@ export async function POST(req: Request) {
   const savedToMessages = service
     ? await createAdminNotification(service, {
         type: 'message',
-        title: `Message from ${sender}`,
+        title: appt
+          ? `Appointment request from ${sender} — ${formatAppointment(appt.request, false)}`
+          : `Message from ${sender}`,
         body: notificationBody,
         customerName: name || null,
         customerEmail: email || null,
@@ -220,7 +264,7 @@ export async function POST(req: Request) {
 
   // Best-effort email backup so the message reaches the owner even if the message
   // center write is unavailable (e.g. service role not configured).
-  const emailed = await sendOwnerEmail(name, email, normalizedPhone, message, imageUrls, prefs, adClick);
+  const emailed = await sendOwnerEmail(name, email, normalizedPhone, message, imageUrls, prefs, adClick, appt);
 
   if (!savedToMessages && !emailed) {
     return NextResponse.json({ error: 'Failed to send message' }, { status: 500 });

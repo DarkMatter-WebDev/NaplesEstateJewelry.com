@@ -34,7 +34,7 @@ export default function FormSuccessPanel({
 }: {
   isEs: boolean;
   /** Small line under the heading: a submission (photos/appraisal) or a message. */
-  kind: 'submission' | 'message';
+  kind: 'submission' | 'message' | 'appointment';
   /** The one sentence under it — each form keeps its own wording. */
   body: string;
   onSendAnother: () => void;
@@ -61,9 +61,11 @@ export default function FormSuccessPanel({
     return () => window.clearTimeout(recheck);
   }, []);
 
-  const received = kind === 'message'
-    ? (isEs ? 'Mensaje enviado' : 'Message sent')
-    : (isEs ? 'Envío recibido' : 'Submission received');
+  const received = kind === 'appointment'
+    ? (isEs ? 'Solicitud enviada' : 'Request sent')
+    : kind === 'message'
+      ? (isEs ? 'Mensaje enviado' : 'Message sent')
+      : (isEs ? 'Envío recibido' : 'Submission received');
 
   return (
     <div

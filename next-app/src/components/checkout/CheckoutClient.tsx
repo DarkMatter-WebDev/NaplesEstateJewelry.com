@@ -30,6 +30,8 @@ import {
 import { chargesFlSalesTax, formatCheckoutCurrency } from '@/lib/checkout-pricing';
 import CheckoutTaxExempt, { type CheckoutExemptionChoice } from '@/components/checkout/CheckoutTaxExempt';
 import HeardAboutCard from '@/components/checkout/HeardAboutCard';
+import GiftOptionField, { EMPTY_GIFT_FORM, type GiftFormState } from '@/components/checkout/GiftOptionField';
+import { giftReceivedLine, type OrderGift } from '@/lib/order-gift';
 import {
   isUnitedStatesCountry,
   normalizeUsState,
@@ -141,7 +143,10 @@ export default function CheckoutClient({ locale, paypalClientId, pickupHoursLine
     items: CartItem[];
     shippingMethod: string;
     customer: CustomerInfo;
+    gift: OrderGift | null;
   } | null>(null);
+  // "This is a gift" (2026-10-29): see GiftOptionField / lib/order-gift.ts.
+  const [gift, setGift] = useState<GiftFormState>(EMPTY_GIFT_FORM);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   // Internal order id from the first create-order call, reused if the buyer
   // cancels the PayPal window and tries again (so we don't create a duplicate order).
@@ -234,6 +239,14 @@ export default function CheckoutClient({ locale, paypalClientId, pickupHoursLine
   const composedName = composeFullName(customer.first_name, customer.last_name);
   const contactReady =
     composedName !== null && customer.email.trim() !== '' && normalizedPhone !== null;
+  // A shipped gift needs the recipient's full name; pickup gifts carry none.
+  const giftRecipientName = gift.isGift && needsShipping
+    ? composeFullName(gift.recipientFirst, gift.recipientLast)
+    : null;
+  const giftReady = !gift.isGift || !needsShipping || giftRecipientName !== null;
+  const orderGift: OrderGift | null = gift.isGift
+    ? { recipientName: giftRecipientName, message: gift.message.trim() || null }
+    : null;
   const shippingAddressReady =
     !needsShipping ||
     (customer.address_line1.trim() !== '' &&
@@ -245,10 +258,11 @@ export default function CheckoutClient({ locale, paypalClientId, pickupHoursLine
   // checkout with a clear message instead of letting it fail at PayPal.
   const unavailableItems = findUnavailableCartItems(items);
   const hasUnavailableItem = unavailableItems.length > 0;
-  const payReady = items.length > 0 && contactReady && shippingAddressReady && infoConfirmed && !hasUnavailableItem && !exemptBusy;
+  const payReady = items.length > 0 && contactReady && giftReady && shippingAddressReady && infoConfirmed && !hasUnavailableItem && !exemptBusy;
 
   const missingFieldLabels = [
     exemptBusy ? (isEs ? 'Aprobación de exención (o cancélela)' : 'Tax-exempt approval (or cancel it)') : null,
+    !giftReady ? (isEs ? 'Nombre del destinatario del regalo' : 'Gift Recipient’s Name') : null,
     needsShipping && customer.address_line1.trim() === '' ? (isEs ? 'Dirección' : 'Street Address') : null,
     needsShipping && customer.city.trim() === '' ? (isEs ? 'Ciudad' : 'City') : null,
     needsShipping && normalizedShippingState === null ? (isEs ? 'Estado válido de EE. UU.' : 'Valid U.S. State') : null,
@@ -285,6 +299,10 @@ export default function CheckoutClient({ locale, paypalClientId, pickupHoursLine
         country: customer.country,
       },
       shippingMethod: effectiveShippingMethod,
+      // The server re-reads and re-checks it (lib/order-gift.ts normalizeGift).
+      gift: gift.isGift
+        ? { isGift: true, recipientFirst: gift.recipientFirst, recipientLast: gift.recipientLast, message: gift.message }
+        : null,
       // Only the CODE is sent. The server re-reads it and recomputes the
       // discount from its own subtotal, so no amount crosses the wire.
       discountCode: appliedDiscount?.code ?? null,
@@ -507,6 +525,14 @@ export default function CheckoutClient({ locale, paypalClientId, pickupHoursLine
           <p className="mb-6 text-sm font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
             {createdOrder.orderNumber}
           </p>
+          {createdOrder.gift && (
+            <p
+              className="mx-auto mb-6 max-w-md rounded-[10px] px-3 py-2.5 text-left text-sm leading-relaxed"
+              style={{ border: '1px solid rgba(115, 92, 0, 0.24)', background: '#fbf5e7', color: '#4d4635' }}
+            >
+              {giftReceivedLine(createdOrder.gift, isEs)}
+            </p>
+          )}
         </div>
 
         <div className="no-print flex flex-wrap justify-center gap-3">
@@ -564,6 +590,9 @@ export default function CheckoutClient({ locale, paypalClientId, pickupHoursLine
                     <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
                       {needsShippingReceipt ? (isEs ? 'Envío a' : 'Ship To') : (isEs ? 'Dirección' : 'Address')}
                     </p>
+                    {createdOrder.gift?.recipientName && (
+                      <p style={{ color: 'var(--color-on-surface)' }}>🎁 {createdOrder.gift.recipientName}</p>
+                    )}
                     <p style={{ color: 'var(--color-on-surface)' }}>{c.address_line1}</p>
                     {c.address_line2 && <p>{c.address_line2}</p>}
                     <p>{[c.city, c.state, c.postal_code].filter(Boolean).join(', ')}</p>
@@ -798,14 +827,20 @@ export default function CheckoutClient({ locale, paypalClientId, pickupHoursLine
             </div>
           </div>
 
+          <GiftOptionField value={gift} onChange={setGift} pickup={!needsShipping} isEs={isEs} />
+
           <div className="checkout-address-fields">
             {needsShipping ? (
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-                  {isEs ? 'Dirección' : 'Address'}
+                  {gift.isGift
+                    ? (isEs ? 'Dirección del destinatario' : 'Recipient’s address')
+                    : (isEs ? 'Dirección' : 'Address')}
                 </p>
                 <p className="mt-1 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-                  {isEs
+                  {gift.isGift
+                    ? (isEs ? 'Enviaremos el regalo a esta dirección.' : 'We’ll ship the gift to this address.')
+                    : isEs
                     ? 'Enviaremos su pedido a esta dirección. ¿Prefiere recogerlo en persona? Elija Recogida local arriba.'
                     : 'We’ll ship your order to this address. Prefer to pick it up in person? Choose Local Pickup above.'}
                 </p>
@@ -1104,6 +1139,7 @@ export default function CheckoutClient({ locale, paypalClientId, pickupHoursLine
                 missingFields={missingFieldLabels}
                 needsInfoConfirmation={!infoConfirmed}
                 getPayload={buildPayPalPayload}
+                separateBilling={gift.isGift && needsShipping}
                 onOrderId={(id) => {
                   orderIdRef.current = id;
                   orderPayloadKeyRef.current = cartPayloadKey;
@@ -1126,7 +1162,7 @@ export default function CheckoutClient({ locale, paypalClientId, pickupHoursLine
                 onSuccess={({ orderId, orderNumber }) => {
                   // Snapshot the order for the printable confirmation, THEN clear the
                   // cart (clearing empties `items`, so capture the summary first).
-                  setCreatedOrder({ orderId, orderNumber, items: summaryItems, shippingMethod: effectiveShippingMethod, customer });
+                  setCreatedOrder({ orderId, orderNumber, items: summaryItems, shippingMethod: effectiveShippingMethod, customer, gift: orderGift });
                   clear();
                 }}
               />

@@ -9,6 +9,7 @@ import {
 } from '@/lib/order-invoice-email';
 import { getStoreHours } from '@/lib/store-hours';
 import { loadOrderTaxExemption } from '@/lib/tax-exempt-server';
+import { loadOrderGift } from '@/lib/order-gift-server';
 
 const ORDER_INVOICE_COLUMNS = [
   'id',
@@ -114,6 +115,7 @@ export async function sendOrderInvoiceEmail(opts: {
     payment: opts.payment ?? null,
     // Tax-exempt sales (owner, 2026-10-27) print the certificate line.
     taxExempt: await loadOrderTaxExemption(supabase, orderId),
+    gift: await loadOrderGift(supabase, orderId),
   });
   const emailType: 'invoice' | 'receipt' = isOrderPaid(emailOrder) ? 'receipt' : 'invoice';
 

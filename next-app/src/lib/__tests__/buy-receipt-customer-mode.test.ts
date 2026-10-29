@@ -409,6 +409,7 @@ describe('customer input mode: the server refuses a locked browser', () => {
     const users = sourceFiles(join(root, 'src')).filter((file) => readFileSync(file, 'utf8').includes('<CustomerModeTabGuard'));
     expect(users.map((file) => file.replace(root, '').replace(/\\/g, '/')).sort()).toEqual([
       '/src/app/[locale]/account/layout.tsx',
+      '/src/app/[locale]/admin/orders/[id]/gift-slip/page.tsx',
       '/src/app/[locale]/admin/orders/[id]/invoice/page.tsx',
       '/src/app/[locale]/admin/orders/[id]/print/page.tsx',
     ]);

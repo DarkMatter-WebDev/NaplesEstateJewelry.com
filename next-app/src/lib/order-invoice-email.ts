@@ -17,6 +17,7 @@ import { describeOrderShippingService } from '@/lib/checkout-shipping';
 import { IN_STORE_PAYMENT_LABELS, type InStorePaymentMethod } from '@/lib/in-store-sale';
 import { paperDateLine } from '@/lib/order-receipt-paper';
 import { exemptReceiptLine, type TaxExemptSnapshot } from '@/lib/tax-exempt';
+import { giftReceiptNote, type OrderGift } from '@/lib/order-gift';
 
 export type InvoiceEmailOrder = Order & { order_items: OrderItem[] };
 
@@ -157,7 +158,7 @@ export function formatPickupHours(schedule: StoreHoursSchedule): string {
 export function buildInvoiceEmailContent(
   order: InvoiceEmailOrder,
   fallbackInvoiceNumber?: string | null,
-  opts?: { pickupHours?: string; payment?: InvoicePaymentBlock | null; taxExempt?: TaxExemptSnapshot | null },
+  opts?: { pickupHours?: string; payment?: InvoicePaymentBlock | null; taxExempt?: TaxExemptSnapshot | null; gift?: OrderGift | null },
 ): InvoiceEmailContent {
   const invoiceNumber = invoiceNumberForOrder(order, fallbackInvoiceNumber);
   const paid = isOrderPaid(order);
@@ -238,11 +239,14 @@ export function buildInvoiceEmailContent(
     : null;
 
   // Sent from a no-reply address, so don't invite replies — direct to phone/text.
-  const note = paid
+  const paidNote = paid
     ? inStoreMethod
       ? `Paid in full by ${IN_STORE_PAYMENT_LABELS[inStoreMethod] ?? 'in store'} on ${paperDateLine(order.created_at).split(' · ')[0] || 'the day of the sale'} — thank you.`
       : 'Your payment has been received in full — thank you.'
     : '';
+  // A checkout gift (2026-10-29): the buyer's record of who it goes to and
+  // what the slip says. The priced receipt stays with the buyer.
+  const note = [paidNote, opts?.gift ? giftReceiptNote(opts.gift) : ''].filter(Boolean).join(' ');
   const contactNote = carriedOut
     ? `Call or text us at ${BUSINESS_PHONE} with any questions.`
     : paid

@@ -158,7 +158,11 @@ export default function PayPalCheckoutButton({
   onPriceChange,
   createOrderUrl = '/api/paypal/create-order',
   cancelOnAbandon = true,
+  separateBilling = false,
 }: {
+  /** A shipped gift: the shipping address is the RECIPIENT's, so the card
+   *  billing never defaults to it — the buyer types their own (2026-10-29). */
+  separateBilling?: boolean;
   clientId: string;
   currency?: string;
   /** The total on screen. Apple Pay / Google Pay show it in their sheet and the
@@ -866,7 +870,7 @@ export default function PayPalCheckoutButton({
     return buildCardBillingAddress({
       shippingMethod: payload.shippingMethod,
       customer: payload.customer,
-      billingSame,
+      billingSame: billingSame && !separateBilling,
       billing,
       isEs: isEsRef.current,
     });
@@ -1085,8 +1089,9 @@ export default function PayPalCheckoutButton({
           <CardBillingInputs
             idPrefix="card-billing"
             pickup={pickup}
-            billingSame={billingSame}
+            billingSame={billingSame && !separateBilling}
             onBillingSameChange={setBillingSame}
+            separateOnly={separateBilling}
             billing={billing}
             onBillingChange={setBilling}
             isEs={isEs}

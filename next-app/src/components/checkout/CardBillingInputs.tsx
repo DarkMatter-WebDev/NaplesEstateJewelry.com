@@ -16,7 +16,11 @@ export default function CardBillingInputs({
   billing,
   onBillingChange,
   isEs,
+  separateOnly = false,
 }: {
+  /** A shipped gift: no "same as shipping" box (that address is the
+   *  recipient's) — the billing boxes always show. */
+  separateOnly?: boolean;
   /** Keeps the input ids unique if two forms ever share a page. */
   idPrefix: string;
   pickup: boolean;
@@ -46,15 +50,23 @@ export default function CardBillingInputs({
 
   return (
     <>
-      <label className="mt-2 flex items-center gap-2 text-sm" style={{ cursor: 'pointer' }}>
-        <input
-          type="checkbox"
-          checked={billingSame}
-          onChange={(e) => onBillingSameChange(e.target.checked)}
-          style={{ accentColor: 'var(--color-primary)', width: '1.05rem', height: '1.05rem', flexShrink: 0, cursor: 'pointer' }}
-        />
-        {isEs ? 'Dirección de facturación igual a la de envío' : 'Billing address same as shipping'}
-      </label>
+      {separateOnly ? (
+        <p className="mt-2 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+          {isEs
+            ? 'Su dirección de facturación (la de la tarjeta, no la de quien recibe el regalo):'
+            : 'Your billing address (the card’s — not the gift recipient’s):'}
+        </p>
+      ) : (
+        <label className="mt-2 flex items-center gap-2 text-sm" style={{ cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={billingSame}
+            onChange={(e) => onBillingSameChange(e.target.checked)}
+            style={{ accentColor: 'var(--color-primary)', width: '1.05rem', height: '1.05rem', flexShrink: 0, cursor: 'pointer' }}
+          />
+          {isEs ? 'Dirección de facturación igual a la de envío' : 'Billing address same as shipping'}
+        </label>
+      )}
       {!billingSame && (
         <div className="mt-2 grid gap-2">
           <div>

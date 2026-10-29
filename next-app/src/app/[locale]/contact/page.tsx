@@ -8,6 +8,7 @@ import { HeroSection, PageContainer } from '@/components/layout/ResponsiveLayout
 import InquiryForm from '@/components/contact/InquiryForm';
 import MessageUsForm from '@/components/contact/MessageUsForm';
 import VisitUsPanel from '@/components/contact/VisitUsPanel';
+import { getStoreHours } from '@/lib/store-hours';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -91,7 +92,7 @@ export default async function ContactPage({ params, searchParams }: Props) {
             </div>
           </>
         ) : (
-          <MessageUsForm locale={locale} />
+          <MessageUsForm locale={locale} storeHours={await getStoreHours()} />
         )}
 
         {/* Visit Us — the contact page had no address, no hours and no map

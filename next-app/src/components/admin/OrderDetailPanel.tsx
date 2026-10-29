@@ -20,6 +20,7 @@ import { AppIcon } from '@/components/AppIcon';
 import OrderTaxExemptionPanel from '@/components/admin/OrderTaxExemptionPanel';
 import type { TaxExemptSnapshot } from '@/lib/tax-exempt';
 import { heardAboutAdminLabel } from '@/lib/order-heard-about';
+import type { OrderGift } from '@/lib/order-gift';
 
 const GOLD = '#735c00';
 const BORDER = 'var(--color-outline-variant)';
@@ -81,6 +82,8 @@ interface Props {
   pickupHours: string;
   /** The tax exemption noted on this order (lib/tax-exempt.ts), or null. */
   taxExemption?: TaxExemptSnapshot | null;
+  /** "This is a gift" at checkout (lib/order-gift.ts), or null. */
+  gift?: OrderGift | null;
 }
 
 export default function OrderDetailPanel({
@@ -94,6 +97,7 @@ export default function OrderDetailPanel({
   trackingSupported = true,
   pickupHours,
   taxExemption = null,
+  gift = null,
 }: Props) {
   const router = useRouter();
   const supabase = createClient();
@@ -573,6 +577,20 @@ export default function OrderDetailPanel({
     previewWindow.focus();
   }
 
+  // The gift slip that goes in the box: item names + message, no prices.
+  function openGiftSlip() {
+    const slipWindow = window.open(
+      `${adminBasePath}/orders/${order.id}/gift-slip`,
+      `order-gift-slip-${order.id}`,
+      'popup=yes,width=820,height=900,scrollbars=yes,resizable=yes',
+    );
+    if (!slipWindow) {
+      setMessage({ text: 'Pop-ups are blocked. Allow pop-ups for this site to print the gift slip.', ok: false });
+      return;
+    }
+    slipWindow.focus();
+  }
+
   return (
     <main className="px-4 md:px-8 py-8">
       <div className="ultrawide-page max-w-[1300px] mx-auto">
@@ -794,7 +812,17 @@ export default function OrderDetailPanel({
         <div className="grid lg:grid-cols-[1fr_22rem] gap-6">
           <div className="flex flex-col gap-6">
             <section className="border p-5" style={{ borderColor: BORDER, background: 'white' }}>
-              <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>Customer</h2>
+              <h2 className="text-xs font-bold uppercase tracking-widest mb-4 flex items-center gap-2" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+                Customer
+                {gift && (
+                  <span
+                    className="rounded-full px-2.5 py-0.5 text-[0.65rem] tracking-[0.1em]"
+                    style={{ background: '#f7efd7', border: '1px solid #dcc98f', color: GOLD }}
+                  >
+                    🎁 Gift
+                  </span>
+                )}
+              </h2>
               <div className="grid md:grid-cols-3 gap-4 text-sm">
                 <Field label="Name" value={order.customer_name} />
                 <Field label="Email" value={order.customer_email} />
@@ -809,8 +837,11 @@ export default function OrderDetailPanel({
                     {shipping && (
                       <div>
                         <span className="mb-1 block text-[0.62rem] font-bold uppercase tracking-widest" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
-                          Shipping Address
+                          {gift?.recipientName ? 'Ship To (Gift Recipient)' : 'Shipping Address'}
                         </span>
+                        {gift?.recipientName && (
+                          <p className="font-bold" style={{ color: 'var(--color-on-surface)' }}>{gift.recipientName}</p>
+                        )}
                         <p className="whitespace-pre-line" style={{ color: 'var(--color-on-surface)' }}>{shipping}</p>
                       </div>
                     )}
@@ -825,6 +856,22 @@ export default function OrderDetailPanel({
                   </div>
                 );
               })()}
+              {gift && (
+                <div className="mt-4 text-sm">
+                  <span className="mb-1 block text-[0.62rem] font-bold uppercase tracking-widest" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+                    Gift Message
+                  </span>
+                  <p className="whitespace-pre-line" style={{ color: 'var(--color-on-surface)' }}>
+                    {gift.message ? `“${gift.message}”` : '(none — the slip will say who it is from)'}
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <button type="button" onClick={openGiftSlip} className="gold-button text-sm">Print Gift Slip</button>
+                  </div>
+                  <p className="mt-2 rounded px-3 py-2 text-[0.8rem]" style={{ background: '#fff6e0', border: '1px solid #f0d58a', color: '#4d4635' }}>
+                    Gift order — put the <b>gift slip</b> in the box, not the priced receipt.
+                  </p>
+                </div>
+              )}
               {(() => {
                 const heardAbout = heardAboutAdminLabel(order.heard_about, order.heard_about_other);
                 if (!heardAbout) return null;

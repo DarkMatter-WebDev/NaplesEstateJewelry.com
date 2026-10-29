@@ -45,7 +45,9 @@ describe('form success panel', () => {
   ])('%s uses the shared panel and can be sent again', (file, kind) => {
     const source = read(...file.split('/'));
     expect(source).toContain('<FormSuccessPanel');
-    expect(source).toContain(`kind="${kind}"`);
+    // A literal, or an expression that still uses the kind (MessageUsForm
+    // switches to 'appointment' when one was requested).
+    expect(source).toMatch(new RegExp(`kind=(?:"${kind}"|\\{[^}]*'${kind}'[^}]*\\})`));
     expect(source).toContain('onSendAnother={sendAnother}');
     expect(source).toMatch(/function sendAnother\(\) \{\s*setDone\(false\);/);
     expect(source).toContain('scrollToFormStart(');

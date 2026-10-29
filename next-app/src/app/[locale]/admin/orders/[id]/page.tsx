@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getVerifiedUser } from '@/lib/auth-claims';
 import OrderDetailPanel from '@/components/admin/OrderDetailPanel';
 import { loadOrderTaxExemption } from '@/lib/tax-exempt-server';
+import { loadOrderGift } from '@/lib/order-gift-server';
 import { formatPickupHours } from '@/lib/order-invoice-email';
 import { getStoreHours } from '@/lib/store-hours';
 import AdminHeader from '@/components/admin/AdminHeader';
@@ -258,6 +259,7 @@ export default async function AdminOrderDetailPage({ params }: Props) {
         recycleBinSupported={recycleBinSupported}
         trackingSupported={trackingSupported}
         taxExemption={await loadOrderTaxExemption(supabase, id)}
+        gift={await loadOrderGift(supabase, id)}
       />
     </div>
   );

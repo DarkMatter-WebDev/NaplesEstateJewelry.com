@@ -13,12 +13,22 @@ import { leadPhotosTooLargeMessage, shrinkFormPhotos } from '@/lib/lead-photo-pr
 import { phoneHoursLabel } from '@/lib/business-location';
 import { appendAdClickFields, sendAdsConversion } from '@/lib/ads-tracking-browser';
 import { FormGrid, PageContainer, Section } from '@/components/layout/ResponsiveLayout';
+import AppointmentRequestField from '@/components/contact/AppointmentRequestField';
+import type { StoreHoursSchedule } from '@/lib/business-location';
+import {
+  appointmentInvalidMessage,
+  formatAppointment,
+  parseAppointmentRequest,
+  type AppointmentRequest,
+} from '@/lib/appointment-request';
 
 interface Props {
   locale: string;
+  /** Admin showroom hours — the appointment calendar's days and times. */
+  storeHours: StoreHoursSchedule;
 }
 
-export default function MessageUsForm({ locale }: Props) {
+export default function MessageUsForm({ locale, storeHours }: Props) {
   const isEs = locale === 'es';
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
@@ -26,6 +36,10 @@ export default function MessageUsForm({ locale }: Props) {
   const [phoneError, setPhoneError] = useState('');
   const [emailError, setEmailError] = useState('');
   const [photoCount, setPhotoCount] = useState(0);
+  // "Request an appointment" ticked: the message turns optional and the
+  // success panel repeats the requested day and time.
+  const [appointment, setAppointment] = useState(false);
+  const [requested, setRequested] = useState<AppointmentRequest | null>(null);
   const formAnchorRef = useRef<HTMLDivElement>(null);
 
   // "Send another": the form is unmounted while the success panel shows, so it
@@ -33,6 +47,8 @@ export default function MessageUsForm({ locale }: Props) {
   function sendAnother() {
     setDone(false);
     setPhotoCount(0);
+    setAppointment(false);
+    setRequested(null);
     setErr('');
     setPhoneError('');
     setEmailError('');
@@ -57,6 +73,11 @@ export default function MessageUsForm({ locale }: Props) {
       return;
     }
     setEmailError('');
+    const appt = parseAppointmentRequest((field) => fd.get(field));
+    if (appt === 'invalid') {
+      setErr(appointmentInvalidMessage(isEs));
+      return;
+    }
     setSending(true);
     setErr('');
     try {
@@ -75,6 +96,7 @@ export default function MessageUsForm({ locale }: Props) {
         body: fd,
       });
       if (!res.ok) throw new LeadSendError(res.status);
+      setRequested(appt);
       setDone(true);
       // ⛔ Only here: after the server accepted the message.
       sendAdsConversion('leadForm');
@@ -131,10 +153,14 @@ export default function MessageUsForm({ locale }: Props) {
           >
             <FormSuccessPanel
               isEs={isEs}
-              kind="message"
-              body={isEs
-                ? 'Gracias por escribirnos. Nos comunicaremos con usted pronto.'
-                : 'Thanks for reaching out. We\'ll be in touch soon.'}
+              kind={requested ? 'appointment' : 'message'}
+              body={requested
+                ? (isEs
+                  ? `Gracias. Pidió una cita para el ${formatAppointment(requested, true)}. Le llamaremos o enviaremos un texto para confirmarla.`
+                  : `Thanks — you asked for ${formatAppointment(requested, false)}. We’ll call or text to confirm.`)
+                : (isEs
+                  ? 'Gracias por escribirnos. Nos comunicaremos con usted pronto.'
+                  : 'Thanks for reaching out. We\'ll be in touch soon.')}
               onSendAnother={sendAnother}
             />
           </div>
@@ -210,18 +236,34 @@ export default function MessageUsForm({ locale }: Props) {
             <LocationField locale={locale} idPrefix="message" />
             <PreferredContactField locale={locale} idPrefix="message" />
 
+            {/* Appointment request (2026-10-29, owner-approved mockup) */}
+            <AppointmentRequestField
+              locale={locale}
+              schedule={storeHours}
+              idPrefix="message"
+              checked={appointment}
+              onCheckedChange={setAppointment}
+            />
+
             <div className="grid gap-1">
               <label htmlFor="message-body" className="form-label">
-                {isEs ? 'Su mensaje' : 'Your message'} *
+                {isEs ? 'Su mensaje' : 'Your message'}
+                {appointment ? (
+                  <span className="normal-case tracking-normal font-medium" style={{ color: 'var(--color-on-surface-variant)' }}>
+                    {isEs ? ' (opcional con una cita)' : ' (optional with an appointment)'}
+                  </span>
+                ) : ' *'}
               </label>
               <textarea
                 id="message-body"
                 name="message"
-                required
+                required={!appointment}
                 placeholder={
-                  isEs
-                    ? 'Escriba su mensaje aquí. Cuéntenos en qué podemos ayudarle.'
-                    : 'Write your message here. Tell us how we can help.'
+                  appointment
+                    ? (isEs ? '¿Qué le gustaría traer? (opcional)' : 'What would you like to bring in? (optional)')
+                    : isEs
+                      ? 'Escriba su mensaje aquí. Cuéntenos en qué podemos ayudarle.'
+                      : 'Write your message here. Tell us how we can help.'
                 }
                 className="form-field"
                 style={{ minHeight: '13rem', resize: 'vertical' }}
@@ -274,7 +316,9 @@ export default function MessageUsForm({ locale }: Props) {
               <button type="submit" className="gold-button" disabled={sending}>
                 {sending
                   ? (isEs ? 'Enviando…' : 'Sending…')
-                  : (isEs ? 'Enviar mensaje' : 'Send message')}
+                  : appointment
+                    ? (isEs ? 'Enviar solicitud' : 'Send request')
+                    : (isEs ? 'Enviar mensaje' : 'Send message')}
               </button>
               <a href="tel:2394048505" className="outline-button">
                 {isEs ? 'O llámenos' : 'Or call us'}

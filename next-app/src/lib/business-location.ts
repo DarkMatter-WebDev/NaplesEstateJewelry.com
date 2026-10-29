@@ -393,9 +393,9 @@ export function closedLabel(isEs: boolean): string {
  * - `'es-compact'`: `11 a.m.`, `11:30 a.m.` — the ES periods convention with
  *                   minutes only when non-zero (the `/card` hours line).
  */
-type TimeStyle = 'en-compact' | 'en-full' | 'es' | 'es-compact';
+export type TimeStyle = 'en-compact' | 'en-full' | 'es' | 'es-compact';
 
-function formatTime(hhmm: string, style: TimeStyle): string {
+export function formatTime(hhmm: string, style: TimeStyle): string {
   const [h24, m] = hhmm.split(':').map(Number);
   const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
   const isPm = h24 >= 12;

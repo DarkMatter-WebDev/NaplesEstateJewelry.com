@@ -29,6 +29,8 @@ import {
 } from '@/lib/us-address';
 import { normalizePhoneNumber } from '@/lib/phone';
 import { normalizePersonName } from '@/lib/person-name';
+import { normalizeGift } from '@/lib/order-gift';
+import { saveOrderGift } from '@/lib/order-gift-server';
 import { findCounterByToken } from '@/lib/offers-server';
 import {
   applyOrderExemption,
@@ -164,6 +166,13 @@ export async function POST(req: Request) {
     );
   }
 
+  // "This is a gift" (2026-10-29): a shipped gift needs the recipient's name.
+  const giftResult = normalizeGift(body.gift, needsShipping);
+  if ('error' in giftResult) {
+    return NextResponse.json({ error: giftResult.error, code: 'gift_recipient' }, { status: 400 });
+  }
+  const gift = giftResult.gift;
+
   const addressValidation = needsShipping
     ? validateUsShippingAddress({
         line1: customer.address_line1,
@@ -187,8 +196,10 @@ export async function POST(req: Request) {
     postalCode: normalizedShippingAddress?.postalCode ?? customer.postal_code,
     country: normalizedShippingAddress?.country ?? customer.country,
   });
+  // A gift ships under the RECIPIENT's name, so PayPal's shipping address
+  // (what Seller Protection checks) matches the label on the box.
   const paypalShippingAddress = normalizedShippingAddress
-    ? buildPayPalShippingAddress(normalizedName, normalizedShippingAddress)
+    ? buildPayPalShippingAddress(gift?.recipientName ?? normalizedName, normalizedShippingAddress)
     : null;
 
   const supabase = await createClient();
@@ -365,6 +376,7 @@ export async function POST(req: Request) {
           throw new Error(`Could not associate the PayPal order: ${updateError?.message ?? 'order row was not updated'}`);
         }
         if (reuseDraft) await noteExemption(order.id, reuseDraft);
+        await saveOrderGift(service, order.id, gift);
         return NextResponse.json({ paypalOrderId: paypalOrder.id, orderId: order.id });
       } catch (err) {
         console.error('PayPal create-order (reuse) error:', err);
@@ -476,6 +488,7 @@ export async function POST(req: Request) {
     if (exemption && draft.taxExempted > 0) {
       await applyOrderExemption(service, orderId, checkoutExemptionSnapshot(exemption, draft.taxExempted));
     }
+    await saveOrderGift(service, orderId, gift);
     await upsertOrderInvoice(service, orderId);
 
     return NextResponse.json({ paypalOrderId: paypalOrder.id, orderId });
