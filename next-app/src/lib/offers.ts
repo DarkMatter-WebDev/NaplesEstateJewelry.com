@@ -158,6 +158,17 @@ export function offerAmountMessage(problem: OfferAmountProblem, listedPrice: num
   }
 }
 
+/**
+ * A declined card on the offer's hold box (2026-10-29): nothing charged AND
+ * nothing held, try again. Shown for our server's `card_declined` and for a
+ * card PayPal refused before our server saw it.
+ */
+export function offerDeclinedMessage(isEs: boolean): string {
+  return isEs
+    ? 'Su tarjeta fue rechazada. NO se le cobró ni se retuvo nada. Pruebe con otra tarjeta o con PayPal arriba, o llámenos al (239) 404-8505.'
+    : 'Your card was declined. You were NOT charged and nothing is held. Try another card or PayPal above, or call (239) 404-8505.';
+}
+
 export type OfferTotals = {
   subtotal: number;
   shippingFee: number;

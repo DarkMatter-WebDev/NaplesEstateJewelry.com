@@ -490,6 +490,7 @@ export default function OfferCheckoutClient({
               ) : mode === 'offer' ? (
                 <PayPalOfferButton
                   clientId={paypalClientId}
+                  amount={totals?.total ?? null}
                   ready={ready}
                   isEs={isEs}
                   missingFields={missing}

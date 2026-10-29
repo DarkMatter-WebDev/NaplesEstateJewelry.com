@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { checkoutErrorMessageForCode, composeUnknownErrorMessage, isAvailabilityError } from '@/lib/checkout-error-messages';
 import { formatCheckoutCurrency, type OrderQuote } from '@/lib/checkout-pricing';
-import { normalizeUsState, normalizeUsZip } from '@/lib/us-address';
+import { buildCardBillingAddress, cardFieldsProblem, EMPTY_BILLING_FORM, isPickupMethod, type BillingForm } from '@/lib/card-billing';
 import { AppIcon } from '@/components/AppIcon';
+import CardBillingInputs from '@/components/checkout/CardBillingInputs';
 import {
   CARD_FIELD_STYLE,
   loadGooglePayJs,
@@ -74,23 +75,12 @@ type CaptureRecovery = {
 
 type PaymentStage = 'idle' | 'awaiting-approval' | 'processing';
 
-type BillingForm = { line1: string; line2: string; city: string; state: string; zip: string };
-
 function cartKey(payload: PayPalPayload): string {
   return JSON.stringify(
     payload.items
       .map((item) => [item.id, item.quantity] as const)
       .sort(([left], [right]) => left.localeCompare(right)),
   );
-}
-
-/** Local pickup: `local-pickup` on the checkout and offers, `pickup` on a pay link. */
-function isPickupMethod(shippingMethod: string): boolean {
-  return shippingMethod === 'local-pickup' || shippingMethod === 'pickup';
-}
-
-function text(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : '';
 }
 
 function readCaptureRecovery(): CaptureRecovery | null {
@@ -220,7 +210,7 @@ export default function PayPalCheckoutButton({
   const [googlePayReady, setGooglePayReady] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
   const [billingSame, setBillingSame] = useState(true);
-  const [billing, setBilling] = useState<BillingForm>({ line1: '', line2: '', city: '', state: '', zip: '' });
+  const [billing, setBilling] = useState<BillingForm>(EMPTY_BILLING_FORM);
 
   // Keep the latest callbacks/getters in refs so the PayPal Buttons instance
   // (initialized once) always reads current cart + contact state.
@@ -873,47 +863,13 @@ export default function PayPalCheckoutButton({
   // the boxes the buyer typed when it is not, or just the ZIP for local pickup.
   function cardBillingAddress(): { value: PayPalBillingAddress } | { error: string } {
     const payload = getPayloadRef.current();
-    const es = isEsRef.current;
-    if (isPickupMethod(payload.shippingMethod)) {
-      const zip = normalizeUsZip(billing.zip);
-      if (!zip) return { error: es ? 'Escriba el código postal de facturación de la tarjeta.' : 'Enter the card’s billing ZIP code.' };
-      return { value: { postalCode: zip, countryCode: 'US' } };
-    }
-    if (billingSame) {
-      const c = payload.customer;
-      const line2 = text(c.address_line2);
-      return {
-        value: {
-          addressLine1: text(c.address_line1),
-          ...(line2 ? { addressLine2: line2 } : {}),
-          adminArea2: text(c.city),
-          adminArea1: normalizeUsState(c.state) ?? text(c.state),
-          postalCode: normalizeUsZip(c.postal_code) ?? text(c.postal_code),
-          countryCode: 'US',
-        },
-      };
-    }
-    const state = normalizeUsState(billing.state);
-    const zip = normalizeUsZip(billing.zip);
-    const missing = [
-      !billing.line1.trim() && (es ? 'dirección' : 'street'),
-      !billing.city.trim() && (es ? 'ciudad' : 'city'),
-      !state && (es ? 'estado' : 'state'),
-      !zip && (es ? 'código postal' : 'ZIP code'),
-    ].filter(Boolean);
-    if (missing.length > 0 || !state || !zip) {
-      return { error: es ? `Complete la dirección de facturación: ${missing.join(', ')}.` : `Complete the billing address: ${missing.join(', ')}.` };
-    }
-    return {
-      value: {
-        addressLine1: billing.line1.trim(),
-        ...(billing.line2.trim() ? { addressLine2: billing.line2.trim() } : {}),
-        adminArea2: billing.city.trim(),
-        adminArea1: state,
-        postalCode: zip,
-        countryCode: 'US',
-      },
-    };
+    return buildCardBillingAddress({
+      shippingMethod: payload.shippingMethod,
+      customer: payload.customer,
+      billingSame,
+      billing,
+      isEs: isEsRef.current,
+    });
   }
 
   async function payByCard() {
@@ -921,20 +877,10 @@ export default function PayPalCheckoutButton({
     const cardFields = cardFieldsRef.current;
     if (!cardFields) return;
     if (!canStartPayment('card')) return;
-    const es = isEsRef.current;
     try {
-      const state = await cardFields.getState();
-      if (!state.isFormValid) {
-        const field = (key: string) => state.fields[key];
-        const bad = [
-          !field('cardNumberField')?.isValid && (es ? 'número de tarjeta' : 'card number'),
-          !field('cardExpiryField')?.isValid && (es ? 'vencimiento' : 'expiration date'),
-          !field('cardCvvField')?.isValid && (es ? 'código de seguridad' : 'security code'),
-          field('cardNameField') && !field('cardNameField')?.isValid && (es ? 'nombre en la tarjeta' : 'name on card'),
-        ].filter(Boolean);
-        setCardError(es
-          ? `Revise: ${bad.length > 0 ? bad.join(', ') : 'los datos de la tarjeta'}.`
-          : `Please check the ${bad.length > 0 ? bad.join(', ') : 'card details'}.`);
+      const problem = cardFieldsProblem(await cardFields.getState(), isEsRef.current);
+      if (problem) {
+        setCardError(problem);
         return;
       }
     } catch {
@@ -1136,57 +1082,15 @@ export default function PayPalCheckoutButton({
           </div>
           <span className="form-label">{isEs ? 'Nombre en la tarjeta' : 'Name on card'}</span>
           <div ref={cardNameRef} className="paypal-card-form__field" />
-          {pickup ? (
-            <div className="mt-2">
-              <label className="form-label" htmlFor="card-billing-zip">{isEs ? 'Código postal de facturación' : 'Billing ZIP code'}</label>
-              <input
-                id="card-billing-zip"
-                className="form-field"
-                inputMode="numeric"
-                autoComplete="billing postal-code"
-                value={billing.zip}
-                onChange={(e) => setBilling({ ...billing, zip: e.target.value })}
-              />
-            </div>
-          ) : (
-            <>
-              <label className="mt-2 flex items-center gap-2 text-sm" style={{ cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={billingSame}
-                  onChange={(e) => setBillingSame(e.target.checked)}
-                  style={{ accentColor: 'var(--color-primary)', width: '1.05rem', height: '1.05rem', flexShrink: 0, cursor: 'pointer' }}
-                />
-                {isEs ? 'Dirección de facturación igual a la de envío' : 'Billing address same as shipping'}
-              </label>
-              {!billingSame && (
-                <div className="mt-2 grid gap-2">
-                  <div>
-                    <label className="form-label" htmlFor="card-billing-line1">{isEs ? 'Dirección de facturación' : 'Billing street address'}</label>
-                    <input id="card-billing-line1" className="form-field" autoComplete="billing address-line1" value={billing.line1} onChange={(e) => setBilling({ ...billing, line1: e.target.value })} />
-                  </div>
-                  <div>
-                    <label className="form-label" htmlFor="card-billing-line2">{isEs ? 'Apto., suite (opcional)' : 'Apt, suite (optional)'}</label>
-                    <input id="card-billing-line2" className="form-field" autoComplete="billing address-line2" value={billing.line2} onChange={(e) => setBilling({ ...billing, line2: e.target.value })} />
-                  </div>
-                  <div>
-                    <label className="form-label" htmlFor="card-billing-city">{isEs ? 'Ciudad' : 'City'}</label>
-                    <input id="card-billing-city" className="form-field" autoComplete="billing address-level2" value={billing.city} onChange={(e) => setBilling({ ...billing, city: e.target.value })} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="form-label" htmlFor="card-billing-state">{isEs ? 'Estado' : 'State'}</label>
-                      <input id="card-billing-state" className="form-field" autoComplete="billing address-level1" value={billing.state} onChange={(e) => setBilling({ ...billing, state: e.target.value })} />
-                    </div>
-                    <div>
-                      <label className="form-label" htmlFor="card-billing-zip">{isEs ? 'Código postal' : 'ZIP code'}</label>
-                      <input id="card-billing-zip" className="form-field" inputMode="numeric" autoComplete="billing postal-code" value={billing.zip} onChange={(e) => setBilling({ ...billing, zip: e.target.value })} />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
+          <CardBillingInputs
+            idPrefix="card-billing"
+            pickup={pickup}
+            billingSame={billingSame}
+            onBillingSameChange={setBillingSame}
+            billing={billing}
+            onBillingChange={setBilling}
+            isEs={isEs}
+          />
           {cardError && (
             <p className="mt-2 text-sm" style={{ color: 'var(--color-error)' }}>{cardError}</p>
           )}

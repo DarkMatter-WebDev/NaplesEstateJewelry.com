@@ -4,7 +4,13 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-10-29 (1)**.
+> compaction. Last reconciled: **2026-10-29 (3)**.
+
+## Make an Offer's hold step uses the new pay box — PayPal + card boxes, "Send offer · Hold $…"; NO Venmo, Apple Pay or Google Pay on offers until one real Apple Pay hold is proven (2026-10-29)
+
+- **Owner:** *"Build as recommended"* on offer mockup 1. Record `CHANGELOG.md` 2026-10-29 (3).
+- **Why no wallets yet:** PayPal documents a card hold (AUTHORIZE, valid 29 days — [Expanded Checkout use cases](https://developer.paypal.com/api/rest/integration/orders-api/api-use-cases/advanced)) but its Apple Pay / Google Pay pages only show charge-now flows. Wallets on offers wait for one real test: the owner makes a small offer with Apple Pay on the iPhone, Claude confirms in PayPal it is a HOLD (not a capture), the owner Declines it (hold released). Venmo: same reason, off.
+- **Rules:** the offer box keeps its OWN SDK copy (`window.paypalOffer`, intent authorize — ⛔ never load authorize on `window.paypal`); PayPal's own card button only when our card boxes are ineligible (never both); a card hold reads the order first and refuses a failed 3-D Secure; a declined card = 402 `card_declined`, the offer row `abandoned` (no email), the buyer told *nothing charged, nothing held*; each try is a new offer + new PayPal order. Billing is the checkout's (`lib/card-billing.ts` + `CardBillingInputs`, shared — change it in one place).
 
 ## "How did you hear about us?" is ONE optional answer on the Order Received screen, saved on the order as an English key; main checkout only, no tally yet (2026-10-29)
 

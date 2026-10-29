@@ -24,9 +24,11 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const paypalOrderId = body && typeof body.paypalOrderId === 'string' ? body.paypalOrderId : null;
   if (!paypalOrderId) return NextResponse.json({ error: 'Missing paypalOrderId' }, { status: 400 });
+  // Card boxes (2026-10-29) get a 3-D Secure check before the hold; a declined card answers code `card_declined`.
+  const paymentMethod = body.paymentMethod === 'card' ? 'card' : 'paypal';
 
   try {
-    const result = await authorizeOffer(createServiceClient(), paypalOrderId);
+    const result = await authorizeOffer(createServiceClient(), paypalOrderId, { paymentMethod });
     if (!result.ok) {
       return NextResponse.json({ error: result.error, code: result.code ?? null }, { status: result.status });
     }

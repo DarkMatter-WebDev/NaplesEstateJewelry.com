@@ -14,7 +14,11 @@ import {
   authorizePayPalOrder,
   capturePayPalAuthorization,
   createPayPalOrder,
+  getPayPalOrder,
   getPayPalOrderAuthorization,
+  isPayPalCaptureDecline,
+  paypalErrorInfo,
+  paypalThreeDSecureFailed,
   voidPayPalAuthorization,
   type PayPalAuthorizationResult,
 } from '@/lib/paypal';
@@ -54,6 +58,7 @@ import {
   OFFER_DELETE_MAX,
   offerAmountMessage,
   offerAmountProblem,
+  offerDeclinedMessage,
   offerDeleteBlock,
   offerExpiresAt,
   offerPayPalReference,
@@ -421,9 +426,13 @@ async function loadOffer(service: SupabaseClient, column: 'id' | 'paypal_order_i
   return data ? normalizeOfferRow(data as unknown as Record<string, unknown>) : null;
 }
 
+/** How the buyer approved the hold — the card boxes (2026-10-29) need a 3-D Secure check first. */
+export type OfferPaymentMethod = 'paypal' | 'card';
+
 export async function authorizeOffer(
   service: SupabaseClient,
   paypalOrderId: string,
+  options: { paymentMethod?: OfferPaymentMethod } = {},
 ): Promise<OfferResult<{ offer: OfferRow }>> {
   const offer = await loadOffer(service, 'paypal_order_id', paypalOrderId);
   if (!offer) return fail(404, 'Offer not found for this payment.');
@@ -433,16 +442,43 @@ export async function authorizeOffer(
   }
   const isEs = offer.locale === 'es';
 
+  // A declined card never opens the offer: the row is set aside (no buyer email
+  // for 'abandoned') and the buyer may try again — the next try is a new offer
+  // with a new PayPal order, so a cached decline can never come back.
+  const declined = async (reason: string) => {
+    console.error('PayPal offer hold issue:', JSON.stringify({ offer: offer.id, reason }));
+    await service.from('product_offers').update({ status: 'abandoned', last_error: `Card declined: ${reason}`.slice(0, 500) })
+      .eq('id', offer.id).in('status', ['pending', 'abandoned']);
+    return fail(402, offerDeclinedMessage(isEs), 'card_declined');
+  };
+
+  // Card boxes: the bank's security check (3-D Secure) ran and failed → never
+  // hold. A failed lookup does not block (the same hold as before).
+  if (options.paymentMethod === 'card') {
+    try {
+      if (paypalThreeDSecureFailed(await getPayPalOrder(paypalOrderId))) return declined('3DS_FAILED');
+    } catch (lookupError) {
+      console.error('PayPal 3-D Secure lookup error (offer):', lookupError);
+    }
+  }
+
   let authorization: PayPalAuthorizationResult;
   try {
     authorization = await authorizePayPalOrder(paypalOrderId);
   } catch (error) {
     console.error('Offer authorize error:', error);
+    const { issues } = paypalErrorInfo((error as { raw?: unknown })?.raw);
     try {
       authorization = await getPayPalOrderAuthorization(paypalOrderId);
     } catch {
+      // PayPal's own error already named a decline — authoritative without the lookup.
+      if (isPayPalCaptureDecline(issues, null)) return declined(issues.join(','));
       return fail(502, isEs ? 'PayPal no confirmó la retención.' : 'PayPal did not confirm the hold.');
     }
+    if (!authorization.authorizationId && isPayPalCaptureDecline(issues, null)) return declined(issues.join(','));
+  }
+  if (authorization.status === 'DENIED' || isPayPalCaptureDecline([], authorization.status)) {
+    return declined(authorization.status);
   }
   if (!authorization.authorizationId || !['CREATED', 'PENDING'].includes(authorization.status)) {
     return fail(402, isEs ? 'PayPal no aprobó la retención del pago.' : 'PayPal did not approve the payment hold.', 'not_authorized');

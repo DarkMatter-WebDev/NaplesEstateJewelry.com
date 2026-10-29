@@ -72,8 +72,22 @@ hold — they are never charged.
 - `/offer/<item id>` (and `/es/…`): the amount (must be below today's price),
   an optional message, pickup or shipping (the checkout's own fees), contact
   details, the **binding box** ("…the held amount is charged automatically…"),
-  then PayPal or a card through PayPal. The page shows exactly what is held:
+  then the pay box. The page shows exactly what is held:
   offer + shipping + Florida tax, from the checkout's own arithmetic.
+- **Pay box (2026-10-29, matches checkout):** the gold PayPal button, then
+  "or hold with a card" — card boxes on our page (PayPal iframes), billing ZIP
+  for Local Pickup or "Billing address same as shipping", a gold **Send offer ·
+  Hold $…** button and "Nothing is charged now…". PayPal's own card button shows
+  only if the card boxes are not available. **No Venmo, Apple Pay or Google Pay
+  on offers** (PayPal does not document a hold for them; wallets wait for one
+  real Apple Pay test — `TASKS.md`). A declined card (PayPal's refusal, a failed
+  3-D Secure, or `card_declined` from `/api/offers/authorize`) says *"Your card
+  was declined. You were NOT charged and nothing is held…"*, empties the card
+  number / date / code, and the offer row is set to `abandoned` (no email); the
+  next try is a new offer with a new PayPal order. Code
+  `components/offers/PayPalOfferButton.tsx` (own SDK `paypalOffer`,
+  `components: 'buttons,card-fields'`); shared billing `lib/card-billing.ts` +
+  `components/checkout/CardBillingInputs.tsx`.
 - Emails: received (held, deadline) · declined · expired · item sold · counter
   (with the Buy-now link). An accepted offer's email IS the normal paid receipt.
   A **failed charge** sends no email — call the buyer.
@@ -86,7 +100,7 @@ hold — they are never charged.
 | Step | PayPal call | Where |
 |---|---|---|
 | Buyer presses PayPal | Orders v2 **intent AUTHORIZE** (`createPayPalOrder({ intent: 'AUTHORIZE' })`) | `POST /api/offers` |
-| Buyer approves | `POST /v2/checkout/orders/{id}/authorize` → the hold | `POST /api/offers/authorize` |
+| Buyer approves (PayPal window or the card boxes) | card only: read the order, refuse a failed 3-D Secure → `POST /v2/checkout/orders/{id}/authorize` → the hold; a decline (`INSTRUMENT_DECLINED` / `TRANSACTION_REFUSED` / `DENIED`) → 402 `card_declined`, offer `abandoned` | `POST /api/offers/authorize` `{ paypalOrderId, paymentMethod }` |
 | Owner accepts | `create_paypal_order` RPC (order row) → `POST /v2/payments/authorizations/{id}/capture` → `capture_paypal_order` RPC (paid + SOLD) → `finalizePaidOrder` (receipt, invoice, owner email) | `POST /api/admin/offers/{id}` `accept` |
 | Decline / expire / sold / counter | `POST /v2/payments/authorizations/{id}/void` | same route, the sweep |
 | Counter paid | the normal checkout (`/api/paypal/create-order` with `counterToken` → capture) | |
