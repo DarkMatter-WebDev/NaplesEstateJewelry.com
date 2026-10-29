@@ -1,6 +1,31 @@
 
 # Changelog
 
+## 2026-10-29 (1) — "How did you hear about us?" card on the Order Received screen BUILT + STAGED, not pushed; ⛔ SQL `supabase/order-heard-about-2026-10.sql` to run BEFORE the push; no env vars
+
+- **Owner:** *"put a small survey that asks them how they heard about us … mock it up before changing code"* → mockup 1 (14 choices + Other) → owner: remove YouTube, "Shopped with you before", "Text or email from us"; one answer; the line on the admin order; Spanish too → mockup 2 → *"Build it"*. Rule `DECISIONS.md` top entry.
+- **What it does:** under Back to Shop / View & Print on the checkout's Order Received screen, an optional card *One quick question · How did you hear about us?* — 11 chips + Other… (opens a box for their own words, ≤ 80 chars); Send appears once one is picked; after a save the card becomes "Thank you — that helps." `/es` shows it in Spanish (*¿Cómo nos conoció?*). Admin → Orders → the order → Customer card gains **Heard About Us** (e.g. *Instagram* or *Other — “Naples farmers market”*); nothing shows if they skipped it. Before: the screen had only the check mark, order number and two buttons.
+- **Files:** NEW `src/lib/order-heard-about.ts`, NEW `src/components/checkout/HeardAboutCard.tsx`, NEW `src/app/api/orders/heard-about/route.ts`, NEW `src/lib/__tests__/order-heard-about.test.ts`, NEW `supabase/order-heard-about-2026-10.sql`; changed `src/components/checkout/CheckoutClient.tsx` (`createdOrder.orderId` from `onSuccess`, the card), `src/components/admin/OrderDetailPanel.tsx` (the line), `src/app/[locale]/admin/orders/[id]/page.tsx` (two columns + missing-column fallback), `src/types/sales.ts`.
+- **Safety:** the save needs the order's UUID (handed to this browser by `capture-order`) AND its order number, `payment_status = 'paid'`, and `heard_about is null` (write-once); 20 saves/IP/hour.
+- **Verified (dev, real `CheckoutClient` with a fake finished order put into its state — no payment, fake UUID matching nothing):** the card renders as mockup 2 at 742 px; Other… opens the box (fixed: an unlayered `input { max-width: 100% }` beat `max-w-[340px]` → the cap moved to a wrapper; now 340 px); Send → `500` "Could not find the 'heard_about' column" (the SQL has not run) → the card says "That didn't save. Please try again." and keeps the answer; a faked 200 → "Thank you — that helps."; `/es/checkout` at 375 px: Spanish card, Enviar, no sideways scroll. ⛔ Not seen: a real save (needs the SQL), the admin line (behind sign-in), a real iPhone.
+- **Gate:** `npx tsc --noEmit` 0 · `npm run lint` 0 errors (4 old `<img>` warnings, `TextDealsManager.tsx`) · `npx vitest run` **2119/2119** (186 files; NEW `order-heard-about.test.ts` 10) · `npm run build` 0 (route `ƒ /api/orders/heard-about`).
+- **To reverse:** remove `<HeardAboutCard … />` from `CheckoutClient.tsx` (the rest is inert without it); the columns may stay.
+
+## 2026-10-28 (20) — Session CLOSED: (11)–(19) all DEPLOYED by the owner; no SQL, no env vars; nothing staged-but-unpushed except docs
+
+- **Shipped this session (owner pushed + deployed; Claude did not check production except the Apple Pay file in (19), which the registration needed):** (11)–(12) diamond guide polish + hero padding on 12 pages · (13)–(14) Joey Windsor's declined-card investigation → decline message, no lock, Netlify reason log · (16) "try again above" · (18) PayPal Advanced Checkout — card boxes on our page, Apple Pay, Google Pay, Venmo, 3-D Secure guard, a new PayPal order after a decline · (19) Apple Pay domain registered.
+- **Research / approvals (no code):** (15) Stripe / Shop Pay vs PayPal → keep PayPal · (17) PayPal approved advanced cards + Apple Pay + Google Pay on the live app.
+- **Last gate run (10-28 (18)):** `npx tsc --noEmit` 0 · `npm run lint` 0 errors (4 old `<img>` warnings in `TextDealsManager.tsx`) · `npx vitest run` 2109/2109 (185 files) · `npm run build` 0 · `next start` served the Apple file 200 octet-stream. Docs-only changes after it.
+- **Open (owner):** `TASKS.md` (15) item 2 first-week checks; (15) item 1 (PayPal + Zettle under Naples Antiques LLC + EIN — and check the other PayPal login didn't become a second business, (19)); (15) item 3 (Pay Later stays off unless asked); (13) items 1 + 3 (leftover attempt orders → Recycle Bin only).
+- **Memory:** the `payments-checkout` memory notes Advanced Checkout + the owner's two PayPal logins.
+
+## 2026-10-28 (19) — Advanced Checkout DEPLOYED (owner); Apple Pay domain REGISTERED in PayPal; no code change
+
+- **Owner:** *"Deployed — register it"*. Pre-check (part of the registration): `https://naplesestatejewelry.com/.well-known/apple-developer-merchantid-domain-association` → 200 `application/octet-stream`, no redirect, bytes = PayPal's file; also 200 for blank / Java / Apache-HttpClient user agents and HEAD; `www` and `http` 301 to the apex.
+- Owner's Chrome: first sign-in landed on a DIFFERENT PayPal login (sandbox-only "Default Application", "Upgrade your account to PayPal for Business…"; a second tab showed "Your business account is ready to go!") — Claude stopped and touched nothing; the owner re-signed in as the business (primary email info@naplesestatejewelry.com, live app NaplesEstateJewelry `AamwcjQe6f…`).
+- NaplesEstateJewelry → Apple Pay → **Manage** (opens `paypal.com/uccservicing/apm/applepay`) → **Add Domain** → `naplesestatejewelry.com` → Register Domain: first try "Domain verification file not found." (the file was serving correctly to every fetch tried); second try → **"Your website is registered with Apple Pay!"** List now: `NaplesEstateJewelry.com` (one entry).
+- Google Pay needs no domain step. Not checked by Claude: Apple Pay / Google Pay buttons on a real iPhone / Chrome, or any real payment.
+
 ## 2026-10-28 (18) — PayPal Advanced Checkout BUILT + STAGED, not pushed: card boxes on our checkout page, Apple Pay, Google Pay, Venmo; a declined card's retry gets a new PayPal order; no SQL, no env vars
 
 - **Owner:** *"Yes, build it"* (after mockup 1 + the answers in (16) + PayPal's approval in (17)).

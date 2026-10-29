@@ -29,6 +29,7 @@ import {
 } from '@/lib/checkout-shipping';
 import { chargesFlSalesTax, formatCheckoutCurrency } from '@/lib/checkout-pricing';
 import CheckoutTaxExempt, { type CheckoutExemptionChoice } from '@/components/checkout/CheckoutTaxExempt';
+import HeardAboutCard from '@/components/checkout/HeardAboutCard';
 import {
   isUnitedStatesCountry,
   normalizeUsState,
@@ -135,6 +136,7 @@ export default function CheckoutClient({ locale, paypalClientId, pickupHoursLine
   // the confirmation screen can render a complete, printable summary — the cart is
   // cleared right after, and a guest has no account to look the order up in later.
   const [createdOrder, setCreatedOrder] = useState<{
+    orderId: string;
     orderNumber: string;
     items: CartItem[];
     shippingMethod: string;
@@ -520,6 +522,9 @@ export default function CheckoutClient({ locale, paypalClientId, pickupHoursLine
               : (isEs ? 'Ver detalles del pedido' : 'View Order Details')}
           </button>
         </div>
+
+        {/* Optional "How did you hear about us?" — one answer, saved on the order. */}
+        <HeardAboutCard orderId={createdOrder.orderId} orderNumber={createdOrder.orderNumber} isEs={isEs} />
 
         {showOrderDetails && (
           <div className="mt-10">
@@ -1118,10 +1123,10 @@ export default function CheckoutClient({ locale, paypalClientId, pickupHoursLine
                   orderIdRef.current = null;
                   orderPayloadKeyRef.current = null;
                 }}
-                onSuccess={({ orderNumber }) => {
+                onSuccess={({ orderId, orderNumber }) => {
                   // Snapshot the order for the printable confirmation, THEN clear the
                   // cart (clearing empties `items`, so capture the summary first).
-                  setCreatedOrder({ orderNumber, items: summaryItems, shippingMethod: effectiveShippingMethod, customer });
+                  setCreatedOrder({ orderId, orderNumber, items: summaryItems, shippingMethod: effectiveShippingMethod, customer });
                   clear();
                 }}
               />

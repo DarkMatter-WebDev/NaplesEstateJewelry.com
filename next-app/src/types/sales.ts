@@ -58,6 +58,9 @@ export interface Order {
   billing_address: Record<string, unknown> | null;
   internal_notes: string | null;
   customer_notes: string | null;
+  /** "How did you hear about us?" key + typed text — `lib/order-heard-about.ts`. */
+  heard_about?: string | null;
+  heard_about_other?: string | null;
   refund_amount: number | null;
   deleted_at?: string | null;
   created_at: string;

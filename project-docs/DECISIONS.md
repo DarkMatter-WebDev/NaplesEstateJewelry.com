@@ -4,7 +4,13 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-10-28 (18)**.
+> compaction. Last reconciled: **2026-10-29 (1)**.
+
+## "How did you hear about us?" is ONE optional answer on the Order Received screen, saved on the order as an English key; main checkout only, no tally yet (2026-10-29)
+
+- **Owner:** approved mockup 2 (*"Build it"*) after cutting YouTube, "Shopped with you before" and "Text or email from us" from mockup 1; *"one answer"*; the line on the order in Admin → Orders = yes; Spanish gets the same card. Not answered → built as recommended: main checkout only (not Make an Offer / `/pay/<token>`), no tally on Orders. Record `CHANGELOG.md` 2026-10-29 (1).
+- **Choices (11 + Other):** Google Search · Google Maps · Instagram · Facebook · TikTok · Yelp · Nextdoor · ChatGPT / AI assistant · Friend or family · Passed the showroom · eBay or Etsy · Other… (typed, ≤ 80 chars). Google is split into Search vs Maps because ads and the Business Profile are separate spend.
+- **Rules:** stored as English keys (`lib/order-heard-about.ts`) so Spanish answers count the same; the save is write-once and needs the order's UUID + order number + paid; skipping changes nothing. ⛔ Never rename a key (stored data) — retire a choice by removing it from the list only; never make the question required or put it before payment.
 
 ## Checkout = PayPal Advanced Checkout: Apple Pay / Google Pay on top, PayPal + Venmo, then card boxes on our page; still ONLY PayPal (2026-10-28)
 

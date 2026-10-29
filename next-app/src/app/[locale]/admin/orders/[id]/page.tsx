@@ -38,6 +38,8 @@ const ORDER_DETAIL_COLUMNS = [
   'billing_address',
   'internal_notes',
   'customer_notes',
+  'heard_about',
+  'heard_about_other',
   'refund_amount',
   'deleted_at',
   'created_at',
@@ -50,6 +52,7 @@ type OrderColumnSupport = {
   itemYearAndQuantity: boolean;
   refundAmount: boolean;
   deletedAt: boolean;
+  heardAbout: boolean;
 };
 
 function getOrderDetailColumns(support: OrderColumnSupport) {
@@ -68,7 +71,17 @@ function getOrderDetailColumns(support: OrderColumnSupport) {
   }
   if (!support.refundAmount) columns = columns.replace('refund_amount, ', '');
   if (!support.deletedAt) columns = columns.replace('deleted_at, ', '');
+  // Before `supabase/order-heard-about-2026-10.sql` runs, the order still opens.
+  if (!support.heardAbout) {
+    columns = columns
+      .replace('heard_about, ', '')
+      .replace('heard_about_other, ', '');
+  }
   return columns;
+}
+
+function isMissingHeardAboutColumnError(error: { message?: string | null } | null | undefined) {
+  return Boolean(error?.message?.toLowerCase().includes('heard_about'));
 }
 
 function isMissingItemYearColumnError(error: { message?: string | null } | null | undefined) {
@@ -161,10 +174,11 @@ export default async function AdminOrderDetailPage({ params }: Props) {
     itemYearAndQuantity: true,
     refundAmount: true,
     deletedAt: true,
+    heardAbout: true,
   };
   let orderResult = initialOrderResult;
 
-  for (let attempt = 0; orderResult.error && attempt < 4; attempt += 1) {
+  for (let attempt = 0; orderResult.error && attempt < 5; attempt += 1) {
     let changed = false;
     if (columnSupport.tracking && isMissingTrackingColumnError(orderResult.error)) {
       columnSupport.tracking = false;
@@ -180,6 +194,10 @@ export default async function AdminOrderDetailPage({ params }: Props) {
     }
     if (columnSupport.deletedAt && isMissingDeletedAtColumnError(orderResult.error)) {
       columnSupport.deletedAt = false;
+      changed = true;
+    }
+    if (columnSupport.heardAbout && isMissingHeardAboutColumnError(orderResult.error)) {
+      columnSupport.heardAbout = false;
       changed = true;
     }
     if (!changed) break;

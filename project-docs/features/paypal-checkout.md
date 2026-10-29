@@ -301,6 +301,19 @@ the capture RPC then marks the order paid + `completed` (fulfillment still reads
 `cancelled`), so the owner sees a paid order and ships or refunds it by hand. Runbook: `features/instant-sale.md`.
 Rules: `DECISIONS.md` → *"Instant Sale"* (2026-10-21).
 
+## "How did you hear about us?" on Order Received (2026-10-29)
+
+Under the Order Received buttons, `components/checkout/HeardAboutCard.tsx` asks one
+optional question: 11 choices + Other (typed, max 80 chars), ONE answer, EN/ES. Send
+-> `POST /api/orders/heard-about` `{ orderId, orderNumber, heardAbout, heardAboutOther }`;
+the route updates ONLY the row whose id AND order number match, `payment_status = 'paid'`
+and `heard_about is null` (write-once; 404 otherwise; rate limit 20/IP/hour). `orderId`
+is the UUID `capture-order` returns to `onSuccess`. Keys are English
+(`lib/order-heard-about.ts`) so Spanish answers count the same. Admin -> Orders -> the
+order -> Customer card shows "Heard About Us". Main checkout only (not the offer or
+`/pay/<token>` screens). SQL `supabase/order-heard-about-2026-10.sql` (two `orders`
+columns); before it runs, Send shows "That didn't save" and the admin page omits the line.
+
 ## Tax-exempt checkout (2026-10-27)
 
 The quote and create-order routes accept `taxExempt: { token } | { useSaved: true }`

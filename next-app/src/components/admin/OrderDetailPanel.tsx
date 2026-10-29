@@ -19,6 +19,7 @@ import { adminUpdateProductsStatus } from '@/app/actions/admin-products';
 import { AppIcon } from '@/components/AppIcon';
 import OrderTaxExemptionPanel from '@/components/admin/OrderTaxExemptionPanel';
 import type { TaxExemptSnapshot } from '@/lib/tax-exempt';
+import { heardAboutAdminLabel } from '@/lib/order-heard-about';
 
 const GOLD = '#735c00';
 const BORDER = 'var(--color-outline-variant)';
@@ -821,6 +822,18 @@ export default function OrderDetailPanel({
                         <p className="whitespace-pre-line" style={{ color: 'var(--color-on-surface)' }}>{billing}</p>
                       </div>
                     )}
+                  </div>
+                );
+              })()}
+              {(() => {
+                const heardAbout = heardAboutAdminLabel(order.heard_about, order.heard_about_other);
+                if (!heardAbout) return null;
+                return (
+                  <div className="mt-4 text-sm">
+                    <span className="mb-1 block text-[0.62rem] font-bold uppercase tracking-widest" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+                      Heard About Us
+                    </span>
+                    <p className="font-bold" style={{ color: GOLD }}>{heardAbout}</p>
                   </div>
                 );
               })()}
