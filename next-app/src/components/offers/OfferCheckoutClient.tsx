@@ -506,6 +506,7 @@ export default function OfferCheckoutClient({
               ) : (
                 <PayPalCheckoutButton
                   clientId={paypalClientId}
+                  amount={totals?.total ?? null}
                   ready={ready}
                   isEs={isEs}
                   missingFields={missing.filter((label) => label !== (isEs ? 'la casilla de confirmación' : 'the confirmation box'))}

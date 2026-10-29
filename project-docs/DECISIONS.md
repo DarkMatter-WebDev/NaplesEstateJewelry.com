@@ -4,7 +4,18 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-10-28 (8)**.
+> compaction. Last reconciled: **2026-10-28 (18)**.
+
+## Checkout = PayPal Advanced Checkout: Apple Pay / Google Pay on top, PayPal + Venmo, then card boxes on our page; still ONLY PayPal (2026-10-28)
+
+- **Owner:** *"go with the recommended layout"*; billing "same as shipping" ticked = OK; *"venmo, keep it"*; *"pay later stays off"*. PayPal approved advanced cards + Apple Pay + Google Pay on the live app 10-28 (17). Record `CHANGELOG.md` 2026-10-28 (15)–(18).
+- **Rules:** one processor (PayPal) — no Stripe / Shop Pay (10-28 (15)). Each method shows only when PayPal and the device say it is eligible; PayPal's own card button appears ONLY when our card form is not eligible (never both). Every method finishes through the one `captureAndFinish` → `/api/paypal/capture-order`, so declines, pending captures and item conflicts read the same. Card / Google Pay captures are refused when 3-D Secure ran and failed. After any decline the next attempt gets a NEW PayPal order (`newPayPalOrder` → `requestIdSalt`).
+- **⛔ Never:** load Pay Later (`disable-funding: 'paylater,credit'` stays); add Apple's JS SDK (the CSS button + Safari's `ApplePaySession` are enough); put the card fields behind the not-ready overlay (buyers may type the card first; Pay checks readiness); change the create-order request body for cards (3-D Secure stays PayPal's default); edit or re-download the Apple domain file except from PayPal's live link; let `/.well-known/` reach the locale proxy.
+
+## A declined card at checkout says "declined — NOT charged, try again above" (the buttons sit above the message; was "below" until 10-28 (16)); never auto-reopen PayPal, never the "do not pay again" lock (2026-10-28)
+
+- **Owner:** *"make sure it functions gracefully.. we dont want it looking messy opening a wrong window or something"*. Record `CHANGELOG.md` 2026-10-28 (13)–(14).
+- **Rules:** `capture-order` answers `code: 'card_declined'` (402) for PayPal `INSTRUMENT_DECLINED` / `TRANSACTION_REFUSED` or a DECLINED/FAILED capture, and checks that BEFORE the `paymentStatusUnknown` lock — a declined capture carries a capture id, and treating it as "unknown" told a real buyer not to pay again. The lock stays for PENDING/unreadable captures only. ⛔ No `actions.restart()`: no window opens that the buyer did not click (and the capture idempotency key would replay the decline on the same PayPal order). The buyer's next tap reuses the same site order (`failed` → `unpaid` on reuse; the pay link accepts `failed` with no capture id). Every decline logs `PayPal capture issue:` with the issue code + debug_id.
 
 ## A dark interior-page hero (`min-h-[…px] items-center`) always carries its own vertical padding, `py-12 md:py-16` (2026-10-28)
 

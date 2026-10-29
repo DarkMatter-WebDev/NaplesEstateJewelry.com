@@ -82,6 +82,9 @@ export async function POST(req: Request) {
   if (!body) return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
 
   const reuseOrderId = typeof body.orderId === 'string' && body.orderId ? body.orderId : null;
+  // Set by the checkout after a declined payment: the retry must get a NEW
+  // PayPal order, not the declined one back (lib/paypal.ts requestIdSalt).
+  const newPayPalOrder = body.newPayPalOrder === true;
   // New payload: items = [{ id, quantity }]. Legacy fallback: productIds = string[]
   // (each treated as quantity 1). normalizeOrderLines dedupes and clamps.
   const rawLines: OrderLine[] = Array.isArray(body.items)
@@ -254,7 +257,7 @@ export async function POST(req: Request) {
   if (reuseOrderId) {
     const { data: order, error } = await service
       .from('orders')
-      .select('id, order_number, total, subtotal, tax, shipping_fee, discount, discount_code, payment_status, paypal_capture_id')
+      .select('id, order_number, total, subtotal, tax, shipping_fee, discount, discount_code, payment_status, paypal_capture_id, paypal_order_id')
       .eq('id', reuseOrderId)
       .maybeSingle();
 
@@ -335,15 +338,20 @@ export async function POST(req: Request) {
           items: lineItems(items),
           referenceId: order.id,
           shippingAddress: paypalShippingAddress,
+          requestIdSalt: newPayPalOrder ? order.paypal_order_id : null,
         });
         // Reset status back to open/pending: the buyer may be resuming an order
-        // that onCancel previously soft-cancelled, and it's live again now.
+        // that onCancel previously soft-cancelled, and it's live again now. A
+        // 'failed' order here is a declined card (a captured one carries a
+        // capture id and was refused above), so it is unpaid again while the
+        // buyer tries another card (2026-10-28).
         const { data: associatedOrder, error: updateError } = await service
           .from('orders')
           .update({
             paypal_order_id: paypalOrder.id,
             order_status: 'open',
             fulfillment_status: 'pending',
+            ...(order.payment_status === 'failed' ? { payment_status: 'unpaid' } : {}),
             customer_name: normalizedName,
             customer_email: String(customer.email).trim(),
             customer_phone: normalizedPhone,

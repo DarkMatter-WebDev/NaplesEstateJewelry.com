@@ -34,6 +34,19 @@ describe('checkoutErrorMessageForCode', () => {
     }
   });
 
+  it('tells a declined buyer they were NOT charged and can try another card (2026-10-28)', () => {
+    const en = checkoutErrorMessageForCode('card_declined', false)!;
+    expect(en).toContain('declined');
+    expect(en).toContain('NOT been charged');
+    expect(en).toContain('try again above with a different card'); // the pay buttons and card boxes sit ABOVE the message
+    expect(en).toContain('(239) 404-8505');
+    const es = checkoutErrorMessageForCode('card_declined', true)!;
+    expect(es).toContain('rechazado');
+    expect(es).toContain('NO se le ha cobrado');
+    expect(es).toContain('de nuevo arriba');
+    expect(es).toContain('(239) 404-8505');
+  });
+
   it('returns null for the stock code and unknown/absent codes (fallback path)', () => {
     // 'unavailable' deliberately flows through the availability path instead.
     expect(checkoutErrorMessageForCode('unavailable', false)).toBeNull();

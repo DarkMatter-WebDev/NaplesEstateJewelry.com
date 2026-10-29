@@ -176,6 +176,7 @@ export default function PayInvoiceClient({ data, locale, paypalClientId }: { dat
         {paypalClientId ? (
           <PayPalCheckoutButton
             clientId={paypalClientId}
+            amount={totals.total}
             ready={missing.length === 0}
             isEs={isEs}
             missingFields={missing}

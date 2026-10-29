@@ -433,7 +433,13 @@ component were removed on 2026-07-30). Full runbook:
 
 - **Frontend:** `next-app/src/components/checkout/PayPalCheckoutButton.tsx` loads
   the PayPal JS SDK (client id passed from the server checkout page, not a
-  `NEXT_PUBLIC_*` var) and renders the PayPal + card buttons. It validates contact
+  `NEXT_PUBLIC_*` var; loader + SDK types in `checkout/paypal-sdk.ts`) and renders
+  the pay box. Since 2026-10-28 (Advanced Checkout): Apple Pay (Safari, CSS-drawn
+  button + native `ApplePaySession`) and Google Pay (Google's `pay.js` button) on
+  top, then one PayPal Buttons instance per funding source (PayPal, Venmo; PayPal's
+  own CARD button only when the card form is ineligible), then PayPal Card Fields
+  (four secure iframes) with our gold "Pay $…" button. Every method ends in the
+  same `captureAndFinish` → `/api/paypal/capture-order` (with `paymentMethod`). It validates contact
   (and, when shipping, address) fields in PayPal's `onClick` before opening the
   window. The shipping method is chosen on the Order Summary's "Shipping" row; the
   Shipping Address block sits in the left review column under the summary.

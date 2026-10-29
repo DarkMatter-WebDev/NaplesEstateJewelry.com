@@ -159,7 +159,11 @@ describe('source guards', () => {
     expect(button).toContain('if (cancelOnAbandonRef.current) cancelAbandonedOrder(');
     const route = read('src', 'app', 'api', 'pay', '[token]', 'create-order', 'route.ts');
     expect(route).not.toMatch(/order_status:\s*'cancelled'/);
-    expect(route).toContain(".eq('payment_status', 'unpaid')");
+    // Only an unpaid order, or one whose card was declined (failed, no capture),
+    // is ever restarted — never a paid or captured one (2026-10-28).
+    expect(route).toContain(".in('payment_status', ['unpaid', 'failed'])");
+    expect(route).toContain(".is('paypal_capture_id', null)");
+    expect(route).not.toMatch(/\.in\('payment_status', \[[^\]]*'paid'/);
   });
 
   it('the pay page is noindex and keeps the token out of the Referer', () => {

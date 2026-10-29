@@ -97,9 +97,14 @@ export async function POST(req: Request, { params }: Props) {
         : {}),
       tax: totals.tax,
       total: totals.total,
+      payment_status: 'unpaid',
     })
     .eq('id', order.id)
-    .eq('payment_status', 'unpaid')
+    // 'failed' with no capture = a declined card (PayPal's DECLINED webhook);
+    // the buyer may try another card on the same link (2026-10-28). A failed
+    // order that DID capture (item conflict) keeps its capture id and is skipped.
+    .in('payment_status', ['unpaid', 'failed'])
+    .is('paypal_capture_id', null)
     .select('id')
     .maybeSingle();
   if (updateError || !updated) {
@@ -107,6 +112,14 @@ export async function POST(req: Request, { params }: Props) {
     return NextResponse.json({ error: isEs ? 'No se pudo iniciar el pago.' : 'Could not start payment.' }, { status: 500 });
   }
   await upsertOrderInvoice(service, order.id);
+
+  // After a declined payment the retry must get a NEW PayPal order, not the
+  // declined one back (lib/paypal.ts requestIdSalt, 2026-10-28).
+  let requestIdSalt: string | null = null;
+  if (body?.newPayPalOrder === true) {
+    const { data: current } = await service.from('orders').select('paypal_order_id').eq('id', order.id).maybeSingle();
+    requestIdSalt = (current?.paypal_order_id as string | null | undefined) ?? null;
+  }
 
   try {
     const paypalOrder = await createPayPalOrder({
@@ -133,6 +146,7 @@ export async function POST(req: Request, { params }: Props) {
           countryCode: 'US',
         }
         : null,
+      requestIdSalt,
     });
     const { error: linkError } = await service.from('orders').update({ paypal_order_id: paypalOrder.id }).eq('id', order.id);
     if (linkError) throw new Error(`Could not link the PayPal order: ${linkError.message}`);

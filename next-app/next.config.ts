@@ -23,20 +23,32 @@ const GOOGLE_ADS_CSP = {
   frame: 'https://www.googletagmanager.com',
 } as const;
 
+// Google Pay at checkout (2026-10-28, PayPal Advanced Checkout): pay.js and its
+// sheet come from pay.google.com, the button artwork from www.gstatic.com, and
+// pay.js also calls https://google.com/pay (seen blocked in dev, 2026-10-28).
+// Apple Pay needs no host — Safari's own ApplePaySession + a CSS-drawn button.
+// ⛔ Must match root netlify.toml (two-CSP rule).
+const GOOGLE_PAY_CSP = {
+  script: 'https://pay.google.com',
+  img: 'https://www.gstatic.com',
+  connect: 'https://pay.google.com https://google.com/pay',
+  frame: 'https://pay.google.com',
+} as const;
+
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   "base-uri 'self'",
   "object-src 'none'",
   "form-action 'self'",
   "frame-ancestors 'none'",
-  `img-src 'self' data: blob: https://evzluixourmsefwdsieu.supabase.co https://s3.tradingview.com https://*.tradingview.com https://*.paypal.com https://*.paypalobjects.com https://*.cloudflarestream.com https://*.videodelivery.net ${GOOGLE_ADS_CSP.img}`,
+  `img-src 'self' data: blob: https://evzluixourmsefwdsieu.supabase.co https://s3.tradingview.com https://*.tradingview.com https://*.paypal.com https://*.paypalobjects.com https://*.cloudflarestream.com https://*.videodelivery.net ${GOOGLE_ADS_CSP.img} ${GOOGLE_PAY_CSP.img}`,
   // challenges.cloudflare.com is Turnstile (Supabase Auth CAPTCHA) — it needs
   // script-src AND frame-src, and must match root netlify.toml (two-CSP rule).
-  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''} https://s3.tradingview.com https://www.paypal.com https://*.paypalobjects.com https://challenges.cloudflare.com ${GOOGLE_ADS_CSP.script}`,
+  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''} https://s3.tradingview.com https://www.paypal.com https://*.paypalobjects.com https://challenges.cloudflare.com ${GOOGLE_ADS_CSP.script} ${GOOGLE_PAY_CSP.script}`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
-  `connect-src 'self' https://evzluixourmsefwdsieu.supabase.co https://api.gold-api.com https://s3.tradingview.com https://*.tradingview.com https://*.tradingview-widget.com https://*.paypal.com https://*.cloudflarestream.com https://*.videodelivery.net ${GOOGLE_ADS_CSP.connect}`,
-  `frame-src https://*.tradingview.com https://*.tradingview-widget.com https://*.paypal.com https://*.cloudflarestream.com https://*.videodelivery.net https://www.google.com https://maps.google.com https://challenges.cloudflare.com ${GOOGLE_ADS_CSP.frame}`,
+  `connect-src 'self' https://evzluixourmsefwdsieu.supabase.co https://api.gold-api.com https://s3.tradingview.com https://*.tradingview.com https://*.tradingview-widget.com https://*.paypal.com https://*.cloudflarestream.com https://*.videodelivery.net ${GOOGLE_ADS_CSP.connect} ${GOOGLE_PAY_CSP.connect}`,
+  `frame-src https://*.tradingview.com https://*.tradingview-widget.com https://*.paypal.com https://*.cloudflarestream.com https://*.videodelivery.net https://www.google.com https://maps.google.com https://challenges.cloudflare.com ${GOOGLE_ADS_CSP.frame} ${GOOGLE_PAY_CSP.frame}`,
   "media-src 'self' blob: https://*.cloudflarestream.com https://*.videodelivery.net",
   "worker-src 'self' blob:",
 ].join('; ');

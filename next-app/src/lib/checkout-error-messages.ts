@@ -57,6 +57,13 @@ export function checkoutErrorMessageForCode(
       return isEs
         ? 'Esta contraoferta ya no está disponible (venció, ya se pagó o la pieza se vendió). No se le ha cobrado. Llámenos al (239) 404-8505 si tiene preguntas.'
         : 'This counter-offer is no longer available (it expired, was already paid, or the piece sold). You have not been charged. Call (239) 404-8505 with any questions.';
+    // PayPal or the card's bank refused the payment at capture (capture-order
+    // returns this code). Nothing was charged and the same order is reused, so
+    // the buyer just taps the button again — no new window opens on its own.
+    case 'card_declined':
+      return isEs
+        ? 'Su pago fue rechazado por el banco de la tarjeta o por PayPal. NO se le ha cobrado. Puede intentarlo de nuevo arriba con otra tarjeta o con su cuenta de PayPal, o llámenos al (239) 404-8505 y le ayudamos a completar su compra.'
+        : 'Your payment was declined by your card’s bank or by PayPal. You have NOT been charged. You can try again above with a different card or your PayPal account, or call us at (239) 404-8505 and we’ll help you complete your purchase.';
     default:
       return null;
   }

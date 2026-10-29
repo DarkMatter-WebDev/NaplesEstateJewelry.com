@@ -98,6 +98,13 @@ export type CreatePayPalOrderInput = {
    * and `voidPayPalAuthorization` releases it otherwise.
    */
   intent?: 'CAPTURE' | 'AUTHORIZE';
+  /**
+   * Only for a retry after a declined payment (2026-10-28): the PayPal order
+   * being replaced. Mixed into the PayPal-Request-Id (never the request body) so
+   * the retry gets a NEW PayPal order — the same id would hand back the declined
+   * order, whose capture key `capture-<id>` can return the cached decline.
+   */
+  requestIdSalt?: string | null;
 };
 
 function round2(value: number) {
@@ -115,10 +122,10 @@ export type PayPalOrderResult = {
 
 export function payPalCreateRequestId(input: CreatePayPalOrderInput): string {
   const request = buildPayPalOrderRequest(input);
-  const digest = createHash('sha256')
-    .update(JSON.stringify(request))
-    .digest('hex')
-    .slice(0, 31);
+  const hash = createHash('sha256').update(JSON.stringify(request));
+  // Unsalted ids stay byte-for-byte what they always were.
+  if (input.requestIdSalt) hash.update(`|retry:${input.requestIdSalt}`);
+  const digest = hash.digest('hex').slice(0, 31);
   return `create-${digest}`;
 }
 
@@ -313,7 +320,36 @@ export function parsePayPalCaptureResponse(raw: unknown): PayPalCaptureResult {
   };
 }
 
-export async function getPayPalOrderCapture(paypalOrderId: string): Promise<PayPalCaptureResult> {
+/**
+ * PayPal error issue codes that mean the buyer's card / PayPal funding was
+ * refused — nothing was charged and the buyer can simply pay another way.
+ * INSTRUMENT_DECLINED = the card processor or bank declined it;
+ * TRANSACTION_REFUSED = PayPal itself refused it.
+ */
+export const PAYPAL_DECLINE_ISSUES = ['INSTRUMENT_DECLINED', 'TRANSACTION_REFUSED'] as const;
+
+/** The `details[].issue` codes and `debug_id` of a PayPal API error body (the thrown `err.raw`). */
+export function paypalErrorInfo(raw: unknown): { issues: string[]; debugId: string | null } {
+  const data = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
+  const details = Array.isArray(data.details) ? data.details as Array<Record<string, unknown>> : [];
+  return {
+    issues: details.map((d) => (typeof d?.issue === 'string' ? d.issue : '')).filter(Boolean),
+    debugId: typeof data.debug_id === 'string' ? data.debug_id : null,
+  };
+}
+
+/**
+ * Was this capture a decline (no money moved)? True when PayPal's error names a
+ * decline issue, or the order's capture record itself reads DECLINED / FAILED.
+ * A PENDING or unreadable capture is NOT a decline — that stays "status unknown".
+ */
+export function isPayPalCaptureDecline(issues: string[], captureStatus: string | null | undefined): boolean {
+  if (issues.some((issue) => (PAYPAL_DECLINE_ISSUES as readonly string[]).includes(issue))) return true;
+  return captureStatus === 'DECLINED' || captureStatus === 'FAILED';
+}
+
+/** The raw PayPal order (GET /v2/checkout/orders/:id). */
+export async function getPayPalOrder(paypalOrderId: string): Promise<Record<string, unknown>> {
   const token = await getAccessToken();
   const res = await fetch(`${paypalApiBase()}/v2/checkout/orders/${encodeURIComponent(paypalOrderId)}`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -323,7 +359,32 @@ export async function getPayPalOrderCapture(paypalOrderId: string): Promise<PayP
   if (!res.ok || !data) {
     throw new Error(`PayPal order lookup failed (${res.status}).`);
   }
-  return parsePayPalCaptureResponse(data);
+  return data;
+}
+
+export async function getPayPalOrderCapture(paypalOrderId: string): Promise<PayPalCaptureResult> {
+  return parsePayPalCaptureResponse(await getPayPalOrder(paypalOrderId));
+}
+
+/**
+ * Did the card's bank security check (3-D Secure) run and FAIL on this order?
+ * Read from a card-form or Google Pay order before capture (2026-10-28).
+ * PayPal's guidance: enrolled card (`enrollment_status` Y) whose authentication
+ * came back N (failed), R (rejected), U (unavailable) or C (challenge not
+ * completed) — do not capture. No 3-D Secure result at all (the check was not
+ * required, the usual case for a US card) or Y / A = carry on.
+ */
+export function paypalThreeDSecureFailed(rawOrder: unknown): boolean {
+  const data = rawOrder && typeof rawOrder === 'object' ? rawOrder as Record<string, unknown> : {};
+  const source = (data.payment_source ?? {}) as Record<string, Record<string, unknown> | undefined>;
+  const card = source.card ?? (source.google_pay?.card as Record<string, unknown> | undefined);
+  const result = card?.authentication_result as Record<string, unknown> | undefined;
+  const threeDS = result?.three_d_secure as Record<string, unknown> | undefined;
+  if (!threeDS) return false;
+  const enrollment = String(threeDS.enrollment_status ?? '');
+  const authentication = String(threeDS.authentication_status ?? '');
+  if (enrollment !== 'Y') return false;
+  return ['N', 'R', 'U', 'C'].includes(authentication);
 }
 
 export async function capturePayPalOrder(paypalOrderId: string): Promise<PayPalCaptureResult> {

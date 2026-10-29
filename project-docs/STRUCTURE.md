@@ -116,6 +116,7 @@ let additional loose app assets accumulate at root.
 | Product video | Cloudflare Stream bytes; Supabase `product_videos` metadata; `src/lib/product-video*.ts` and `cloudflare-stream.ts` |
 | Product pricing | `next-app/src/lib/pricing.ts` and `spot-price.ts` |
 | Authoritative checkout totals | `next-app/src/lib/checkout-pricing.ts` |
+| Checkout pay box (2026-10-28 Advanced Checkout: Apple Pay, Google Pay, PayPal, Venmo, card boxes — one `captureAndFinish`) | `next-app/src/components/checkout/PayPalCheckoutButton.tsx` (used by `/checkout`, counter-offer Buy-now, `/pay/<token>`); SDK loader + types `components/checkout/paypal-sdk.ts`; Apple Pay domain file `public/.well-known/apple-developer-merchantid-domain-association` (PayPal's live copy). Runbook `features/paypal-checkout.md` → *Advanced Checkout* |
 | Shipping methods and fees | `next-app/src/lib/checkout-shipping.ts` |
 | U.S. address normalization | `next-app/src/lib/us-address.ts` |
 | PayPal integration | `src/lib/paypal*.ts`, PayPal API routes, and `features/paypal-checkout.md` |

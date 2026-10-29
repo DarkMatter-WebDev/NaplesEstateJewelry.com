@@ -188,6 +188,9 @@ export const config = {
     // localized page, and the unanchored `review` prefix carved it out of the
     // locale rewrite too — a 404 in dev before the page had a single visitor.
     // Guarded by lib/__tests__/reviews-page.test.ts.
-    '/((?!_next/static|_next/image|favicon.ico|icon|api/|p/|review$|robots.txt|sitemap.*\\.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff2?|mp4|webm|mov|ogg|pdf|txt)).*)',
+    // `\\.well-known/` (2026-10-28): Apple fetches the Apple Pay domain file at
+    // /.well-known/apple-developer-merchantid-domain-association and refuses a
+    // redirect — it must never be sent to /en/....
+    '/((?!_next/static|_next/image|favicon.ico|icon|api/|p/|review$|\\.well-known/|robots.txt|sitemap.*\\.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff2?|mp4|webm|mov|ogg|pdf|txt)).*)',
   ],
 };

@@ -1093,6 +1093,7 @@ export default function CheckoutClient({ locale, paypalClientId, pickupHoursLine
             ) : paypalClientId ? (
               <PayPalCheckoutButton
                 clientId={paypalClientId}
+                amount={displayedTotals.total}
                 ready={payReady}
                 isEs={isEs}
                 missingFields={missingFieldLabels}

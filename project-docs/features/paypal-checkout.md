@@ -148,6 +148,62 @@ the remaining owner-run live recovery/refund/race test matrix in `TASKS.md`.
   retries also retry missing invoice/receipt finalization without duplicating an
   automatic receipt; automatic receipt and owner sends carry stable Resend
   idempotency keys.
+- **Declined card at capture (2026-10-28).** PayPal answers the capture with
+  `422` + `details[].issue` `INSTRUMENT_DECLINED` (bank/processor) or
+  `TRANSACTION_REFUSED` (PayPal), and the order lookup shows a DECLINED capture
+  that still has an id. `capture-order` checks `isPayPalCaptureDecline` FIRST
+  and returns `402 { code: 'card_declined', orderId }` — no database write; the
+  `PAYMENT.CAPTURE.DECLINED` webhook marks the order `failed` on its own. The
+  button shows the bilingual "declined — NOT charged — try again above" line (10-28 (16): was "below"),
+  sets no recovery lock and keeps the order id, so the buyer's next tap goes
+  through create-order's reuse path (which flips `failed` back to `unpaid`) and
+  a fresh PayPal order. No `actions.restart()` (see `DECISIONS.md`). Netlify
+  logs one `PayPal capture issue: {"order","issues","debugId"}` line per decline
+  — filter the function log by `PayPal capture issue` to read the reason.
+- **Advanced Checkout (2026-10-28) — card boxes on our page, Apple Pay, Google
+  Pay.** PayPal approved advanced card payments + Apple Pay + Google Pay on the
+  live app (`CHANGELOG.md` 2026-10-28 (17)). The SDK loads
+  `components=buttons,card-fields,applepay,googlepay` (Pay Later still disabled,
+  Venmo on). Order of the pay box: Apple Pay (only Safari with Apple Pay set up)
+  · Google Pay (only where Google says ready) · PayPal · Venmo (phones) · "or pay
+  by card" · card number / expiration / security code / name (PayPal iframes,
+  `CARD_FIELD_STYLE`) · billing ("same as shipping" ticked; untick = street /
+  apt / city / state / ZIP; Local Pickup = billing ZIP only) · decline / error
+  line · gold "Pay $total" · "processed securely by PayPal" note. Each piece
+  shows only when eligible; if the card form is not, PayPal's own "Debit or
+  Credit Card" button comes back instead (never both).
+  - **One finish for every method:** `createOrderForPayment(method)` →
+    create-order (unchanged server pricing / `price_changed` / stock checks) →
+    PayPal approval in that method's own way → `captureAndFinish(id, method)` →
+    `/api/paypal/capture-order` `{ paypalOrderId, paymentMethod }`. Apple Pay:
+    order created in `onpaymentauthorized`, `confirmOrder`, sheet closed with
+    SUCCESS, then capture on the page. Google Pay: order + `confirmOrder` in
+    `onPaymentAuthorized`; sheet closes; `initiatePayerAction` if PayPal asks
+    (3-D Secure); then capture.
+  - **3-D Secure:** create-order is unchanged (PayPal's default runs the bank
+    check only when required — rare for US cards). For `card` / `google_pay`
+    the capture route reads the order first: `paypalThreeDSecureFailed` (enrolled
+    card + authentication N / R / U / C) → `card_declined`, no capture. A failed
+    lookup does not block.
+  - **New PayPal order after a decline:** the button sends `newPayPalOrder: true`
+    on the next attempt; both create-order routes then salt the PayPal-Request-Id
+    with the declined PayPal order id (`requestIdSalt`, never in the body). Before
+    this, the identical request id returned the declined order and its cached
+    capture result.
+  - **Apple Pay domain:** `public/.well-known/apple-developer-merchantid-domain-association`
+    = PayPal's LIVE file verbatim (hex; from paypalobjects.com, 2026-10-28);
+    `netlify.toml` forces `application/octet-stream`; `proxy.ts` matcher skips
+    `\.well-known/`. ⛔ After the deploy: PayPal developer dashboard → Live →
+    NaplesEstateJewelry → Apple Pay → **Manage → Add Domain**
+    `naplesestatejewelry.com`. Apple Pay shows nowhere until that is done.
+  - **CSP:** Google Pay hosts (`pay.google.com` script/connect/frame,
+    `google.com/pay` connect, `www.gstatic.com` img) in BOTH `next.config.ts`
+    and root `netlify.toml`. Apple Pay needs none.
+  - **Localhost:** PayPal refuses the Google Pay config from `localhost` (CORS,
+    `googlepay_config_error`) — Google Pay can only be seen on the live site.
+    Card fields and the PayPal button do render locally with the live client id.
+  - Guards: `lib/__tests__/paypal-advanced-checkout.test.ts`,
+    `paypal-capture-decline-route.test.ts`.
 - **`cancel-order`** (service-role client): fire-and-forget soft-cancel for the
   unpaid order a buyer abandoned before approving (closed the PayPal window).
   It flips `order_status`/`fulfillment_status` to `cancelled` only and never

@@ -1809,6 +1809,54 @@ body:has([data-site-header]) .route-progress {
   outline-offset: 1px;
 }
 
+/* Checkout pay box (PayPal Advanced Checkout, 2026-10-28 —
+   components/checkout/PayPalCheckoutButton.tsx). Wallet buttons first, PayPal /
+   Venmo under them, then "or pay by card" and the card boxes.
+   Apple Pay: Safari draws Apple's own black button from these properties, so no
+   Apple script is loaded; other browsers never render the element. */
+.apple-pay-button {
+  display: block;
+  width: 100%;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  -webkit-appearance: -apple-pay-button;
+  -apple-pay-button-type: buy;
+  -apple-pay-button-style: black;
+}
+.paypal-button-stack > div + div {
+  margin-top: 10px;
+}
+.paypal-card-form {
+  margin-top: 0.25rem;
+}
+.paypal-card-form__or {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.9rem 0 0.4rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-on-surface-variant);
+}
+.paypal-card-form__or::before,
+.paypal-card-form__or::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--color-outline-variant);
+}
+.paypal-card-form .form-label {
+  margin-top: 0.55rem;
+}
+/* PayPal's iframe insets its input a few pixels on every side; pull the box
+   flush with our own fields (measured 2026-10-28 at 390 and 1366 px). */
+.paypal-card-form__field {
+  line-height: 0;
+  margin: -3px -7px -3px;
+}
+
 .clearable-field {
   position: relative;
 }

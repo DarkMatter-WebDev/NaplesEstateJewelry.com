@@ -1,7 +1,16 @@
 import { NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
 import { createServiceClient } from '@/lib/supabase/service';
-import { capturePayPalOrder, getPayPalOrderCapture, paypalConfigured, type PayPalCaptureResult } from '@/lib/paypal';
+import {
+  capturePayPalOrder,
+  getPayPalOrder,
+  getPayPalOrderCapture,
+  isPayPalCaptureDecline,
+  paypalConfigured,
+  paypalErrorInfo,
+  paypalThreeDSecureFailed,
+  type PayPalCaptureResult,
+} from '@/lib/paypal';
 import { finalizePaidOrder, notifyItemConflict } from '@/lib/order-finalize';
 import { scheduleProductStatusHooks } from '@/lib/product-status-hooks';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
@@ -52,16 +61,49 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'This payment has already been refunded.' }, { status: 409 });
   }
 
+  // A card/funding decline: nothing was charged, so the buyer may simply pay
+  // another way (checkout shows "declined — not charged" and keeps the button
+  // live). Never the "status unknown" lock below — a declined capture still
+  // carries a capture id, which used to read as "unknown" and told the buyer
+  // not to pay again (2026-10-28).
+  const declined = () =>
+    NextResponse.json(
+      { error: 'Your payment was declined.', code: 'card_declined', orderId: order.id },
+      { status: 402 },
+    );
+
+  // Card form / Google Pay (2026-10-28): if the card's bank security check
+  // (3-D Secure) ran and failed, never capture — treat it as a decline. The
+  // client names the method; PayPal-button and Apple Pay orders carry no such
+  // check. A failed lookup does not block: it is the same capture as before.
+  const paymentMethod = body && typeof body.paymentMethod === 'string' ? body.paymentMethod : null;
+  if (paymentMethod === 'card' || paymentMethod === 'google_pay') {
+    try {
+      if (paypalThreeDSecureFailed(await getPayPalOrder(paypalOrderId))) {
+        console.error('PayPal capture issue:', JSON.stringify({ order: order.order_number, issues: ['3DS_FAILED'], paymentMethod }));
+        return declined();
+      }
+    } catch (lookupError) {
+      console.error('PayPal 3-D Secure lookup error:', lookupError);
+    }
+  }
+
   // Capture server-side.
   let capture: PayPalCaptureResult;
   try {
     capture = await capturePayPalOrder(paypalOrderId);
   } catch (err) {
     console.error('PayPal capture error:', err);
+    // The plain log above collapses PayPal's `details` to [Object]; print the
+    // issue codes on their own line so a decline reason is readable in Netlify.
+    const { issues, debugId } = paypalErrorInfo((err as { raw?: unknown })?.raw);
+    console.error('PayPal capture issue:', JSON.stringify({ order: order.order_number, issues, debugId }));
     try {
       const recovered = await getPayPalOrderCapture(paypalOrderId);
       if (recovered.status === 'COMPLETED' && recovered.captureId) {
         capture = recovered;
+      } else if (isPayPalCaptureDecline(issues, recovered.status)) {
+        return declined();
       } else if (recovered.captureId) {
         return NextResponse.json(
           {
@@ -76,6 +118,9 @@ export async function POST(req: Request) {
       }
     } catch (recoveryError) {
       console.error('PayPal capture recovery lookup error:', recoveryError);
+      // PayPal's own error already named a decline — authoritative even when the
+      // follow-up lookup fails.
+      if (isPayPalCaptureDecline(issues, null)) return declined();
       return NextResponse.json(
         {
           error: 'PayPal did not confirm the payment status. Do not submit it again until it is reviewed.',
@@ -88,6 +133,10 @@ export async function POST(req: Request) {
   }
 
   if (capture.status !== 'COMPLETED' || !capture.captureId) {
+    if (isPayPalCaptureDecline([], capture.status)) {
+      console.error('PayPal capture issue:', JSON.stringify({ order: order.order_number, captureStatus: capture.status }));
+      return declined();
+    }
     return NextResponse.json(
       { error: 'Payment was not completed.', status: capture.status },
       { status: 402 },
