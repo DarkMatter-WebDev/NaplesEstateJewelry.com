@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { isLocaleOnlyChange, normalizeRevealPathname } from '@/components/layout/CustomerReveal';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { isLocaleOnlyChange, normalizeRevealPathname, shouldSkipReveal } from '@/components/layout/CustomerReveal';
 
 // The English/Español toggle must be a text swap, not an arrival (owner,
 // 2026-09-08, on /card: the entrance fade after the switch read as a "flash
@@ -32,5 +34,31 @@ describe('isLocaleOnlyChange', () => {
     expect(isLocaleOnlyChange('/card', '/reviews')).toBe(false);
     expect(isLocaleOnlyChange('/es/card', '/es/reviews')).toBe(false);
     expect(isLocaleOnlyChange('/', '/es/shop')).toBe(false);
+  });
+});
+
+// Owner, 2026-10-31, opening /card and /magnet from a QR code: "the page seems
+// to load, then flash and load again." The first page of a visit is already
+// painted from the server HTML before the sweep runs, so fading it in means
+// blanking a page the visitor is reading.
+describe('shouldSkipReveal', () => {
+  it('skips the fade on a full page load and on a language switch', () => {
+    expect(shouldSkipReveal(null, '/card')).toBe(true);
+    expect(shouldSkipReveal(null, '/free-evaluation')).toBe(true);
+    expect(shouldSkipReveal(null, '/es')).toBe(true);
+    expect(shouldSkipReveal('/card', '/es/card')).toBe(true);
+  });
+
+  it('keeps the fade for a real page change inside the site', () => {
+    expect(shouldSkipReveal('/card', '/reviews')).toBe(false);
+    expect(shouldSkipReveal('/free-evaluation', '/')).toBe(false);
+    expect(shouldSkipReveal('/es/card', '/es/sell')).toBe(false);
+  });
+
+  it('is the decision the effect uses, remembered per pathname', () => {
+    const source = readFileSync(join(process.cwd(), 'src/components/layout/CustomerReveal.tsx'), 'utf8');
+    expect(source).toContain(': shouldSkipReveal(lastRevealPathname, pathname);');
+    expect(source).toContain('if (skipReveal) settleWithoutReveal();');
+    expect(source).toContain('lastRunSkippedReveal = skipReveal;');
   });
 });

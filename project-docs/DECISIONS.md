@@ -6,6 +6,11 @@
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
 > compaction. Last reconciled: **2026-10-29 (11)**.
 
+## The entrance fade plays only on a page-to-page click inside the site — never on the first page of a visit, never on a language switch (2026-10-31)
+
+- **Why:** the first page is already painted from the server HTML before the fade's sweep runs (it waits for the window `load` event), so fading it meant blanking a page the visitor was reading — the owner's QR "load, flash, load again" on `/card` and `/magnet` (filmed on live `/card`: drawn at 0.75 s, blank at 1.15 s, back by 1.8 s). A page-to-page click is different: its new content is hidden before it paints, so the fade reads as an arrival.
+- **How:** `shouldSkipReveal()` in `components/layout/CustomerReveal.tsx` (first load OR locale-only change → settle as `done`, never `pending`). ⛔ Never move the first-load reveal earlier to "fix" the timing instead — any hide after the HTML has painted is the same flash.
+
 ## `/free-evaluation` hero shows the OWNER'S photo where it says "I'm Chris", and short verbatim reviews under the Call buttons; the pinned call bar is the phone's call button (2026-10-31)
 
 - **Owner:** approved mockups — reviews "B + Set 1", photo *"right after the 'I'm Chris' block"*, then *"Build it"*. Record `CHANGELOG.md` 2026-10-31 (7)–(8).

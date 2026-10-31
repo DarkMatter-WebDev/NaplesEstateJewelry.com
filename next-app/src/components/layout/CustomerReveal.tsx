@@ -190,11 +190,31 @@ export function normalizeRevealPathname(pathname: string): string {
  * a stagger — the entrance animation of a new page, applied to a page the
  * visitor was already reading. A language switch must be a text swap, never
  * an arrival, so it gets no reveal at all; the nodes simply render visible.
- * Real page changes (home → shop) and first loads keep the animation.
+ * Real page changes (home → shop) keep the animation; first loads lost it on
+ * 2026-10-31 (see `shouldSkipReveal`).
  */
 export function isLocaleOnlyChange(previousPathname: string | null, nextPathname: string): boolean {
   if (previousPathname === null || previousPathname === nextPathname) return false;
   return normalizeRevealPathname(previousPathname) === normalizeRevealPathname(nextPathname);
+}
+
+/**
+ * Should this run settle the page without the entrance fade?
+ *
+ * Yes on a full page load (`previousPathname === null`). Owner, 2026-10-31,
+ * opening /card and /magnet from a QR code: "the page seems to load, then
+ * flash and load again." Exactly that: the server HTML is already painted
+ * (filmed on live /card: fully drawn at 0.75 s), and the sweep waits for the
+ * window `load` event before stamping `pending` — so a page the visitor was
+ * already looking at went blank at ~1.15 s and faded back in. On a phone over
+ * cellular the gap before `load` is longer, so the page shows even longer
+ * before it vanishes. The fade only works where the content is NEW: a soft
+ * navigation between pages, whose incoming DOM is hidden before it paints.
+ *
+ * Yes on a language switch (see `isLocaleOnlyChange`). No otherwise.
+ */
+export function shouldSkipReveal(previousPathname: string | null, nextPathname: string): boolean {
+  return previousPathname === null || isLocaleOnlyChange(previousPathname, nextPathname);
 }
 
 /**
@@ -205,7 +225,8 @@ export function isLocaleOnlyChange(previousPathname: string | null, nextPathname
  * look like a first mount (measured 2026-09-08: the stamp landed 80ms after
  * the URL change, from the fresh instance's timer). A module variable survives
  * the remount and resets with the document, which is exactly the lifetime the
- * question "is this the same page in another language?" needs.
+ * question "is this the same page in another language?" — and "is this the
+ * first page of the visit?" — need.
  */
 let lastRevealPathname: string | null = null;
 /**
@@ -213,10 +234,11 @@ let lastRevealPathname: string | null = null;
  * again for the SAME pathname. React StrictMode (dev) mounts every effect
  * twice, and Fast Refresh can re-run it too; on those second runs the stored
  * pathname already equals the current one, and a fresh comparison would say
- * "not a switch" and fade the page after all (measured 2026-09-08). One
- * decision per pathname, however many times the effect runs for it.
+ * "not a switch" (or "not the first load") and fade the page after all
+ * (measured 2026-09-08). One decision per pathname, however many times the
+ * effect runs for it.
  */
-let lastRunWasLocaleSwitch = false;
+let lastRunSkippedReveal = false;
 
 export default function CustomerReveal() {
   const pathname = usePathname();
@@ -227,10 +249,10 @@ export default function CustomerReveal() {
 
     const normalizedPathname = normalizeRevealPathname(pathname);
     const isAdminRoute = normalizedPathname === '/admin' || normalizedPathname.startsWith('/admin/');
-    const localeSwitch =
-      pathname === lastRevealPathname ? lastRunWasLocaleSwitch : isLocaleOnlyChange(lastRevealPathname, pathname);
+    const skipReveal =
+      pathname === lastRevealPathname ? lastRunSkippedReveal : shouldSkipReveal(lastRevealPathname, pathname);
     lastRevealPathname = pathname;
-    lastRunWasLocaleSwitch = localeSwitch;
+    lastRunSkippedReveal = skipReveal;
 
     if (isAdminRoute) {
       root.classList.remove('customer-reveal-enabled');
@@ -251,9 +273,9 @@ export default function CustomerReveal() {
       });
     };
 
-    // A language switch: mark the remounted nodes settled without ever hiding
-    // them, so later sweeps (the observer below) skip them exactly as they
-    // skip any revealed element.
+    // A first load or a language switch: mark the nodes settled without ever
+    // hiding them, so later sweeps (the observer below) skip them exactly as
+    // they skip any revealed element.
     const settleWithoutReveal = () => {
       if (disposed) return;
       root.classList.add('customer-reveal-enabled');
@@ -287,7 +309,7 @@ export default function CustomerReveal() {
     let timer: number | undefined;
     const startReveal = () => {
       timer = window.setTimeout(() => {
-        if (localeSwitch) settleWithoutReveal();
+        if (skipReveal) settleWithoutReveal();
         else runReveal();
         observer.observe(root, { childList: true, subtree: true });
       }, 80);

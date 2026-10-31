@@ -1,6 +1,20 @@
 
 # Changelog
 
+## 2026-10-31 (16) — No entrance fade on the first page of a visit (the QR "load, flash, load again") — BUILT + STAGED, not pushed; no SQL, no env vars
+
+- **Owner:** *"when a page opens from a qr code.. whether its the /card page, or /magnet... the page seems to load, then flash and load again"* → **"Yes, fix sitewide"**.
+- **Cause (filmed on live `/card`, fresh headless profile, 390×844, throttled to ~LTE):** page fully drawn at 0.75 s → window `load` at 1.05 s → `CustomerReveal` stamped every section `pending` (opacity 0, blur, 18 px down) at **1.15 s** → faded back in by 1.8 s. The sweep waits for `load` + 80 ms, so on a first load it hid server HTML the visitor was already reading. Every first visit to every customer page did this; QR scans are always first visits. The owner's desk Chrome has reduced motion ON, which disables the effect — why it shows on the phone. Same mechanism as the 2026-09-08 locale-switch "flash reload" on `/card`.
+- **Fix:** `components/layout/CustomerReveal.tsx` — new exported `shouldSkipReveal(previous, next)` = full page load (`previous === null`) OR a language switch; the effect settles the page (`done`, never hidden) in both cases. The module variable `lastRunWasLocaleSwitch` → `lastRunSkippedReveal` (StrictMode re-runs keep the one decision per pathname). Soft navigations between pages keep the fade.
+- **Dev film after the fix:** `/card` first load → opacity 1 throughout, 0 elements ever `pending`; click to `/reviews` → 26 sections `pending` → faded in (unchanged); magnet landing `/free-evaluation?utm_source=car_magnet…` → opacity 1 throughout, 0 `pending`.
+- **Sitewide sweep before the push (owner: "double check that its fixed sitewide"):** a detector that counts on-screen elements whose effective opacity (own × ancestors) is < 0.9 or that are blurred, every ~70 ms for 6 s, fresh isolated context per page, 390×844, ~LTE throttle. Proven on live first (unfixed): `/card` +73 elements blanked after paint, magnet landing +18, `/about` +21. **Dev (fixed), 46 pages** = every English sitemap page except products, 2 product pages, `/card`, `/kittcard`, the magnet landing, `/es`, `/es/card`, `/es/free-evaluation`, `/cart`, `/wishlist`, `/account/sign-in`: **40 → 0 blanked, 0 reveal stamps.** The rest: `/` and `/es` +4–8 = the hero carousel's own slide crossfade (same on live, 0 reveal stamps); `/shop` (and `/cart`, `/wishlist`, which 307 to `/shop`) = a SEPARATE, intended sequence — `shop/(list)/loading.tsx` skeleton → the page's own CSS `.shop-entry-reveal` animation fades the catalog in once; the content never shows and then vanishes. 7 live `/shop` runs: one fade each, never a replay. A second fade appeared on dev in 2 of 5 runs (node remounted, no RSC fetch, no console errors) — dev-server only, not on production. Not changed. Gate: `npx tsc --noEmit` 0 · `npm run lint` 0 errors (4 old warnings) · `npx vitest run` **2177/2177** · `npm run build` 0.
+- **To reverse:** in the effect, use `isLocaleOnlyChange(lastRevealPathname, pathname)` instead of `shouldSkipReveal(...)`.
+
+## 2026-10-31 (15) — Magnet-arrival cookie-notice rule DEPLOYED (owner) and checked live: all pass
+
+- Owner: *"Pushed and deployed"*. Live check (fresh first-visit headless profile, 390×844, `notice-check.mjs --live`): magnet arrival on `/free-evaluation` → notice `none`, not accepted, nothing stored; then a client-side tap to Home → `block`; plain `/free-evaluation` → `block`; `/es/free-evaluation?utm_source=car_magnet…` → `none`; `/card` → `none`. Screenshot: first screen shows the headline, "I'm Chris…", the full photo and the pinned Call bar.
+- `curl -I /magnet` → 302 with the tags; `qr_scans` still empty (no real scan yet; the check's headless UA and direct page visits are not counted).
+
 ## 2026-10-31 (14) — No cookie notice on the first page for car-magnet arrivals — BUILT + STAGED, not pushed; cards already hide it (confirmed live); no SQL, no env vars
 
 - **Owner:** mockup "Mock it up" → *"build it, and do we hide the cookie notice for card scanners too?"*
