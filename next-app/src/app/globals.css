@@ -3089,6 +3089,17 @@ body:has(main[data-no-cookie-notice]) [data-cookie-notice] {
   display: none;
 }
 
+/* Car-magnet arrivals on /free-evaluation (owner, 2026-10-31): the same reason
+   as /card — a first-time scanner's notice covered the owner's photo on the
+   first screen. Needs BOTH halves: `data-nej-magnet` on <html> (stamped before
+   paint by [locale]/layout.tsx only when the URL has utm_source=car_magnet) and
+   the landing page's <main data-magnet-landing>. So it applies only to that
+   page in that visit; any other page — even after a client-side navigation
+   that keeps the <html> attribute — shows the notice. Never consent. */
+html[data-nej-magnet] body:has(main[data-magnet-landing]) [data-cookie-notice] {
+  display: none;
+}
+
 /* Phone contact bar — Call · Text · Directions on the seller pages
    (components/cta/MobileContactBar.tsx; owner-approved mockup B, 2026-09-20).
    Phones only. ⛔ The hide-on-desktop rule lives HERE, not in a utility class:

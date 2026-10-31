@@ -53,6 +53,20 @@ describe('/magnet redirect', () => {
     expect(head).not.toContain('recordScan');
   });
 
+  it('hides the cookie notice for magnet arrivals on the landing page only — never as consent', () => {
+    const layout = read('src', 'app', '[locale]', 'layout.tsx');
+    const source = new URL(MAGNET_DESTINATION).searchParams.get('utm_source');
+    expect(source).toBe('car_magnet');
+    const script = layout.match(/__html: `([^`]*data-nej-magnet[^`]*)`/)?.[1] ?? '';
+    expect(script).toContain(`utm_source=${source}(&|$)`);
+    expect(script).toContain("setAttribute('data-nej-magnet','')");
+    expect(script).not.toMatch(/localStorage|data-nej-cookies-ok/);
+    expect(read('src', 'app', 'globals.css')).toContain(
+      'html[data-nej-magnet] body:has(main[data-magnet-landing]) [data-cookie-notice]',
+    );
+    expect(read('src', 'app', '[locale]', 'free-evaluation', 'page.tsx')).toMatch(/<main [^>]*data-magnet-landing[ >]/);
+  });
+
   it('stays out of the sitemap', () => {
     expect(read('src', 'app', 'sitemap.ts')).not.toMatch(/magnet/i);
   });

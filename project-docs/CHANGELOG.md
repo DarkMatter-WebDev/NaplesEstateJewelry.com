@@ -1,6 +1,25 @@
 
 # Changelog
 
+## 2026-10-31 (14) — No cookie notice on the first page for car-magnet arrivals — BUILT + STAGED, not pushed; cards already hide it (confirmed live); no SQL, no env vars
+
+- **Owner:** mockup "Mock it up" → *"build it, and do we hide the cookie notice for card scanners too?"*
+- **Cards:** YES, since 2026-09-03 — confirmed on production today: `/card`, `/kittcard`, `/es/card`, `/es/kittcard` all carry `<main data-no-cookie-notice>` and the live stylesheet has `body:has(main[data-no-cookie-notice]) [data-cookie-notice]`.
+- **Magnet (new):** `[locale]/layout.tsx` gets a second pre-paint script: `utm_source=car_magnet` in the URL → `data-nej-magnet` on `<html>` (never localStorage, never `data-nej-cookies-ok`); `globals.css` `html[data-nej-magnet] body:has(main[data-magnet-landing]) [data-cookie-notice] { display: none }`; `/free-evaluation`'s `<main data-magnet-landing>`. Both halves needed → hidden only on that page in that visit.
+- **Dev check (fresh first-visit profile, 390×844):** magnet arrival → notice `display:none`, not accepted, nothing stored; then a client-side tap to Home (flag still on `<html>`) → notice **shows**; plain `/free-evaluation` → shows; `/es/free-evaluation?utm_source=car_magnet…` → hidden; `/card` → hidden (existing rule).
+- Test: `magnet-redirect.test.ts` + 1 (flag script matches `MAGNET_DESTINATION`'s `utm_source`, no localStorage/consent in it, CSS needs both halves, page marker). Existing `cookie-consent-gate` + `card-page` tests unchanged and green. Gate: `tsc` 0 · lint 0 errors · **2174/2174** · build 0.
+- **To reverse:** delete the second layout script, the `html[data-nej-magnet]…` CSS rule and `data-magnet-landing`.
+
+## 2026-10-31 (13) — DEPLOYED by the owner; production checked: `/magnet` 302s, live page, counters at 0, Insights route, IndexNow 200
+
+- Owner: *"Pushed and deployed"* (carries 10-31 (1)–(12) + the 10-30 `HOURS` fallback).
+- **`curl -I` (HEAD — never counted):** `https://naplesestatejewelry.com/magnet` → **302** `no-store` → `…/free-evaluation?utm_source=car_magnet&utm_medium=qr&utm_campaign=vehicle_magnets`; `/magnet/` → **302** same (one hop — the edge proxy sees the raw path, unlike dev's 308); `/Magnet` → **302** same; `https://www.naplesestatejewelry.com/magnet` → **301** (Netlify primary-domain) → apex → 302; followed to the end: 2 hops → **200** on the tagged page.
+- **Live HTML (EN + ES):** `chris-owner.webp` + `.fe-owner-photo-crop` present, placeholder gone, `.fe-reviews` with Scott Tallent / Ruthe Lloyd / Judith Lam, Google reviews link.
+- **Phone (390×844, fresh first-visit profile, opened via `/magnet`; HeadlessChrome UA → not counted):** final URL keeps all three tags; photo top 587 px; pinned Call bar on screen; reviews at 1,767 px. ⚠️ A first visit also shows the cookie notice (~225 px at the bottom), which covers most of the photo on the first screen until tapped — reported to the owner, not changed (the notice wording/size is an owner decision, `CookieNotice.tsx`; `/card` hides it via `data-no-cookie-notice`).
+- **Counters:** `qr_scans` still **0 rows** after every check above; `POST /api/scan` → 204; `/card` + `/kittcard` → 200; `/admin/insights` (no session) → 307 to sign-in (route exists).
+- **IndexNow:** `npm run indexnow -- --urls=/free-evaluation,/es/free-evaluation` → **200 OK** for 2.
+- Open: the owner's Admin → Insights look + one real magnet/card scan; QR artwork on the apex `/magnet`; delete the unused placeholder image (owner's call); the cookie-notice question.
+
 ## 2026-10-31 (12) — Scan table re-checked live after the owner re-ran `qr-scans-2026-10.sql`: ALL PASS — ready to push
 
 - service_role: `select id, scanned_at, source` OK, 0 rows · `magnet_scans` gone (PGRST205) · anon read + insert → 42501 · service_role insert of `source = 'BAD SOURCE!'` → 23514 `qr_scans_source_format_check` (nothing written) · still 0 rows after the checks. Same read-only script as (11).

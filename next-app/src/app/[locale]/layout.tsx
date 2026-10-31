@@ -204,6 +204,19 @@ export default async function LocaleLayout({ children, params }: Props) {
             __html: `try{if(localStorage.getItem('nej_cookie_notice_v1')==='accepted')document.documentElement.setAttribute('data-nej-cookies-ok','')}catch(e){}`,
           }}
         />
+        {/* Car-magnet arrivals (owner, 2026-10-31, mockup "no notice on the
+            first page"): a QR scan lands on /free-evaluation with
+            utm_source=car_magnet (lib/magnet-redirect.ts). Flag it before first
+            paint so the notice does not cover the owner's photo on that first
+            screen. This is NOT consent: it never touches localStorage or the
+            accepted attribute, and globals.css hides the banner only while the
+            page is the magnet landing page — the next page shows it as usual.
+            A magnet visitor has no gclid, so the Google tag never loads for them. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(/[?&]utm_source=car_magnet(&|$)/.test(location.search))document.documentElement.setAttribute('data-nej-magnet','')}catch(e){}`,
+          }}
+        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }}

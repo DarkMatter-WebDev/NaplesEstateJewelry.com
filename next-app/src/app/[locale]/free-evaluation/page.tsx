@@ -140,7 +140,9 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
     <>
       <BreadcrumbJsonLd locale={locale} crumbs={crumbs} />
       <SiteHeader />
-      <main className="site-header-offset">
+      {/* data-magnet-landing: with the URL flag from layout.tsx, hides the
+          cookie notice for car-magnet scanners on this page only (globals.css). */}
+      <main className="site-header-offset" data-magnet-landing>
 
         {/* Hero — descriptive, no form. This page is built to be SENT to someone
             who is unsure what they have, so the first screen explains the
