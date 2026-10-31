@@ -117,8 +117,8 @@ describe('/card page — search and chrome rules', () => {
 
 describe('hoursSegmentsCompact — day/time pairs for the bolded hours line', () => {
   it('compresses the default week to one segment in both languages', () => {
-    expect(hoursSegmentsCompact(DEFAULT_STORE_HOURS, false)).toEqual([{ days: 'Mon–Sat', times: '11am–3pm' }]);
-    expect(hoursSegmentsCompact(DEFAULT_STORE_HOURS, true)).toEqual([{ days: 'Lun–Sáb', times: '11 a.m. – 3 p.m.' }]);
+    expect(hoursSegmentsCompact(DEFAULT_STORE_HOURS, false)).toEqual([{ days: 'Mon–Sat', times: '10am–4pm' }]);
+    expect(hoursSegmentsCompact(DEFAULT_STORE_HOURS, true)).toEqual([{ days: 'Lun–Sáb', times: '10 a.m. – 4 p.m.' }]);
   });
 
   it('splits on a time change and keeps single days as one abbreviation', () => {

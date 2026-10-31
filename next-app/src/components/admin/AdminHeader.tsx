@@ -9,7 +9,7 @@ import { AppIcon } from '@/components/AppIcon';
 
 const GOLD = '#735c00';
 
-export type AdminSection = 'products' | 'social-queues' | 'orders' | 'offers' | 'instant-sale' | 'tax-exempt' | 'buy-receipts' | 'buyers' | 'messages' | 'subscribers' | 'text-deals' | 'marketing' | 'discount-codes' | 'users' | 'settings';
+export type AdminSection = 'products' | 'social-queues' | 'orders' | 'offers' | 'instant-sale' | 'tax-exempt' | 'buy-receipts' | 'buyers' | 'messages' | 'subscribers' | 'text-deals' | 'marketing' | 'insights' | 'discount-codes' | 'users' | 'settings';
 
 const SECTION_LABELS: Record<AdminSection, string> = {
   products: 'Products',
@@ -24,6 +24,7 @@ const SECTION_LABELS: Record<AdminSection, string> = {
   subscribers: 'Subscribers',
   'text-deals': 'Text Deals',
   marketing: 'Email Campaigns',
+  insights: 'Insights',
   'discount-codes': 'Discount Codes',
   users: 'Users',
   settings: 'Admin Settings',
@@ -285,6 +286,9 @@ export default function AdminHeader({
       </AdminNavItem>
       <AdminNavItem href={`${adminBasePath}/marketing`} active={active === 'marketing'}>
         Email Campaigns
+      </AdminNavItem>
+      <AdminNavItem href={`${adminBasePath}/insights`} active={active === 'insights'}>
+        Insights
       </AdminNavItem>
       <AdminNavItem href={`${adminBasePath}/discount-codes`} active={active === 'discount-codes'}>
         Discount Codes

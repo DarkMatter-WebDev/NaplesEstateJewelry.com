@@ -1983,6 +1983,75 @@ body:has([data-site-header]) .route-progress {
   text-transform: uppercase;
   color: #f2ca50;
 }
+/* /free-evaluation hero additions (2026-10-31, owner-approved mockup).
+   The owner photo's phone copy is a 4:3 crop of the square file, aimed at the
+   face. The review strip sits under the Call / Visit buttons: short verbatim
+   quotes, gold rule like the metal panel, stars + name under each. Kept in
+   this unlayered file (not Tailwind) so it can't be overridden by utilities. */
+.fe-owner-photo-crop {
+  aspect-ratio: 4 / 3;
+  height: auto;
+  object-fit: cover;
+  object-position: 50% 30%;
+}
+.fe-reviews {
+  margin-top: 1.5rem;
+  text-align: left;
+}
+.fe-reviews-label {
+  margin: 0 0 0.6rem;
+  font-family: var(--font-label);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #f2ca50;
+}
+.fe-reviews-list {
+  display: grid;
+  gap: 0.7rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fe-review {
+  border-left: 2px solid rgba(242, 202, 80, 0.5);
+  padding-left: 0.75rem;
+}
+.fe-review-quote {
+  margin: 0;
+  font-family: var(--font-headline);
+  font-style: italic;
+  font-size: 0.95rem;
+  line-height: 1.35;
+  color: #efe9dc;
+}
+.fe-review-by {
+  margin-top: 0.2rem;
+  font-family: var(--font-label);
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  color: #d7d0c3;
+}
+.fe-review-stars {
+  margin-right: 0.45rem;
+  color: #e9c349;
+  letter-spacing: 0.12em;
+}
+.fe-reviews-link {
+  display: inline-block;
+  margin-top: 0.7rem;
+  font-size: 0.82rem;
+  color: #f2ca50;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+@media (min-width: 768px) {
+  .fe-review-quote {
+    font-size: 1.05rem;
+  }
+}
+
 .fe-hero-kicker::after {
   content: '';
   flex: 1 1 auto;

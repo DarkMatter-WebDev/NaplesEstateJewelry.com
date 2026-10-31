@@ -7,7 +7,9 @@ import { sellerTextBody, smsHref } from '@/lib/contact-links';
  * 2026-09-20).
  *
  * Why: four places on the site said "call or text" but only ever dialled. The
- * existing wording and call links stay; this sits beside them.
+ * call links stay; this sits beside them. Where a call BUTTON sits beside this
+ * one it says only "Call" (owner, 2026-10-31) — "call or text" stays only in
+ * sentences, where the number really does take both.
  *
  * - The number comes from `contact-links.ts` — the owner's cell, never the
  *   toll-free text-deals number.

@@ -425,7 +425,7 @@ export default async function HomePage({ params }: Props) {
                     className="hover-underline-grow text-xs font-bold uppercase tracking-[0.16em]"
                     style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
                   >
-                    {isEs ? 'Llame o envíe un mensaje →' : 'Call or text Chris →'}
+                    {isEs ? 'Llame a Chris →' : 'Call Chris →'}
                   </a>
                   {/* The link above only dials; this one really texts (2026-09-20). */}
                   <TextUsLink

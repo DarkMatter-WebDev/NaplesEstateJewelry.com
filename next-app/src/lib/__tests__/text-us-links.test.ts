@@ -15,16 +15,27 @@ describe('Text Us links', () => {
   });
 
   it.each([
-    ['src/app/[locale]/sell/[city]/page.tsx', 'CALL OR TEXT (239) 404-8505', 'opening="seller"'],
-    ['src/app/[locale]/free-evaluation/page.tsx', 'Call or Text Chris', 'opening="seller"'],
-    ['src/app/[locale]/(home)/page.tsx', 'Call or text Chris →', '<TextUsLink'],
+    ['src/app/[locale]/sell/[city]/page.tsx', "'CALL (239) 404-8505'", 'opening="seller"'],
+    ['src/app/[locale]/free-evaluation/page.tsx', "'Call Chris'", 'opening="seller"'],
+    ['src/app/[locale]/(home)/page.tsx', "'Call Chris →'", '<TextUsLink'],
     ['src/components/shop/ProductTrustSections.tsx', 'call or', '<TextUsLink'],
-  ])('%s keeps its "call or text" wording and gains a real text link', (file, wording, link) => {
+  ])('%s keeps its call link and gains a real text link', (file, wording, link) => {
     const source = read(...file.split('/'));
     expect(source).toContain(wording);
     expect(source).toContain(link);
     // The call link that was there stays.
     expect(source).toContain('href="tel:2394048505"');
+  });
+
+  // Owner, 2026-10-31: a dial-only button beside a Text button must not say
+  // "call or text". Sentences (ProductTrustSections, emails) keep the phrase.
+  it.each([
+    'src/app/[locale]/sell/[city]/page.tsx',
+    'src/app/[locale]/free-evaluation/page.tsx',
+    'src/app/[locale]/(home)/page.tsx',
+  ])('%s: the call button beside the text button says only "Call"', (file) => {
+    const source = read(...file.split('/'));
+    expect(source).not.toMatch(/'(CALL OR TEXT|Call or [Tt]ext Chris|LLAMAR O TEXTO|Llame o envíe un mensaje →|Llame o Envíe un Texto a Chris)/);
   });
 
   it('never prefills the seller line for shoppers', () => {

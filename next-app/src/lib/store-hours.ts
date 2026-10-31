@@ -15,7 +15,7 @@ export { DEFAULT_STORE_HOURS };
  * Storage: `shop_settings.store_hours` (jsonb, single row, added by
  * `supabase/store-hours-2026-08.sql`). `null` or any malformed/unreachable
  * value degrades to `DEFAULT_STORE_HOURS`, so the site renders its historical
- * Tue–Sat 11:00–15:00 hours until the migration runs and an admin saves.
+ * Mon–Sat 10:00–16:00 hours until the migration runs and an admin saves.
  *
  * ⛔ Server-only (`unstable_cache` + a server Supabase read). Client components
  * that need hours receive a formatted STRING prop from their server parent —

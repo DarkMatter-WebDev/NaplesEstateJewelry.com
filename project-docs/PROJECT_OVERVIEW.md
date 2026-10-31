@@ -43,8 +43,8 @@ discretion and a personal relationship over a storefront transaction.
 - **Phone / text**: (239) 404-8505
 - **Showroom**: 6240 Shirley St, Ste 104, Naples, FL 34109 — **inside Sharon
   Lynch Collections** (shared suite; name the landmark, the sign out front is
-  theirs). Open **Mon–Fri 11:00–15:00, Sat 11:00–16:00, or by appointment**
-  as of 2026-08-29 (Saturday closes an hour later than the rest of the week).
+  theirs). Open **Mon–Sat 10:00–16:00, Sunday closed, or by appointment**
+  as of 2026-10-30 (was Mon–Fri 11–3 / Sat 11–4 from 2026-08-29).
   ⛔ Hours are ADMIN-EDITABLE and the owner changes them on the fly — the DB
   (`shop_settings.store_hours`, Admin → Settings → Store Hours) is the source
   of truth, not this line and not `HOURS` in `business-location.ts`. Treat both

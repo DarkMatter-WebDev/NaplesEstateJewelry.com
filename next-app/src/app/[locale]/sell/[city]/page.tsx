@@ -326,7 +326,7 @@ export default async function SellCityPage({ params }: Props) {
                     {isEs ? 'CÓMO LLEGAR' : 'GET DIRECTIONS'}
                   </a>
                   <a href="tel:2394048505" className="outline-button">
-                    {isEs ? 'LLAMAR O TEXTO (239) 404-8505' : 'CALL OR TEXT (239) 404-8505'}
+                    {isEs ? 'LLAMAR (239) 404-8505' : 'CALL (239) 404-8505'}
                   </a>
                   {/* The button above only dials; this one really texts (2026-09-20). */}
                   <TextUsLink isEs={isEs} opening="seller" className="outline-button" style={{ gap: '0.5rem' }}>

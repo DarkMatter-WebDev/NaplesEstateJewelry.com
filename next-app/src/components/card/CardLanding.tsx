@@ -9,6 +9,7 @@ import ShowroomAddress from '@/components/ShowroomAddress';
 import CopyAddressButton from '@/components/CopyAddressButton';
 import CardTodayHours from '@/components/card/CardTodayHours';
 import CardJoinListButton from '@/components/card/CardJoinListButton';
+import ScanBeacon from '@/components/ScanBeacon';
 import StorefrontPhoto from '@/components/StorefrontPhoto';
 import {
   FACEBOOK_URL,
@@ -136,8 +137,9 @@ export default async function CardLanding({ locale, holder }: CardLandingProps) 
   // `?&body=`: iOS wants `&`, Android wants `?`; this form satisfies both.
   const smsHref = `sms:${holder.phoneDigits}?&body=${encodeURIComponent(smsBody)}`;
   const phoneTel = `tel:${holder.phoneDigits}`;
-  // Prefilled subject for the same reason the text is prefilled: the site has
-  // no scan analytics, so the message itself says the lead came from a card.
+  // Prefilled subject for the same reason the text is prefilled: the visit
+  // count in Admin → Insights (ScanBeacon below) says how many people opened
+  // the card page, not who wrote — so the message itself says it came from a card.
   const mailSubject = isEs ? 'Su tarjeta — Naples Estate Jewelry' : 'Your card — Naples Estate Jewelry';
   const mailHref = `mailto:${holder.email}?subject=${encodeURIComponent(mailSubject)}`;
 
@@ -158,6 +160,8 @@ export default async function CardLanding({ locale, holder }: CardLandingProps) 
     // 2026-09-03). Server-rendered and JS-free, so there is no flash; the
     // banner still shows on every page the visitor taps through to.
     <main className="flex flex-1 flex-col" data-no-cookie-notice style={{ background: 'var(--color-background)' }}>
+      {/* One visit per tab → Admin → Insights (time + which card only). */}
+      <ScanBeacon source={holder.key} />
       {/* Language toggle — slim, at the very top, both languages always
           visible. Next <Link>, not a plain anchor (owner, 2026-09-04: the
           full-document reload showed as a blip/flash on the switch). A client

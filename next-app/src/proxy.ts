@@ -4,6 +4,7 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { routing } from './i18n/routing';
 import { CUSTOMER_MODE_COOKIE, customerModeBounce } from './lib/customer-mode-lock';
 import { resolveDefaultLocalePrefixRedirect, resolveLegacyRedirect } from './lib/legacy-redirects';
+import { isMagnetPath, MAGNET_SCAN_ROUTE } from './lib/magnet-redirect';
 
 const intl = createIntlMiddleware(routing);
 const INTERNAL_LOCALE_HEADER = 'x-naples-internal-locale';
@@ -115,6 +116,11 @@ export async function proxy(request: NextRequest) {
   // on .com only.
   const hostRedirect = canonicalHostRedirect(request);
   if (hostRedirect) return hostRedirect;
+
+  // The vehicle-magnet QR address: handed to /api/magnet, which counts the scan
+  // and answers the 302 (lib/magnet-redirect.ts). Before the locale rewrite,
+  // like the other short links.
+  if (isMagnetPath(pathname)) return NextResponse.rewrite(new URL(MAGNET_SCAN_ROUTE, request.url));
 
   // Legacy/retired paths next — nothing below may run for these.
   const legacy = legacyRedirect(request);

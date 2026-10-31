@@ -83,7 +83,7 @@ const buildJsonLd = (schedule: StoreHoursSchedule) => ({
   ...(GEO ? { geo: { '@type': 'GeoCoordinates', ...GEO } } : {}),
   hasMap: mapsUrl(),
   // ⚠️ Admin-editable since 2026-08 (Admin → Settings → Store Hours); defaults
-  // to Tue-Sat 11:00-15:00 until configured. Must stay identical to the Google
+  // to Mon-Sat 10:00-16:00 until configured. Must stay identical to the Google
   // Business Profile: Google compares them once the profile is verified — the
   // admin panel repeats that warning. Omitted entirely when every day is
   // closed (an empty array would be worse schema than none).

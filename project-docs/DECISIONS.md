@@ -4,7 +4,29 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-10-29 (7)**.
+> compaction. Last reconciled: **2026-10-29 (11)**.
+
+## `/free-evaluation` hero shows the OWNER'S photo where it says "I'm Chris", and short verbatim reviews under the Call buttons; the pinned call bar is the phone's call button (2026-10-31)
+
+- **Owner:** approved mockups — reviews "B + Set 1", photo *"right after the 'I'm Chris' block"*, then *"Build it"*. Record `CHANGELOG.md` 2026-10-31 (7)–(8).
+- **Rules:** the hero photo is the real `chris-owner.webp` (phones: 4:3 crop right after the lede; lg+: the square in the right column) — ⛔ never a generated or stock face beside first-person copy. The review strip quotes reviews WHOLE from `TESTIMONIALS` (`HERO_REVIEW_NAMES`) — pick short ones; ⛔ never trim a review to fit (the verbatim rule; Linda Cusumano's entry stays the one exception). No count, no review schema. Placement under the Call / Visit buttons so the strip never pushes the CTA; pushing the in-page gold Call button lower for the photo is accepted because the Call · Text · Directions bar is pinned on phones (`contact-bar-paths.ts`) — ⛔ never add a second pinned call button.
+- `/magnet` (vehicle-magnet QR) is a 302 to this page with UTM tags (`lib/magnet-redirect.ts`); change `MAGNET_DESTINATION` to re-point printed magnets. No analytics records the tags (owner's 09-20 / 10-02 rulings stand). **Scans are counted first-party** (owner 10-31: *"yes, add the magnet counter"*, then *"add the same counter to /card and /kittcard… a new admin page called insights"* + *"timestamps… grouped by page"*): one table `qr_scans` (time + `source` only; service role, RLS no policies). `/magnet` counts server side in `/api/magnet` (skips bots/previews/test tools/HEAD; 302 `no-store`); `/card` + `/kittcard` count with a once-per-tab page ping (`ScanBeacon` → `POST /api/scan`, page sources only). The list of codes is `lib/scan-sources.ts`; **Admin → Insights** shows counts + every scan's Eastern time grouped by code (newest 200 per code). ⛔ Never add IP, device, cookie or any visitor detail to that table — that would turn it into the tracking the owner ruled out. ⛔ Never let a page report `magnet` (it would double-count).
+
+## Competitor-name searches belong to "NEJ Competitors - Search" alone; NEJ Sellers keeps its `covenant` negative ONLY while that campaign runs (2026-10-31)
+
+- **Owner:** *"Keep it, record it"* on the recommendation. Record `CHANGELOG.md` 2026-10-31 (4)–(6).
+- **Rule:** competitor names are bid on only in the $5/day Competitors campaign (id 24417990404) — never added as keywords to Sellers / Coins / Lee. Sellers' broad `covenant` negative stays so Covenant searches can't also match a Sellers phrase (e.g. "jewelry buyer naples") and draw on Sellers' budget-limited $45, and so the competitor test is measured in one place. This narrows the 09-23 "never negative a competitor's name" rule: it still holds for every campaign while the competitor campaign is paused or removed.
+- ⛔ **Coupled:** if NEJ Competitors - Search is ever paused or removed (e.g. at the ~Nov 21 check-up), remove `covenant` from Sellers in the same sitting — otherwise no NEJ ad shows on Covenant searches at all. Don't add `elemetal` / `gold center` negatives to Sellers (none of its keywords match them). The `covenant` negative's origin is unknown (not in our records).
+
+## A dial-only button never says "call or text" — when a Text button sits beside it, it says "Call" (2026-10-31)
+
+- **Owner:** spotted *Call or Text Chris* next to *Text Chris* → *"one should say just call chris"*. Record `CHANGELOG.md` 2026-10-31 (1).
+- **Rule:** a `tel:` button or link labelled as an action says **Call …** (EN) / **Llame a … / LLAMAR …** (ES); the `sms:` one beside it says Text. "Call or text (239) 404-8505" stays correct inside a SENTENCE (the number takes both). Guard: `lib/__tests__/text-us-links.test.ts`.
+
+## Page titles stay ≤ ~60 characters INCLUDING the " | Naples Estate Jewelry" suffix (24 chars); `/contact` = "Contact Us & Request an Appointment" (2026-10-29)
+
+- **Owner:** asked to retitle `/contact` "Contact Us, Submit Item or Schedule an Appt" → told it would be 78 characters with the brand and cut off by Google → *"if not, use your recommended wording"*. Record `CHANGELOG.md` 2026-10-29 (10)–(11).
+- **Rule:** the part before the suffix gets ~36 characters. Lead with what the page does now (`/contact` offers appointments; the old "Submit Your Item" section was removed long ago). Keep the URL; a retitle is a small, reversible SEO change — Google re-reads it in days to weeks. Every retitle gets IndexNow + a Search Console re-crawl after the deploy, and a dated check-up (here ~Nov 26: clicks down by more than half with impressions steady → restore).
 
 ## A checkout gift ships under the RECIPIENT's name with a price-free gift slip; the buyer keeps the priced receipt; card billing never defaults to the gift address (2026-10-29)
 
@@ -3018,6 +3040,21 @@ byte-identity on the default schedule.
 consumer is `DEFAULT_STORE_HOURS`. An hours edit in the admin panel must be
 mirrored to the Google Business Profile, eBay merchant location, and Etsy
 shop location the same day (the panel carries the warning permanently).
+
+**2026-10-30 — hours are now 10:00–16:00 Mon–Sat, Sunday closed, and the
+mirror list is wider than this entry first said.** Changing hours means: the
+admin editor (source of truth) → GBP → Bing Places → Yelp → Apple Business →
+Facebook Page (About → Details, acting as the Page) → Nextdoor (page-admin
+Edit page) → the satellite `naplesjewelrybuyers.com` files (hard-coded JSON-LD
++ FAQ + hours block, its own folder) → the `HOURS` fallback + the tests pinned
+to it. eBay/Etsy carry no hours (the eBay inventory location was created
+without operating hours). Per-listing editor traps are in `CHANGELOG.md`
+2026-10-30 (4).
+
+**The appointment window is NOT the store hours (owner, 2026-10-30: "Leave
+10–5").** `APPOINTMENT_HOURS` in `appointment-request.ts` stays 10:00–17:00
+while the showroom closes at 16:00 — appointments may run past the posted
+close. ⛔ Don't tie it to `getStoreHours()` and don't re-propose trimming it.
 
 ### An hours save busts the WHOLE page tree, deliberately — and it WORKS
 

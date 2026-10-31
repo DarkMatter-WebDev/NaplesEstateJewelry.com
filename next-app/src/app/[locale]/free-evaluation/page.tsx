@@ -13,6 +13,24 @@ import { hoursSegmentsCompact, mapsUrl, phoneHoursLabel } from '@/lib/business-l
 import { getStoreHours } from '@/lib/store-hours';
 import { SERVICE_AREAS } from '@/lib/service-areas';
 import TextUsLink from '@/components/cta/TextUsLink';
+import { GOOGLE_REVIEWS_URL, TESTIMONIALS } from '@/lib/testimonials';
+
+// Review strip under the hero's Call / Visit buttons (2026-10-31, owner-approved
+// mockup "B + Set 1"). Three SHORT reviews shown whole, so nothing here trims a
+// customer's words (DECISIONS: "A review is published verbatim or not at all");
+// the text comes from TESTIMONIALS, never retyped. Chosen for trust and price —
+// the questions a stranger scanning a car magnet has.
+const HERO_REVIEW_NAMES = ['Scott Tallent', 'Ruthe Lloyd', 'Judith Lam'];
+const HERO_REVIEWS = HERO_REVIEW_NAMES.map((name) => TESTIMONIALS.find((t) => t.name === name)).filter(
+  (t): t is (typeof TESTIMONIALS)[number] => Boolean(t),
+);
+
+// One photo file, two renders: on phones it sits right after the "I'm Chris"
+// paragraph as a 4:3 crop (face on the first screen); from lg it is the square
+// in the hero's right column, beside that same paragraph. Same src + sizes on
+// both, so the browser fetches the file once.
+const OWNER_PHOTO = '/assets/images/pages/chris-owner.webp';
+const OWNER_PHOTO_SIZES = '(min-width: 1024px) 42vw, 100vw';
 
 // 2026-09-11 (owner): this page leads with CALLING and VISITING, not with the
 // photo form. The free-evaluation calls were the valuable ones, people who
@@ -114,6 +132,9 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
 
   // One crumbs array feeds both the JSON-LD and the visible trail.
   const crumbs = [{ name: isEs ? 'Tasación Gratuita' : 'Free Appraisal', path: '/free-evaluation' }];
+  const ownerPhotoAlt = isEs
+    ? 'Chris, el propietario, en su mesa de tasación en el salón de Naples, con básculas y una cadena de oro'
+    : 'Chris, the owner, at his appraisal table in the Naples showroom, with scales and a gold chain';
 
   return (
     <>
@@ -181,6 +202,22 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
                       ? 'Soy Chris. Llevo más de 15 años tasando joyería de patrimonio en el suroeste de Florida. Traiga su oro, plata, diamantes, relojes, monedas o una colección completa — le diré qué es cada pieza, sin ninguna obligación de vender.'
                       : "I'm Chris. I've spent 15+ years appraising estate jewelry across Southwest Florida. Bring your gold, silver, diamonds, watches, coins, or a whole collection — I'll tell you what each piece is, with no obligation to sell any of it."}
                   </p>
+                  {/* Phones only (owner, 2026-10-31: "see my pic when they read
+                      'I'm Chris'"). It pushes the gold Call button ~276px lower,
+                      which is fine because the pinned Call · Text · Directions bar
+                      (contact-bar-paths.ts) is on screen the whole time. */}
+                  <div className="lg:hidden mt-5">
+                    <Image
+                      src={OWNER_PHOTO}
+                      alt={ownerPhotoAlt}
+                      width={1302}
+                      height={1302}
+                      priority
+                      sizes={OWNER_PHOTO_SIZES}
+                      className="fe-owner-photo-crop w-full rounded-2xl"
+                      style={{ boxShadow: '0 18px 50px rgba(0,0,0,0.45)' }}
+                    />
+                  </div>
                   <p className="mt-4">
                     {isEs
                       ? 'Llámeme, pase por el salón o voy a su casa. Colecciones completas son bienvenidas — yo clasifico y pruebo todo por usted.'
@@ -259,24 +296,41 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
                     {isEs ? 'Envíe una nota rápida ↓' : 'Send a quick note instead ↓'}
                   </a>
                 </p>
+
+                <div className="fe-reviews">
+                  <p className="fe-reviews-label">{isEs ? 'Reseñas de Google' : 'From our Google reviews'}</p>
+                  <ul className="fe-reviews-list">
+                    {HERO_REVIEWS.map((review) => (
+                      <li key={review.name} className="fe-review">
+                        <blockquote className="fe-review-quote">
+                          &ldquo;{isEs ? review.quoteEs : review.quote}&rdquo;
+                        </blockquote>
+                        <p className="fe-review-by">
+                          <span className="fe-review-stars" aria-hidden="true">★★★★★</span>
+                          <span className="sr-only">{isEs ? 'Cinco estrellas, ' : 'Five stars, '}</span>
+                          {review.name}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                  <a href={GOOGLE_REVIEWS_URL} target="_blank" rel="noopener noreferrer" className="fe-reviews-link">
+                    {isEs ? 'Ver todas las reseñas en Google' : 'Read all our reviews on Google'}
+                    <span aria-hidden="true"> →</span>
+                  </a>
+                </div>
               </div>
 
-              {/* PLACEHOLDER, to be replaced with a real photograph of Chris.
-                  Generated, and deliberately framed with the face out of shot:
-                  the copy beside it is first person ("I'm Chris…"), so a
-                  recognisable stranger here would read as a claim about who he
-                  is. The alt text describes the work, never a person, for the
-                  same reason. Swap the file and the alt text together. */}
-              <div className="relative">
+              {/* From lg only: the square beside the "I'm Chris" paragraph. It
+                  replaced a generated placeholder (face out of shot) on
+                  2026-10-31; phones get the 4:3 copy inside the text column. */}
+              <div className="relative hidden lg:block">
                 <Image
-                  src="/assets/images/pages/evaluation-desk-placeholder.webp"
-                  alt={isEs
-                    ? 'Piezas de oro y plata clasificadas en grupos sobre un tapete de escritorio, junto a una lupa de joyero y una báscula'
-                    : "Gold and silver pieces sorted into groups on a desk mat beside a jeweller's loupe and a scale"}
-                  width={1600}
-                  height={1067}
+                  src={OWNER_PHOTO}
+                  alt={ownerPhotoAlt}
+                  width={1302}
+                  height={1302}
                   priority
-                  sizes="(min-width: 1024px) 42vw, 100vw"
+                  sizes={OWNER_PHOTO_SIZES}
                   className="w-full h-auto rounded-2xl"
                   style={{ boxShadow: '0 24px 70px rgba(0,0,0,0.45)' }}
                 />
@@ -704,7 +758,7 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start items-center">
                   <a href="tel:2394048505" className="gold-button">
-                    {isEs ? 'Llame o Envíe un Texto a Chris' : 'Call or Text Chris'}
+                    {isEs ? 'Llame a Chris' : 'Call Chris'}
                   </a>
                   {/* The button above only dials; this one really texts (2026-09-20). */}
                   <TextUsLink isEs={isEs} opening="seller" className="outline-button" style={{ gap: '0.5rem' }}>
