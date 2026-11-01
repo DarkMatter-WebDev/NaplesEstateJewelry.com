@@ -1,0 +1,133 @@
+# Feature: Live Metal Pricing
+
+> Current pricing flow for gold/silver spot-backed products. Last updated:
+> **2026-07-06**.
+
+## Summary
+
+Shop prices update against server-side spot data in the Next.js app. The old
+root Netlify Function and static `window.ShopPricing` script are retired.
+
+Current surfaces:
+
+- public shop cards,
+- product detail pricing and melt/scrap context,
+- cart, checkout, wishlist, admin pricing previews,
+- `/api/metal-prices` for browser/API consumers.
+
+## Key Files
+
+- `next-app/src/lib/spot-price.ts` - fetches/caches spot data from
+  `api.gold-api.com`; defines its own `FALLBACK_GOLD_SPOT` used only if the
+  upstream API call fails.
+- `next-app/src/app/api/metal-prices/route.ts` - Next route handler exposing
+  spot data to the app.
+- `next-app/src/lib/pricing.ts` - product melt value and display price
+  helpers; defines a separate `FALLBACK_GOLD_SPOT` of its own (different
+  value, different purpose — a display-time fallback for price computation,
+  not the spot-fetch fallback above). Don't assume the two constants are the
+  same value or kept in sync.
+- `next-app/src/types/product.ts` - product pricing fields and status helpers.
+- `next-app/src/app/[locale]/shop/page.tsx` - server-side spot fetch for shop
+  listing pricing.
+- `next-app/src/app/[locale]/shop/[id]/page.tsx` - product detail price context.
+- `next-app/src/components/shop/PriceUpdateTicker.tsx` - visible refresh timing
+  where used.
+
+## Data Shape
+
+Pricing inputs live on Supabase `products` rows:
+
+- `category` - legacy broad pricing category, currently `Gold` or `Silver`.
+- `metal_type` - broader merchandising metal family.
+- `metal_variant` - color/subtype such as yellow gold, white gold, silver,
+  vermeil, platinum.
+- `purity` - karat for gold, sterling/silver value for silver inventory.
+- `weight_grams` / `gram_weight` - product weight used for melt value.
+- `price_mode` - `spot-multiplier` or `manual`.
+- `pricing_multiplier` - multiplier over melt for spot-priced items.
+- `manual_price_label` - fixed/manual display value; `asking_price` is legacy DB
+  fallback only and is cleared by current admin product saves.
+
+## Pricing Logic
+
+For spot-multiplier products:
+
+```text
+meltValue = spotPerGram * purityRatio * gramWeight
+displayPrice = meltValue * pricingMultiplier
+```
+
+`pricing.ts` owns the exact helper behavior so shop cards, detail pages, cart,
+checkout, and admin surfaces stay consistent.
+
+Manual-priced products skip the live multiplier math and display the saved
+manual price label. Bare numeric labels are normalized by the shared helper
+(`1` -> `$1`, `1200` -> `$1,200`), and the same parser is used by cart,
+checkout, and order snapshot pricing so fixed-price items do not fall back to
+dash totals when entered as a plain number.
+
+## Customer trade-in price ("Own gold or silver? … pay as little as ___")
+
+A separate, marketing-only line on `shop/[id]`, independent of the sale price
+and the scrap-value box (which always shows the real melt value).
+`resolveAdvertisedTradeInPrice(product, meltValue, siteDefault, askingPrice)` in
+`types/product.ts` resolves it in strict precedence:
+
+1. **Per-item override** (`products.special_price_override_*`) — always wins.
+   The item form's "Override Type" (`special_price_override_mode`):
+   - `'amount'` — a flat dollar price (`_amount`);
+   - `'percent'` — % over melt (`_percent`);
+   - `'asking_percent'` (2026-10-31) — `askingPrice * (1 - _discount_percent/100)`, 0–100;
+   - `'asking_amount'` (2026-10-31) — `askingPrice - _discount_amount`; the save
+     refuses an amount ≥ the asking price, and a result ≤ $0 never shows.
+   Only the chosen number is saved. The asking modes need a numeric asking
+   price; otherwise the line falls to the site-wide default, then melt. No floor
+   at melt. Migration `supabase/product-trade-in-off-asking-2026-10.sql`; before
+   it runs, the product page and the item save drop ONLY its two columns (an
+   off-asking save stops with "Run … first" inside the editor). Guard
+   `lib/__tests__/trade-in-off-asking.test.ts`.
+2. **Site-wide default** — `shop_settings.special_price_default_enabled` plus a
+   **basis** (`special_price_default_basis`, added 2026-10-25). Set once in
+   Admin → Settings → **Customer Trade-in Price** (`AdminSpecialPricePanel.tsx`,
+   via the `shop-settings` route + `fetchSpecialPriceDefault`), applied to every
+   item at once:
+   - `'melt'` (default) — `meltValue * (1 + special_price_default_percent/100)`
+     (signed; negative = below spot).
+   - `'asking'` — `askingPrice * (1 - special_price_default_discount_percent/100)`
+     (0–100). The asking price is `getProductPriceValue` (THE chargeable price).
+     An item with no numeric asking price ("Contact for price") shows its melt
+     value. No floor at melt.
+   Each basis keeps its own number. Both still need a computable melt value, so
+   the line appears on exactly the items it always did.
+3. **Plain melt value** — the historical default when neither is set.
+
+The line is advertising only: checkout, PayPal, Make an Offer, eBay, Etsy and
+the feeds never read it. Reads degrade to the melt-only setting before the
+basis migration and to "off" before the original one; a melt-basis save still
+works before the basis migration. **Migrations:
+`supabase/shop-special-price-default-2026-07.sql`, then
+`supabase/shop-trade-in-asking-discount-2026-10.sql`.** Guards:
+`types/__tests__/product.test.ts`, `lib/__tests__/shop-settings-trade-in.test.ts`.
+Changes propagate to product pages within ~5 min (ISR), like the spot values
+they show.
+
+## Source And Fallback
+
+`spot-price.ts` currently uses `api.gold-api.com` and keeps a fallback so the
+shop remains usable if the provider is unavailable. If traffic grows or the
+public endpoint becomes unreliable, add a keyed provider behind the same helper
+instead of calling a provider directly from the browser.
+
+## Verification
+
+After pricing code, route, or schema-contract changes:
+
+```bash
+cd next-app
+npm run lint
+npm run build
+```
+
+Also verify `/api/metal-prices`, `/shop`, and at least one `/shop/[id]` product
+detail page in-browser.
