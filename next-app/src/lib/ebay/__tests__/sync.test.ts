@@ -43,6 +43,7 @@ describe('offer contract hardening', () => {
       merchantLocationKey: 'location',
       marketplaceId: 'EBAY_US',
       bestOfferEnabled: false,
+      offerMinimum: { settings: { mode: null, offAmount: null, offPercent: null, fixed: null }, minimum: null, autoDeclinePrice: null, status: 'none' as const },
     };
     expect(offerBody(payload).listingDuration).toBe('GTC');
   });

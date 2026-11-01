@@ -10,6 +10,7 @@ import { PageContainer, Section } from '@/components/layout/ResponsiveLayout';
 import ShowroomAddress from '@/components/ShowroomAddress';
 import ShowroomHours from '@/components/ShowroomHours';
 import CopyAddressButton from '@/components/CopyAddressButton';
+import { SocialFollowTiles } from '@/components/SocialFollow';
 import { mapsUrl, wayfindingSentence } from '@/lib/business-location';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -289,6 +290,8 @@ export default async function AboutPage({ params }: Props) {
                 <span aria-hidden="true">-&gt;</span>
               </a>
             </div>
+            {/* Follow Along (owner, 2026-11-01): the four social accounts. */}
+            <SocialFollowTiles isEs={isEs} label={isEs ? 'Síganos' : 'Follow Along'} className="mt-9" />
           </PageContainer>
         </Section>
 

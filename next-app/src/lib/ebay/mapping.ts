@@ -8,6 +8,7 @@ import {
   parseLengthInches,
 } from '@/types/product';
 import { EBAY_EXCLUDED_PRODUCT_IDS, EBAY_EXCLUDED_REASON } from './guards';
+import { computeOfferMinimum, offerMinimumSettingsFromProduct, type OfferMinimum } from './best-offer';
 import { getMarketplaceSpotPriceError, getProductPriceValue } from '@/lib/pricing';
 import { getMarketplaceShippingTier } from '@/lib/checkout-shipping';
 import { getSiteUrl } from '@/lib/order-email-branding';
@@ -812,6 +813,9 @@ export interface MappedEbayPayload {
   /** The item's own Best Offer choice (`products.ebay_best_offer`) — sent on every offer
    *  write, since eBay's updateOffer replaces the whole offer. NOT in the content hash. */
   bestOfferEnabled: boolean;
+  /** The item's Best Offer minimum worked out for TODAY's eBay price (2026-11-01) —
+   *  `autoDeclinePrice` is what offerBody sends. NOT in the content hash. */
+  offerMinimum: OfferMinimum;
 }
 
 export function buildMappedPayload(
@@ -847,6 +851,7 @@ export function buildMappedPayload(
     merchantLocationKey: connection?.merchant_location_key ?? null,
     marketplaceId: connection?.marketplace_id ?? 'EBAY_US',
     bestOfferEnabled: product.ebay_best_offer === true,
+    offerMinimum: computeOfferMinimum(offerMinimumSettingsFromProduct(product), priceResult.price, product.ebay_best_offer === true),
   };
 }
 
@@ -870,7 +875,9 @@ export function buildMappedPayload(
 // `bestOfferEnabled` is deliberately EXCLUDED (2026-10-14): the "Allow offers"
 // box pushes its own change to a live listing the moment it is ticked (see
 // setEbayBestOffer in sync.ts), and adding it here would have flagged every
-// existing listing "Content stale" the day it shipped.
+// existing listing "Content stale" the day it shipped. `offerMinimum` is
+// excluded for the same reason (2026-11-01): it moves with the price, which has
+// its own path, and the box pushes its own change.
 // ---------------------------------------------------------------------------
 export function computeContentHash(payload: MappedEbayPayload): string {
   const stable = {

@@ -9,6 +9,8 @@ import BreadcrumbTrail from '@/components/BreadcrumbTrail';
 import { PageContainer } from '@/components/layout/ResponsiveLayout';
 import TestimonialCard from '@/components/home/TestimonialCard';
 import { AppIcon } from '@/components/AppIcon';
+import GoogleReviewsLine from '@/components/GoogleReviewsLine';
+import { getGoogleReviews } from '@/lib/google-reviews-server';
 
 /**
  * `/reviews` — every curated Google review on one page (owner, 2026-09-08;
@@ -43,8 +45,10 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
   const isEs = locale === 'es';
-  // No count anywhere on the page (owner, 2026-09-08): it would read as "only
-  // N" and drift against the Google total.
+  // No count in the title/description. The page itself carries the rating
+  // line (owner, 2026-11-01, reversing 09-08's "no count anywhere": "50+, all
+  // five stars" cannot read as "only N"; the count is admin-edited and rounded
+  // down, so it does not drift above the Google total).
   return pageMetadata({
     title: isEs ? 'Reseñas de Clientes' : 'Customer Reviews',
     description: isEs
@@ -60,6 +64,7 @@ export default async function ReviewsPage({ params }: Props) {
   const isEs = locale === 'es';
 
   const crumbs: Crumb[] = [{ name: isEs ? 'Reseñas' : 'Reviews', path: '/reviews' }];
+  const reviews = await getGoogleReviews();
 
   return (
     <>
@@ -86,6 +91,7 @@ export default async function ReviewsPage({ params }: Props) {
             >
               {isEs ? 'Reseñas' : 'Reviews'}
             </h1>
+            <GoogleReviewsLine settings={reviews} isEs={isEs} className="mt-4" />
             <p
               className="mx-auto mt-5 max-w-2xl text-base leading-relaxed md:text-lg"
               style={{ color: 'var(--color-on-surface-variant)' }}

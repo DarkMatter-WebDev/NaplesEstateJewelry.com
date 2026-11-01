@@ -1,9 +1,20 @@
 'use client';
 
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { EbayAspectRows, FIELD_LABEL, useProductFieldEditor, type EditorKey } from './ProductFieldInlineEditor';
 import { AppIcon } from '@/components/AppIcon';
 import type { ProductFieldEditPatch, ReviewProductFields } from '@/lib/product-field-edits';
+import {
+  OFFER_MINIMUM_MODES,
+  computeOfferMinimum,
+  normalizeOfferMinimumMode,
+  offerMinimumHowLine,
+  offerMinimumTodayLine,
+  validateOfferMinimumInput,
+  type OfferMinimum,
+  type OfferMinimumMode,
+  type OfferMinimumSettings,
+} from '@/lib/ebay/best-offer';
 
 interface PreflightCheck {
   check: string;
@@ -35,6 +46,8 @@ interface MappedEbayPayload {
   marketplaceId: string;
   /** This item's own Best Offer choice (products.ebay_best_offer). */
   bestOfferEnabled: boolean;
+  /** The item's Best Offer minimum for today's eBay price (2026-11-01). */
+  offerMinimum: OfferMinimum;
 }
 
 interface EbayListingSummary {
@@ -62,6 +75,40 @@ interface BestOfferChangeResult {
   confirmedOnEbay: boolean | null;
   message: string;
   error?: { code: string; message: string };
+}
+
+interface OfferMinimumChangeResult {
+  ok: boolean;
+  pushed: boolean;
+  message: string;
+  error?: { code: string; message: string };
+}
+
+// The "Minimum offer" picker — same wording as the item form's trade-in Override Type.
+const OFFER_MINIMUM_LABELS: Record<OfferMinimumMode, string> = {
+  off_amount: 'Dollar amount off asking price',
+  off_percent: 'Percent off asking price',
+  fixed: 'Fixed amount ($)',
+};
+
+type OfferMinimumDraft = { mode: OfferMinimumMode | null } & Record<OfferMinimumMode, string>;
+
+function offerMinimumDraftFrom(settings: OfferMinimumSettings | undefined): OfferMinimumDraft {
+  const text = (value: number | null | undefined) => (value == null ? '' : String(value));
+  return {
+    mode: settings?.mode ?? null,
+    off_amount: text(settings?.offAmount),
+    off_percent: text(settings?.offPercent),
+    fixed: text(settings?.fixed),
+  };
+}
+
+function offerMinimumSettingsFromDraft(draft: OfferMinimumDraft): OfferMinimumSettings {
+  const num = (value: string) => {
+    const n = Number(value);
+    return value.trim() !== '' && Number.isFinite(n) && n > 0 ? n : null;
+  };
+  return { mode: draft.mode, offAmount: num(draft.off_amount), offPercent: num(draft.off_percent), fixed: num(draft.fixed) };
 }
 
 interface SyncStepResult {
@@ -123,6 +170,11 @@ export default function EbayProductPanel({
   const [pushingPrice, setPushingPrice] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [savingBestOffer, setSavingBestOffer] = useState(false);
+  const [minimumDraft, setMinimumDraft] = useState<OfferMinimumDraft>(() => offerMinimumDraftFrom(undefined));
+  const [savingMinimum, setSavingMinimum] = useState(false);
+  // The Save result sits right under its button (not the panel-top notice) so it is seen without scrolling.
+  const [minimumResult, setMinimumResult] = useState<{ text: string; ok: boolean } | null>(null);
+  const storedMinimumKey = useRef<string | null>(null);
   const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null);
 
   const showNotice = (text: string, ok = true) => {
@@ -141,6 +193,14 @@ export default function EbayProductPanel({
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(errorMessage(data, 'Could not load the eBay preview.'));
       setPreview(data as PreviewResponse);
+      // Refill the Minimum offer box only when the STORED minimum changed, so a
+      // preview refresh after another action never wipes what is being typed.
+      const storedMinimum = (data as PreviewResponse).payload?.offerMinimum?.settings;
+      const storedKey = JSON.stringify(storedMinimum ?? null);
+      if (storedKey !== storedMinimumKey.current) {
+        storedMinimumKey.current = storedKey;
+        setMinimumDraft(offerMinimumDraftFrom(storedMinimum));
+      }
       setLoadError(null);
       return { ok: true };
     } catch (err) {
@@ -330,6 +390,37 @@ export default function EbayProductPanel({
     }
   };
 
+  // The item's Best Offer minimum (2026-11-01). Same round trip as the box
+  // above: saved on the product, and — while offers are on — the live or
+  // prepared offer is updated at once and eBay's minimum is read back.
+  const saveOfferMinimum = async () => {
+    const mode = minimumDraft.mode;
+    const value = mode ? minimumDraft[mode] : null;
+    const invalid = validateOfferMinimumInput(mode, value);
+    if (invalid) {
+      setMinimumResult({ text: invalid, ok: false });
+      return;
+    }
+    setSavingMinimum(true);
+    setMinimumResult(null);
+    try {
+      const res = await fetch('/api/admin/ebay/offer-minimum', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ productId, mode, value: mode ? Number(value) : null }),
+      });
+      const data = (await res.json().catch(() => null)) as OfferMinimumChangeResult | null;
+      if (!res.ok || !data) throw new Error(errorMessage(data, 'Could not save the minimum.'));
+      setMinimumResult({ text: data.message, ok: data.ok && !/^eBay accepted the update but/.test(data.message) });
+    } catch (err) {
+      setMinimumResult({ text: err instanceof Error ? err.message : 'Could not save the minimum.', ok: false });
+    } finally {
+      setSavingMinimum(false);
+      await loadPreview();
+      onSynced?.();
+    }
+  };
+
   const runDelistAction = async (action: 'hide' | 'withdraw' | 'restore' | 'unstage') => {
     setBusyAction(action === 'restore' ? 'restore' : action === 'unstage' ? 'unstage' : 'delist');
     try {
@@ -380,12 +471,18 @@ export default function EbayProductPanel({
   const offerIsLive = listing?.syncState === 'published' || listing?.syncState === 'out_of_date';
   const offerIsPrepared = hasOffer && (listing?.syncState === 'review' || listing?.syncState === 'offer_created');
   const bestOfferHint = offerIsLive
-    ? 'Changes the live eBay listing right away. Offers are answered on eBay; nothing is accepted or declined automatically.'
+    ? 'Changes the live eBay listing right away. Offers are answered on eBay; nothing is accepted automatically.'
     : offerIsPrepared
       ? 'Updates the prepared listing right away; it carries this choice when you publish.'
       : listing?.syncState === 'hidden_oos'
         ? 'Saved now; eBay gets it after Restore, then Sync Updates.'
         : 'Saved now; included when this item is synced to eBay.';
+  const minimumBusy = savingMinimum || savingBestOffer || syncing || publishing || pushingPrice || busyAction !== null || fieldEditor.saving;
+  // The box's figures follow what is TYPED; the stored minimum is in preview.payload.offerMinimum.
+  const draftMinimum = computeOfferMinimum(offerMinimumSettingsFromDraft(minimumDraft), preview.payload.price, true);
+  const draftMinimumWarns = draftMinimum.status === 'at_or_above_price' || draftMinimum.status === 'too_low' || draftMinimum.status === 'no_price';
+  const draftHowLine = offerMinimumHowLine(draftMinimum.settings, preview.payload.price);
+  const storedMinimum = preview.payload.offerMinimum;
 
   // A product-backed value with its pencil; the cell spans both columns while
   // its editor is open so the inputs have room.
@@ -522,6 +619,100 @@ export default function EbayProductPanel({
             {savingBestOffer ? 'Saving…' : 'Allow offers'}
           </label>
           <p className="text-[0.7rem] italic opacity-75">{bestOfferHint}</p>
+          {!preview.payload.bestOfferEnabled && (
+            <p className="text-[0.7rem] italic opacity-75">
+              Turn on &ldquo;Allow offers&rdquo; to set a minimum.
+              {storedMinimum?.settings.mode ? ' A minimum you saved earlier is kept for next time.' : ''}
+            </p>
+          )}
+
+          {preview.payload.bestOfferEnabled && (
+            <div
+              className="mt-2.5 p-3 rounded-[10px]"
+              style={{
+                border: '1px solid color-mix(in srgb, var(--color-primary) 22%, transparent)',
+                background: 'linear-gradient(180deg, #fffdf8 0%, #fbf9f2 100%)',
+              }}
+            >
+              <label className="form-label" htmlFor={`ebay-offer-min-${productId}`}>Minimum offer</label>
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  id={`ebay-offer-min-${productId}`}
+                  className="form-field w-full sm:w-60"
+                  value={minimumDraft.mode ?? 'none'}
+                  disabled={minimumBusy}
+                  onChange={(e) => {
+                    setMinimumDraft({ ...minimumDraft, mode: normalizeOfferMinimumMode(e.target.value) });
+                    setMinimumResult(null);
+                  }}
+                >
+                  <option value="none">No minimum</option>
+                  {OFFER_MINIMUM_MODES.map((mode) => (
+                    <option key={mode} value={mode}>{OFFER_MINIMUM_LABELS[mode]}</option>
+                  ))}
+                </select>
+                {minimumDraft.mode && (
+                  <span className="inline-flex items-center gap-1 text-sm" style={{ color: 'var(--color-on-surface)' }}>
+                    {minimumDraft.mode !== 'off_percent' && '$'}
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min={1}
+                      max={minimumDraft.mode === 'off_percent' ? 99 : undefined}
+                      step={minimumDraft.mode === 'off_percent' ? 1 : 'any'}
+                      className="form-field w-28"
+                      aria-label={OFFER_MINIMUM_LABELS[minimumDraft.mode]}
+                      value={minimumDraft[minimumDraft.mode]}
+                      disabled={minimumBusy}
+                      onChange={(e) => {
+                        setMinimumDraft({ ...minimumDraft, [minimumDraft.mode!]: e.target.value });
+                        setMinimumResult(null);
+                      }}
+                    />
+                    {minimumDraft.mode === 'off_percent' ? '% off' : minimumDraft.mode === 'off_amount' ? 'off' : ''}
+                  </span>
+                )}
+              </div>
+              <p
+                className={draftMinimumWarns ? 'mt-2.5 px-3 py-2 text-xs' : 'mt-2.5 text-[0.8rem]'}
+                style={draftMinimumWarns
+                  ? {
+                    color: '#7a5200',
+                    background: 'color-mix(in srgb, #a9760a 12%, transparent)',
+                    border: '1px solid color-mix(in srgb, #a9760a 35%, transparent)',
+                  }
+                  : { color: 'var(--color-on-surface)' }}
+              >
+                {offerMinimumTodayLine(draftMinimum, preview.payload.price)}
+                {draftHowLine && !draftMinimumWarns && (
+                  <span className="block text-[0.7rem] mt-0.5" style={{ color: 'var(--color-on-surface-variant)' }}>{draftHowLine}</span>
+                )}
+              </p>
+              <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
+                <button type="button" className="outline-button" disabled={minimumBusy} onClick={() => void saveOfferMinimum()}>
+                  {savingMinimum ? 'Saving…' : 'Save minimum'}
+                </button>
+                <span className="text-[0.7rem]" style={{ color: 'var(--color-on-surface-variant)' }}>
+                  {offerIsLive || offerIsPrepared
+                    ? 'Updates the eBay listing right away; eBay reads it back.'
+                    : 'Saved now; included when this item is synced to eBay.'}
+                </span>
+              </div>
+              {minimumResult && (
+                <div
+                  className="mt-2.5 px-3 py-2 text-xs font-medium"
+                  role="status"
+                  style={{
+                    background: minimumResult.ok ? 'color-mix(in srgb, var(--color-primary) 10%, transparent)' : 'color-mix(in srgb, var(--color-error) 10%, transparent)',
+                    border: `1px solid ${minimumResult.ok ? 'color-mix(in srgb, var(--color-primary) 28%, transparent)' : 'color-mix(in srgb, var(--color-error) 28%, transparent)'}`,
+                    color: minimumResult.ok ? 'var(--color-primary)' : 'var(--color-error)',
+                  }}
+                >
+                  {minimumResult.text}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

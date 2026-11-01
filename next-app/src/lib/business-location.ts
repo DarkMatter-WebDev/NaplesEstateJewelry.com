@@ -119,11 +119,17 @@ export const GOOGLE_REVIEW_URL = 'https://g.page/r/CcAn8whCTJ_sEBM/review';
  */
 export const INSTAGRAM_URL = 'https://www.instagram.com/naples_estate_jewelry/';
 export const FACEBOOK_URL = 'https://www.facebook.com/naplesestatejewelry';
+/** Found 2026-11-01: @naples_estate_jewelry (bio links naplesestatejewelry.com; `@naplesestatejewelry` does not exist). */
+export const TIKTOK_URL = 'https://www.tiktok.com/@naples_estate_jewelry';
+/** The page's own canonical address (Nextdoor business page, 6240 Shirley St). */
+export const NEXTDOOR_URL = 'https://nextdoor.com/page/naples-estate-jewelry-naples-fl/';
 
 export const SAME_AS: readonly string[] = [
   GOOGLE_BUSINESS_PROFILE_URL,
   INSTAGRAM_URL,
   FACEBOOK_URL,
+  TIKTOK_URL,
+  NEXTDOOR_URL,
 ];
 
 /** `6240 Shirley St, Ste 104` */

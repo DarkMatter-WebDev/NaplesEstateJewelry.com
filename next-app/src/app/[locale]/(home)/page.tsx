@@ -21,6 +21,7 @@ import ShowroomHours from '@/components/ShowroomHours';
 import StorefrontPhoto from '@/components/StorefrontPhoto';
 import CopyAddressButton from '@/components/CopyAddressButton';
 import TestimonialsSection from '@/components/home/TestimonialsSection';
+import { SocialFollowTiles } from '@/components/SocialFollow';
 import { getHomeCarouselPayload } from '@/lib/home-carousel-server';
 import { getHomeBanner } from '@/lib/home-banner-server';
 import { resolveHomeBanner } from '@/lib/home-banner';
@@ -586,6 +587,25 @@ export default async function HomePage({ params }: Props) {
         {/* Testimonials — real Google reviews (verbatim), shared with product
             pages via src/lib/testimonials.ts */}
         <TestimonialsSection locale={locale} />
+
+        {/* Follow Us (owner, 2026-11-01): the four social accounts, right
+            above "Visit Us · Come See Us Today." Its own short band — the
+            section padding is trimmed so it reads as a bridge, not a chapter. */}
+        <Section
+          className="border-t"
+          style={{ borderColor: 'var(--color-outline-variant)', paddingTop: '3.5rem', paddingBottom: '3.5rem' }}
+        >
+          <PageContainer max="content">
+            <div className="flex flex-col items-center text-center">
+              <SocialFollowTiles
+                isEs={isEs}
+                label={isEs ? 'Síganos' : 'Follow Us'}
+                lede={isEs ? 'Novedades y hallazgos del salón, a medida que llegan.' : 'New arrivals and showroom finds, as they come in.'}
+                className="w-full"
+              />
+            </div>
+          </PageContainer>
+        </Section>
 
         {/* CTA — also the hero's "Visit Us" destination.
             ⚠️ `scroll-margin-top` is not optional: the header is fixed, so

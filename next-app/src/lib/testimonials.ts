@@ -306,4 +306,260 @@ export const TESTIMONIALS: Testimonial[] = [
     meta: 'Google review',
     metaEs: 'Reseña de Google',
   },
+
+  // ── 2026-11-01: the 29 reviews that were on the live profile but not here
+  // (owner: "bring in more of our reviews from the GBP"). Copied from Google
+  // Maps that day — every one 5 stars, none machine-translated, all English.
+  // Verbatim, typos included ("Chis", "Ypu", "Differently would recommend",
+  // "upmost"); multi-paragraph reviews are joined with single spaces (line
+  // breaks only — no word changed). Spanish = our translation.
+  {
+    name: 'Lan Kremkau',
+    quote:
+      'Chris is absolutely amazing. Took my call on a Sunday really spent time with me to help me understand what I had and by far had the best offer of anyone. Will use him exclusively for all my items moving forward',
+    quoteEs:
+      'Chris es absolutamente increíble. Atendió mi llamada un domingo, realmente dedicó tiempo a ayudarme a entender lo que tenía y, por mucho, me hizo la mejor oferta de todos. De ahora en adelante lo usaré exclusivamente para todas mis piezas',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Marlene Finberg',
+    quote:
+      'Great experience. Sold a bunch of sterling silver jewelry here. Shopped around and got by far the highest price from Naples Estate Jewelry. Chris was a pleasure to deal with and helped explain everything along the way.',
+    quoteEs:
+      'Gran experiencia. Vendí un montón de joyería de plata esterlina aquí. Comparé precios y, por mucho, Naples Estate Jewelry me dio el precio más alto. Fue un placer tratar con Chris y me explicó todo en cada paso.',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Carleigh Pace',
+    quote:
+      'Chris is so sweet and runs an amazing business! I highly recommend! I went to many places to sell my rings and Chris was the kindest and friendliest person I dealt with. I also love that he supports other locals and businesses! You will not be disappointed doing business here.',
+    quoteEs:
+      '¡Chris es muy amable y tiene un negocio increíble! ¡Lo recomiendo mucho! Fui a muchos lugares para vender mis anillos y Chris fue la persona más amable y cordial con la que traté. ¡También me encanta que apoye a otros negocios y personas de la zona! No se decepcionará haciendo negocios aquí.',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Olsi Arqimandriti',
+    quote:
+      'Very happy doing business with Chris, very knowledgeable and very fair gold prices. I would definitely come back and continue doing business here.',
+    quoteEs:
+      'Muy contento de hacer negocios con Chris, muy conocedor y con precios del oro muy justos. Sin duda volvería y seguiría haciendo negocios aquí.',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'John P',
+    quote:
+      'A true 5-Star experience! Chris at Naples Estate Jewelry is the best! We experienced a great transaction and would highly recommend this gentleman. Knowledgeable, courteous, and trustworthy - many traits we unfortunately don’t bump into very often these days. We would not hesitate to do business here again. John P Fort Myers',
+    quoteEs:
+      '¡Una verdadera experiencia de 5 estrellas! ¡Chris, de Naples Estate Jewelry, es el mejor! Tuvimos una gran transacción y recomendamos mucho a este caballero. Conocedor, cortés y confiable: cualidades que, por desgracia, no se encuentran muy a menudo hoy en día. No dudaríamos en volver a hacer negocios aquí. John P, Fort Myers',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Karen Corriveau',
+    quote:
+      'Brought some items for Chris to look at, he was extremely knowledgeable and kind. I highly recommend checking with him before you go anywhere else!',
+    quoteEs:
+      'Le traje algunas piezas a Chris para que las viera; fue sumamente conocedor y amable. ¡Recomiendo mucho consultarlo a él antes de ir a cualquier otro lugar!',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Denise Holman',
+    quote:
+      'Best place in Naples!! Chris is very knowledgeable and honest. Great place to do business. Thanks so much for your help.',
+    quoteEs:
+      '¡¡El mejor lugar de Naples!! Chris es muy conocedor y honesto. Un gran lugar para hacer negocios. Muchas gracias por su ayuda.',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Evie Glick',
+    quote:
+      'I had the pleasure of meeting Chris at Naples estate jewelry on Shirley Street. Very professional, very helpful and I would suggest anyone looking to sell jewelry or gold visit this fine establishment.',
+    quoteEs:
+      'Tuve el placer de conocer a Chris en Naples Estate Jewelry, en Shirley Street. Muy profesional, muy servicial, y le sugeriría a cualquiera que quiera vender joyería u oro que visite este excelente establecimiento.',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Jo',
+    quote: 'Very nice experience and great knowledge Differently would recommend',
+    quoteEs: 'Una experiencia muy agradable y un gran conocimiento. Sin duda lo recomendaría',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Jakin Wilson',
+    quote: 'Quick and fair appraisal of my silver. A pleasure to work with.',
+    quoteEs: 'Una tasación rápida y justa de mi plata. Un placer trabajar con él.',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Eliana Serra',
+    quote: 'Excellent service and very professional.',
+    quoteEs: 'Excelente servicio y muy profesional.',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Jeremy Adams',
+    quote: 'Best in the business, honestly',
+    quoteEs: 'El mejor del negocio, de verdad',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Zilmuchi',
+    quote:
+      '⭐⭐⭐⭐⭐ Chris is absolutely wonderful! He is incredibly kind, friendly, and patient. He takes the time to listen, answer questions, and make everyone feel comfortable and valued. His professionalism and genuine care truly make a difference. Such a pleasure to work with. Highly recommend!',
+    quoteEs:
+      '⭐⭐⭐⭐⭐ ¡Chris es absolutamente maravilloso! Es increíblemente amable, cordial y paciente. Se toma el tiempo de escuchar, responder preguntas y hacer que todos se sientan cómodos y valorados. Su profesionalismo y su interés genuino de verdad marcan la diferencia. Un verdadero placer trabajar con él. ¡Muy recomendado!',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Roxy',
+    quote: 'Very Professional Business',
+    quoteEs: 'Un negocio muy profesional',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Robert Stumbo',
+    quote:
+      'I recently visited this estate jewelry and antique shop and was thoroughly impressed. The selection of vintage and estate pieces is carefully curated—beautiful rings, necklaces, brooches, and unique antique finds that you simply don’t see in regular jewelry stores. Everything felt authentic and well-preserved. Chris was knowledgeable, friendly, and never pushy. They took the time to share the history behind several pieces and helped me find something truly special. Pricing was fair for the quality, and the overall atmosphere of the shop made browsing a real pleasure. Highly recommend if you’re looking for one-of-a-kind estate jewelry or antique treasures. I’ll definitely be back!',
+    quoteEs:
+      'Hace poco visité esta tienda de joyería de patrimonio y antigüedades y quedé muy impresionado. La selección de piezas vintage y de patrimonio está cuidadosamente elegida: anillos, collares y broches preciosos, y hallazgos antiguos únicos que simplemente no se ven en las joyerías comunes. Todo se sentía auténtico y bien conservado. Chris fue conocedor, amable y nunca insistente. Se tomaron el tiempo de contarme la historia de varias piezas y me ayudaron a encontrar algo realmente especial. Los precios eran justos para la calidad, y el ambiente de la tienda hizo que recorrerla fuera un verdadero placer. Muy recomendado si busca joyería de patrimonio única o tesoros antiguos. ¡Sin duda volveré!',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Cristina Roa',
+    quote:
+      'Had the best experience today at Naples Estate Jewelry! Chris is so knowledgeable and has great items that are so unique and incredibly priced. I’m going to be a regular to see what new things have arrived!',
+    quoteEs:
+      '¡Hoy tuve la mejor experiencia en Naples Estate Jewelry! Chris es muy conocedor y tiene piezas estupendas, muy únicas y a precios increíbles. ¡Voy a ser clienta habitual para ver qué cosas nuevas han llegado!',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'devon amory',
+    quote:
+      'Chris was an absolute delight!!! He is exactly who you want when it comes to this!! Chris has a passion for not only the items but the history behind it. When I say I was waiting years to find someone like him I truly mean it, he’s honest and takes his time. Thank you for caring and seeing the true value in my collection and helping me part with it in the best way possible, Im truly grateful!!!',
+    quoteEs:
+      '¡¡¡Chris fue un verdadero encanto!!! ¡¡Es exactamente la persona que uno quiere para esto!! Chris siente pasión no solo por las piezas, sino también por la historia detrás de ellas. Cuando digo que llevaba años esperando encontrar a alguien como él, lo digo en serio: es honesto y se toma su tiempo. Gracias por preocuparse, por ver el verdadero valor de mi colección y por ayudarme a desprenderme de ella de la mejor manera posible. ¡¡¡Estoy muy agradecido!!!',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Joseph Mason',
+    quote: 'Treated me very well',
+    quoteEs: 'Me trató muy bien',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Barbara Arnold',
+    quote:
+      'I brought in a lot of family jewelry pieces - some valuable, some not. Chis is very knowledgable and experienced. There was no pressure and he gave me good advice about the pieces I decided not to sell. The visit was well worth my time.',
+    quoteEs:
+      'Traje muchas joyas de la familia, algunas valiosas y otras no. Chris tiene mucho conocimiento y experiencia. No hubo ninguna presión y me dio buenos consejos sobre las piezas que decidí no vender. La visita valió mucho la pena.',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Sara Buboltz',
+    quote: 'Chris was super kind and knowledgeable.',
+    quoteEs: 'Chris fue súper amable y muy conocedor.',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Tina L',
+    quote:
+      'Great experience with Naples Estate Jewelry. Chris was very kind, professional & informative. I appreciate the time taken to look over the jewelry pieces that I brought in, answering any questions I had and full transparency. I’ll absolutely be back in the near future!',
+    quoteEs:
+      'Gran experiencia con Naples Estate Jewelry. Chris fue muy amable, profesional e informativo. Agradezco el tiempo que dedicó a revisar las joyas que traje, a responder todas mis preguntas y su total transparencia. ¡Sin duda volveré pronto!',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'J. W.',
+    quote:
+      'Chris is the best in the business. Honest, fair and a wealth of knowledge. Highly recommend. Really happy to have found him here in Naples!',
+    quoteEs:
+      'Chris es el mejor del negocio. Honesto, justo y con un enorme conocimiento. Muy recomendado. ¡Muy contento de haberlo encontrado aquí en Naples!',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Leah Mueller',
+    quote: 'Great place! Very helpful and willing to help.I will definitely be back',
+    quoteEs: '¡Un gran lugar! Muy serviciales y dispuestos a ayudar. Sin duda volveré',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Lyn Dukes',
+    quote: 'Wonderful place. Great people. Beautiful items. Ypu have to come see!!',
+    quoteEs: 'Un lugar maravilloso. Gente estupenda. Piezas preciosas. ¡¡Tiene que venir a verlo!!',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Amy Aditatar',
+    quote:
+      'I brought my Grandma’s silver here today and was met with the upmost respect, great customer service, and a fair price. I would recommend coming here and doing your business here over the other local businesses.',
+    quoteEs:
+      'Hoy traje aquí la plata de mi abuela y me recibieron con el mayor respeto, un excelente servicio al cliente y un precio justo. Recomendaría venir y hacer sus negocios aquí antes que en otros negocios de la zona.',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Lorena & Scott Schultz',
+    quote:
+      'Chris is the man and helped my husband and I. He knows basically everything there is to know about jewelry. He is extremely responsive, knowledgeable, and always looks out for his clients best interests. I highly recommend this company as this industry can be a little shady from my experience, but Chris was as transparent as anyone I’ve ever met!',
+    quoteEs:
+      'Chris es lo máximo y nos ayudó a mi esposo y a mí. Sabe prácticamente todo lo que hay que saber sobre joyería. Responde muy rápido, tiene mucho conocimiento y siempre vela por los mejores intereses de sus clientes. Recomiendo mucho esta empresa porque, según mi experiencia, este sector puede ser un poco turbio, ¡pero Chris fue tan transparente como nadie que haya conocido!',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Adrian Sanchez',
+    quote: 'Thank you!!!',
+    quoteEs: '¡¡¡Gracias!!!',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Scott Schultz',
+    quote: 'Chris Surette was awesome! Best service and great prices. Highly recommended!',
+    quoteEs: '¡Chris Surette fue increíble! El mejor servicio y excelentes precios. ¡Muy recomendado!',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Tom Hardesty',
+    quote:
+      'Chris is the BEST!!! He has many fine pieces that are of very high quality, and very reasonable to work with! Go see him!!!',
+    quoteEs:
+      '¡¡¡Chris es el MEJOR!!! Tiene muchas piezas finas de muy alta calidad, ¡y es muy razonable para trabajar con él! ¡¡¡Vaya a verlo!!!',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
 ];
+
+/**
+ * The reviews that ride the scrolling band (homepage + product pages) — the
+ * substantive ones (owner, 2026-11-01: all 51 on /reviews, a hand-picked set on
+ * the band). The rule is the quote's length, not a hand-kept flag, so a newly
+ * pasted review sorts itself: one-liners like "Thank you!!!" stay on /reviews.
+ * 160 characters = 24 of the 51 on 2026-11-01 (the band showed all 22 before).
+ */
+export const BAND_MIN_QUOTE_CHARS = 160;
+export const BAND_TESTIMONIALS: Testimonial[] = TESTIMONIALS.filter((t) => t.quote.length >= BAND_MIN_QUOTE_CHARS);

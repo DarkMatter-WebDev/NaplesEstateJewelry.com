@@ -10,6 +10,7 @@ import ShowroomHours from '@/components/ShowroomHours';
 import StorefrontPhoto from '@/components/StorefrontPhoto';
 import CopyAddressButton from '@/components/CopyAddressButton';
 import { PageContainer } from '@/components/layout/ResponsiveLayout';
+import { SocialFollowTiles } from '@/components/SocialFollow';
 
 interface Props {
   locale?: string;
@@ -143,6 +144,11 @@ export default function VisitUsPanel({ locale = 'en' }: Props) {
               </a>
             </div>
             <p className="mt-3 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>{phoneHoursLabel(isEs)}</p>
+
+            {/* Follow Us (owner, 2026-11-01). Here, under the showroom details —
+                never at the top of /contact, where it would push the message
+                form down. 2 × 2 at every width: the column is narrow. */}
+            <SocialFollowTiles isEs={isEs} label={isEs ? 'Síganos' : 'Follow Us'} align="start" twoColumn className="mt-7" />
           </div>
 
           {/* RIGHT — orientation, then the map. */}

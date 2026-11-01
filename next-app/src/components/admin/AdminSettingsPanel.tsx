@@ -6,6 +6,7 @@ import AdminCarouselSettingsPanel from './AdminCarouselSettingsPanel';
 import AdminShopVisibilityPanel from './AdminShopVisibilityPanel';
 import AdminStoreHoursPanel from './AdminStoreHoursPanel';
 import AdminHomeBannerPanel from './AdminHomeBannerPanel';
+import AdminGoogleReviewsPanel from './AdminGoogleReviewsPanel';
 import AdminSpecialPricePanel from './AdminSpecialPricePanel';
 import MarketingSettingsPanel from './MarketingSettingsPanel';
 import EtsySettingsPanel from './EtsySettingsPanel';
@@ -342,6 +343,7 @@ export default function AdminSettingsPanel() {
         <AdminShopVisibilityPanel />
         <AdminStoreHoursPanel />
         <AdminHomeBannerPanel />
+        <AdminGoogleReviewsPanel />
         <AdminSpecialPricePanel />
         <MarketingSettingsPanel />
         <EtsySettingsPanel />

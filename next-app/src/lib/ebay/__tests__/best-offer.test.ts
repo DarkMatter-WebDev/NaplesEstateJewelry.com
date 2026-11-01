@@ -44,6 +44,7 @@ function payload(bestOfferEnabled: boolean): MappedEbayPayload {
     merchantLocationKey: 'location',
     marketplaceId: 'EBAY_US',
     bestOfferEnabled,
+    offerMinimum: { settings: { mode: null, offAmount: null, offPercent: null, fixed: null }, minimum: null, autoDeclinePrice: null, status: 'none' },
   };
 }
 
@@ -53,12 +54,14 @@ describe('the offer eBay receives', () => {
     expect(offerBody(payload(false)).listingPolicies.bestOfferTerms).toEqual({ bestOfferEnabled: false });
   });
 
-  it('never sends an auto-accept or auto-decline price (owner: offers are answered on eBay)', () => {
+  it('never sends an auto-accept price; no auto-decline without a minimum (offers are answered on eBay)', () => {
     for (const on of [true, false]) {
       const json = JSON.stringify(offerBody(payload(on)));
       expect(json).not.toMatch(/autoAcceptPrice|autoDeclinePrice/);
     }
     expect(Object.keys(bestOfferTerms(true))).toEqual(['bestOfferEnabled']);
+    // The minimum (2026-11-01) is the ONLY threshold ever sent — see offer-minimum.test.ts.
+    expect(JSON.stringify(bestOfferTerms(true, 1034.99))).not.toMatch(/autoAccept/);
   });
 
   it('keeps the rest of the offer as it was (policies, fixed price, GTC)', () => {

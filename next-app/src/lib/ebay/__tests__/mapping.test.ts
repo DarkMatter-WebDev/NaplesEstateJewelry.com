@@ -720,6 +720,21 @@ describe('Best Offer per item (2026-10-14)', () => {
     expect(buildMappedPayload(makeProduct(), makeConnection(), null).bestOfferEnabled).toBe(false);
   });
 
+  it('works the Best Offer minimum out from the payload\'s own eBay price (2026-11-01)', () => {
+    const on = buildMappedPayload(
+      makeProduct({ price_mode: 'manual', manual_price_label: '$1,000', asking_price: 1000, ebay_best_offer: true, ebay_offer_min_mode: 'off_percent', ebay_offer_min_off_percent: 10 }),
+      makeConnection(),
+      null,
+    );
+    expect(on.price).not.toBeNull();
+    expect(on.offerMinimum.settings.mode).toBe('off_percent');
+    expect(on.offerMinimum.minimum).toBe(Math.floor(Math.round(on.price! * 0.9 * 100) / 100));
+    expect(on.offerMinimum.status).toBe('active');
+    const off = buildMappedPayload(makeProduct({ ebay_best_offer: false, ebay_offer_min_mode: 'fixed', ebay_offer_min_fixed: 900 }), makeConnection(), null);
+    expect(off.offerMinimum.autoDeclinePrice).toBeNull();
+    expect(buildMappedPayload(makeProduct(), makeConnection(), null).offerMinimum.status).toBe('none');
+  });
+
   it('does NOT change the content hash — the box pushes its own change, and every live listing must not turn "Content stale"', () => {
     const off = buildMappedPayload(makeProduct({ ebay_best_offer: false }), makeConnection(), null);
     const on = buildMappedPayload(makeProduct({ ebay_best_offer: true }), makeConnection(), null);

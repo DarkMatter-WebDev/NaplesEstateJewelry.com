@@ -4,6 +4,7 @@ import { mapsUrl, phoneHoursLabel } from '@/lib/business-location';
 import ShowroomAddress from '@/components/ShowroomAddress';
 import ShowroomHours from '@/components/ShowroomHours';
 import CopyAddressButton from '@/components/CopyAddressButton';
+import { SocialFollowFooterRow } from '@/components/SocialFollow';
 
 /**
  * `locale` is REQUIRED, and deliberately has no default.
@@ -203,6 +204,12 @@ export default function SiteFooter({ locale }: Props) {
             ))}
           </nav>
         </div>
+
+        {/* Social links (owner, 2026-11-01, mockup 2): their OWN full-width row
+            under the four link columns, between two separator lines (this
+            row's border-t and the address band's), logos spread across most of
+            the width — not inside the brand column (mockup 1). */}
+        <SocialFollowFooterRow isEs={isEs} />
 
         {/* Sitewide NAP. The footer is on every page, so this is the strongest
             name/address/phone signal the site emits — it must stay

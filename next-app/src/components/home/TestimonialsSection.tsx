@@ -1,5 +1,7 @@
 import { PageContainer, Section } from '@/components/layout/ResponsiveLayout';
-import { TESTIMONIALS } from '@/lib/testimonials';
+import { BAND_TESTIMONIALS } from '@/lib/testimonials';
+import { getGoogleReviews } from '@/lib/google-reviews-server';
+import GoogleReviewsLine from '@/components/GoogleReviewsLine';
 import TestimonialCard from './TestimonialCard';
 import TestimonialMarqueeBand from './TestimonialMarqueeBand';
 
@@ -38,9 +40,12 @@ const MIN_CARDS_PER_HALF = 8;
  */
 const SECONDS_PER_CARD = 7;
 
-export default function TestimonialsSection({ locale, compact = false }: Props) {
+export default async function TestimonialsSection({ locale, compact = false }: Props) {
   const isEs = locale === 'es';
-  if (TESTIMONIALS.length === 0) return null;
+  if (BAND_TESTIMONIALS.length === 0) return null;
+  // "★★★★★ 50+ Google reviews · All five stars" — homepage only (owner,
+  // 2026-11-01); the count is admin-edited (Admin → Settings → Google Reviews).
+  const reviews = compact ? null : await getGoogleReviews();
 
   const heading = (
     <>
@@ -51,11 +56,12 @@ export default function TestimonialsSection({ locale, compact = false }: Props) 
         {isEs ? 'Lo Que Dicen Los Clientes' : 'What Clients Say'}
       </p>
       <h2
-        className={`text-center font-bold tracking-tight ${compact ? 'text-2xl mb-8' : 'responsive-title-lg mb-10'}`}
+        className={`text-center font-bold tracking-tight ${compact ? 'text-2xl mb-8' : 'responsive-title-lg mb-4'}`}
         style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
       >
         {isEs ? 'De Confianza en el Suroeste de Florida' : 'Trusted Across Southwest Florida'}
       </h2>
+      {reviews && <GoogleReviewsLine settings={reviews} isEs={isEs} className="mb-9" />}
     </>
   );
 
@@ -90,8 +96,8 @@ export default function TestimonialsSection({ locale, compact = false }: Props) 
     </div>
   );
 
-  const repeatsPerHalf = Math.max(1, Math.ceil(MIN_CARDS_PER_HALF / TESTIMONIALS.length));
-  const cardsPerHalf = repeatsPerHalf * TESTIMONIALS.length;
+  const repeatsPerHalf = Math.max(1, Math.ceil(MIN_CARDS_PER_HALF / BAND_TESTIMONIALS.length));
+  const cardsPerHalf = repeatsPerHalf * BAND_TESTIMONIALS.length;
   const durationSeconds = cardsPerHalf * SECONDS_PER_CARD;
 
   return (
@@ -111,7 +117,7 @@ export default function TestimonialsSection({ locale, compact = false }: Props) 
           one attribute on the wrapper excludes every card beneath it. */}
       <TestimonialMarqueeBand durationSeconds={durationSeconds}>
         {Array.from({ length: repeatsPerHalf * 2 }).flatMap((_, pass) =>
-          TESTIMONIALS.map((review) =>
+          BAND_TESTIMONIALS.map((review) =>
             <TestimonialCard key={`${review.name}-${pass}`} review={review} isEs={isEs} isRepeat={pass > 0} />,
           ),
         )}

@@ -11,10 +11,9 @@ import CardTodayHours from '@/components/card/CardTodayHours';
 import CardJoinListButton from '@/components/card/CardJoinListButton';
 import ScanBeacon from '@/components/ScanBeacon';
 import StorefrontPhoto from '@/components/StorefrontPhoto';
+import { SOCIAL_PROFILES, socialLinkLabel } from '@/lib/social-links';
 import {
-  FACEBOOK_URL,
   GOOGLE_REVIEW_URL,
-  INSTAGRAM_URL,
   byAppointmentLabel,
   hoursRows,
   hoursSegmentsCompact,
@@ -106,24 +105,6 @@ const BIG_BUTTON: CSSProperties = {
   fontSize: '0.74rem',
   gap: '0.6rem',
 };
-
-function InstagramGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-      <rect x="2" y="2" width="20" height="20" rx="5" />
-      <circle cx="12" cy="12" r="4" />
-      <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-function FacebookGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-      <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
-    </svg>
-  );
-}
 
 export default async function CardLanding({ locale, holder }: CardLandingProps) {
   const isEs = locale === 'es';
@@ -338,14 +319,22 @@ export default async function CardLanding({ locale, holder }: CardLandingProps) 
             <AppIcon name="shopping_bag" className="text-[1.25rem]" style={tileIconStyle} />
             {isEs ? 'Tienda' : 'Shop'}
           </Link>
-          <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" className={tileClass} style={tileStyle}>
-            <span style={tileIconStyle}><InstagramGlyph /></span>
-            Instagram
-          </a>
-          <a href={FACEBOOK_URL} target="_blank" rel="noopener noreferrer" className={tileClass} style={tileStyle}>
-            <span style={tileIconStyle}><FacebookGlyph /></span>
-            Facebook
-          </a>
+          {/* The four social accounts with each brand's official logo (owner,
+              2026-11-01 — replaced the hand-drawn Instagram / Facebook glyphs). */}
+          {SOCIAL_PROFILES.map((profile) => (
+            <a
+              key={profile.name}
+              href={profile.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={socialLinkLabel(profile.name, isEs)}
+              className={tileClass}
+              style={tileStyle}
+            >
+              <Image src={profile.logo} alt="" width={22} height={22} unoptimized className="h-[22px] w-[22px] flex-shrink-0" />
+              {profile.name}
+            </a>
+          ))}
           {/* Join the List — full-width, tinted like the sign-up window's
               "Text-only deals" box; opens that window (Email / Text / Both). */}
           <CardJoinListButton

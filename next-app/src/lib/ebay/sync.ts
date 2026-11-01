@@ -18,13 +18,24 @@ import {
 import { ensureFreshAccessToken } from './auth';
 import {
   BEST_OFFER_SQL_MISSING_MESSAGE,
+  OFFER_MINIMUM_COLUMN,
+  OFFER_MINIMUM_SQL_MISSING_MESSAGE,
+  autoDeclineFromOffer,
   bestOfferFromOffer,
   bestOfferPushedMessage,
   bestOfferSavedMessage,
   bestOfferTerms,
   bestOfferUnchangedMessage,
+  computeOfferMinimum,
   isMissingBestOfferColumn,
+  isMissingOfferMinimumColumn,
+  needsOfferMinimumUpdate,
+  offerMinimumPushedMessage,
+  offerMinimumSavedOnlyMessage,
+  offerMinimumSettingsFromProduct,
   planBestOfferChange,
+  type OfferMinimum,
+  type OfferMinimumMode,
 } from './best-offer';
 import {
   buildMappedPayload,
@@ -207,8 +218,9 @@ export function offerBody(payload: MappedEbayPayload) {
       paymentPolicyId: payload.paymentPolicyId,
       returnPolicyId: payload.returnPolicyId,
       // Per item, on or off, always explicit (2026-10-14): updateOffer is a
-      // full replace, so leaving this out would silently switch Best Offer off.
-      bestOfferTerms: bestOfferTerms(payload.bestOfferEnabled),
+      // full replace, so leaving this out would silently switch Best Offer off
+      // — and leaving out the minimum (2026-11-01) removes it from eBay.
+      bestOfferTerms: bestOfferTerms(payload.bestOfferEnabled, payload.offerMinimum.autoDeclinePrice),
     },
     pricingSummary: { price: { value: String(payload.price ?? 0), currency: 'USD' } },
     merchantLocationKey: payload.merchantLocationKey,
@@ -263,6 +275,52 @@ async function updateOffer(accessToken: string, offerId: string, payload: Mapped
   });
 }
 
+/**
+ * Price push for an item with a Best Offer minimum (2026-11-01). eBay's
+ * price-only bulk call cannot touch `bestOfferTerms`, so a minimum that follows
+ * the price would go stale there (and a fixed one could end up at or above a
+ * falling price). This sends the whole offer instead — new price and the
+ * minimum worked out from it, in ONE write. Live listings only (the price
+ * planners select `published` / `out_of_date`; priceOnlyStep is the drawer's
+ * Push price on a listed item). Like every updateOffer it also carries any other
+ * pending offer change (description, shipping tier). Returns the price sent.
+ */
+async function updateOfferPriceWithMinimum(params: {
+  accessToken: string;
+  offerId: string;
+  product: Product;
+  connection: EbayConnectionDefaults;
+  spotData: SpotData | null;
+  tierPolicyMap: Record<string, string>;
+}): Promise<number> {
+  const payload = buildMappedPayload(params.product, params.connection, params.spotData, undefined, params.tierPolicyMap);
+  if (payload.price == null) throw new Error('No computable price for this item.');
+  await updateOffer(params.accessToken, params.offerId, payload);
+  return payload.price;
+}
+
+/**
+ * Items whose price pushes must go through updateOfferPriceWithMinimum: Best
+ * Offer on AND a minimum chosen. Best-effort by design — before the minimum SQL
+ * runs the column is missing and this returns an empty set, so every item keeps
+ * the ordinary price-only push (a new optional column degrades ALONE).
+ */
+async function getOfferMinimumProductIds(service: SupabaseClient): Promise<Set<string>> {
+  // A thrown lookup must not stop every price push either: worst case, a
+  // minimum item takes one price-only push and its minimum catches up next run.
+  try {
+    const { data, error } = await service
+      .from('products')
+      .select('id')
+      .eq('ebay_best_offer', true)
+      .not('ebay_offer_min_mode', 'is', null);
+    if (error) return new Set();
+    return new Set(((data ?? []) as Array<{ id: string }>).map((row) => row.id));
+  } catch {
+    return new Set();
+  }
+}
+
 interface PublishOfferResponse {
   listingId: string;
   warnings?: Array<{ message?: string }>;
@@ -299,8 +357,8 @@ interface GetOfferResponse {
   // (isPublished = Boolean(listingId)) wrongly reported it as live.
   status?: string;
   listing?: { listingId?: string; listingStatus?: string; soldQuantity?: number };
-  /** Returned only while Best Offer is on (read back by setEbayBestOffer). */
-  listingPolicies?: { bestOfferTerms?: { bestOfferEnabled?: boolean } };
+  /** Returned only while Best Offer is on (read back by setEbayBestOffer / setEbayOfferMinimum). */
+  listingPolicies?: { bestOfferTerms?: { bestOfferEnabled?: boolean; autoDeclinePrice?: { value?: string } } };
 }
 
 async function getOfferCall(accessToken: string, offerId: string): Promise<GetOfferResponse> {
@@ -705,7 +763,20 @@ async function priceOnlyStep(
   }
   try {
     const { accessToken } = await ensureFreshAccessToken(service);
-    await bulkUpdatePriceQuantity(accessToken, [{ sku: listing.ebay_sku, offerId: listing.ebay_offer_id, price: priceResult.price }]);
+    if (needsOfferMinimumUpdate(offerMinimumSettingsFromProduct(product), product.ebay_best_offer === true)) {
+      // The price-only call cannot change the auto-decline price, so an item
+      // with a minimum gets price + minimum together in one full offer update.
+      priceResult.price = await updateOfferPriceWithMinimum({
+        accessToken,
+        offerId: listing.ebay_offer_id,
+        product,
+        connection,
+        spotData,
+        tierPolicyMap: await loadTierPolicyMap(service),
+      });
+    } else {
+      await bulkUpdatePriceQuantity(accessToken, [{ sku: listing.ebay_sku, offerId: listing.ebay_offer_id, price: priceResult.price }]);
+    }
     await upsertListing(service, productId, { last_pushed_price: priceResult.price });
     await insertSyncLog(service, {
       product_id: productId,
@@ -1062,6 +1133,121 @@ export async function setEbayBestOffer(
     syncState: result.syncState,
     confirmedOnEbay: confirmed,
     message: bestOfferPushedMessage(enabled, result.syncState, confirmed),
+  };
+}
+
+export interface OfferMinimumChangeResult {
+  ok: boolean;
+  /** True when the item's eBay offer was updated in this call. */
+  pushed: boolean;
+  syncState: EbaySyncState | null;
+  /** The minimum as stored now (the old one again when the eBay update failed), for today's price. */
+  minimum: OfferMinimum | null;
+  message: string;
+  error?: { code: string; message: string };
+}
+
+const OFFER_MINIMUM_SELECT = 'id, ebay_best_offer, ebay_offer_min_mode, ebay_offer_min_off_amount, ebay_offer_min_off_percent, ebay_offer_min_fixed';
+
+/**
+ * The eBay drawer's "Minimum offer" box (2026-11-01): store the kind + its
+ * number on the product (the other kinds' numbers are kept, so switching back
+ * remembers them), then — when "Allow offers" is on and the offer is live or
+ * prepared — send it to eBay through the ordinary update path, exactly like the
+ * "Allow offers" box (setEbayBestOffer), and read eBay's auto-decline price
+ * back. A failed eBay update puts the stored minimum back.
+ */
+export async function setEbayOfferMinimum(
+  productId: string,
+  mode: OfferMinimumMode | null,
+  value: number | null,
+): Promise<OfferMinimumChangeResult> {
+  const service = createServiceClient();
+  const failed = (code: string, message: string, syncState: EbaySyncState | null = null): OfferMinimumChangeResult => ({
+    ok: false,
+    pushed: false,
+    syncState,
+    minimum: null,
+    message,
+    error: { code, message },
+  });
+
+  const { data: row, error: readError } = await service.from('products').select(OFFER_MINIMUM_SELECT).eq('id', productId).maybeSingle();
+  if (readError) {
+    return isMissingOfferMinimumColumn(readError)
+      ? failed('sql_missing', OFFER_MINIMUM_SQL_MISSING_MESSAGE)
+      : failed('read_failed', readError.message);
+  }
+  if (!row) return failed('product_not_found', 'Product not found.');
+  const previous = row as Record<string, unknown>;
+  const patch: Record<string, unknown> = { ebay_offer_min_mode: mode };
+  if (mode != null) patch[OFFER_MINIMUM_COLUMN[mode]] = value;
+
+  const { error: writeError } = await service.from('products').update(patch).eq('id', productId);
+  if (writeError) {
+    return isMissingOfferMinimumColumn(writeError)
+      ? failed('sql_missing', OFFER_MINIMUM_SQL_MISSING_MESSAGE)
+      : failed('save_failed', writeError.message);
+  }
+
+  // Today's figure, from the same price the offer gets.
+  const product = await loadProduct(service, productId);
+  const connectionRow = await getConnection(service);
+  const spotData = await fetchSpotData().catch(() => null);
+  const price = product ? computeEbayPrice(product, spotData, connectionRow?.price_markup_pct ?? 15).price : null;
+  const bestOfferOn = product?.ebay_best_offer === true;
+  const minimum = product ? computeOfferMinimum(offerMinimumSettingsFromProduct(product), price, bestOfferOn) : null;
+  const describe = (text: string) => `${mode ?? 'none'}${mode ? ` ${value}` : ''} — ${text}`;
+
+  const listing = await getListing(service, productId);
+  // With offers off nothing about the minimum is on eBay, so there is nothing to send.
+  if (!bestOfferOn || planBestOfferChange(listing) === 'save' || !minimum) {
+    await insertSyncLog(service, {
+      product_id: productId,
+      listing_id: listing?.ebay_listing_id ?? null,
+      action: 'offer_minimum',
+      outcome: 'ok',
+      message: describe(`saved only (state ${listing?.sync_state ?? 'not listed'}${bestOfferOn ? '' : ', offers off'})`),
+    });
+    return {
+      ok: true,
+      pushed: false,
+      syncState: listing?.sync_state ?? null,
+      minimum,
+      message: minimum ? offerMinimumSavedOnlyMessage(minimum, listing?.sync_state ?? null) : 'Minimum saved.',
+    };
+  }
+
+  const result = await runSyncStep(productId, 'update');
+  if (result.error) {
+    const restore: Record<string, unknown> = { ebay_offer_min_mode: previous.ebay_offer_min_mode ?? null };
+    if (mode != null) restore[OFFER_MINIMUM_COLUMN[mode]] = previous[OFFER_MINIMUM_COLUMN[mode]] ?? null;
+    await service.from('products').update(restore).eq('id', productId);
+    return failed(result.error.code, `eBay was not updated, so the minimum was put back: ${result.error.message}`, result.syncState);
+  }
+
+  let confirmed: number | null = null;
+  let readOk = true;
+  try {
+    const { accessToken } = await ensureFreshAccessToken(service);
+    confirmed = autoDeclineFromOffer(await getOfferCall(accessToken, listing!.ebay_offer_id!));
+  } catch {
+    readOk = false;
+  }
+  const mismatch = readOk && confirmed !== minimum.autoDeclinePrice;
+  await insertSyncLog(service, {
+    product_id: productId,
+    listing_id: result.listingId ?? listing?.ebay_listing_id ?? null,
+    action: 'offer_minimum',
+    outcome: mismatch ? 'warning' : 'ok',
+    message: describe(`offer updated; sent ${minimum.autoDeclinePrice ?? 'none'}, eBay reads ${readOk ? confirmed ?? 'none' : 'unknown'}`),
+  });
+  return {
+    ok: true,
+    pushed: true,
+    syncState: result.syncState,
+    minimum,
+    message: offerMinimumPushedMessage(minimum, price, confirmed, readOk),
   };
 }
 
@@ -1922,6 +2108,80 @@ async function pushEbayPriceCandidates(params: {
 }
 
 /**
+ * The price push with Best Offer minimums (2026-11-01). Items WITHOUT a minimum
+ * go through pushEbayPriceCandidates exactly as before (25-offer bulk calls);
+ * items WITH one get updateOfferPriceWithMinimum, one at a time, AFTER the bulk
+ * ones and inside the same deadline / item cap — whatever does not fit is
+ * counted as `remaining` and is picked up by the next run, because its
+ * `last_pushed_price` has not moved. Same success / failure bookkeeping (and so
+ * the same MAX_PRICE_PUSH_ATTEMPTS back-off) as the bulk path.
+ */
+async function pushEbayPriceCandidatesWithMinimums(params: {
+  service: SupabaseClient;
+  candidates: EbayPricePushCandidate[];
+  connection: EbayConnectionDefaults;
+  spotData: SpotData;
+  maxItems?: number;
+  deadlineAt?: number;
+}): Promise<{ pushed: number; failed: number; remaining: number }> {
+  const minimumIds = await getOfferMinimumProductIds(params.service);
+  const fullCandidates = params.candidates.filter((candidate) => minimumIds.has(candidate.listing.product_id));
+  const bulkCandidates = params.candidates.filter((candidate) => !minimumIds.has(candidate.listing.product_id));
+
+  const bulk = await pushEbayPriceCandidates({
+    service: params.service,
+    candidates: bulkCandidates,
+    maxItems: params.maxItems,
+    deadlineAt: params.deadlineAt,
+  });
+  const bulkAttempted = bulkCandidates.length - bulk.remaining;
+  const room = Math.max(0, Math.min(
+    (params.maxItems ?? Number.POSITIVE_INFINITY) - bulkAttempted,
+    bulk.remaining > 0 ? 0 : fullCandidates.length,
+  ));
+  if (!room) return { pushed: bulk.pushed, failed: bulk.failed, remaining: bulk.remaining + fullCandidates.length };
+
+  const { data, error } = await params.service
+    .from('products')
+    .select('*')
+    .in('id', fullCandidates.slice(0, room).map((candidate) => candidate.listing.product_id));
+  if (error) throw new Error(error.message);
+  const products = new Map(((data ?? []) as Product[]).map((product) => [product.id, product]));
+  const { accessToken } = await ensureFreshAccessToken(params.service);
+  const tierPolicyMap = await loadTierPolicyMap(params.service);
+
+  const succeeded: EbayPricePushCandidate[] = [];
+  const failures: EbayPricePushFailure[] = [];
+  let attempted = 0;
+  for (const candidate of fullCandidates.slice(0, room)) {
+    if (params.deadlineAt != null && (bulkAttempted > 0 || attempted > 0) && Date.now() > params.deadlineAt) break;
+    attempted += 1;
+    const product = products.get(candidate.listing.product_id);
+    try {
+      if (!product) throw new Error('Product not found.');
+      const price = await updateOfferPriceWithMinimum({
+        accessToken,
+        offerId: candidate.listing.ebay_offer_id!,
+        product,
+        connection: params.connection,
+        spotData: params.spotData,
+        tierPolicyMap,
+      });
+      succeeded.push({ ...candidate, price });
+    } catch (err) {
+      failures.push({ candidate, err });
+    }
+  }
+  await recordEbayPricePushSuccesses(params.service, succeeded);
+  await recordEbayPricePushFailures(params.service, failures);
+  return {
+    pushed: bulk.pushed + succeeded.length,
+    failed: bulk.failed + failures.length,
+    remaining: bulk.remaining + (fullCandidates.length - attempted),
+  };
+}
+
+/**
  * Wall-clock ceiling for the WHOLE scheduled request, stamped on entry.
  *
  * 20s, not the old 22s, and measured from a different place. The old value was
@@ -1976,9 +2236,11 @@ export async function runScheduledPricePush(): Promise<EbayPricePushResult> {
       connection.price_markup_pct,
       connectionRow.price_push_threshold_pct,
     );
-    const processed = await pushEbayPriceCandidates({
+    const processed = await pushEbayPriceCandidatesWithMinimums({
       service,
       candidates: plan.candidates,
+      connection,
+      spotData,
       deadlineAt,
     });
     const result: EbayPricePushResult = {
@@ -2019,9 +2281,11 @@ export async function pushPricesBatch(): Promise<EbayPricePushResult> {
   const listings = (listingResult.data ?? []) as EbayListingRow[];
   const products = await loadPriceProducts(service, listings.map((listing) => listing.product_id));
   const plan = planEbayPricePush(listings, products, spotData, connection.price_markup_pct, null);
-  const processed = await pushEbayPriceCandidates({
+  const processed = await pushEbayPriceCandidatesWithMinimums({
     service,
     candidates: plan.candidates,
+    connection,
+    spotData,
     maxItems: 25,
   });
   return {
