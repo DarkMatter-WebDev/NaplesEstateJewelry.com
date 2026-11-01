@@ -103,6 +103,8 @@ const PRODUCT_DETAIL_COLUMNS = [
   'special_price_override_amount',
   'special_price_override_mode',
   'special_price_override_percent',
+  'special_price_override_discount_percent',
+  'special_price_override_discount_amount',
   'sold_price',
   'quantity',
   'accepts_offers',
@@ -119,6 +121,8 @@ const OPTIONAL_PRODUCT_DETAIL_COLUMNS = [
   'special_price_override_amount',
   'special_price_override_mode',
   'special_price_override_percent',
+  'special_price_override_discount_percent',
+  'special_price_override_discount_amount',
   'quantity',
   'sold_price',
   'width_mm',
@@ -135,16 +139,49 @@ function isMissingOptionalColumnError(error: { message?: string | null } | null 
   return OPTIONAL_PRODUCT_DETAIL_COLUMNS.some((column) => message.includes(column));
 }
 
+// The two "off the asking price" columns (product-trade-in-off-asking-2026-10.sql)
+// degrade on their own: before that SQL runs, the page drops ONLY them, never the
+// whole optional set — which would also hide Make an Offer and every other
+// trade-in override until the SQL ran (measured 2026-10-31: 68 offer items, 10
+// overrides).
+const TRADE_IN_OFF_ASKING_COLUMNS = ['special_price_override_discount_percent', 'special_price_override_discount_amount'];
+const PRODUCT_DETAIL_COLUMNS_WITHOUT_OFF_ASKING = PRODUCT_DETAIL_COLUMNS
+  .split(', ')
+  .filter((column) => !TRADE_IN_OFF_ASKING_COLUMNS.includes(column))
+  .join(', ');
+
+function isMissingOffAskingColumnError(error: { message?: string | null } | null | undefined) {
+  return Boolean(error?.message?.toLowerCase().includes('special_price_override_discount'));
+}
+
 // Wrapped in React.cache so generateMetadata() and the page component share a
 // single DB query per request instead of each firing their own (this route calls
 // it in both places to resolve the product + the 404 decision).
 const fetchPublicProduct = cache(async (id: string) => {
   const supabase = createPublicClient();
-  const result = await supabase
+  let result = await supabase
     .from('products')
     .select(PRODUCT_DETAIL_COLUMNS)
     .eq('id', id)
     .single();
+
+  if (isMissingOffAskingColumnError(result.error)) {
+    const withoutOffAsking = await supabase
+      .from('products')
+      .select(PRODUCT_DETAIL_COLUMNS_WITHOUT_OFF_ASKING)
+      .eq('id', id)
+      .single();
+    result = {
+      ...withoutOffAsking,
+      data: withoutOffAsking.data
+        ? ({
+            ...(withoutOffAsking.data as unknown as Record<string, unknown>),
+            special_price_override_discount_percent: null,
+            special_price_override_discount_amount: null,
+          } as unknown as typeof result.data)
+        : null,
+    } as typeof result;
+  }
 
   if (isMissingOptionalColumnError(result.error)) {
     const fallback = await supabase
@@ -163,6 +200,8 @@ const fetchPublicProduct = cache(async (id: string) => {
             special_price_override_amount: null,
             special_price_override_mode: 'amount',
             special_price_override_percent: null,
+            special_price_override_discount_percent: null,
+            special_price_override_discount_amount: null,
             sold_price: null,
             quantity: 1,
             width_mm: null,
@@ -386,7 +425,8 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
   // melt value computed off the full item weight would overstate scrap value.
   const showSpotPrice = shouldShowSpotPrice(p);
   // The "Own gold or silver?" trade-in line resolves in precedence order: a
-  // per-item override wins; else the SITE-WIDE default (a % over/under melt, or
+  // per-item override wins (a $ price, % over melt, or % / $ off the asking
+  // price); else the SITE-WIDE default (a % over/under melt, or
   // a % off the asking price — set once in Admin → Settings → Customer Trade-in
   // Price) applies to every item; else it falls back to the plain computed melt
   // value. The scrap-value box above stays tied to the real computed value

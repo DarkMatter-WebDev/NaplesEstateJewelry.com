@@ -99,9 +99,13 @@ export interface Product {
   // How an enabled override expresses the trade-in price. 'amount' (default)
   // uses the flat dollar figure above; 'percent' uses a markup over the item's
   // computed spot/melt value (meltValue * (1 + percent/100)), so it auto-tracks
-  // the live spot price instead of being a fixed number.
-  special_price_override_mode: 'amount' | 'percent' | null;
+  // the live spot price instead of being a fixed number. 'asking_percent' and
+  // 'asking_amount' (2026-10-31) take a % or a $ amount OFF the asking price,
+  // each from its own column below.
+  special_price_override_mode: SpecialPriceOverrideMode | null;
   special_price_override_percent: number | null;
+  special_price_override_discount_percent: number | null;
+  special_price_override_discount_amount: number | null;
   // Units currently in stock for this listing. Most items are one-of-a-kind
   // (default 1); a positive count above 1 means several identical units are
   // listed together. Missing/null (e.g. a pre-migration row) normalizes to 1
@@ -288,21 +292,40 @@ export function getSpecialPriceOverrideAmount(
   return typeof amount === 'number' && Number.isFinite(amount) && amount > 0 ? amount : null;
 }
 
-// Missing/null mode (pre-migration row, or a call site that hasn't been updated
-// to pass it) normalizes to 'amount' — the flat-dollar behavior that existed
-// before the percent option — so this is purely additive.
+/** How a per-item trade-in override is expressed (the item form's "Override Type"). */
+export type SpecialPriceOverrideMode = 'amount' | 'percent' | 'asking_percent' | 'asking_amount';
+
+export const SPECIAL_PRICE_OVERRIDE_MODES: readonly SpecialPriceOverrideMode[] = [
+  'amount',
+  'percent',
+  'asking_percent',
+  'asking_amount',
+];
+
+// Missing/null/unknown mode (pre-migration row, or a call site that hasn't been
+// updated to pass it) normalizes to 'amount' — the flat-dollar behavior that
+// existed before the other options — so each addition is purely additive.
 export function normalizeSpecialPriceOverrideMode(
   value: string | null | undefined,
-): 'amount' | 'percent' {
-  return value === 'percent' ? 'percent' : 'amount';
+): SpecialPriceOverrideMode {
+  return (SPECIAL_PRICE_OVERRIDE_MODES as readonly string[]).includes(value ?? '')
+    ? (value as SpecialPriceOverrideMode)
+    : 'amount';
 }
 
+const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+
 // Resolves the actual trade-in price to advertise on the product page, given
-// the item's computed melt/spot value (pass null when it can't be computed).
-// Returns null when the override is off or its inputs are invalid, in which
-// case the caller falls back to the plain computed scrap value.
-//   'amount'  → the flat dollar figure (must be > 0)
-//   'percent' → meltValue * (1 + percent/100), requires a computable meltValue
+// the item's computed melt/spot value and its asking price (pass null for
+// either when it can't be computed). Returns null when the override is off or
+// its inputs are invalid, in which case the caller falls back (site-wide
+// default, then the plain computed scrap value).
+//   'amount'         → the flat dollar figure (must be > 0)
+//   'percent'        → meltValue * (1 + percent/100), requires a computable meltValue
+//   'asking_percent' → askingPrice * (1 - discountPercent/100), 0–100 (owner 2026-10-31)
+//   'asking_amount'  → askingPrice - discountAmount, must leave more than $0 (owner 2026-10-31)
+// The asking modes need a numeric asking price (> 0); "Contact for price" items
+// fall back. No floor at melt — same rule as the site-wide % off asking.
 export function resolveSpecialTradeInPrice(
   product: Pick<
     Product,
@@ -310,15 +333,31 @@ export function resolveSpecialTradeInPrice(
     | 'special_price_override_amount'
     | 'special_price_override_mode'
     | 'special_price_override_percent'
-  >,
+  > &
+    Partial<Pick<Product, 'special_price_override_discount_percent' | 'special_price_override_discount_amount'>>,
   meltValue: number | null,
+  askingPrice: number | null = null,
 ): number | null {
   if (!product.special_price_override_enabled) return null;
-  if (normalizeSpecialPriceOverrideMode(product.special_price_override_mode) === 'percent') {
+  const mode = normalizeSpecialPriceOverrideMode(product.special_price_override_mode);
+  if (mode === 'percent') {
     const percent = product.special_price_override_percent;
     if (meltValue == null || !Number.isFinite(meltValue)) return null;
-    if (typeof percent !== 'number' || !Number.isFinite(percent) || percent < 0) return null;
+    if (!isFiniteNumber(percent) || percent < 0) return null;
     return meltValue * (1 + percent / 100);
+  }
+  if (mode === 'asking_percent' || mode === 'asking_amount') {
+    if (!isFiniteNumber(askingPrice) || askingPrice <= 0) return null;
+    if (mode === 'asking_percent') {
+      const discount = product.special_price_override_discount_percent;
+      if (!isFiniteNumber(discount) || discount < 0 || discount > 100) return null;
+      const price = askingPrice * (1 - discount / 100);
+      return price > 0 ? price : null;
+    }
+    const off = product.special_price_override_discount_amount;
+    if (!isFiniteNumber(off) || off <= 0) return null;
+    const price = askingPrice - off;
+    return price > 0 ? price : null;
   }
   return getSpecialPriceOverrideAmount(product);
 }
@@ -337,7 +376,8 @@ export interface SiteTradeInDefault {
 
 // The actual trade-in price to advertise on a product page, resolving the full
 // precedence in one place:
-//   1. the per-item override (resolveSpecialTradeInPrice) — always wins;
+//   1. the per-item override (resolveSpecialTradeInPrice) — always wins, incl.
+//      its own % or $ off the asking price;
 //   2. else the SITE-WIDE default when enabled:
 //        basis 'melt'   → meltValue * (1 + percent/100) (percent may be negative)
 //        basis 'asking' → askingPrice * (1 - discountPercent/100) (0–100)
@@ -352,12 +392,13 @@ export function resolveAdvertisedTradeInPrice(
     | 'special_price_override_amount'
     | 'special_price_override_mode'
     | 'special_price_override_percent'
-  >,
+  > &
+    Partial<Pick<Product, 'special_price_override_discount_percent' | 'special_price_override_discount_amount'>>,
   meltValue: number | null,
   siteDefault: SiteTradeInDefault | null | undefined,
   askingPrice: number | null = null,
 ): number | null {
-  const perItem = resolveSpecialTradeInPrice(product, meltValue);
+  const perItem = resolveSpecialTradeInPrice(product, meltValue, askingPrice);
   if (perItem != null) return perItem;
   if (!siteDefault?.enabled || meltValue == null || !Number.isFinite(meltValue)) return meltValue;
 

@@ -40,6 +40,7 @@ export const DEEPFIELD_PRODUCT_FIELDS = [
   'sold_price', 'melt_value', 'asking_price', 'show_spot_price',
   'special_price_override_enabled', 'special_price_override_amount',
   'special_price_override_mode', 'special_price_override_percent',
+  'special_price_override_discount_percent', 'special_price_override_discount_amount',
   'status', 'location', 'quantity', 'featured',
   'images', 'image_urls', 'image_padding', 'image_padding_by_image',
   'created_at', 'updated_at',

@@ -1,6 +1,21 @@
 
 # Changelog
 
+## 2026-10-31 (20) — Item trade-in price can be a % or a $ amount OFF THE ASKING PRICE — BUILT + STAGED, not pushed; ⛔ SQL `supabase/product-trade-in-off-asking-2026-10.sql` BEFORE the push; no env vars
+
+- **Owner:** *"add that option to calculate it as a percent off the asking price to the individual item … also allow … a set amount off the asking price"*; plan repeated back, owner: **"Yes, build it"**.
+- **Before:** the item form's "Override customer special pricing" → "Override Type" had *Fixed amount ($)* and *Percentage over spot*.
+- **Now:** + **Percent off asking price** (`'asking_percent'`, 0–100, new column `special_price_override_discount_percent`) and **Dollar amount off asking price** (`'asking_amount'`, > 0, new column `special_price_override_discount_amount`). Same editor for add and edit. A live preview under the box: "Trade-in line shows $850 (asking price $1,000)."; an item with no numeric price says it falls back. Asking price = `getProductPriceValue` (shown + charged price). Math in `resolveSpecialTradeInPrice(product, melt, askingPrice)` (`types/product.ts`); `resolveAdvertisedTradeInPrice` now passes the asking price through. Save refuses a % outside 0–100, an empty amount, and an amount ≥ the asking price; a result ≤ $0 never displays (falls back). No floor at melt. Only the chosen number is saved (existing per-item rule — the form keeps each while you switch). Advertising only, as before. Site-wide panel unchanged.
+- **Deploy-order safety (found while checking):** before the SQL, the product page's and the item save's "missing column" fallback dropped EVERY optional column — measured on dev against live data: the Tiffany bracelet's line read $5,238 instead of live's $4,271, and 68 offer items / 10 overrides would have lost Make an Offer / their override until the SQL ran. Now both drop ONLY the two new columns; an off-asking save before the SQL stops with "Run supabase/product-trade-in-off-asking-2026-10.sql …" inside the editor (not `flash()`, which paints behind it). Re-checked on dev: $4,271, same as live.
+- **Also:** `supabase/products.sql` (canonical schema) carries the two columns + the four-choice rule; `lib/deepfield/payload.ts` allow-list carries the two columns beside the other override fields; five test fixtures updated.
+- **Not checked:** the item form itself in a browser (admin sign-in). Product page on dev: 200, line correct.
+- **Tests:** `types/__tests__/product.test.ts` + 7 (both modes, beats site-wide, no melt floor, ≤ $0 / out-of-range / missing → fallback, Contact-for-price, checkbox off, old modes unchanged + unknown → amount); new `lib/__tests__/trade-in-off-asking.test.ts` (4: SQL, product page columns + narrow fallback, form options + save + SQL notice ×2, narrow retry ×2). Gate: `npx tsc --noEmit` 0 · `npm run lint` 0 errors (4 old warnings) · `npx vitest run` **2190/2190** · `npm run build` 0.
+- **To reverse:** set any item using an off-asking choice back to another choice, remove the two `<option>`s; the columns can stay.
+
+## 2026-10-31 (19) — Insights "Clear" LIVE: owner ran the SQL, pushed, deployed and cleared a code; grant confirmed
+
+- Owner: *"ran sql, pushed and deployed, code cleared successfully"*. Read-only re-check with the server key: no-op `delete … where id = -1` → **ok, 0 rows** (was 42501 before the SQL); rows by code now `card: 1` only — the magnet's test scan was the one cleared, the card's was left alone, as designed.
+
 ## 2026-10-31 (18) — Admin → Insights: a "Clear" button per code — BUILT + STAGED, not pushed; ⛔ re-run `supabase/qr-scans-2026-10.sql` (adds the DELETE grant); no env vars
 
 - **Owner:** *"add a button to individually clear each page's visit counter in insights"*.

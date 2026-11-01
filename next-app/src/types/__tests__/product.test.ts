@@ -10,7 +10,9 @@ import {
   parseLengthInches,
   normalizeProductStatus,
   productWidthDisplay,
+  normalizeSpecialPriceOverrideMode,
   resolveAdvertisedTradeInPrice,
+  resolveSpecialTradeInPrice,
 } from '../product';
 
 type OverrideFields = Parameters<typeof resolveAdvertisedTradeInPrice>[0];
@@ -102,6 +104,68 @@ describe('resolveAdvertisedTradeInPrice', () => {
         resolveAdvertisedTradeInPrice(noOverride, 1000, { enabled: true, basis: 'melt', percent: 10, discountPercent: 20 }, 2000),
       ).toBe(1100);
       expect(resolveAdvertisedTradeInPrice(noOverride, 1000, { enabled: true, percent: 10, discountPercent: 20 }, 2000)).toBe(1100);
+    });
+  });
+
+  // Owner 2026-10-31: the item's own "Override Type" can also be a % or a $
+  // amount OFF the asking price (the price the shop shows and checkout charges).
+  describe('per-item override off the asking price', () => {
+    const siteMelt = { enabled: true, percent: 10 } as const;
+    const offAsking = (
+      mode: 'asking_percent' | 'asking_amount',
+      value: number | null,
+    ): OverrideFields => ({
+      special_price_override_enabled: true,
+      special_price_override_mode: mode,
+      special_price_override_amount: 777, // a stale number from another choice must never leak in
+      special_price_override_percent: 25,
+      special_price_override_discount_percent: mode === 'asking_percent' ? value : null,
+      special_price_override_discount_amount: mode === 'asking_amount' ? value : null,
+    });
+
+    it('percent off: $1,000 asking − 20% = $800, and it beats the site-wide default', () => {
+      expect(resolveAdvertisedTradeInPrice(offAsking('asking_percent', 20), 500, siteMelt, 1000)).toBe(800);
+      expect(resolveAdvertisedTradeInPrice(offAsking('asking_percent', 0), 500, siteMelt, 1000)).toBe(1000);
+      expect(resolveAdvertisedTradeInPrice(offAsking('asking_percent', 12.5), 500, null, 1247)).toBeCloseTo(1091.125);
+    });
+
+    it('dollar amount off: $1,000 asking − $150 = $850', () => {
+      expect(resolveAdvertisedTradeInPrice(offAsking('asking_amount', 150), 500, siteMelt, 1000)).toBe(850);
+    });
+
+    it('has no floor at melt value', () => {
+      expect(resolveAdvertisedTradeInPrice(offAsking('asking_percent', 60), 500, null, 1000)).toBe(400);
+      expect(resolveAdvertisedTradeInPrice(offAsking('asking_amount', 700), 500, null, 1000)).toBe(300);
+    });
+
+    it('never advertises $0 or less, or an out-of-range / missing number: falls back to the site-wide default', () => {
+      expect(resolveAdvertisedTradeInPrice(offAsking('asking_amount', 1000), 500, siteMelt, 1000)).toBe(550);
+      expect(resolveAdvertisedTradeInPrice(offAsking('asking_amount', 1500), 500, siteMelt, 1000)).toBe(550);
+      expect(resolveAdvertisedTradeInPrice(offAsking('asking_percent', 100), 500, siteMelt, 1000)).toBe(550);
+      expect(resolveAdvertisedTradeInPrice(offAsking('asking_percent', 101), 500, siteMelt, 1000)).toBe(550);
+      expect(resolveAdvertisedTradeInPrice(offAsking('asking_percent', -5), 500, siteMelt, 1000)).toBe(550);
+      expect(resolveAdvertisedTradeInPrice(offAsking('asking_amount', 0), 500, siteMelt, 1000)).toBe(550);
+      expect(resolveAdvertisedTradeInPrice(offAsking('asking_amount', null), 500, null, 1000)).toBe(500);
+    });
+
+    it('"Contact for price" (no numeric asking price) falls back to the site-wide default, then melt', () => {
+      expect(resolveAdvertisedTradeInPrice(offAsking('asking_percent', 20), 500, siteMelt, null)).toBe(550);
+      expect(resolveAdvertisedTradeInPrice(offAsking('asking_amount', 150), 500, null, 0)).toBe(500);
+    });
+
+    it('is off while the override checkbox is off', () => {
+      expect(
+        resolveAdvertisedTradeInPrice({ ...offAsking('asking_percent', 20), special_price_override_enabled: false }, 500, null, 1000),
+      ).toBe(500);
+    });
+
+    it('the two older choices are unchanged, and an unknown mode reads as a flat amount', () => {
+      expect(resolveSpecialTradeInPrice({ ...offAsking('asking_percent', 20), special_price_override_mode: 'amount' }, 500, 1000)).toBe(777);
+      expect(resolveSpecialTradeInPrice({ ...offAsking('asking_percent', 20), special_price_override_mode: 'percent' }, 500, 1000)).toBe(625);
+      expect(normalizeSpecialPriceOverrideMode('asking_percent')).toBe('asking_percent');
+      expect(normalizeSpecialPriceOverrideMode('asking_amount')).toBe('asking_amount');
+      expect(normalizeSpecialPriceOverrideMode('something')).toBe('amount');
+      expect(normalizeSpecialPriceOverrideMode(null)).toBe('amount');
     });
   });
 });

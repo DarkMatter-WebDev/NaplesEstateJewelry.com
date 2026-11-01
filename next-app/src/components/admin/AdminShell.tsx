@@ -29,6 +29,8 @@ import {
   normalizeProductMetalVariant,
   normalizeProductQuantity,
   normalizeSpecialPriceOverrideMode,
+  resolveSpecialTradeInPrice,
+  type SpecialPriceOverrideMode,
   normalizeProductTypeValue,
   productJewelryTypeLabel,
   hasAnyProductImagePadding,
@@ -180,6 +182,8 @@ const OPTIONAL_PRODUCT_COLUMNS = [
   'special_price_override_amount',
   'special_price_override_mode',
   'special_price_override_percent',
+  'special_price_override_discount_percent',
+  'special_price_override_discount_amount',
   'sold_price',
   'quantity',
   'width_mm',
@@ -204,6 +208,36 @@ function isMissingAcceptsOffersColumnError(error: { message?: string | null } | 
 function isMissingWidthColumnError(error: { message?: string | null } | null | undefined) {
   return Boolean(error?.message?.toLowerCase().includes('width_mm'));
 }
+
+// Before supabase/product-trade-in-off-asking-2026-10.sql runs, an "off the
+// asking price" override fails on its new column OR on the old two-choice mode
+// rule. Either way it must say so — the generic retry would save the item
+// WITHOUT its override and look like it worked.
+function isMissingTradeInOffAskingError(error: { message?: string | null } | null | undefined) {
+  const message = error?.message?.toLowerCase() ?? '';
+  return message.includes('special_price_override_discount') || message.includes('special_price_override_mode_check');
+}
+
+function usesTradeInOffAsking(payload: { special_price_override_mode?: string | null }) {
+  return payload.special_price_override_mode === 'asking_percent' || payload.special_price_override_mode === 'asking_amount';
+}
+
+// Every other save before that SQL: drop ONLY the two new columns. The generic
+// retry drops every optional column, which would silently lose this save's
+// quantity, offers and trade-in changes.
+function isMissingOffAskingColumnError(error: { message?: string | null } | null | undefined) {
+  return Boolean(error?.message?.toLowerCase().includes('special_price_override_discount'));
+}
+
+function withoutOffAskingColumns<T extends Record<string, unknown>>(payload: T): T {
+  const rest: Record<string, unknown> = { ...payload };
+  delete rest.special_price_override_discount_percent;
+  delete rest.special_price_override_discount_amount;
+  return rest as T;
+}
+
+const TRADE_IN_OFF_ASKING_SQL_NOTICE =
+  'Run supabase/product-trade-in-off-asking-2026-10.sql in Supabase before using a trade-in price off the asking price.';
 
 function withoutWidthColumn<T extends Record<string, unknown>>(payload: T): T {
   const rest: Record<string, unknown> = { ...payload };
@@ -764,6 +798,8 @@ function emptyProduct(): Omit<Product, 'created_at' | 'updated_at'> {
     special_price_override_amount: null,
     special_price_override_mode: 'amount',
     special_price_override_percent: null,
+    special_price_override_discount_percent: null,
+    special_price_override_discount_amount: null,
     quantity: 1,
     status: 'available',
     location: 'showcase',
@@ -1900,9 +1936,26 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       errs.push('Width must be between 0.01 and 1000 millimeters.');
     }
     if (e.special_price_override_enabled) {
-      if (normalizeSpecialPriceOverrideMode(e.special_price_override_mode) === 'percent') {
+      const overrideMode = normalizeSpecialPriceOverrideMode(e.special_price_override_mode);
+      if (overrideMode === 'percent') {
         if (!(typeof e.special_price_override_percent === 'number' && e.special_price_override_percent >= 0)) {
           errs.push('Enter a percentage over spot for the customer special pricing override, or uncheck it.');
+        }
+      } else if (overrideMode === 'asking_percent') {
+        const discount = e.special_price_override_discount_percent;
+        if (!(typeof discount === 'number' && Number.isFinite(discount) && discount >= 0 && discount <= 100)) {
+          errs.push('Enter a percent off the asking price from 0 to 100 for the customer special pricing override, or uncheck it.');
+        }
+      } else if (overrideMode === 'asking_amount') {
+        const off = e.special_price_override_discount_amount;
+        if (!(typeof off === 'number' && Number.isFinite(off) && off > 0)) {
+          errs.push('Enter a dollar amount off the asking price for the customer special pricing override, or uncheck it.');
+        } else {
+          // Refuse an amount that leaves $0 or less (owner's plan, 2026-10-31).
+          const asking = getProductPriceValue(e as Product, spotData);
+          if (asking != null && asking > 0 && off >= asking) {
+            errs.push(`The amount off ($${off.toFixed(2)}) must be less than the asking price (${formatUsdPrice(asking)}).`);
+          }
         }
       } else if (!(e.special_price_override_amount && e.special_price_override_amount > 0)) {
         errs.push('Enter a custom amount for the customer special pricing override, or uncheck it.');
@@ -3403,6 +3456,16 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
         normalizeSpecialPriceOverrideMode(editing.special_price_override_mode) === 'percent'
           ? editing.special_price_override_percent ?? null
           : null,
+      special_price_override_discount_percent:
+        editing.special_price_override_enabled &&
+        normalizeSpecialPriceOverrideMode(editing.special_price_override_mode) === 'asking_percent'
+          ? editing.special_price_override_discount_percent ?? null
+          : null,
+      special_price_override_discount_amount:
+        editing.special_price_override_enabled &&
+        normalizeSpecialPriceOverrideMode(editing.special_price_override_mode) === 'asking_amount'
+          ? editing.special_price_override_discount_amount ?? null
+          : null,
       status: resolvedStatus,
       location: editing.location || 'showcase',
       item_year: normalizeProductItemYear(editing.item_year),
@@ -3438,6 +3501,12 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       // full row reloads via the service role on the next page load). (CODE-D04)
       let { error } = await supabase.from('products').insert(payload);
       if (isMissingOptionalColumnError(error)) {
+        if (isMissingTradeInOffAskingError(error) && usesTradeInOffAsking(payload)) {
+          // Inside the editor: flash() paints behind the open editor.
+          setFormErrors([TRADE_IN_OFF_ASKING_SQL_NOTICE]);
+          setSaving(false);
+          return;
+        }
         if (isMissingAcceptsOffersColumnError(error) && payload.accepts_offers === true) {
           flash('Run supabase/make-offer-2026-10.sql in Supabase before turning on offers.', false);
           setSaving(false);
@@ -3448,9 +3517,11 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
           setSaving(false);
           return;
         }
-        const retryPayload = isMissingWidthColumnError(error)
-          ? withoutWidthColumn(payload)
-          : withoutOptionalColumns(payload);
+        const retryPayload = isMissingOffAskingColumnError(error)
+          ? withoutOffAskingColumns(payload)
+          : isMissingWidthColumnError(error)
+            ? withoutWidthColumn(payload)
+            : withoutOptionalColumns(payload);
         const retry = await supabase.from('products').insert(retryPayload);
         error = retry.error;
       }
@@ -3467,6 +3538,12 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       if (productChanged) {
         let { error } = await supabase.from('products').update(payload).eq('id', originalProductId);
         if (isMissingOptionalColumnError(error)) {
+          if (isMissingTradeInOffAskingError(error) && usesTradeInOffAsking(payload)) {
+            // Inside the editor: flash() paints behind the open editor.
+            setFormErrors([TRADE_IN_OFF_ASKING_SQL_NOTICE]);
+            setSaving(false);
+            return;
+          }
           if (isMissingAcceptsOffersColumnError(error) && payload.accepts_offers === true) {
             flash('Run supabase/make-offer-2026-10.sql in Supabase before turning on offers.', false);
             setSaving(false);
@@ -3477,9 +3554,11 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
             setSaving(false);
             return;
           }
-          const retryPayload = isMissingWidthColumnError(error)
-            ? withoutWidthColumn(payload)
-            : withoutOptionalColumns(payload);
+          const retryPayload = isMissingOffAskingColumnError(error)
+            ? withoutOffAskingColumns(payload)
+            : isMissingWidthColumnError(error)
+              ? withoutWidthColumn(payload)
+              : withoutOptionalColumns(payload);
           const retry = await supabase.from('products').update(retryPayload).eq('id', originalProductId);
           error = retry.error;
         }
@@ -6072,9 +6151,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 </label>
                 <p className="mt-1 text-xs normal-case" style={{ color: 'var(--color-on-surface-variant)' }}>
                   The &quot;Own gold or silver? Put it toward this piece…&quot; line on the product page defaults to
-                  the computed scrap value above. Check this to show a custom price on that line instead — either a
-                  flat amount or a percentage over the item&apos;s spot/melt value (the scrap-value box itself is
-                  unaffected).
+                  the computed scrap value above. Check this to show a custom price on that line instead — a flat
+                  amount, a percentage over the item&apos;s spot/melt value, or a percentage or dollar amount off the
+                  asking price (the scrap-value box itself is unaffected).
                 </p>
                 {editing.special_price_override_enabled && (() => {
                   const overrideMode = normalizeSpecialPriceOverrideMode(editing.special_price_override_mode);
@@ -6088,23 +6167,97 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     percentValue >= 0
                       ? meltPreview * (1 + percentValue / 100)
                       : null;
+                  // Off the asking price (owner 2026-10-31): the price the shop
+                  // shows and checkout charges, so the preview reads the draft's
+                  // own price the same way the product page will.
+                  const askingPreview = getProductPriceValue(editing as Product, spotData);
+                  const offAskingPreview =
+                    overrideMode === 'asking_percent' || overrideMode === 'asking_amount'
+                      ? resolveSpecialTradeInPrice({ ...editing, special_price_override_enabled: true }, meltPreview, askingPreview)
+                      : null;
+                  const offAskingHint =
+                    askingPreview == null || askingPreview <= 0
+                      ? 'This item has no number for its price (e.g. “Contact for price”), so the line falls back to the site-wide setting, then the melt value.'
+                      : offAskingPreview != null
+                        ? `Trade-in line shows ${formatUsdPrice(offAskingPreview)} (asking price ${formatUsdPrice(askingPreview)}).`
+                        : `Asking price is ${formatUsdPrice(askingPreview)}.`;
                   return (
                     <div className="mt-2 space-y-2">
-                      <div className="max-w-[260px]">
+                      <div className="max-w-[300px]">
                         <label className="form-label">Override Type</label>
                         <select
                           className="form-field w-full"
                           value={overrideMode}
                           onChange={(e) => setEditing({
                             ...editing,
-                            special_price_override_mode: e.target.value === 'percent' ? 'percent' : 'amount',
+                            special_price_override_mode: normalizeSpecialPriceOverrideMode(e.target.value) as SpecialPriceOverrideMode,
                           })}
                         >
                           <option value="amount">Fixed amount ($)</option>
                           <option value="percent">Percentage over spot</option>
+                          <option value="asking_percent">Percent off asking price</option>
+                          <option value="asking_amount">Dollar amount off asking price</option>
                         </select>
                       </div>
-                      {overrideMode === 'percent' ? (
+                      {overrideMode === 'asking_percent' ? (
+                        <div className="max-w-[300px]">
+                          <label className="form-label">Percent Off Asking Price</label>
+                          <div className="relative max-w-[200px]">
+                            <input
+                              type="number"
+                              step="0.5"
+                              min="0"
+                              max="100"
+                              className="form-field w-full pr-8"
+                              placeholder="e.g. 20"
+                              value={editing.special_price_override_discount_percent ?? ''}
+                              onChange={(e) => setEditing({
+                                ...editing,
+                                special_price_override_discount_percent: e.target.value ? Number(e.target.value) : null,
+                              })}
+                            />
+                            <span
+                              className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm"
+                              style={{ color: 'var(--color-on-surface-variant)' }}
+                            >
+                              %
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs normal-case" style={{ color: 'var(--color-on-surface-variant)' }}>
+                            {offAskingHint}
+                          </p>
+                        </div>
+                      ) : overrideMode === 'asking_amount' ? (
+                        <div className="max-w-[300px]">
+                          <label className="form-label">Dollar Amount Off Asking Price</label>
+                          <div className="relative max-w-[200px]">
+                            <span
+                              className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm"
+                              style={{ color: 'var(--color-on-surface-variant)' }}
+                            >
+                              $
+                            </span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              className="form-field w-full"
+                              // Inline, not `pl-7`: `.form-field`'s padding is
+                              // unlayered CSS and beats Tailwind utilities.
+                              style={{ paddingLeft: '1.75rem' }}
+                              placeholder="e.g. 150"
+                              value={editing.special_price_override_discount_amount ?? ''}
+                              onChange={(e) => setEditing({
+                                ...editing,
+                                special_price_override_discount_amount: e.target.value ? Number(e.target.value) : null,
+                              })}
+                            />
+                          </div>
+                          <p className="mt-1 text-xs normal-case" style={{ color: 'var(--color-on-surface-variant)' }}>
+                            {offAskingHint}
+                          </p>
+                        </div>
+                      ) : overrideMode === 'percent' ? (
                         <div className="max-w-[200px]">
                           <label className="form-label">Percent Over Spot</label>
                           <div className="relative">

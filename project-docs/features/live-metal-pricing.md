@@ -74,8 +74,19 @@ and the scrap-value box (which always shows the real melt value).
 `resolveAdvertisedTradeInPrice(product, meltValue, siteDefault, askingPrice)` in
 `types/product.ts` resolves it in strict precedence:
 
-1. **Per-item override** (`products.special_price_override_*` — a flat dollar
-   amount or a signed % over melt) — always wins.
+1. **Per-item override** (`products.special_price_override_*`) — always wins.
+   The item form's "Override Type" (`special_price_override_mode`):
+   - `'amount'` — a flat dollar price (`_amount`);
+   - `'percent'` — % over melt (`_percent`);
+   - `'asking_percent'` (2026-10-31) — `askingPrice * (1 - _discount_percent/100)`, 0–100;
+   - `'asking_amount'` (2026-10-31) — `askingPrice - _discount_amount`; the save
+     refuses an amount ≥ the asking price, and a result ≤ $0 never shows.
+   Only the chosen number is saved. The asking modes need a numeric asking
+   price; otherwise the line falls to the site-wide default, then melt. No floor
+   at melt. Migration `supabase/product-trade-in-off-asking-2026-10.sql`; before
+   it runs, the product page and the item save drop ONLY its two columns (an
+   off-asking save stops with "Run … first" inside the editor). Guard
+   `lib/__tests__/trade-in-off-asking.test.ts`.
 2. **Site-wide default** — `shop_settings.special_price_default_enabled` plus a
    **basis** (`special_price_default_basis`, added 2026-10-25). Set once in
    Admin → Settings → **Customer Trade-in Price** (`AdminSpecialPricePanel.tsx`,

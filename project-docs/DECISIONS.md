@@ -6,6 +6,12 @@
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
 > compaction. Last reconciled: **2026-10-29 (11)**.
 
+## An item's own trade-in price can also be a % or a $ amount OFF the asking price; the site-wide panel keeps its two choices (2026-10-31)
+
+- **Owner:** asked for both on the add/edit item form; approved the restated plan (*"Yes, build it"*), including: item form only (not site-wide), no floor at melt, refuse an amount ≥ the asking price, "Contact for price" items fall back (site-wide default, then melt).
+- **Rules:** `special_price_override_mode` `'asking_percent'` (0–100, `_discount_percent`) / `'asking_amount'` (> 0, `_discount_amount`); each has its own column so no number ever changes meaning. Asking price = `getProductPriceValue`. Per-item still beats site-wide. Advertising only — ⛔ never checkout, offers, marketplaces or feeds.
+- **Migration safety:** a new optional product column degrades ALONE — never through the generic "drop every optional column" retry, which silently hides Make an Offer, quantity and other overrides until the SQL runs (measured 10-31: 68 + 10 items). Record `CHANGELOG.md` 2026-10-31 (20).
+
 ## The entrance fade plays only on a page-to-page click inside the site — never on the first page of a visit, never on a language switch (2026-10-31)
 
 - **Why:** the first page is already painted from the server HTML before the fade's sweep runs (it waits for the window `load` event), so fading it meant blanking a page the visitor was reading — the owner's QR "load, flash, load again" on `/card` and `/magnet` (filmed on live `/card`: drawn at 0.75 s, blank at 1.15 s, back by 1.8 s). A page-to-page click is different: its new content is hidden before it paints, so the fade reads as an arrival.

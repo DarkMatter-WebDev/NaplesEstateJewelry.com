@@ -28,13 +28,17 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-10-31 (18) — Admin → Insights: "Clear" button per code — BUILT + STAGED, not pushed; ⛔ SQL re-run
+### 🟡 2026-10-31 (20) — Item trade-in price: "% off asking price" + "$ off asking price" — BUILT + STAGED, not pushed; ⛔ SQL first
 
-Record `CHANGELOG.md` 2026-10-31 (18).
+Record `CHANGELOG.md` 2026-10-31 (20).
 
-1. **Owner, ⛔ SQL:** re-run `supabase/qr-scans-2026-10.sql` in the Supabase SQL Editor (safe to re-run; the last check should list `DELETE, INSERT, SELECT` for service_role). Before or after the push — without it the button only shows "run supabase/qr-scans-2026-10.sql".
+1. **Owner, ⛔ SQL:** run `supabase/product-trade-in-off-asking-2026-10.sql` in the Supabase SQL Editor. Its three checks at the end: two column rows; a mode rule listing `amount, percent, asking_percent, asking_amount`; four grant rows (anon + authenticated × two columns).
 2. **Owner:** push + deploy.
-3. **Owner:** on Insights, press Clear on one code (e.g. your test card scan) → confirm → that code shows 0, the others keep their counts.
+3. **Owner:** open one item → tick "Override customer special pricing" → Override Type "Percent off asking price" → 20 → the preview shows asking − 20% → Save → its product page's "pay as little as" line matches (allow ~5 min). Then try "Dollar amount off asking price" on another.
+
+### ✅ 2026-10-31 (18)–(19) — Admin → Insights: "Clear" button per code — DEPLOYED, SQL run, owner-verified
+
+Record `CHANGELOG.md` 2026-10-31 (18)–(19). Owner ran the SQL, pushed, deployed and cleared the magnet test scan; the card's stayed. Nothing open.
 
 ### 🟢 2026-10-31 (16)–(17) — No entrance fade on the first page of a visit (QR "load, flash, load again") — DEPLOYED, live-checked on 46 pages
 

@@ -56,6 +56,8 @@ function makeProduct(overrides: Partial<Product> = {}): Product {
     special_price_override_amount: null,
     special_price_override_mode: 'amount',
     special_price_override_percent: null,
+    special_price_override_discount_percent: null,
+    special_price_override_discount_amount: null,
     quantity: 1,
     status: 'available',
     location: null,
