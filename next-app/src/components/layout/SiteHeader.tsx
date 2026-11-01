@@ -449,7 +449,7 @@ export default function SiteHeader() {
         {/* gap-[0.3125rem] below md: 5px, not 8px. On a phone the mark and the
             wordmark are competing for a row that is already full, and 3px of
             gap is 3px the wordmark does not have to give up. */}
-        <Link href={href('/')} onClick={handleHomeClick} className="flex items-center gap-[0.3125rem] md:gap-2 min-w-0 shrink overflow-hidden">
+        <Link href={href('/')} onClick={handleHomeClick} className="hover-dim flex items-center gap-[0.3125rem] md:gap-2 min-w-0 shrink overflow-hidden">
           {/* The mark is the octopus alone on transparency (owner, 2026-08-16),
               replacing the old navy circular emblem that carried its own
               "NAPLES ESTATE JEWELRY" text — which duplicated the wordmark
@@ -540,7 +540,7 @@ export default function SiteHeader() {
               on this body link. */}
           <Link
             href={altHref}
-            className="site-header-language hidden md:inline-block text-xs font-bold tracking-widest uppercase px-1.5 py-1 transition-colors"
+            className="site-header-language hover-chip hidden md:inline-block text-xs font-bold tracking-widest uppercase px-1.5 py-1 transition-colors"
             style={{ color: GOLD, fontFamily: 'var(--font-label)' }}
           >
             {locale === 'en' ? 'ES' : 'EN'}

@@ -126,7 +126,7 @@ export default async function CardLanding({ locale, holder }: CardLandingProps) 
 
   const prefix = isEs ? '/es' : '';
   const tileClass =
-    'flex items-center justify-center gap-2 rounded-xl border px-2 py-2.5 text-[0.7rem] font-semibold uppercase tracking-[0.08em] no-underline';
+    'lift-tile flex items-center justify-center gap-2 rounded-xl border px-2 py-2.5 text-[0.7rem] font-semibold uppercase tracking-[0.08em] no-underline';
   const tileStyle: CSSProperties = {
     background: 'var(--color-surface-container-lowest)',
     borderColor: 'var(--color-outline-variant)',
@@ -164,7 +164,7 @@ export default async function CardLanding({ locale, holder }: CardLandingProps) 
               hrefLang={lang}
               lang={lang}
               aria-current={current ? 'page' : undefined}
-              className="px-6 py-1.5 text-[0.7rem] font-bold uppercase tracking-[0.16em] no-underline"
+              className="hover-text px-6 py-1.5 text-[0.7rem] font-bold uppercase tracking-[0.16em] no-underline"
               style={{
                 fontFamily: 'var(--font-label)',
                 color: current ? 'var(--color-primary)' : 'var(--color-on-surface-variant)',
@@ -183,7 +183,7 @@ export default async function CardLanding({ locale, holder }: CardLandingProps) 
             Caslon uppercase so it reads as the same wordmark. */}
         <div className="flex flex-col items-center text-center">
           {/* The wordmark is a home link, as on every other page. */}
-          <Link href={prefix || '/'} prefetch={false} className="flex flex-col items-center no-underline" style={{ color: 'inherit' }}>
+          <Link href={prefix || '/'} prefetch={false} className="hover-dim flex flex-col items-center no-underline" style={{ color: 'inherit' }}>
           <h1
             className="text-[1.2rem] uppercase leading-none tracking-[0.08em]"
             style={{ color: 'var(--color-on-surface)', fontFamily: 'var(--font-headline)' }}
@@ -270,7 +270,7 @@ export default async function CardLanding({ locale, holder }: CardLandingProps) 
               pulled up 4px — measured in CHANGELOG.md 2026-09-24. */}
           <a
             href={mailHref}
-            className="mt-1 flex items-center justify-center gap-1.5 text-[0.78rem] font-semibold no-underline"
+            className="hover-link mt-1 flex items-center justify-center gap-1.5 text-[0.78rem] font-semibold no-underline"
             style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
           >
             <AppIcon name="mail" className="text-[0.85rem]" />

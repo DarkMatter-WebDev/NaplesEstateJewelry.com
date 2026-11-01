@@ -178,7 +178,7 @@ export default async function SpotPricesPage({ params }: Props) {
                 is stated. The phone hours ride along (Option C). */}
             <p className="mx-auto mt-6 max-w-2xl text-[15px] leading-relaxed text-[#d7d0c3]">
               {isEs ? '¿Tiene oro o plata para vender? ' : 'Have gold or silver to sell? '}
-              <a href="tel:2394048505" className="whitespace-nowrap font-bold text-[#e9c349]">
+              <a href="tel:2394048505" className="hover-link hover-link-on-dark whitespace-nowrap font-bold text-[#e9c349]">
                 {isEs ? 'Llame al (239) 404-8505' : 'Call (239) 404-8505'}
               </a>
               {isEs

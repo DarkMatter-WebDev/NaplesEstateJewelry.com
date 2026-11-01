@@ -62,7 +62,7 @@ export function SocialFollowTiles({
               target="_blank"
               rel="noopener noreferrer"
               aria-label={socialLinkLabel(profile.name, isEs)}
-              className={`flex items-center gap-2.5 rounded-full border py-2 pl-2.5 pr-4 text-[0.85rem] font-bold no-underline ${twoColumn ? '' : 'md:inline-flex'}`}
+              className={`lift-tile flex items-center gap-2.5 rounded-full border py-2 pl-2.5 pr-4 text-[0.85rem] font-bold no-underline ${twoColumn ? '' : 'md:inline-flex'}`}
               style={{
                 background: 'var(--color-surface-container-lowest)',
                 borderColor: 'var(--color-outline-variant)',
@@ -103,7 +103,7 @@ export function SocialFollowFooterRow({ isEs }: { isEs: boolean }) {
               rel="noopener noreferrer"
               aria-label={socialLinkLabel(profile.name, isEs)}
               title={profile.name}
-              className="block"
+              className="lift-icon block"
             >
               <Image src={profile.logo} alt="" width={40} height={40} unoptimized className="h-[34px] w-[34px] md:h-10 md:w-10" />
             </a>

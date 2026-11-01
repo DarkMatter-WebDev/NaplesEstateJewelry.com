@@ -85,7 +85,7 @@ export default function SiteFooter({ locale }: Props) {
             </p>
             <a
               href="tel:2394048505"
-              className="inline-flex min-h-8 items-center justify-center border px-3 text-xs font-bold md:mt-1 md:min-h-0 md:border-0 md:px-0 md:text-sm"
+              className="hover-link inline-flex min-h-8 items-center justify-center border px-3 text-xs font-bold md:mt-1 md:min-h-0 md:border-0 md:px-0 md:text-sm"
               style={{
                 borderColor: 'var(--color-outline-variant)',
                 color: 'var(--color-primary)',
@@ -103,7 +103,7 @@ export default function SiteFooter({ locale }: Props) {
             {' '}
             <a
               href="mailto:info@naplesestatejewelry.com"
-              className="text-xs md:text-sm md:mt-1"
+              className="hover-link text-xs md:text-sm md:mt-1"
               style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
             >
               info@naplesestatejewelry.com

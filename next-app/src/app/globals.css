@@ -3298,3 +3298,126 @@ html[data-nej-magnet] body:has(main[data-magnet-landing]) [data-cookie-notice] {
     }
   }
 }
+
+/* Hover lift for tiles and logo links (2026-11-01 — the social links in
+   components/SocialFollow.tsx and every tile on the business-card pages,
+   card/CardLanding.tsx). Owner rule: EVERY button reacts to hover. Tiles and logos lift
+   like .gold-button / .outline-button, with a deeper shadow and a gold border
+   on the tiles, and press in on click. Pointer-only (a tap would latch the
+   lift on a phone). The base background/border live in each element's inline
+   style, so the hover border and shadow carry !important to win over them —
+   only inside these hover/active rules. */
+.lift-tile,
+.lift-icon {
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s, filter 0.15s;
+}
+@media (hover: hover) {
+  .lift-tile:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--color-primary) 55%, transparent) !important;
+    box-shadow: 0 12px 24px rgba(38, 28, 6, 0.1) !important;
+  }
+  .lift-icon:hover {
+    transform: translateY(-3px);
+    filter: drop-shadow(0 6px 8px rgba(38, 28, 6, 0.18));
+  }
+}
+.lift-tile:active,
+.lift-icon:active {
+  transform: scale(0.96);
+  transition-duration: 0.05s;
+}
+.lift-tile:focus-visible,
+.lift-icon:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+/* Same reduced-motion treatment as the site's buttons: no movement, but the
+   gold border and shadow (tiles) / drop shadow (logos) still answer the hover. */
+@media (prefers-reduced-motion: reduce) {
+  .lift-tile,
+  .lift-icon {
+    transition: box-shadow 0.15s, border-color 0.15s, filter 0.15s;
+  }
+  .lift-tile:hover,
+  .lift-icon:hover,
+  .lift-tile:active,
+  .lift-icon:active {
+    transform: none;
+  }
+}
+
+/* Hover sweep (2026-11-01 — owner: "check the site" against the rule "EVERY
+   button reacts to hover"; DECISIONS.md top entry). A real-mouse audit of 38
+   public pages found these with no hover change at all. Shared classes, so a
+   new control picks one instead of inventing a one-off:
+     .hover-chip  small bordered buttons — gold border + light gold tint
+     .hover-link  text links / text buttons — gold underline appears/thickens
+     .hover-text  links with their own border-b or no underline — darker gold
+     .hover-dim   logo links — a slight fade
+   Colour-only (no movement), so no reduced-motion variant is needed. Pointer
+   devices only. !important only where inline styles set the colour/border. */
+.hover-chip,
+.hover-link,
+.hover-text,
+.hover-dim,
+.product-trust-link,
+.fe-reviews-link,
+.shop-year-reset,
+main details > summary,
+main a.underline {
+  transition: color 0.15s, background-color 0.15s, border-color 0.15s, opacity 0.15s, text-decoration-color 0.15s, text-decoration-thickness 0.15s;
+}
+@media (hover: hover) {
+  .hover-chip:hover {
+    border-color: var(--color-primary) !important;
+    background-color: color-mix(in srgb, var(--color-primary) 10%, transparent) !important;
+    color: var(--color-primary) !important;
+  }
+  .hover-link:hover {
+    text-decoration-line: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+    color: var(--hover-link-color, #5a4800) !important;
+  }
+  .hover-link-on-dark:hover {
+    --hover-link-color: #fff3c4;
+  }
+  .hover-text:hover {
+    color: #5a4800 !important;
+    border-color: var(--color-primary) !important;
+  }
+  .hover-dim:hover {
+    opacity: 0.78;
+  }
+  /* Underlined links inside body copy (Tailwind `underline`), sitewide:
+     the underline thickens — never a colour change, because some of these
+     sit on dark sections where a dark gold would be unreadable. */
+  main a.underline:hover {
+    text-decoration-thickness: 2px;
+  }
+  .product-trust-link:hover {
+    text-decoration-thickness: 2px;
+    color: #5a4800;
+  }
+  .fe-reviews-link:hover {
+    color: #fff3c4;
+    text-decoration-thickness: 2px;
+  }
+  .shop-year-reset:hover:not(:disabled) {
+    color: var(--color-primary);
+    text-decoration-thickness: 2px;
+  }
+  .shop-card-image-arrow:hover {
+    border-color: var(--color-primary) !important;
+    background-color: rgba(255, 255, 255, 0.96) !important;
+    color: var(--color-primary) !important;
+  }
+  /* FAQ accordion question rows, sitewide — an underline in the row's own
+     colour, readable on light and dark sections alike. */
+  main details > summary:hover {
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
+  }
+}

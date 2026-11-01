@@ -949,9 +949,9 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                         disabled site-wide for hydration safety, so tappable
                         numbers must be real anchors. */}
                     {isEs ? (
-                      <>¿Tienes oro o plata? Aplícalo a esta pieza y paga desde <strong style={{ color: '#735c00' }}>{tradeInValue}</strong> — llama al <a href="tel:2394048505" style={{ color: '#735c00', fontWeight: 700, whiteSpace: 'nowrap' }}>(239) 404-8505</a>. <Link href={isEs ? '/es/trade-in' : '/trade-in'} style={{ color: '#735c00', fontWeight: 700, textDecoration: 'underline', textUnderlineOffset: '2px' }}>Cómo funciona</Link></>
+                      <>¿Tienes oro o plata? Aplícalo a esta pieza y paga desde <strong style={{ color: '#735c00' }}>{tradeInValue}</strong> — llama al <a href="tel:2394048505" className="hover-link" style={{ color: '#735c00', fontWeight: 700, whiteSpace: 'nowrap' }}>(239) 404-8505</a>. <Link href={isEs ? '/es/trade-in' : '/trade-in'} className="hover-link" style={{ color: '#735c00', fontWeight: 700, textDecoration: 'underline', textUnderlineOffset: '2px' }}>Cómo funciona</Link></>
                     ) : (
-                      <>Own gold or silver? Put it toward this piece and pay as little as <strong style={{ color: '#735c00' }}>{tradeInValue}</strong> — call <a href="tel:2394048505" style={{ color: '#735c00', fontWeight: 700, whiteSpace: 'nowrap' }}>(239) 404-8505</a>. <Link href={isEs ? '/es/trade-in' : '/trade-in'} style={{ color: '#735c00', fontWeight: 700, textDecoration: 'underline', textUnderlineOffset: '2px' }}>How it works</Link></>
+                      <>Own gold or silver? Put it toward this piece and pay as little as <strong style={{ color: '#735c00' }}>{tradeInValue}</strong> — call <a href="tel:2394048505" className="hover-link" style={{ color: '#735c00', fontWeight: 700, whiteSpace: 'nowrap' }}>(239) 404-8505</a>. <Link href={isEs ? '/es/trade-in' : '/trade-in'} className="hover-link" style={{ color: '#735c00', fontWeight: 700, textDecoration: 'underline', textUnderlineOffset: '2px' }}>How it works</Link></>
                     )}
                   </p>
                 </div>

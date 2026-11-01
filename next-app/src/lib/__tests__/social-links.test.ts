@@ -93,6 +93,19 @@ describe('where they appear', () => {
     expect(card).not.toMatch(/InstagramGlyph|FacebookGlyph/);
   });
 
+  it('every social button reacts to hover (owner rule, 2026-11-01): lift + gold border/shadow, press-in, no motion under reduced motion', () => {
+    expect(component).toMatch(/className=\{`lift-tile /);
+    expect(component).toMatch(/className="lift-icon block"/);
+    const card = read('src', 'components', 'card', 'CardLanding.tsx');
+    expect(card).toMatch(/const tileClass =\s*'lift-tile /); // every card tile, not only the social ones
+    const css = read('src', 'app', 'globals.css');
+    const block = css.slice(css.indexOf('.lift-tile,'));
+    expect(block).toMatch(/@media \(hover: hover\) \{\s*\.lift-tile:hover \{\s*transform: translateY\(-2px\)/);
+    expect(block).toMatch(/\.lift-icon:hover \{\s*transform: translateY\(-3px\)/);
+    expect(block).toMatch(/\.lift-tile:active,\s*\.lift-icon:active \{\s*transform: scale\(0\.96\)/);
+    expect(block).toMatch(/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?transform: none;/);
+  });
+
   it('not on the call-first landing pages', () => {
     for (const page of [['free-evaluation', 'page.tsx'], ['sell', '[city]', 'page.tsx']]) {
       expect(read('src', 'app', '[locale]', ...page)).not.toMatch(/SocialFollow|SOCIAL_PROFILES/);

@@ -1,6 +1,36 @@
 
 # Changelog
 
+## 2026-11-01 (7) — Sell menu: "Sell Us Bullion" → "Sell Us Bullion & Coins" (ES "Lingotes" → "Lingotes y Monedas") — BUILT + STAGED, not pushed
+
+- **Owner:** *"change "sell us bullion" in the sell dropdown menu to sell us bullion & coins"*. `messages/en.json` / `es.json` → `nav.bullion` (one key feeds the desktop dropdown and the phone menu). ES matches the gold page's "Bullion & Coins" card ("Lingotes y Monedas").
+- Checked in dev at 1280 px with the dropdown open: one line in both languages, inside the menu (EN right edge 810 / menu 818), still `/bullion` / `/es/bullion`. Guard in `lib/__tests__/hover-feedback.test.ts`.
+
+## 2026-11-01 (6) — Sitewide hover sweep: every button the audit found with no hover change now reacts — BUILT + STAGED, not pushed; no SQL, no env vars
+
+- **Owner:** *"Yes, check the site"* (against the new rule "EVERY button reacts to hover").
+- **Method:** Playwright, real mouse, 1280 px, 38 public pages (sitemap + homepage, estate pages, a product, `/card`, checkout, legal pages; admin not included): one element per visual signature per page, computed style of the element + descendants + ::before/::after before vs after hover. **First run: 289 elements / 40 kinds with no change.** Ruled out as false alarms (checked one by one): nav dropdown items (react once the menu is open), the shop card's full-card link (the card reacts), the spot-price refresh hit area (its pill reacts), the active "Gallery view" and active "Home", disabled "Reset" / "Reset notice", links inside closed FAQ answers / accordions.
+- **Fix — four shared classes in `app/globals.css` (end, "Hover sweep"):** `.hover-chip` (gold border + light gold tint: copy-address buttons sitewide, the ES language chip, the diamond-guide grade chips), `.hover-link` (gold underline appears/thickens: footer phone + email, "Show every grade", the card page's email, the spot-prices "Call" link on the dark band via `.hover-link-on-dark`, the product page's trade-in phone + "How it works"), `.hover-text` (darker gold + gold border: About's "Read what clients say on Google", the card page's language tabs), `.hover-dim` (slight fade: the header logo, the card page's logo). Plus rules on existing classes: `.shop-card-image-arrow`, `.shop-year-reset`, `.fe-reviews-link`, `.product-trust-link`, and sitewide **`main a.underline`** (underline thickens — no colour change, some sit on dark sections) and **`main details > summary`** (FAQ question rows get an underline in their own colour). Pointer devices only; colour-only, so no reduced-motion variant needed.
+- **Re-check:** full re-run → only the known false alarms + in-paragraph links; the audit then gained `textDecorationThickness` (it had not measured it) → affected pages re-run: **only false alarms remain**; `/sell` alone: 1 = the closed dropdown.
+- **Files:** `app/globals.css`, `components/layout/SiteHeader.tsx`, `SiteFooter.tsx`, `components/CopyAddressButton.tsx`, `components/GradeChartScale.tsx`, `app/[locale]/about/page.tsx`, `app/[locale]/spot-prices/page.tsx`, `components/card/CardLanding.tsx`, `app/[locale]/shop/[id]/page.tsx`; NEW `lib/__tests__/hover-feedback.test.ts` (16).
+- **Gate:** `npx tsc --noEmit` 0 errors · `npm run lint` 0 errors (4 pre-existing `<img>` warnings) · `npx vitest run` **2255/2255** · `npm run build` exit 0.
+- **To reverse:** delete the "Hover sweep" block at the end of `globals.css` (the class names then do nothing).
+
+## 2026-11-01 (5) — Hover lift on the social buttons (and every business-card tile); "every button reacts to hover" recorded as a rule — BUILT + STAGED, not pushed; no SQL, no env vars
+
+- **Owner:** *"give some feedback to hover-over of the socials buttons we added... make them raise up on hover-over.. we want to adhere to the rule that all buttons give feedback on hover-over.. record that rule if we havent before"* — recorded as a top-level `DECISIONS.md` entry (a softer line existed deep in the file; now points to it).
+- **Before:** the social tiles (homepage band, Contact, About), the footer logos and the card-page tiles showed no change on hover.
+- **Now:** NEW `.lift-tile` / `.lift-icon` in `app/globals.css` (end of file): tiles rise 2px with a gold border and deeper shadow, footer logos rise 3px with a drop shadow (hover-capable pointers only), both press in (scale 0.96) on click, gold focus ring; reduced motion = no movement, the border/shadow change stays (same pattern as `.gold-button`). Applied in `components/SocialFollow.tsx` (tiles + footer logos) and in `card/CardLanding.tsx`'s shared `tileClass` — so **What We Buy, Shop and Join the List** (found with NO hover change) now react too.
+- **Checks:** Playwright with a real mouse, 1280 px — normal motion: home tile −2px, footer logo −3px, card tile −2px, each with the border/shadow change; reduced motion: no movement, border/shadow still change — **12/12**; card page: What We Buy, Shop, Instagram, Nextdoor, Join the List all react. Guard test added to `lib/__tests__/social-links.test.ts`.
+- **Gate:** `npx tsc --noEmit` 0 errors · `npm run lint` 0 errors (4 pre-existing `<img>` warnings) · `npx vitest run` **2239/2239** · `npm run build` exit 0.
+- **To reverse:** delete the `.lift-tile` / `.lift-icon` block at the end of `globals.css` (the class names then do nothing).
+
+ — 🟢 DEPLOYED (owner): (1) eBay Best Offer minimum, (2) social links, (3) "50+ Google reviews · All five stars" + 51 reviews; both SQL files run first; IndexNow 200 ×10
+
+- **Owner:** *"SQL run, deployed"* (`google-reviews-2026-11.sql`; the eBay-minimum SQL was run earlier the same day). Production not checked by Claude (not asked).
+- **IndexNow:** `MSYS_NO_PATHCONV=1 npm run indexnow -- --urls=/,/es,/reviews,/es/reviews,/free-evaluation,/es/free-evaluation,/contact,/es/contact,/about,/es/about` → **200 OK for 10 URLs**.
+- ◻ **Open (owner):** Admin → Settings → Google Reviews → Save once (stores 51; until then the site shows the same built-in default); first minimum on a live eBay item; optional tap-through of the four social logos on a phone. Check-up ~Jan 2, 2027 (review histogram + new reviews) in `TASKS.md`.
+
 ## 2026-11-01 (3) — "★★★★★ 50+ Google reviews · All five stars" (admin-editable count) on the homepage, /reviews and /free-evaluation + the 29 missing Google reviews (51 total) — BUILT + STAGED, not pushed; ⛔ SQL `supabase/google-reviews-2026-11.sql` BEFORE the push; no env vars
 
 - **Owner:** *"update the reviews section of the homepage to mention 50+ reviews, all five star? do you recommend we add it somewhere else too? maybe bring in more of our reviews from the GBp too?"* → mockup 1 → *"make the # of reviews on the new line a variable accessible from the admin settings … unless theres a way to update it live"* → admin-box mockup → **"Yes, build it all"**.

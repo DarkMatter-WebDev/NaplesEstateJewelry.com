@@ -82,7 +82,7 @@ export default function GradeChartScale({ title, grades, bands, bandStyle, stora
               type="button"
               aria-pressed={on}
               onClick={() => setPicked(on ? null : c.g)}
-              className={`inline-flex min-w-[2.4rem] cursor-pointer items-center justify-center rounded-md border px-2 py-1 text-xs font-bold ${
+              className={`hover-chip inline-flex min-w-[2.4rem] cursor-pointer items-center justify-center rounded-md border px-2 py-1 text-xs font-bold ${
                 on ? 'border-[#735c00] ring-2 ring-[#735c00] ring-offset-1' : 'border-[#d0c5af]'
               }`}
               style={{ background: bandStyle[c.band].bg, color: bandStyle[c.band].fg, fontFamily: 'var(--font-label)' }}
@@ -155,7 +155,7 @@ export default function GradeChartScale({ title, grades, bands, bandStyle, stora
         type="button"
         onClick={toggleExpanded}
         aria-expanded={expanded}
-        className="mt-4 cursor-pointer text-xs font-bold text-[#735c00] underline underline-offset-2"
+        className="hover-link mt-4 cursor-pointer text-xs font-bold text-[#735c00] underline underline-offset-2"
       >
         {expanded ? (isEs ? 'Mostrar menos ▴' : 'Show less ▴') : isEs ? 'Mostrar todos los grados ▾' : 'Show every grade ▾'}
       </button>

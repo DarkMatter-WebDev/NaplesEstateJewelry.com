@@ -4,7 +4,16 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-11-01 (3)**.
+> compaction. Last reconciled: **2026-11-01 (5)**.
+
+## EVERY button reacts to hover — a lift (or colour change) on hover, a press-in on click, a focus ring for the keyboard (2026-11-01)
+
+- **Owner (verbatim):** *"give some feedback to hover-over of the socials buttons we added... make them raise up on hover-over.. we want to adhere to the rule that all buttons give feedback on hover-over.. record that rule if we havent before"*. (A softer form sat deep in this file — *"Desktop interactive controls should expose a small, consistent hover lift or color/background reaction plus press feedback"* — never as its own entry; this is it.)
+- **The rule:** anything that looks like a button or a tile link — pills, tiles, logo links, icon buttons — changes visibly on hover: the site's lift (`.gold-button` / `.outline-button` −1px; `.lift-tile` −2px + gold border + deeper shadow; `.lift-icon` −3px + drop shadow) or, where movement does not fit, a colour/background change. Plus a press-in on `:active` and a visible `:focus-visible` ring.
+- **How:** reuse the shared classes (`.gold-button`, `.outline-button`, `.lift-tile`, `.lift-icon` in `globals.css`) — never a one-off. Hover rules inside `@media (hover: hover)` (a tap would latch them on a phone). Under `prefers-reduced-motion: reduce` the movement stops but the colour / border / shadow change stays — the owner's desk Chrome has reduced motion ON, so there the owner sees the gold border and shadow, not the lift.
+- **Checking it:** a real mouse hover in Playwright, comparing computed `transform` / border / shadow / `textDecorationThickness` before and after (a hidden pane freezes transitions — [[dev-server-gotchas]]). New buttons ship with their hover; guard tests pin the classes (`social-links.test.ts`, `hover-feedback.test.ts`).
+- **Shared classes (2026-11-01 (6) sweep):** `.hover-chip` (small bordered buttons), `.hover-link` (text links / text buttons; `.hover-link-on-dark` on dark bands), `.hover-text` (links with their own border-b), `.hover-dim` (logo links); sitewide `main a.underline` thickens its underline and `main details > summary` gets an underline — ⛔ never a colour change in those two sitewide rules (some sit on dark sections). False alarms the audit always reports: closed dropdown/accordion contents, overlay hit areas whose parent reacts, active/disabled controls.
+- Record `CHANGELOG.md` 2026-11-01 (5).
 
 ## The Google review count is admin-edited and shown ROUNDED DOWN ("50+"); "All five stars" only while the owner's box says so; all reviews on /reviews, the full-length ones on the band (2026-11-01)
 
@@ -8706,7 +8715,8 @@ entries retain the ordinary `/shop` fallback. This avoids polluting shareable
 product URLs with transient navigation state.
 
 Desktop interactive controls should expose a small, consistent hover lift or
-color/background reaction plus press feedback. Mobile-only controls are not
+color/background reaction plus press feedback. (Promoted to its own rule
+2026-11-01: *"EVERY button reacts to hover"*, top of this file.) Mobile-only controls are not
 part of the desktop affordance audit unless a future mobile pass is requested.
 
 Admin Products does not display separate Total, Available, or Sold summary

@@ -72,7 +72,7 @@ export default function CopyAddressButton({ locale = 'en', className = '' }: Pro
         onClick={handleCopy}
         aria-label={label}
         title={label}
-        className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border align-middle transition-colors ${className}`}
+        className={`hover-chip inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border align-middle transition-colors ${className}`}
         style={{
           borderColor:
             state === 'copied' ? 'var(--color-primary)' : 'var(--color-outline-variant)',

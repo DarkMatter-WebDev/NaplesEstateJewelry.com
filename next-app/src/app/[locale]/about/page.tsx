@@ -283,7 +283,7 @@ export default async function AboutPage({ params }: Props) {
                 href="https://share.google/yQQMAvFDiOLppBZ30"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 border-b pb-1 text-sm font-bold uppercase tracking-widest transition-colors"
+                className="hover-text inline-flex items-center gap-2 border-b pb-1 text-sm font-bold uppercase tracking-widest transition-colors"
                 style={{ color: 'var(--color-primary)', borderColor: 'color-mix(in srgb, var(--color-primary) 30%, transparent)', fontFamily: 'var(--font-label)' }}
               >
                 <span>{isEs ? 'Lea lo que dicen los clientes en Google' : 'Read what clients say on Google'}</span>
