@@ -36,6 +36,30 @@ export async function recordScan(source: ScanSource): Promise<boolean> {
   return Promise.race([insert, timeout]);
 }
 
+/**
+ * Delete every saved scan for ONE code (Admin → Insights "Clear", owner
+ * 2026-10-31: "individually clear each page's visit counter"). The other codes
+ * are untouched. Needs the DELETE grant in supabase/qr-scans-2026-10.sql.
+ */
+export async function clearScans(source: ScanSource): Promise<{ removed: number } | { error: string }> {
+  try {
+    const { data, error } = await createServiceClient().from(TABLE).delete().eq('source', source).select('id');
+    if (error) {
+      console.error(`Scans not cleared (${source}):`, error.code, error.message);
+      return {
+        error:
+          error.code === '42501'
+            ? 'Clearing is not switched on yet: run supabase/qr-scans-2026-10.sql in Supabase.'
+            : error.message || 'Could not clear the scans.',
+      };
+    }
+    return { removed: data?.length ?? 0 };
+  } catch (err) {
+    console.error(`Scans not cleared (${source}):`, err);
+    return { error: 'Could not clear the scans.' };
+  }
+}
+
 export type ScanSummary = {
   last7Days: number;
   last30Days: number;

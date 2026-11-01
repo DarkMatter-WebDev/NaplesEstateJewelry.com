@@ -28,12 +28,20 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-10-31 (16) — No entrance fade on the first page of a visit (QR "load, flash, load again") — BUILT + STAGED, not pushed; no SQL, no env vars
+### 🟡 2026-10-31 (18) — Admin → Insights: "Clear" button per code — BUILT + STAGED, not pushed; ⛔ SQL re-run
 
-Record `CHANGELOG.md` 2026-10-31 (16). One file (`components/layout/CustomerReveal.tsx`) + its test.
+Record `CHANGELOG.md` 2026-10-31 (18).
 
-1. **Owner:** push + deploy.
-2. **Owner, after the deploy:** scan a car magnet and a business card with the phone — the page should appear once and stay (no blank-then-fade). Clicking to another page on the site still fades in; that is intended.
+1. **Owner, ⛔ SQL:** re-run `supabase/qr-scans-2026-10.sql` in the Supabase SQL Editor (safe to re-run; the last check should list `DELETE, INSERT, SELECT` for service_role). Before or after the push — without it the button only shows "run supabase/qr-scans-2026-10.sql".
+2. **Owner:** push + deploy.
+3. **Owner:** on Insights, press Clear on one code (e.g. your test card scan) → confirm → that code shows 0, the others keep their counts.
+
+### 🟢 2026-10-31 (16)–(17) — No entrance fade on the first page of a visit (QR "load, flash, load again") — DEPLOYED, live-checked on 46 pages
+
+Record `CHANGELOG.md` 2026-10-31 (16)–(17). One file (`components/layout/CustomerReveal.tsx`) + its test.
+
+1. ~~**Owner:** push + deploy.~~ Done 10-31; live sweep: 0 pages blank out.
+2. **Owner:** scan a car magnet and a business card with the phone — the page should appear once and stay (no blank-then-fade). Clicking to another page on the site still fades in; that is intended.
 
 > **Session CLOSED 2026-10-30 (5):** store hours 10–4 Mon–Sat / Sun closed everywhere; satellite deployed by the owner; GBP Offer renewed through Dec 31, hours Update Published, holiday hours set (Veterans Day + Black Friday open, Thanksgiving / Christmas Eve / Christmas closed). Nothing to push for the live site (the staged `HOURS` fallback change is cosmetic insurance). Open = check-ups ~Nov 2 / ~Nov 6 / ~Jan 1 + GBP "Offers delivery" + the July Nextdoor post (owner's calls).
 >

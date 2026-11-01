@@ -1,6 +1,19 @@
 
 # Changelog
 
+## 2026-10-31 (18) — Admin → Insights: a "Clear" button per code — BUILT + STAGED, not pushed; ⛔ re-run `supabase/qr-scans-2026-10.sql` (adds the DELETE grant); no env vars
+
+- **Owner:** *"add a button to individually clear each page's visit counter in insights"*.
+- **What:** each code's section on Insights (car magnets, Chris's card, Kitt's card) gets a red **Clear** button beside its count, shown only when that code has scans. It asks first (`window.confirm`: "Clear all N scans for <code>? … The other codes are not touched. This can't be undone."), then `DELETE /api/admin/insights/scans/[source]` → `requireAdmin()` → known codes only (`SCAN_SOURCE_KEYS`) → `clearScans(source)` in `lib/qr-scans.ts` deletes that code's rows only → page refreshes, count 0.
+- **SQL:** live probe (no-op `delete … where id = -1` with the server key) → `42501 permission denied` — the table was granted SELECT + INSERT only. `supabase/qr-scans-2026-10.sql` now grants `select, insert, delete` (safe to re-run; the check at the end lists DELETE). Until it runs, the button answers "Clearing is not switched on yet: run supabase/qr-scans-2026-10.sql in Supabase." and nothing is deleted.
+- **Found in passing:** the dev log warned "two children with the same key, `heirloom`" — `/jewelry-appraisal`'s "What We Appraise" cards keyed on `card.mark`, and two cards share the heirloom mark. Now keyed on `card.href` (unique). No visible change.
+- **Checks:** signed-out `DELETE …/scans/card` and `…/scans/bogus` → 401, rows unchanged (live: magnet 1, card 1 — presumably the owner's test scans). The page itself was NOT viewed in a browser (admin sign-in; the connected Chrome could not open localhost). Tests: `magnet-redirect.test.ts` + 2 (delete scoped to `.eq('source', source)`, 42501 → plain instruction; route admin-only + known codes, confirm, `total > 0` guard) and the grant pin updated. Gate: `npx tsc --noEmit` 0 · `npm run lint` 0 errors (4 old warnings) · `npx vitest run` **2179/2179** · `npm run build` 0 (`/api/admin/insights/scans/[source]` listed).
+- **To reverse:** remove `ClearScansButton` from the Insights page and delete the route; optionally `revoke delete on public.qr_scans from service_role;`.
+
+## 2026-10-31 (17) — First-load fade removal DEPLOYED (owner) and checked live on all 46 pages: pass
+
+- Owner: *"pushed and deployed"*. Same detector as (16), production, 46 pages: **0 pages with a reveal stamp** (before the deploy: `/card`, magnet landing, `/about` all stamped and blanked +73 / +18 / +21). 40 pages 0 blanked; `/` and `/es` +4–5 = hero slideshow; `/shop` (+ `/cart`, `/wishlist` → `/shop`) = skeleton then the shop's own one-time fade, unchanged and intended. Owner's own check: scan a magnet and a card with the phone.
+
 ## 2026-10-31 (16) — No entrance fade on the first page of a visit (the QR "load, flash, load again") — BUILT + STAGED, not pushed; no SQL, no env vars
 
 - **Owner:** *"when a page opens from a qr code.. whether its the /card page, or /magnet... the page seems to load, then flash and load again"* → **"Yes, fix sitewide"**.

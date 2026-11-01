@@ -7,8 +7,9 @@ import { CARD_HOLDERS } from '@/lib/card-holders';
 
 vi.mock('server-only', () => ({}));
 const insert = vi.fn();
+const deleteEq = vi.fn();
 vi.mock('@/lib/supabase/service', () => ({
-  createServiceClient: () => ({ from: () => ({ insert }) }),
+  createServiceClient: () => ({ from: () => ({ insert, delete: () => ({ eq: deleteEq }) }) }),
 }));
 
 const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts), 'utf8');
@@ -89,7 +90,8 @@ describe('QR scan counting (magnet + cards)', () => {
     for (const key of SCAN_SOURCE_KEYS) expect(key).toMatch(/^[a-z0-9_-]{1,40}$/); // the SQL check constraint
     // This project never grants new tables to service_role on its own (live 42501, 10-31).
     const sql = read('..', 'supabase', 'qr-scans-2026-10.sql');
-    expect(sql).toContain('grant select, insert on public.qr_scans to service_role;');
+    // DELETE since 10-31: Insights' per-code Clear button.
+    expect(sql).toContain('grant select, insert, delete on public.qr_scans to service_role;');
     expect(sql).toContain('revoke all on public.qr_scans from anon, authenticated;');
   });
 
@@ -157,5 +159,30 @@ describe('QR scan counting (magnet + cards)', () => {
     const header = read('src', 'components', 'admin', 'AdminHeader.tsx');
     expect(header).toContain('`${adminBasePath}/insights`');
     expect(read('src', 'app', '[locale]', 'admin', 'marketing', 'page.tsx')).not.toMatch(/scan/i);
+  });
+
+  // Owner 10-31: "add a button to individually clear each page's visit counter".
+  it('Clear deletes only the one code it is pressed for', async () => {
+    const { clearScans } = await import('@/lib/qr-scans');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    deleteEq.mockReturnValue({ select: () => Promise.resolve({ data: [{ id: 1 }, { id: 2 }], error: null }) });
+    await expect(clearScans('card')).resolves.toEqual({ removed: 2 });
+    expect(deleteEq).toHaveBeenCalledWith('source', 'card');
+    // The missing grant gets a plain instruction, not a database code.
+    deleteEq.mockReturnValue({ select: () => Promise.resolve({ data: null, error: { code: '42501', message: 'permission denied' } }) });
+    const refused = await clearScans('magnet');
+    expect('error' in refused && refused.error).toContain('qr-scans-2026-10.sql');
+  });
+
+  it('Clear is admin-only, accepts only known codes, asks first, and shows only when there are scans', () => {
+    const route = read('src', 'app', 'api', 'admin', 'insights', 'scans', '[source]', 'route.ts');
+    expect(route).toContain('await requireAdmin()');
+    expect(route).toContain('SCAN_SOURCE_KEYS as string[]).includes(source)');
+    const button = read('src', 'components', 'admin', 'ClearScansButton.tsx');
+    expect(button).toContain('window.confirm(');
+    expect(button).toContain("method: 'DELETE'");
+    expect(button).toContain('router.refresh()');
+    const page = read('src', 'app', '[locale]', 'admin', 'insights', 'page.tsx');
+    expect(page).toContain('{total > 0 && <ClearScansButton source={source}');
   });
 });

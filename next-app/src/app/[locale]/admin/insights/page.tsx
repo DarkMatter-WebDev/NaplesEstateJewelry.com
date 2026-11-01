@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { getVerifiedUser } from '@/lib/auth-claims';
 import AdminHeader from '@/components/admin/AdminHeader';
+import ClearScansButton from '@/components/admin/ClearScansButton';
 import { getRecentScans, getScanSummaries, RECENT_SCANS_PER_SOURCE } from '@/lib/qr-scans';
 import { SCAN_SOURCES, SCAN_SOURCE_KEYS } from '@/lib/scan-sources';
 
@@ -164,13 +165,16 @@ export default async function AdminInsightsPage({ params }: Props) {
                       naplesestatejewelry.com{SCAN_SOURCES[source].path}
                     </span>
                   </h2>
-                  <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-                    {total === 0
-                      ? 'No scans yet'
-                      : total > times.length
-                        ? `Newest ${times.length} of ${total} scans`
-                        : `${total} ${total === 1 ? 'scan' : 'scans'}, newest first`}
-                  </p>
+                  <div className="flex items-center gap-3">
+                    <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                      {total === 0
+                        ? 'No scans yet'
+                        : total > times.length
+                          ? `Newest ${times.length} of ${total} scans`
+                          : `${total} ${total === 1 ? 'scan' : 'scans'}, newest first`}
+                    </p>
+                    {total > 0 && <ClearScansButton source={source} label={SCAN_SOURCES[source].label} total={total} />}
+                  </div>
                 </div>
                 {times.length > 0 && (
                   <ol

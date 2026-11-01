@@ -48,7 +48,10 @@ revoke all on public.qr_scans from anon, authenticated;
 -- project does NOT grant new tables to service_role automatically — without
 -- this line every save and every Insights read fails with 42501 "permission
 -- denied" (found 2026-10-31 by a live check after the first run of this file).
-grant select, insert on public.qr_scans to service_role;
+-- DELETE (added 2026-10-31, same day): Admin → Insights' per-code "Clear"
+-- button (owner: "clear each page's visit counter"); the delete runs only
+-- behind the admin check in /api/admin/insights/scans/[source].
+grant select, insert, delete on public.qr_scans to service_role;
 
 notify pgrst, 'reload schema';
 
@@ -60,7 +63,7 @@ select c.relname as table_name, c.relrowsecurity as rls_on,
   join pg_namespace n on n.oid = c.relnamespace
  where n.nspname = 'public' and c.relname = 'qr_scans';
 select to_regclass('public.magnet_scans') as old_table_should_be_null;
--- Check: service_role must show INSERT and SELECT; anon and authenticated nothing.
+-- Check: service_role must show DELETE, INSERT and SELECT; anon and authenticated nothing.
 select grantee, string_agg(privilege_type, ', ' order by privilege_type) as privileges
   from information_schema.role_table_grants
  where table_schema = 'public' and table_name = 'qr_scans'

@@ -300,7 +300,7 @@ export default async function JewelryAppraisalPage({ params }: Props) {
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
               {appraiseCards.map((card) => (
                 <Link
-                  key={card.mark}
+                  key={card.href}
                   href={card.href}
                   className="rounded-2xl border border-[#d0c5af] bg-white p-7 shadow-[0_14px_38px_rgba(38,28,6,0.05)] transition-all hover:-translate-y-0.5 hover:shadow-xl"
                 >
