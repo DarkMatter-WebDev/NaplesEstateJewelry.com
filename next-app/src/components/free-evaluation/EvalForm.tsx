@@ -15,10 +15,14 @@ import { appendAdClickFields, sendAdsConversion } from '@/lib/ads-tracking-brows
 interface Props {
   locale: string;
   submitted: boolean;
+  /** Which page the form sits on (2026-11-01): `sell-by-mail` is the unlisted
+   *  /sellbymail page — its leads arrive as "Sell by Mail Request". */
+  variant?: 'free-evaluation' | 'sell-by-mail';
 }
 
-export default function EvalForm({ locale, submitted }: Props) {
+export default function EvalForm({ locale, submitted, variant = 'free-evaluation' }: Props) {
   const isEs = locale === 'es';
+  const byMail = variant === 'sell-by-mail';
   const [photoCount, setPhotoCount] = useState(0);
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(submitted);
@@ -75,7 +79,7 @@ export default function EvalForm({ locale, submitted }: Props) {
         setErr(leadPhotosTooLargeMessage(isEs));
         return;
       }
-      fd.append('source', 'free-evaluation');
+      fd.append('source', variant);
       // The Google Ads click this visitor arrived with, if any — so the lead
       // says where it came from. Nothing is added for anyone else.
       appendAdClickFields(fd);
@@ -121,9 +125,13 @@ export default function EvalForm({ locale, submitted }: Props) {
           <FormSuccessPanel
             isEs={isEs}
             kind="submission"
-            body={isEs
-              ? 'Revisaremos su información y nos comunicaremos con usted pronto.'
-              : "We'll review your submission and be in touch soon."}
+            body={byMail
+              ? (isEs
+                ? 'Revisaremos sus fotos y le contactaremos para enviarle su etiqueta prepagada.'
+                : "We'll review your photos and be in touch about sending your prepaid label.")
+              : isEs
+                ? 'Revisaremos su información y nos comunicaremos con usted pronto.'
+                : "We'll review your submission and be in touch soon."}
             onSendAnother={sendAnother}
           />
         </div>
@@ -295,7 +303,9 @@ export default function EvalForm({ locale, submitted }: Props) {
           <button type="submit" className="gold-button w-full" disabled={sending}>
             {sending
               ? (isEs ? 'Enviando…' : 'Sending…')
-              : (isEs ? 'Enviar para Tasación Gratuita' : 'Send for Free Appraisal')}
+              : byMail
+                ? (isEs ? 'Enviar Fotos' : 'Send Photos')
+                : (isEs ? 'Enviar para Tasación Gratuita' : 'Send for Free Appraisal')}
           </button>
         </>
       )}

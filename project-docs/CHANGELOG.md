@@ -1,6 +1,27 @@
 
 # Changelog
 
+## 2026-11-01 (10) — /sellbymail images (option B): icon on every step + "What we buy" icons, owner photo in the opener, storefront photo in "Rather come in?" — BUILT + STAGED, not pushed
+
+- **Owner:** *"lets add some of the images we use elsewhere on the site to this page, too... mock up some options.. maybe the ai generated icons we use?"* → options A (icons only) / B (icons + photos), made on the real page → **"Build option B"**.
+- **Built** in `src/app/[locale]/sellbymail/page.tsx`: `ClayMark` (the owner's icon pack) on each step — phone-signal, shield, heirloom, house, scale, pricing, camera, cash (76 px, right of the gold number); a four-icon row in "What we buy" (chain · Gold, sterling-flatware · Sterling, gemstone · Diamonds, coins · Coins; `aria-hidden`, the list below carries the words); the opener is text left + `chris-owner.webp` right from lg (4:3 crop under the text below lg; `priority`; new pronoun-free alt "Chris, the owner, at the appraisal table in the Naples showroom, with scales and a gold chain"); `StorefrontPhoto aspect="2:1"` in "Rather come in?". No new image files.
+- **Checks:** dev, headless Chrome — the 40 page checks again **40/40**; images: 12 marks loaded, owner photo loaded + beside the h1 at 1280 px / below it at 390 px, storefront loaded, no sideways scroll. Guard test +2 (`sell-by-mail-page.test.ts`). Gate: `tsc` 0 · lint 0 errors · **2264/2264** · build exit 0 (first build attempt failed on a transient Google Fonts fetch inside `next/font`; fonts.googleapis.com answered 200 and the immediate retry passed — no code change).
+
+## 2026-11-01 (9) — UNLISTED "Sell to Us by Mail" page `/sellbymail` (EN + ES) for clients and dealers the owner knows — BUILT + STAGED, not pushed; no SQL, no env vars
+
+- **Owner:** *"Is there a way to create a page … only accessible through a direct link …"* → *"lets mock one up to advertise remote buying … box up their items, we send a self addressed label, we receive items, evaluate, make an offer, and send back anything we do not buy"*. Shown the 2026-08-30 "No mail-in page" decision (Florida Ch. 538 Part III mail/Internet buyer registration) first; owner: *"thats why its unlisted.. i'll only send this link to people and dealers i know"* — the owner's call. Answers: USPS / FedEx / UPS by value; customer pays return shipping; Zelle, bank transfer, mailed check; offer within 1 day of arrival; then (mockup 1): address *"sell by mail with no dashes"*, a step for a photo of their ID, *"the shipment is insured on the way to me, depending on the value"*, the "What we buy" list is right, step 1 also offers the photo form.
+- **Built:** NEW `src/app/[locale]/sellbymail/page.tsx` — normal `SiteHeader` + `SiteFooter`; opener "Sell to Us by Mail." + "For clients & dealers we work with" + Call / Text / Email / Send Photos; "Eight Simple Steps" (tell us · prepaid insured label · box it up · arrival · evaluate · offer within one day · ID photo · paid or returned); "The Details" (paying, shipping, what we buy, showroom); the photo form (`#send-photos`); "Ready to Ship?". **Unlisted:** `robots: { index: false, follow: false }`, not in `sitemap.ts`, no link anywhere. `EvalForm` gained `variant: 'sell-by-mail'` (source, "Send Photos" button, label-focused thank-you); `/api/inquire` titles those leads **"Sell by Mail Request"** and the admin inbox "Sell-by-mail request from …".
+- **Tests:** NEW `src/lib/__tests__/sell-by-mail-page.test.ts` (7: noindex, off the sitemap, no link from any app file or message, header/footer, the owner's facts, step-1 contacts + form, lead marking).
+- **Gate:** `npx tsc --noEmit` 0 errors · `npm run lint` 0 errors (4 pre-existing `<img>` warnings) · `npx vitest run` **2262/2262** · `npm run build` exit 0 (`/en/sellbymail` + `/es/sellbymail` prerendered).
+- **Seen in dev:** headless Chrome, 1280 + 390 px, EN + ES — **40/40**: 200, noindex meta, header + footer, 8 steps (2 rows of 4 on computers, stacked on phones), the form + "Send Photos" jump, tel/sms/mailto, no sideways scroll, "Send Photos" / "Enviar Fotos", no page errors; not linked from `/`, `/sell`, `/contact`, `/about`, `/es`; not in `/sitemap.xml`. A real form submission was NOT sent (it would reach the live inbox).
+- **To reverse:** delete `src/app/[locale]/sellbymail/` (the form variant and route mapping are harmless left in place).
+
+## 2026-11-01 (8) — 🟢 DEPLOYED (owner): (5) hover lift on the social buttons + card tiles, (6) sitewide hover sweep, (7) "Sell Us Bullion & Coins"; no SQL, no env vars
+
+- **Owner:** *"ok, now its pushed and deployed"* (an earlier "Pushed and deployed" was withdrawn — *"sorry not yet"* — before anything was recorded). Production not checked by Claude (not asked).
+- **IndexNow not run:** no URL was added, removed or retitled — hover styles and one menu label only (the runbook's trigger is a new/retitled/removed URL).
+- Nothing staged-but-unpushed except docs. Open: the ~Jan 2, 2027 review check-up; owner first-uses from (1)–(3) in `TASKS.md`; admin pages not hover-audited (ask first).
+
 ## 2026-11-01 (7) — Sell menu: "Sell Us Bullion" → "Sell Us Bullion & Coins" (ES "Lingotes" → "Lingotes y Monedas") — BUILT + STAGED, not pushed
 
 - **Owner:** *"change "sell us bullion" in the sell dropdown menu to sell us bullion & coins"*. `messages/en.json` / `es.json` → `nav.bullion` (one key feeds the desktop dropdown and the phone menu). ES matches the gold page's "Bullion & Coins" card ("Lingotes y Monedas").

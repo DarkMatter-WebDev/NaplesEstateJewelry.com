@@ -4,7 +4,14 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-11-01 (5)**.
+> compaction. Last reconciled: **2026-11-01 (9)**.
+
+## An UNLISTED `/sellbymail` page for clients and dealers the owner knows — never public (2026-11-01)
+
+- **Owner:** shown the 2026-08-30 "No mail-in page" decision (Florida Ch. 538 Part III registration for buying by mail/Internet) before anything was built; answered *"thats why its unlisted.. i'll only send this link to people and dealers i know.. not the general public"* — the owner's call, recorded as such (Claude does not decide licensing).
+- **The rule:** `/sellbymail` + `/es/sellbymail` exist only behind the link the owner sends: `noindex, nofollow`, ⛔ never in `sitemap.ts`, ⛔ never linked from a menu, footer, page, email template or ad, ⛔ never in `SAME_AS` / schema. Guarded by `lib/__tests__/sell-by-mail-page.test.ts`. The site's public local positioning (no mail-in, "no mailing off your valuables") is unchanged.
+- **Facts on the page are the owner's (11-01) and only those:** prepaid label, USPS / FedEx / UPS by value, insured inbound with coverage by value, photo ID before payment, offer within one day of arrival, Zelle / bank transfer / mailed check, customer pays return shipping. New claims need the owner's word.
+- Photo-form leads arrive as **"Sell by Mail Request"** (`EvalForm variant="sell-by-mail"`). Record `CHANGELOG.md` 2026-11-01 (9).
 
 ## EVERY button reacts to hover — a lift (or colour change) on hover, a press-in on click, a focus ring for the keyboard (2026-11-01)
 
@@ -2484,6 +2491,8 @@ would have contradicted shipped production content:
 - `PROJECT_OVERVIEW.md:24` names national mail-in buyers as the competitor the
   brand is positioned against
 - sitewide `JewelryStore` `areaServed` lists exactly six Florida cities
+
+⚠️ **2026-11-01:** the owner chose an UNLISTED `/sellbymail` page for known clients and dealers only (top entry "An UNLISTED `/sellbymail` page") — the public site stays as below.
 
 ⚠️ **If it is ever revisited**, the license is the gating question, not the
 copy — and the copy sweep is 12+ pages plus schema, not a new route. A smaller

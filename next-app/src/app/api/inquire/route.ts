@@ -44,7 +44,7 @@ const OWNER_EMAIL = 'rcman12589@gmail.com';
 // .co domain is no longer verified there, so a .co From address will not send.
 const FROM = 'Naples Estate Jewelry <noreply@naplesestatejewelry.com>';
 
-type InquiryKind = 'free-evaluation' | 'submit-item' | 'product-inquiry';
+type InquiryKind = 'free-evaluation' | 'sell-by-mail' | 'submit-item' | 'product-inquiry';
 
 /** Human, type-aware notification titles for the unified admin inbox. */
 function inquiryNotificationTitle(kind: InquiryKind, name: string, itemTitle: string): string {
@@ -52,6 +52,8 @@ function inquiryNotificationTitle(kind: InquiryKind, name: string, itemTitle: st
   switch (kind) {
     case 'free-evaluation':
       return `Free evaluation request from ${who}`;
+    case 'sell-by-mail':
+      return `Sell-by-mail request from ${who}`;
     case 'submit-item':
       return `Item submission from ${who}`;
     case 'product-inquiry':
@@ -395,7 +397,10 @@ async function handleLeadForm(req: Request) {
   // that is not a click ID is dropped by the validator.
   const adClick = parseAdClickIds((param) => form.get(param));
 
-  const itemTitle = source === 'free-evaluation' ? 'Free Evaluation Request' : 'Submit Your Item';
+  // The unlisted /sellbymail page (2026-11-01) shares the free-evaluation form.
+  const itemTitle = source === 'free-evaluation'
+    ? 'Free Evaluation Request'
+    : source === 'sell-by-mail' ? 'Sell by Mail Request' : 'Submit Your Item';
 
   let message = rawMessage || '(No description provided.)';
   if (location) message += `\n\nLocation: ${location}`;
@@ -461,7 +466,7 @@ async function handleLeadForm(req: Request) {
   }
 
   await notifyAdminOfInquiry({
-    kind: source === 'free-evaluation' ? 'free-evaluation' : 'submit-item',
+    kind: source === 'free-evaluation' ? 'free-evaluation' : source === 'sell-by-mail' ? 'sell-by-mail' : 'submit-item',
     itemTitle, name, phone: normalizedPhone, email: email || null, message, imageUrls, prefs, adClick,
   });
   await sendEmails({ itemTitle, name, phone: normalizedPhone, email: email || null, message, imageUrls, prefs, adClick });
