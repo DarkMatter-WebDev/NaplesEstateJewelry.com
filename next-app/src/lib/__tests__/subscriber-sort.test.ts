@@ -11,6 +11,7 @@ import {
 
 function row(overrides: Partial<SubscriberRow> & { email: string }): SubscriberRow {
   return {
+    subscriberId: null,
     name: null,
     source: 'subscriber',
     subscriberSource: null,

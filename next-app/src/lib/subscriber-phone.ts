@@ -87,6 +87,20 @@ export function smsConsentText(locale: string): string {
   return locale === 'es' ? SMS_CONSENT_TEXT.es : SMS_CONSENT_TEXT.en;
 }
 
+/** The tick box in Admin → Subscribers → Add Subscriber (owner wording, 2026-11-02). */
+export const ADMIN_SMS_CONSENT_LABEL = 'Sign them up for text deals.';
+
+/**
+ * The record of consent stored for a number the owner adds by hand, because
+ * the customer asked in person or on the phone (owner, 2026-11-02). It is not
+ * the website statement — the customer never saw that box — so it carries no
+ * `SMS_CONSENT_VERSION`. The double opt-in still applies: the row is
+ * `pending` and gets the same "reply YES" text as a web sign-up; nothing else
+ * is sent until the customer answers YES from their own phone.
+ */
+export const ADMIN_SMS_CONSENT_TEXT =
+  `Added by the shop in Admin > Subscribers at the customer's request ("${ADMIN_SMS_CONSENT_LABEL}" ticked). The customer confirms by replying YES to the confirmation text; no deals are sent before that.`;
+
 /** "Email", "Text" or "Both" for the admin table, from the row's stored fields. */
 export function subscriberChannelLabel(row: { email: string | null; phone: string | null }): 'Email' | 'Text' | 'Both' | '—' {
   const hasEmail = Boolean(row.email);

@@ -171,6 +171,8 @@ export async function buildMarketingAudience(scope: AudienceScope = 'all', audie
 
 /** One line of Admin → Subscribers: an email recipient, a text-alert sign-up, or both. */
 export type SubscriberDirectoryRow = MarketingRecipient & {
+  /** `homepage_subscribers.id` behind this line — what Edit / Combine / Delete act on; null for account- or buyer-only lines. */
+  subscriberId: string | null;
   /** E.164 mobile number when text alerts were requested. */
   phone: string | null;
   smsStatus: 'pending' | 'confirmed' | 'stopped' | null;
@@ -189,12 +191,13 @@ export type SubscriberDirectoryRow = MarketingRecipient & {
 export async function buildSubscriberDirectory(audienceClient?: SupabaseClient): Promise<SubscriberDirectoryRow[]> {
   const supabase = audienceClient ?? createServiceClient();
   const audience = await buildMarketingAudience('all', supabase);
-  const rows: SubscriberDirectoryRow[] = audience.map((recipient) => ({ ...recipient, phone: null, smsStatus: null }));
+  const rows: SubscriberDirectoryRow[] = audience.map((recipient) => ({ ...recipient, subscriberId: null, phone: null, smsStatus: null }));
 
+  // Every newsletter row (not only those with a number) so each line knows
+  // its row id — Edit and Combine work by id since 2026-11-02.
   const { data, error } = await supabase
     .from('homepage_subscribers')
-    .select('email, full_name, source, subscribed_at, phone_e164, sms_status')
-    .not('phone_e164', 'is', null);
+    .select('id, email, full_name, source, subscribed_at, phone_e164, sms_status');
 
   if (error?.code === '42703') return rows;
   if (error) throw new Error(`Could not load text-alert subscribers. ${error.message}`);
@@ -202,18 +205,23 @@ export async function buildSubscriberDirectory(audienceClient?: SupabaseClient):
   const byEmail = new Map(rows.map((row) => [row.email, row]));
   for (const row of data ?? []) {
     const phone = typeof row.phone_e164 === 'string' ? row.phone_e164 : null;
-    if (!phone) continue;
     const smsStatus = row.sms_status === 'confirmed' || row.sms_status === 'pending' || row.sms_status === 'stopped'
       ? row.sms_status
       : null;
     const email = normalizeEmail(row.email);
     const existing = email ? byEmail.get(email) : undefined;
-    if (existing) {
-      existing.phone = phone;
-      existing.smsStatus = smsStatus;
+    if (existing && (existing.subscriberEmail || phone)) {
+      existing.subscriberId = row.id ?? null;
+      if (phone) {
+        existing.phone = phone;
+        existing.smsStatus = smsStatus;
+      }
       continue;
     }
+    // An unsubscribed email with no number is not on the directory at all.
+    if (!phone) continue;
     rows.push({
+      subscriberId: row.id ?? null,
       email: '',
       name: row.full_name ?? null,
       source: 'subscriber',

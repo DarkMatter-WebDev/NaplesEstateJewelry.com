@@ -4,7 +4,15 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-11-01 (15)**.
+> compaction. Last reconciled: **2026-11-02 (2)**.
+
+## The owner can add a customer to text deals by hand — but the customer still confirms with YES, and only the customer can undo a STOP (2026-11-02)
+
+- **Owner:** customers sometimes ask the shop to add them; Add Subscriber in Admin → Subscribers takes a mobile number + the tick box **"Sign them up for text deals."** (owner's wording; never pre-ticked).
+- **Why the YES text stays:** the toll-free registration describes web-form opt-in; a by-hand add is a spoken request, so the customer's own YES reply from their phone is the written confirmation. ⛔ Never mark a hand-added number `confirmed` directly; never send a deal to `pending`.
+- **Record of consent:** `ADMIN_SMS_CONSENT_TEXT` (not the website statement, so no `SMS_CONSENT_VERSION`), source `admin_manual`.
+- ⛔ **A `stopped` number is refused** — Twilio blocks it (21610) until the customer texts START/YES themselves. Record `CHANGELOG.md` 2026-11-02 (1).
+- **Edit + Combine (2026-11-02 (2)):** Edit works by row id on every newsletter row. A typed email / number already on another row is never saved over it — the owner is offered **Combine**, which only `merge_homepage_subscribers` performs (one transaction; ⛔ never re-implement it as separate API writes — a half-done combine loses the number). The number keeps its status and history (Confirmed stays Confirmed, no new YES text); the email keeps its unsubscribe token so old unsubscribe links work. No combine when both rows have an email or both have a number. Name in the Edit box wins; clearing a box takes them off that list after a confirm, never both.
 
 ## The colour Google logo ONCE per section — one or two per page (2026-11-01)
 

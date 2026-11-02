@@ -78,6 +78,30 @@ record. Rules in `DECISIONS.md` → *"The /card page"*.
   text-only rows can be deleted by number (`DELETE /api/admin/subscribers`
   with `{ phone }`). Email sends still use `buildMarketingAudience`, which
   skips rows without a valid email.
+- **Add Subscriber takes a mobile number too (2026-11-02)** — for customers
+  who ask the shop to add them. Name / Email / Mobile number + the tick box
+  "Sign them up for text deals." (never pre-ticked, required for a number);
+  email OR number, at least one. A number goes through `subscribe_homepage_v2`
+  (source `admin_manual`, consent text `ADMIN_SMS_CONSENT_TEXT`, version null)
+  and gets the same "reply YES" text at once; the row is `pending` until the
+  customer answers. A `stopped` number is refused (409: "text START to
+  (888) 423-7522"); Twilio's 21610 on the send gets the same wording. An
+  email-only add is the old upsert, unchanged. Route
+  `app/api/admin/subscribers/route.ts` (+ `route.test.ts`); messages show
+  inside the Add Subscriber box.
+- **Edit + Combine (2026-11-02 (2))** — every newsletter line carries its
+  `subscriberId` (`buildSubscriberDirectory`), so Edit (PATCH by id) and
+  Delete (by id) work on text-only rows too. Edit opens a box under the row:
+  Name · Email · Mobile number; `email` / `phone` are sent only when changed
+  ('' = clear, never both). A new number needs the tick → `pending` + the
+  "reply YES" text. A typed email / number already on another row returns 409
+  with that row → the box offers **Combine** (both directions) → PATCH with
+  `combineWithId` → `merge_homepage_subscribers` (`supabase/subscriber-merge-2026-11.sql`,
+  one transaction: email + list state + unsubscribe token from the row that
+  had the email, number + status + consent + bookkeeping from the row that had
+  the number, text history re-pointed, other row deleted; refused when both
+  have an email or both have a number). Missing function → 503 "run the SQL".
+  Tests `route.edit.test.ts`.
 - **Legal:** Terms → "Text Message Program" section (`id="text-messages"`,
   EN + ES) and one Privacy bullet (STOP + "we do not share mobile numbers…"),
   both linked from the consent statement. Carriers check for these.

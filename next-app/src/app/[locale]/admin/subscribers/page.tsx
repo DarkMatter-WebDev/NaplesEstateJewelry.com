@@ -50,6 +50,7 @@ export default async function AdminSubscribersPage({ params }: Props) {
   ]);
 
   const rows: SubscriberRow[] = audienceResult.data.map((recipient) => ({
+    subscriberId: recipient.subscriberId,
     email: recipient.email,
     name: recipient.name,
     source: recipient.source,

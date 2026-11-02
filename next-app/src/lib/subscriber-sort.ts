@@ -12,6 +12,8 @@
 import { formatUsPhone, smsStatusLabel, subscriberChannelLabel, type SmsStatus } from './subscriber-phone';
 
 export type SubscriberRow = {
+  /** The `homepage_subscribers` row behind this line (Edit / Combine / Delete act on it); null for account- or buyer-only lines. */
+  subscriberId: string | null;
   /** '' for a text-only sign-up. */
   email: string;
   name: string | null;
