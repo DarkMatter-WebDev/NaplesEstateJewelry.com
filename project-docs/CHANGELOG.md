@@ -1,6 +1,87 @@
 
 # Changelog
 
+## 2026-11-01 (17) — Rating-line stars on a computer: weight on the capitals' middle, the same on every page — BUILT + STAGED, not pushed (same push as (12)–(16)); no SQL
+
+- **Owner** (after (16)): *"the stars look lower than the '50+ Google reviews' txt"* on the /sellbymail rating line; mockups of 3 options shown → owner: **"use option 1 for the areas where we have the full 5 gold stars"**, *"the phone versions … already looked good too.. only desktop needed fixing"*; leave the single star icons (/bullion, /faq links; /card, /reviews gold buttons) alone.
+- **Why (16) wasn't enough:** it centred the stars' BOX on the capitals, but a star's gold sits mostly in its lower half — measured by the pixels its weight was ~1px below the capitals' middle and its bottom points 1–2px under the baseline. Second finding while building: centred in the 21.6px line the stars sit 1.8px down it, and Chrome rounds stars and text differently when the line lands on a whole pixel → the stars jumped 1px depending on where the line landed (reproduced by nudging the line 0–7/8px at DPR 1, 1.25, 2, 4).
+- **Fix** (`GoogleReviewsLine`, the homepage / /sellbymail / /reviews rating line): stars span `-translate-y-[0.04em] lg:self-start lg:translate-y-[0.06em]` (was an inline `translateY(-0.04em)`). From 1024px up the stars are pinned to the line's top and lowered 0.06em → same 18px stars, weight on the capitals' middle (= mockup "Option 1"). Phones unchanged (owner).
+- **After (measured, ink):** stars' weight vs the capitals' middle −0.10 (DPR 1), −0.03 (1.25), +0.12 (2), +0.24 (4) px — identical at every sub-pixel position; homepage, /sellbymail, /reviews, /es, /es/sellbymail at 1280 + 1024 all the same; 390 unchanged.
+- **Left alone (owner):** the single star icons and the stand-alone five-star rows (/sellbymail dark panel, above the two quotes).
+- **Tests:** `google-reviews.test.ts` stars test updated (classes; no inline transform). **Gate:** `npx tsc --noEmit` 0 errors · `npm run lint` 0 errors (4 pre-existing `<img>` warnings) · `npx vitest run` **2273/2273** · `npm run build` exit 0 (dev stopped first, restarted after).
+- **To reverse:** in `GoogleReviewsLine` put back `style={{ transform: 'translateY(-0.04em)' }}` on the stars span and drop the three translate/self classes.
+
+## 2026-11-01 (16) — Stars + Google logo sit level (measured), everywhere they share a line — BUILT + STAGED, not pushed (same push as (12)–(15)); no SQL
+
+- **Owner** (screenshot of the rating line): *"the stars look a little bit lower than the rest of the line, and the Google logo looks like it sits a little bit higher … check those areas too"*.
+- **Measured first** (headless Chrome, CSS px, + = lower): rating line — logo letters' baseline **−0.80** vs the text baseline, stars' middle **+0.57** vs the capitals' middle; small caps links/captions — logo **−1.4 to −1.8**; `/card` gold button — star icon and pill **+1.4** vs the capitals, and the logo's letters rode high inside the pill.
+- **Fixes:**
+  - `GoogleWordmark`: `vertical-align: calc(height × −0.2462)` (`GOOGLE_DESCENT_RATIO` = (92 − 69.35) / 92, the "g" tail's share) instead of a fixed −0.24em — "Google" now sits ON the text baseline at every size.
+  - `GoogleWordmark pill`: padding as shares of the logo height, the "g"-tail share added on TOP, so the letters (not the image box) are centred in the pill.
+  - `GoogleReviewsLine`: the stars raised `translateY(−0.04em)` (scales with the text).
+  - `CardLanding` gold button: star icon + pill `-translate-y-[1.4px]`.
+  - /sellbymail panel pill: dropped the now-unneeded `text-[28px]` sizing.
+- **After (measured):** rating line (homepage, /sellbymail, /reviews) logo **0.00**, stars **0.00**; /free-evaluation, /about, /bullion, /faq, /silver-services, product-page note — logo ≤ 0.02; /bullion + /faq star icon −0.08; /card (1280 + 390, EN + ES) icon −0.02, pill −0.02, letters in pill +0.01. Close-ups at 3× shown to the owner.
+- **Tests:** `google-reviews.test.ts` +2 (the descent-ratio drop + pill top padding; the stars' raise); the /card pill assertion updated. **Gate:** `npx tsc --noEmit` 0 errors · `npm run lint` 0 errors (4 pre-existing `<img>` warnings) · `npx vitest run` **2273/2273** · `npm run build` exit 0 (dev stopped first, restarted after).
+- **To reverse:** restore `align-[-0.24em]` in `GoogleWordmark`, drop the stars' `translateY` and the two `-translate-y-[1.4px]`.
+
+## 2026-11-01 (15) — Google logo ONCE per section, built across the site (+ the /card gold button on a white pill) — BUILT + STAGED, not pushed; ONE push carries (12)–(15); no SQL, no env vars
+
+- **Owner:** *"looks good, except for one change.. add it to that spot on J, but put it on a pill so the 'o' doesnt disppear like you mentioned.. build it"* (on the (14) plan sheet).
+- **Built (one logo per section; every other "Google" = the word):**
+  - **A homepage** `TestimonialsSection`: the rating line only (cards + note → word).
+  - **C product pages** (same component, `compact`): the "Client reviews on [G]." note only.
+  - **B /sellbymail** (2): the rating line under the intro + the pill on the dark panel; the panel link, featured caption, band cards and the Ruthe Lloyd quote → word.
+  - **D `/reviews`**: `GoogleReviewsLine googleLogo` (intro, buttons, 51 cards stay the word).
+  - **E `/free-evaluation`**: the "From our 50+ five-star [G] reviews" label (link stays the word).
+  - **F `/about`, G `/bullion`, H `/faq`**: the one reviews link; **I `/silver-services`**: "Linda Cusumano · [G] review".
+  - **J `/card`** (`CardLanding`): "Leave a [G] Review" — the logo on a **white pill** inside the gold button.
+- **Component changes:** `GoogleWordmark` gained `pill` (white rounded pill, padding in em) — used by the /sellbymail panel and the /card button; carries the once-per-section rule in its header. `TestimonialCard` LOST its `googleLogo` prop (cards always say the word). The `/sellbymail` `GoogleReviewMeta` helper is gone.
+- **Tests:** `google-reviews.test.ts` rewritten for the rule (cards never carry it; homepage line / product note; per-page logo counts — /sellbymail 2, /reviews, /free-evaluation, /about, /bullion, /faq 1, /card + /silver-services 1 per language; the /card pill).
+- **Gate:** `npx tsc --noEmit` 0 errors · `npm run lint` 0 errors (4 pre-existing `<img>` warnings) · `npx vitest run` **2271/2271** · `npm run build` exit 0 (dev stopped first, restarted after).
+- **Seen in dev** (headless Chrome, 1280 px, EN + ES, 10 pages) — **76/80**: every page 200, logo count exactly as planned in both languages (homepage 1, /sellbymail 2, product page 1, /reviews 1, /free-evaluation 1, /about 1, /bullion 1, /faq 1, /silver-services 1, /card 1), every logo loaded. The 4 misses are page errors on /bullion + /silver-services (EN + ES) from TradingView's own embed script (`embed-widget-mini-symbol-overview.js` `_replaceScript`: "Cannot read properties of null (reading 'querySelector')") — also on untouched /gold-services, so not this change; not chased.
+- ⚠️ **Tooling trap:** a `\b` typed into a Node heredoc landed in the test file as a raw BACKSPACE (U+0008), so the regex silently matched nothing — found via `cat -A`, fixed by rewriting with `String.fromCharCode(92)`. Same family as the memory note on typed escapes.
+- **To reverse:** remove the `<GoogleWordmark …/>` / `googleLogo` uses listed above (each spot falls back to the word).
+
+## 2026-11-01 (14) — NEW owner rule: the colour Google logo once per section; placement PLANNED and shown, NOT built
+
+- **Owner:** *"new rule to apply.. only use the color google logo once on each section … plan out where we will add the color logo if we were to just use it once or maybe twice on each page too... dont implement yet.. show me where itll change and which ones stay the same"*.
+- **Shown:** a mockup sheet made on the real dev pages (injected outlines only, no app code): green box = logo, grey dashed = word. Plan: A homepage reviews section → the rating line only (cards + note back to the word) · B /sellbymail → 2: the rating line under the intro + the white pill on the dark panel (panel link, featured caption, band cards and the quote above the form back to the word) · C product-page band → the "Client reviews on Google." note · D `/reviews` → the rating line (intro, buttons, 51 cards stay the word) · E `/free-evaluation` → the "From our 50+ five-star Google reviews" label (link stays) · F `/about`, G `/bullion`, H `/faq` → the one reviews link · I `/silver-services` → the Linda Cusumano caption · J `/card` gold button → STAYS the word (Google's yellow "o" vanishes on gold).
+- **Counted on the mock:** homepage 1 logo, /sellbymail 2, product page 1, `/reviews` 1, `/free-evaluation` 1, `/about` / `/bullion` / `/faq` / `/silver-services` 1 each, `/card` 0.
+- Rule in `DECISIONS.md` top entry + memory `google-logo-once-per-section`. ⚠️ (12)–(13) are still STAGED with a logo on every card (homepage + /sellbymail) — they break the new rule until this plan is built.
+
+## 2026-11-01 (13) — Google's own wordmark in the HOMEPAGE reviews section; every other "Google" on the site listed for the owner — BUILT + STAGED, not pushed (same push as (12)); no SQL, no env vars
+
+- **Owner:** *"lets also use the google color logo like that on the homepage reviews section too, also find any other areas google is mentioned in the site and show me so i can decide if we should use it there too."*
+- **Built:** `components/home/TestimonialsSection.tsx` — `const googleLogo = !compact`: the homepage's "★★★★★ 50+ [Google] reviews · All five stars" line, every band card ("[Google] review" / "Read on [Google] →") and the "Client reviews on [Google]." note. **Product pages (the compact band) still show the word** — the owner's call, item 1 of the list below.
+- **Tests:** `google-reviews.test.ts` +2 (homepage on / product pages off; the SVG has Google's four colours and no script).
+- **Gate:** `npx tsc --noEmit` 0 errors · `npm run lint` 0 errors (4 pre-existing `<img>` warnings) · `npx vitest run` **2268/2268** · `npm run build` exit 0 (dev server stopped first, restarted after).
+- **Seen in dev** (headless Chrome) — **25/25**: `/` + `/es` at 1280 + 390 px — line logo, note logo, a logo on every band card, visible logos loaded, no sideways scroll, no page errors; a product page (`/shop/14k-gold-round-box-link-chain-necklace`) keeps "Google review" with 0 logos.
+- **Every other visible "Google", shown to the owner as a labelled screenshot sheet** (decision pending — TASKS first block): 1 product-page reviews band (cards + note; dark page); 2 `/reviews` intro sentence + rating line + "Leave a Review on Google" / "See All Reviews on Google" buttons; 3 the 51 `/reviews` cards; 4 `/free-evaluation` reviews box ("From our 50+ five-star Google reviews", "Read all our reviews on Google"; dark box); 5 `/about` "Read what clients say on Google"; 6 `/bullion` same; 7 `/faq` "Read all our reviews on Google"; 8 `/silver-services` "Linda Cusumano · Google review"; 9 `/card` "Leave a Google Review" button. **Not proposed:** privacy / cookie wording and the cookie notice (legal text names the company), the "How did you hear about us?" dropdown (an option cannot hold an image), Google Pay at checkout (PayPal draws that button).
+- **To reverse:** set `googleLogo` back to `false` in `TestimonialsSection.tsx`.
+
+## 2026-11-01 (12) — /sellbymail trust redesign: 5-star Google reviews + trust testimonials, Google's own wordmark — BUILT + STAGED, not pushed; no SQL, no env vars
+
+- **Owner:** *"redesign the new sell by mail page … really emphasize our good reputation and the all 5 star Google reviews, and … list some of the testimonials that … highlight the trust factor"* → mockup 1 (trust section after the opener, 6-card grid) → *"move the trust section down below the eight simple steps … make the long list of reviews a self scrolling (but stop on hover and manually scrollable too) banner … similar to … the site homepage"* → mockup 2 → *"for the word 'google' can use use the real google logo / word in its signature colors?"* → mockup 3 → **"Yes, build it"**.
+- **Built** (`src/app/[locale]/sellbymail/page.tsx`):
+  - under the intro: `GoogleReviewsLine` (★★★★★ 50+ [Google] reviews · All five stars; admin-edited count);
+  - NEW section after "Eight Simple Steps", before "The Details": "Why Sellers Trust Us / Every Review, Five Stars." (heading falls back to "What Our Clients Say" if the admin box says not all five-star), a dark rating panel (Google wordmark on a white pill, stars, **5.0** only while all five-star, "50+ reviews", "Read them on Google" → profile), the featured review (Mine Cervantes), then six trust reviews (Lorena & Scott Schultz, Joseph Roth, Edna Cavazos, Scott Tallent, Barbara Arnold, John P) in the **homepage's own scrolling band** (`TestimonialMarqueeBand` — scrolls itself, stops on hover, drags), and "Read All Our Reviews" → `/reviews`;
+  - a short Ruthe Lloyd quote above the photo form.
+- **Verbatim:** picks are by reviewer NAME in NEW `src/lib/sell-by-mail-trust.ts`; text always comes from `lib/testimonials.ts`. Each pick's trust line is set in bold gold — emphasis only, no word changed; a highlight that is not in the quote renders nothing.
+- **Google wordmark:** NEW `public/assets/images/brands/google.svg` (Google's official `Google_2015_logo.svg` from Wikimedia Commons, never redrawn) + NEW `components/GoogleWordmark.tsx` (alt "Google", sized in em). Used ONLY on /sellbymail — the homepage, /reviews, /free-evaluation and admin preview still show the word.
+- **Shared components, opt-in props only (other pages unchanged):** `TestimonialCard` + `highlight` / `googleLogo` (and exported `quoteWithHighlight`); `TestimonialMarqueeBand` + `className`; `GoogleReviewsLine` + `googleLogo`; `TestimonialsSection` exports `marqueeLayout()` (same repeat/speed rule for both bands). `globals.css`: `.testimonial-marquee-tall` = 10-line quotes (homepage band stays 6) so each highlight is in view.
+- **Tests:** `sell-by-mail-page.test.ts` +2 (every pick is a real review and every highlight is verbatim in EN + ES; section order, band reuse, wordmark file).
+- **Gate:** `npx tsc --noEmit` 0 errors · `npm run lint` 0 errors (4 pre-existing `<img>` warnings) · `npx vitest run` **2266/2266** · `npm run build` exit 0 (`/en/sellbymail` + `/es/sellbymail` prerendered).
+- **Seen in dev** (headless Chrome, EN + ES × 1280 + 390 px) — **48/48**: 200; section order steps → trust → details; Google wordmarks loaded; opener line "50+ … reviews"; 24 band cards (6 × repeats) with 24 highlights; 10-line clamp; no sideways scroll; "Read All Our Reviews" → `/reviews` / `/es/reviews`; band moves by itself, stops on hover, drags (computer); no page errors.
+- ⚠️ **Dev-only trap hit again:** the dev server served a stylesheet WITHOUT the new `.testimonial-marquee-tall` rule even after a restart, while the production build had it — fixed by stopping dev, deleting `.next/dev`, restarting (memory "dev-server-gotchas"). The build had also been run beside the running dev server, which the 09-12 rule says not to do; dev was restarted clean afterwards.
+- **To reverse:** in `sellbymail/page.tsx` remove the trust section, the `GoogleReviewsLine` under the intro and the pull-quote; the new props, `GoogleWordmark`, `google.svg`, `sell-by-mail-trust.ts` and the CSS rule are harmless left in place.
+
+## 2026-11-01 (11) — 🟢 DEPLOYED (owner): the UNLISTED `/sellbymail` page with option B images ((9)–(10)); no SQL, no env vars
+
+- **Owner:** *"Pushed and deployed"*. Production not checked by Claude (not asked).
+- **IndexNow deliberately NOT run:** the page is `noindex` and must stay out of search — submitting it would invite exactly what it avoids.
+- The link to send: `https://naplesestatejewelry.com/sellbymail` (Spanish `/es/sellbymail`), lowercase only (owner declined a case-insensitive redirect). Nothing staged-but-unpushed except docs.
+
 ## 2026-11-01 (10) — /sellbymail images (option B): icon on every step + "What we buy" icons, owner photo in the opener, storefront photo in "Rather come in?" — BUILT + STAGED, not pushed
 
 - **Owner:** *"lets add some of the images we use elsewhere on the site to this page, too... mock up some options.. maybe the ai generated icons we use?"* → options A (icons only) / B (icons + photos), made on the real page → **"Build option B"**.

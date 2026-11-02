@@ -570,6 +570,12 @@ table {
   -webkit-line-clamp: 6;
   line-clamp: 6;
 }
+/* /sellbymail's trust band (2026-11-01): ten lines, so each card's highlighted
+   trust line is in view — it often sits past line six. */
+.testimonial-marquee-tall .testimonial-card blockquote {
+  -webkit-line-clamp: 10;
+  line-clamp: 10;
+}
 .testimonial-marquee .testimonial-card figcaption,
 .testimonial-marquee .testimonial-google-link {
   font-size: 0.75rem;

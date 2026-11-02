@@ -8,7 +8,17 @@ import EvalForm from '@/components/free-evaluation/EvalForm';
 import TextUsLink from '@/components/cta/TextUsLink';
 import ClayMark, { type ClayMarkName } from '@/components/ClayMark';
 import StorefrontPhoto from '@/components/StorefrontPhoto';
+import Link from 'next/link';
+import GoogleReviewsLine from '@/components/GoogleReviewsLine';
+import GoogleWordmark from '@/components/GoogleWordmark';
+import TestimonialCard, { quoteWithHighlight } from '@/components/home/TestimonialCard';
+import TestimonialMarqueeBand from '@/components/home/TestimonialMarqueeBand';
+import { marqueeLayout } from '@/components/home/TestimonialsSection';
 import { streetLine } from '@/lib/business-location';
+import { GOOGLE_REVIEWS_URL } from '@/lib/testimonials';
+import { TRUST_BAND, TRUST_FEATURED, TRUST_PULL, trustReview } from '@/lib/sell-by-mail-trust';
+import { reviewCountLabel } from '@/lib/google-reviews';
+import { getGoogleReviews } from '@/lib/google-reviews-server';
 
 /**
  * `/sellbymail` — UNLISTED "Sell to Us by Mail" page (owner, 2026-11-01,
@@ -31,9 +41,30 @@ import { streetLine } from '@/lib/business-location';
  * a four-icon "What we buy" row, the owner photo beside the opener, and the
  * storefront photo (wide crop) in "Rather come in?" — all images the site
  * already uses; nothing new.
+ *
+ * Trust (owner, 2026-11-01, mockup 3): the review line under the intro, a
+ * "Why Sellers Trust Us" section after the steps (rating panel, one featured
+ * review, six more in the homepage's scrolling band), and one short quote
+ * above the photo form. Google's own wordmark TWICE on the page, once per
+ * section (owner rule, 2026-11-01): the rating line under the intro and the
+ * pill on the dark panel; every other "Google" here is the word.
  */
 
 const OWNER_PHOTO = '/assets/images/pages/chris-owner.webp';
+
+function GoldStars({ size }: { size: number }) {
+  return (
+    <span className="inline-flex gap-0.5" aria-hidden="true">
+      {[0, 1, 2, 3, 4].map((i) => (
+        <svg key={i} viewBox="0 0 24 24" width={size} height={size} className="block">
+          <path fill="#d4af37" d="M12 2.5l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 17.4l-6.1 3.5 1.5-6.8L2.2 9.5l6.9-.7z" />
+        </svg>
+      ))}
+    </span>
+  );
+}
+
+
 
 interface Props {
   params: Promise<{ locale: string }>;
@@ -166,6 +197,15 @@ export default async function SellByMailPage({ params }: Props) {
   const t = (pair: [string, string]) => (isEs ? pair[1] : pair[0]);
   const muted = { color: 'var(--color-on-surface-variant)' } as const;
   const headline = { fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' } as const;
+  const reviews = await getGoogleReviews();
+  const reviewCount = reviewCountLabel(reviews.count);
+  const featured = trustReview(TRUST_FEATURED);
+  const band = TRUST_BAND.flatMap((pick) => {
+    const review = trustReview(pick);
+    return review ? [{ review, highlight: pick.highlight }] : [];
+  });
+  const pull = trustReview(TRUST_PULL);
+  const { repeatsPerHalf, durationSeconds } = marqueeLayout(Math.max(1, band.length));
 
   return (
     <>
@@ -191,6 +231,7 @@ export default async function SellByMailPage({ params }: Props) {
                 ? '¿No puede venir a Naples? Envíe su oro, plata y joyería a nuestro salón con una etiqueta prepagada. Lo evaluamos todo y le hacemos una oferta en un día desde la llegada; venda lo que quiera, y lo que conserve se lo devolvemos.'
                 : 'Can’t make it to Naples? Ship your gold, silver and jewelry to our showroom with a prepaid label. We evaluate everything and make you an offer within one day of arrival — sell what you like, and anything you keep comes back to you.'}
             </p>
+            <GoogleReviewsLine settings={reviews} isEs={isEs} googleLogo className="mt-[18px] lg:justify-start" />
             <span
               className="mt-5 inline-block rounded-full border px-3.5 py-1.5 text-[0.62rem] font-bold uppercase tracking-[0.16em]"
               style={{
@@ -254,6 +295,126 @@ export default async function SellByMailPage({ params }: Props) {
                 </li>
               ))}
             </ol>
+          </PageContainer>
+        </section>
+
+        {/* Trust (after the steps): rating panel + featured review, then the
+            six trust reviews in the homepage's scrolling band. */}
+        <section
+          className="responsive-section border-t"
+          style={{ background: 'linear-gradient(180deg, #fbf7ec 0%, #fff 100%)', borderColor: 'var(--color-outline-variant)' }}
+        >
+          <PageContainer max="content">
+            <Eyebrow>{isEs ? 'Por Qué Confían en Nosotros' : 'Why Sellers Trust Us'}</Eyebrow>
+            <h2 className={H2} style={headline}>
+              {reviews.allFiveStar ? (
+                <>
+                  {isEs ? 'Cada Reseña, ' : 'Every Review, '}
+                  <span style={{ color: 'var(--color-primary)' }}>{isEs ? 'Cinco Estrellas.' : 'Five Stars.'}</span>
+                </>
+              ) : isEs ? 'Lo Que Dicen Nuestros Clientes' : 'What Our Clients Say'}
+            </h2>
+            <div className="mt-9 grid gap-5 md:grid-cols-[18rem_1fr]">
+              {/* Rating panel. The wordmark sits on a white pill — its blue and
+                  green don't hold on the dark panel. "5.0" only while every
+                  review is five stars. */}
+              <div
+                className="flex flex-col items-center justify-center gap-2.5 rounded-[18px] px-6 py-7 text-center text-white"
+                style={{ background: '#1f1a10', boxShadow: '0 22px 50px rgba(38, 28, 6, 0.18)' }}
+              >
+                <GoogleWordmark pill height="30px" />
+                {reviews.allFiveStar && (
+                  <>
+                    <GoldStars size={26} />
+                    <p className="text-[3.6rem] font-bold leading-none" style={{ fontFamily: 'var(--font-headline)', color: '#e9c349' }}>
+                      5.0
+                    </p>
+                  </>
+                )}
+                <p className="text-[1.15rem] font-extrabold" style={{ fontFamily: 'var(--font-label)' }}>
+                  {reviewCount ? (isEs ? `${reviewCount} reseñas` : `${reviewCount} reviews`) : (isEs ? 'Reseñas' : 'Reviews')}
+                </p>
+                {reviews.allFiveStar && (
+                  <p className="text-[0.8rem] font-semibold uppercase tracking-[0.14em]" style={{ fontFamily: 'var(--font-label)', color: '#d8cfb8' }}>
+                    {isEs ? 'Todas de cinco estrellas' : 'All five stars'}
+                  </p>
+                )}
+                <a
+                  href={GOOGLE_REVIEWS_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover-link hover-link-on-dark mt-1.5 text-[0.85rem] font-semibold"
+                  style={{ fontFamily: 'var(--font-label)', color: '#e9c349' }}
+                  aria-label={isEs ? 'Léalas en Google (se abre en una pestaña nueva)' : 'Read them on Google (opens in a new tab)'}
+                >
+                  {isEs ? 'Léalas en Google' : 'Read them on Google'}
+                  <span aria-hidden="true"> →</span>
+                </a>
+              </div>
+              {featured && (
+                <figure
+                  className="relative m-0 rounded-[18px] border bg-white px-[30px] pt-[30px] pb-6 shadow-[0_8px_20px_rgba(38,28,6,0.05)]"
+                  style={CARD_STYLE}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -top-1.5 left-[18px] text-[6rem] font-bold leading-none"
+                    style={{ fontFamily: 'var(--font-headline)', color: 'color-mix(in srgb, var(--color-primary) 22%, transparent)' }}
+                  >
+                    &ldquo;
+                  </span>
+                  <GoldStars size={18} />
+                  <blockquote
+                    className="relative mt-2.5 text-[clamp(1.08rem,1.8vw,1.3rem)] italic leading-[1.6]"
+                    style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
+                  >
+                    &ldquo;{quoteWithHighlight(isEs ? featured.quoteEs : featured.quote, TRUST_FEATURED.highlight && t(TRUST_FEATURED.highlight))}&rdquo;
+                  </blockquote>
+                  <figcaption className="mt-3.5 text-[0.8rem]" style={{ ...muted, fontFamily: 'var(--font-label)' }}>
+                    <strong style={{ color: 'var(--color-on-surface)' }}>{featured.name}</strong>
+                    {' · '}
+                    {isEs ? featured.metaEs : featured.meta}
+                    {' · '}
+                    <a
+                      href={GOOGLE_REVIEWS_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover-link font-semibold"
+                      style={{ color: 'var(--color-primary)' }}
+                      aria-label={isEs ? `Leer en Google: reseña completa de ${featured.name} (se abre en una pestaña nueva)` : `Read on Google: ${featured.name}'s full review (opens in a new tab)`}
+                    >
+                      {isEs ? 'Leer en Google' : 'Read on Google'}
+                      <span aria-hidden="true"> →</span>
+                    </a>
+                  </figcaption>
+                </figure>
+              )}
+            </div>
+          </PageContainer>
+          {/* Edge to edge, outside PageContainer, like the homepage band. */}
+          {band.length > 0 && (
+            <div className="mt-7">
+              <TestimonialMarqueeBand durationSeconds={durationSeconds} className="testimonial-marquee-tall">
+                {Array.from({ length: repeatsPerHalf * 2 }).flatMap((_, pass) =>
+                  band.map(({ review, highlight }) => (
+                    <TestimonialCard
+                      key={`${review.name}-${pass}`}
+                      review={review}
+                      isEs={isEs}
+                      isRepeat={pass > 0}
+                      highlight={highlight && t(highlight)}
+                    />
+                  )),
+                )}
+              </TestimonialMarqueeBand>
+            </div>
+          )}
+          <PageContainer max="content">
+            <div className="mt-7 text-center">
+              <Link href={isEs ? '/es/reviews' : '/reviews'} className="outline-button">
+                {isEs ? 'Lea Todas Nuestras Reseñas' : 'Read All Our Reviews'}
+              </Link>
+            </div>
           </PageContainer>
         </section>
 
@@ -329,6 +490,22 @@ export default async function SellByMailPage({ params }: Props) {
         {/* Photo form (step 1's "send a few photos") */}
         <section id="send-photos" className="responsive-section scroll-mt-24">
           <PageContainer max="content">
+            {pull && (
+              <figure className="mx-auto mb-11 max-w-[44rem] text-center">
+                <GoldStars size={20} />
+                <blockquote
+                  className="mt-3 text-[clamp(1.25rem,2.4vw,1.6rem)] italic leading-[1.45]"
+                  style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
+                >
+                  &ldquo;{isEs ? pull.quoteEs : pull.quote}&rdquo;
+                </blockquote>
+                <figcaption className="mt-2.5 text-[0.82rem]" style={{ ...muted, fontFamily: 'var(--font-label)' }}>
+                  <strong style={{ color: 'var(--color-on-surface)' }}>{pull.name}</strong>
+                  {' · '}
+                  {isEs ? pull.metaEs : pull.meta}
+                </figcaption>
+              </figure>
+            )}
             <Eyebrow>{isEs ? 'Empiece con Fotos' : 'Start With Photos'}</Eyebrow>
             <h2 className={H2} style={headline}>{isEs ? 'Envíenos Unas Fotos' : 'Send Us a Few Photos'}</h2>
             <p className="mx-auto mt-4 max-w-[38rem] text-center leading-relaxed" style={muted}>

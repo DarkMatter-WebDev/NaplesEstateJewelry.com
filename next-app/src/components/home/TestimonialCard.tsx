@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { GOOGLE_REVIEWS_URL, type Testimonial } from '@/lib/testimonials';
 
 /**
@@ -17,9 +18,30 @@ type Props = {
   isEs: boolean;
   /** A duplicate rendered only to fill the marquee loop — hidden from AT and the tab order. */
   isRepeat?: boolean;
+  /**
+   * A run of the quote (in the shown language) set in bold gold — /sellbymail's
+   * trust reviews (2026-11-01). Emphasis only: the words stay verbatim, and a
+   * highlight that is not in the quote shows nothing (guarded by a test).
+   */
+  highlight?: string;
 };
 
-export default function TestimonialCard({ review, isEs, isRepeat = false }: Props) {
+/** The quote with `highlight` set in bold gold, or the plain quote. */
+export function quoteWithHighlight(quote: string, highlight?: string): ReactNode {
+  const at = highlight ? quote.indexOf(highlight) : -1;
+  if (!highlight || at < 0) return quote;
+  return (
+    <>
+      {quote.slice(0, at)}
+      <strong className="font-bold" style={{ color: '#8a6a08' }}>{highlight}</strong>
+      {quote.slice(at + highlight.length)}
+    </>
+  );
+}
+
+// Cards always say the WORD "Google" — the colour logo is once per section
+// (owner rule, 2026-11-01), and a band or grid of cards is one section.
+export default function TestimonialCard({ review, isEs, isRepeat = false, highlight }: Props) {
   return (
     // `product-light-surface`: this card is always white, so on a dark
     // product page (where these reviews also render) it has to restore
@@ -42,7 +64,7 @@ export default function TestimonialCard({ review, isEs, isRepeat = false }: Prop
           `lib/testimonials.ts`. The card links to Google, where the
           untruncated review lives. */}
       <blockquote style={{ color: 'var(--color-on-surface)' }}>
-        &ldquo;{isEs ? review.quoteEs : review.quote}&rdquo;
+        &ldquo;{quoteWithHighlight(isEs ? review.quoteEs : review.quote, highlight)}&rdquo;
       </blockquote>
       <figcaption className="mt-auto pt-2" style={{ color: 'var(--color-on-surface-variant)' }}>
         <strong style={{ color: 'var(--color-on-surface)' }}>{review.name}</strong>

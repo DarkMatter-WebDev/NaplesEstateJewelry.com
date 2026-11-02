@@ -91,3 +91,33 @@ describe('photo-form leads from the page arrive marked', () => {
     expect(route).toContain('return `Sell-by-mail request from ${who}`;');
   });
 });
+
+describe('trust section (owner, 2026-11-01, mockup 3)', () => {
+  it('every pick is a real review and every highlight is verbatim in both languages', async () => {
+    const { TRUST_BAND, TRUST_FEATURED, TRUST_PULL, trustReview } = await import('@/lib/sell-by-mail-trust');
+    const picks = [TRUST_FEATURED, ...TRUST_BAND, TRUST_PULL];
+    expect(picks.map((p) => p.name)).toEqual([
+      'Mine Cervantes', 'Lorena & Scott Schultz', 'Joseph Roth', 'Edna Cavazos', 'Scott Tallent', 'Barbara Arnold', 'John P', 'Ruthe Lloyd',
+    ]);
+    for (const pick of picks) {
+      const review = trustReview(pick);
+      expect(review, pick.name).toBeDefined();
+      if (pick.highlight) {
+        expect(review!.quote).toContain(pick.highlight[0]);
+        expect(review!.quoteEs).toContain(pick.highlight[1]);
+      }
+    }
+  });
+
+  it('sits after the steps and before the details; band reused; Google wordmark used', () => {
+    const steps = PAGE.indexOf('{/* Steps */}');
+    const trust = PAGE.indexOf('{/* Trust (after the steps)');
+    const details = PAGE.indexOf('{/* Details */}');
+    expect(steps).toBeGreaterThan(0);
+    expect(trust).toBeGreaterThan(steps);
+    expect(details).toBeGreaterThan(trust);
+    expect(PAGE).toContain('<TestimonialMarqueeBand durationSeconds={durationSeconds} className="testimonial-marquee-tall">');
+    expect(PAGE).toContain('<GoogleReviewsLine settings={reviews} isEs={isEs} googleLogo');
+    expect(existsSync(join(process.cwd(), 'public', 'assets', 'images', 'brands', 'google.svg'))).toBe(true);
+  });
+});

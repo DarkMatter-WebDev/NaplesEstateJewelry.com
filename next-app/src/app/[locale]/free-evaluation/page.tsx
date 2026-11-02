@@ -16,6 +16,7 @@ import TextUsLink from '@/components/cta/TextUsLink';
 import { GOOGLE_REVIEWS_URL, TESTIMONIALS } from '@/lib/testimonials';
 import { freeEvaluationReviewsLabel } from '@/lib/google-reviews';
 import { getGoogleReviews } from '@/lib/google-reviews-server';
+import GoogleWordmark from '@/components/GoogleWordmark';
 
 // Review strip under the hero's Call / Visit buttons (2026-10-31, owner-approved
 // mockup "B + Set 1"). Three SHORT reviews shown whole, so nothing here trims a
@@ -304,7 +305,12 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
 
                 <div className="fe-reviews">
                   {/* Admin-edited count (owner, 2026-11-01): "From our 50+ five-star Google reviews". */}
-                  <p className="fe-reviews-label">{freeEvaluationReviewsLabel(googleReviews, isEs)}</p>
+                  {/* The one colour Google logo in this box (owner rule, 2026-11-01). */}
+                  <p className="fe-reviews-label">
+                    {freeEvaluationReviewsLabel(googleReviews, isEs).split('Google').map((part, i) => (
+                      <span key={i}>{i > 0 && <GoogleWordmark height="1.5em" />}{part}</span>
+                    ))}
+                  </p>
                   <ul className="fe-reviews-list">
                     {HERO_REVIEWS.map((review) => (
                       <li key={review.name} className="fe-review">

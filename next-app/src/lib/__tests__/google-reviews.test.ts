@@ -127,3 +127,62 @@ describe('where the line appears', () => {
     expect(read('..', 'supabase', 'google-reviews-2026-11.sql')).toMatch(/add column if not exists google_reviews jsonb/);
   });
 });
+
+describe("Google's own wordmark (owner, 2026-11-01)", () => {
+  // Owner rule (2026-11-01): the colour logo ONCE per section, 1–2 per page.
+  const src = (...p: string[]) => readFileSync(join(process.cwd(), 'src', ...p), 'utf8');
+  const logos = (text: string) => (text.match(/<GoogleWordmark\b/g) ?? []).length + (text.match(/<GoogleReviewsLine\b[^>]*\bgoogleLogo\b/g) ?? []).length;
+
+  it('review cards never carry it (a band or grid of cards is one section)', () => {
+    expect(src('components', 'home', 'TestimonialCard.tsx')).not.toMatch(/GoogleWordmark|googleLogo/);
+  });
+
+  it('homepage: the rating line; product pages: the note under the band — one each', () => {
+    const section = src('components', 'home', 'TestimonialsSection.tsx');
+    expect(section).toContain('<GoogleReviewsLine settings={reviews} isEs={isEs} googleLogo className="mb-9" />');
+    expect(section).toContain('{compact ? (');
+    expect(logos(section)).toBe(2); // the line (homepage only) + the note (product pages only)
+  });
+
+  it('each page has its one logo (two on /sellbymail)', () => {
+    const pages: [string[], number][] = [
+      [['app', '[locale]', 'sellbymail', 'page.tsx'], 2],
+      [['app', '[locale]', 'reviews', 'page.tsx'], 1],
+      [['app', '[locale]', 'free-evaluation', 'page.tsx'], 1],
+      [['app', '[locale]', 'about', 'page.tsx'], 1],
+      [['app', '[locale]', 'bullion', 'page.tsx'], 1],
+      [['app', '[locale]', 'faq', 'page.tsx'], 1],
+      [['components', 'card', 'CardLanding.tsx'], 2], // EN + ES branches of the one button
+    ];
+    for (const [p, n] of pages) expect(logos(src(...p)), p.join('/')).toBe(n);
+    // /silver-services: EN + ES branches of the one caption.
+    expect(logos(src('app', '[locale]', 'silver-services', 'page.tsx'))).toBe(2);
+  });
+
+  it('the gold /card button puts it on a white pill', () => {
+    expect(src('components', 'card', 'CardLanding.tsx')).toContain('<GoogleWordmark pill height="1.15em" className="-translate-y-[1.4px]" />');
+  });
+
+  it("the file is Google's official SVG (four brand colours, no script)", () => {
+    const svg = readFileSync(join(process.cwd(), 'public', 'assets', 'images', 'brands', 'google.svg'), 'utf8');
+    for (const colour of ['#4285F4', '#EA4335', '#FBBC05', '#34A853']) expect(svg).toContain(colour);
+    expect(svg).not.toMatch(/<script|onload=/i);
+  });
+});
+
+describe('Google logo + stars sit level (owner, 2026-11-01)', () => {
+  const src = (...p: string[]) => readFileSync(join(process.cwd(), 'src', ...p), 'utf8');
+  it("the wordmark drops by its own 'g' tail so the letters sit on the text baseline", () => {
+    const mark = src('components', 'GoogleWordmark.tsx');
+    expect(mark).toContain('export const GOOGLE_DESCENT_RATIO = (92 - 69.35) / 92;');
+    expect(mark).toContain('verticalAlign: `calc(${height} * ${-GOOGLE_DESCENT_RATIO})`');
+    // Pill: the extra padding goes on TOP, so the letters (not the image) are centred.
+    expect(mark).toContain('paddingTop: `calc(${height} * (0.17 + ${GOOGLE_DESCENT_RATIO}))`');
+  });
+  it('the rating-line stars: computer = top of the line + 0.06em down; phone = raised 0.04em', () => {
+    const line = src('components', 'GoogleReviewsLine.tsx');
+    expect(line).toContain('-translate-y-[0.04em] lg:self-start lg:translate-y-[0.06em]');
+    // An inline transform would override the classes.
+    expect(line).not.toMatch(/style=\{\{ transform:/);
+  });
+});

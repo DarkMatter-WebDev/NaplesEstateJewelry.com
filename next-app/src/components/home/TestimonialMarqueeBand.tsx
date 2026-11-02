@@ -35,6 +35,8 @@ type Props = {
   /** Seconds the track takes to travel one half (derived from the card count). */
   durationSeconds: number;
   children: ReactNode;
+  /** Extra class on the band, e.g. `testimonial-marquee-tall` (/sellbymail: 10-line quotes). */
+  className?: string;
 };
 
 /** Movement before a press counts as a drag rather than a click. */
@@ -42,7 +44,7 @@ const DRAG_THRESHOLD_PX = 6;
 /** After a finger lets go, wait this long before scrolling by itself again. */
 const TOUCH_RESUME_MS = 3000;
 
-export default function TestimonialMarqueeBand({ durationSeconds, children }: Props) {
+export default function TestimonialMarqueeBand({ durationSeconds, children, className = '' }: Props) {
   const bandRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
 
@@ -231,7 +233,7 @@ export default function TestimonialMarqueeBand({ durationSeconds, children }: Pr
   return (
     // Class names and data-customer-reveal-skip are load-bearing — see the
     // comments in TestimonialsSection and in globals.css.
-    <div ref={bandRef} className="testimonial-marquee" data-customer-reveal-skip>
+    <div ref={bandRef} className={`testimonial-marquee ${className}`.trim()} data-customer-reveal-skip>
       <div ref={trackRef} className="testimonial-marquee-track">
         {children}
       </div>

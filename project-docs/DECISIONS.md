@@ -4,7 +4,21 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-11-01 (9)**.
+> compaction. Last reconciled: **2026-11-01 (15)**.
+
+## The colour Google logo ONCE per section — one or two per page (2026-11-01)
+
+- **Owner:** *"only use the color google logo once on each section.. if a section like the block on the homepage has google multiple times, only use the color version once... using it too much looks bad"*; plan for *"just … once or maybe twice on each page"*.
+- **The rule:** per section, the single most visible "Google" gets the logo (a rating line / rating panel first); every other "Google" in that section — cards, captions, "Read on Google" links, notes — is the plain word. 1 logo per page, 2 at most. ⛔ Never on the gold button, legal/cookie text, the heard-about dropdown or Google Pay.
+- **Placement — BUILT 2026-11-01 (15) on the owner's yes, with one change: J `/card` gets the logo on a WHITE PILL inside the gold button (not the word):** A homepage reviews section → the rating line only (cards + note back to the word) · B /sellbymail → 2: the rating line under the intro + the white pill on the dark panel (panel link, featured caption, band cards and the quote above the form back to the word) · C product-page band → the "Client reviews on Google." note · D `/reviews` → the rating line (intro, buttons, 51 cards stay the word) · E `/free-evaluation` → the "From our 50+ five-star Google reviews" label (link stays) · F `/about`, G `/bullion`, H `/faq` → the one reviews link · I `/silver-services` → the Linda Cusumano caption · J `/card` gold button → STAYS the word (Google's yellow "o" vanishes on gold).
+- Supersedes the logo-on-every-card build in `CHANGELOG.md` 2026-11-01 (12)–(13). On dark or gold surfaces use `GoogleWordmark pill`. Guarded by `google-reviews.test.ts` (per-page counts). Record (14)–(15).
+
+## Google's own wordmark for "Google" on /sellbymail only; trust reviews picked by name, highlighted never edited (2026-11-01)
+
+- **Owner:** *"for the word 'google' can use use the real google logo / word in its signature colors?"* → mockup → **"Yes, build it"**. Told before building: Google's brand rules generally restrict using its logo, though it supplies it for businesses promoting their reviews; low risk on an unlisted page with real reviews linking to the profile — the owner's call.
+- **The file is Google's own** (`public/assets/images/brands/google.svg`, official `Google_2015_logo.svg`) — ⛔ never redrawn or recoloured (same rule as the social logos). On a dark surface it sits on a white pill.
+- **Scope:** /sellbymail only (`GoogleWordmark`, opt-in `googleLogo` props). Using it on the homepage / `/reviews` / `/free-evaluation` is an open owner question, not done.
+- **Trust picks** live in `lib/sell-by-mail-trust.ts` by reviewer NAME; the words come from `lib/testimonials.ts`. The gold-bold "highlight" is emphasis on a verbatim run — ⛔ never a shortened or reworded quote (mockup 1 trimmed two quotes and was corrected before it was shown). Record `CHANGELOG.md` 2026-11-01 (12).
 
 ## An UNLISTED `/sellbymail` page for clients and dealers the owner knows — never public (2026-11-01)
 

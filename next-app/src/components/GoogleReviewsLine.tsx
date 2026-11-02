@@ -1,4 +1,5 @@
 import { googleReviewsLine, type GoogleReviewsSettings } from '@/lib/google-reviews';
+import GoogleWordmark from '@/components/GoogleWordmark';
 
 // "★★★★★ 50+ Google reviews · All five stars" (owner, 2026-11-01, mockup 1).
 // The count comes from Admin → Settings → Google Reviews; this component is
@@ -17,24 +18,40 @@ export default function GoogleReviewsLine({
   settings,
   isEs,
   small = false,
+  googleLogo = false,
   className = '',
 }: {
   settings: GoogleReviewsSettings;
   isEs: boolean;
   /** The admin preview's second (Spanish) line. */
   small?: boolean;
+  /** Google's own wordmark in place of the word (/sellbymail, 2026-11-01). */
+  googleLogo?: boolean;
   className?: string;
 }) {
   const line = googleReviewsLine(settings, isEs);
+  const [beforeGoogle, afterGoogle] = line.count.split('Google');
+  const count = googleLogo && afterGoogle !== undefined
+    ? <>{beforeGoogle}<GoogleWordmark />{afterGoogle}</>
+    : line.count;
   return (
     <p
       className={`flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 ${small ? 'text-[0.75rem]' : 'text-[0.9rem]'} ${className}`}
       style={{ fontFamily: 'var(--font-label)', color: 'var(--color-on-surface)' }}
     >
       {/* Five drawn stars only while every review is five stars — never a
-          partial claim. The words carry the meaning for screen readers. */}
+          partial claim. The words carry the meaning for screen readers.
+          A star's gold sits mostly in its lower half, so centred stars read
+          low. On a computer they are pinned to the TOP of the line and
+          lowered 0.06em, which puts their visual weight on the middle of the
+          capitals (measured by the pixels; owner picked this, "Option 1",
+          2026-11-01). Pinned to the top, not centred: centring leaves them
+          1.8px down the line, and the browser then rounds stars and text
+          differently, so they jumped 1px depending on where the line landed.
+          Phones keep the small 0.04em raise — the owner judged those already
+          looked right. */}
       {settings.allFiveStar && (
-        <span className="inline-flex gap-0.5" aria-hidden="true">
+        <span className="inline-flex gap-0.5 -translate-y-[0.04em] lg:self-start lg:translate-y-[0.06em]" aria-hidden="true">
           <Star />
           <Star />
           <Star />
@@ -42,7 +59,7 @@ export default function GoogleReviewsLine({
           <Star />
         </span>
       )}
-      <strong className="font-extrabold">{line.count}</strong>
+      <strong className="font-extrabold">{count}</strong>
       {/* Explicit spaces around the dot for screen readers and text
           extractors; whitespace-only nodes add no flex items. */}
       {line.stars && (

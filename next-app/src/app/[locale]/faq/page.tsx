@@ -8,6 +8,7 @@ import BreadcrumbJsonLd from '@/components/BreadcrumbJsonLd';
 import SiteFooter from '@/components/layout/SiteFooter';
 import { AppIcon } from '@/components/AppIcon';
 import LinkedPhrase from '@/components/LinkedPhrase';
+import GoogleWordmark from '@/components/GoogleWordmark';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -209,7 +210,7 @@ export default async function FaqPage({ params }: Props) {
                 className="inline-flex items-center gap-2 text-[#735c00] hover:text-[#1a1c1c] transition-colors text-xs uppercase tracking-widest border-b border-[#735c00]/30 hover:border-[#735c00] pb-1"
               >
                 <AppIcon name="star" className="text-base" fill="currentColor" />
-                {isEs ? 'Leer todas nuestras reseñas en Google' : 'Read all our reviews on Google'}
+                <span>{isEs ? 'Leer todas nuestras reseñas en ' : 'Read all our reviews on '}<GoogleWordmark height="1.5em" /></span>
                 <AppIcon name="arrow_outward" className="text-base" />
               </a>
             </div>

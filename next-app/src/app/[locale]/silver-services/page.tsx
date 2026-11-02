@@ -14,6 +14,7 @@ import { TESTIMONIALS } from '@/lib/testimonials';
 import SilverMarksTeaser from '@/components/silver/SilverMarksTeaser';
 import FaqSection, { type Faq } from '@/components/FaqSection';
 import { phoneHoursLabel } from '@/lib/business-location';
+import GoogleWordmark from '@/components/GoogleWordmark';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -623,7 +624,7 @@ export default async function SilverServicesPage({ params }: Props) {
                     </p>
                   </blockquote>
                   <figcaption className="mt-3 text-xs font-bold uppercase tracking-[0.14em] text-[#8a8677]" style={{ fontFamily: 'var(--font-label)' }}>
-                    Linda Cusumano · {isEs ? 'Reseña de Google' : 'Google review'}
+                    Linda Cusumano · {isEs ? <>Reseña de <GoogleWordmark height="1.5em" /></> : <><GoogleWordmark height="1.5em" /> review</>}
                   </figcaption>
                 </figure>
               );

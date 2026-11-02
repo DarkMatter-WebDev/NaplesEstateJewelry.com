@@ -4,6 +4,7 @@ import { getGoogleReviews } from '@/lib/google-reviews-server';
 import GoogleReviewsLine from '@/components/GoogleReviewsLine';
 import TestimonialCard from './TestimonialCard';
 import TestimonialMarqueeBand from './TestimonialMarqueeBand';
+import GoogleWordmark from '@/components/GoogleWordmark';
 
 // Curated customer testimonials, shared by the homepage and product pages so
 // there is exactly one review list (src/lib/testimonials.ts) and one card
@@ -40,12 +41,21 @@ const MIN_CARDS_PER_HALF = 8;
  */
 const SECONDS_PER_CARD = 7;
 
+/** How many times the list repeats per half, and the seconds per half — shared with /sellbymail's trust band. */
+export function marqueeLayout(cardCount: number): { repeatsPerHalf: number; durationSeconds: number } {
+  const repeatsPerHalf = Math.max(1, Math.ceil(MIN_CARDS_PER_HALF / cardCount));
+  return { repeatsPerHalf, durationSeconds: repeatsPerHalf * cardCount * SECONDS_PER_CARD };
+}
+
 export default async function TestimonialsSection({ locale, compact = false }: Props) {
   const isEs = locale === 'es';
   if (BAND_TESTIMONIALS.length === 0) return null;
   // "★★★★★ 50+ Google reviews · All five stars" — homepage only (owner,
   // 2026-11-01); the count is admin-edited (Admin → Settings → Google Reviews).
   const reviews = compact ? null : await getGoogleReviews();
+  // Google's own wordmark, ONCE in this section (owner rule, 2026-11-01): on
+  // the homepage the rating line carries it; product pages (compact) have no
+  // rating line, so the note under the band does. Cards keep the word.
 
   const heading = (
     <>
@@ -61,7 +71,7 @@ export default async function TestimonialsSection({ locale, compact = false }: P
       >
         {isEs ? 'De Confianza en el Suroeste de Florida' : 'Trusted Across Southwest Florida'}
       </h2>
-      {reviews && <GoogleReviewsLine settings={reviews} isEs={isEs} className="mb-9" />}
+      {reviews && <GoogleReviewsLine settings={reviews} isEs={isEs} googleLogo className="mb-9" />}
     </>
   );
 
@@ -91,14 +101,14 @@ export default async function TestimonialsSection({ locale, compact = false }: P
         {isEs ? 'Dejar una Reseña' : 'Leave a Review'}
       </a>
       <p className="mt-3 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-        {isEs ? 'Reseñas de clientes en Google.' : 'Client reviews on Google.'}
+        {compact ? (
+          <>{isEs ? 'Reseñas de clientes en ' : 'Client reviews on '}<GoogleWordmark height="1.3em" />.</>
+        ) : isEs ? 'Reseñas de clientes en Google.' : 'Client reviews on Google.'}
       </p>
     </div>
   );
 
-  const repeatsPerHalf = Math.max(1, Math.ceil(MIN_CARDS_PER_HALF / BAND_TESTIMONIALS.length));
-  const cardsPerHalf = repeatsPerHalf * BAND_TESTIMONIALS.length;
-  const durationSeconds = cardsPerHalf * SECONDS_PER_CARD;
+  const { repeatsPerHalf, durationSeconds } = marqueeLayout(BAND_TESTIMONIALS.length);
 
   return (
     <Section className="border-t" style={{ borderColor: 'var(--color-outline-variant)' }}>

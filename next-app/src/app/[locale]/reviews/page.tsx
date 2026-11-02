@@ -91,7 +91,8 @@ export default async function ReviewsPage({ params }: Props) {
             >
               {isEs ? 'Reseñas' : 'Reviews'}
             </h1>
-            <GoogleReviewsLine settings={reviews} isEs={isEs} className="mt-4" />
+            {/* The one colour Google logo on this page (owner rule, 2026-11-01). */}
+            <GoogleReviewsLine settings={reviews} isEs={isEs} googleLogo className="mt-4" />
             <p
               className="mx-auto mt-5 max-w-2xl text-base leading-relaxed md:text-lg"
               style={{ color: 'var(--color-on-surface-variant)' }}

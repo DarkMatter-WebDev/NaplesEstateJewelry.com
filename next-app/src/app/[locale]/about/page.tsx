@@ -12,6 +12,7 @@ import ShowroomHours from '@/components/ShowroomHours';
 import CopyAddressButton from '@/components/CopyAddressButton';
 import { SocialFollowTiles } from '@/components/SocialFollow';
 import { mapsUrl, wayfindingSentence } from '@/lib/business-location';
+import GoogleWordmark from '@/components/GoogleWordmark';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -286,7 +287,7 @@ export default async function AboutPage({ params }: Props) {
                 className="hover-text inline-flex items-center gap-2 border-b pb-1 text-sm font-bold uppercase tracking-widest transition-colors"
                 style={{ color: 'var(--color-primary)', borderColor: 'color-mix(in srgb, var(--color-primary) 30%, transparent)', fontFamily: 'var(--font-label)' }}
               >
-                <span>{isEs ? 'Lea lo que dicen los clientes en Google' : 'Read what clients say on Google'}</span>
+                <span>{isEs ? 'Lea lo que dicen los clientes en ' : 'Read what clients say on '}<GoogleWordmark height="1.5em" /></span>
                 <span aria-hidden="true">-&gt;</span>
               </a>
             </div>

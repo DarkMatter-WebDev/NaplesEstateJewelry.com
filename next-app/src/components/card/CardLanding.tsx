@@ -21,6 +21,7 @@ import {
   phoneHours,
 } from '@/lib/business-location';
 import { getStoreHours } from '@/lib/store-hours';
+import GoogleWordmark from '@/components/GoogleWordmark';
 
 /**
  * The landing page printed (as a QR code) on the business cards — ONE
@@ -297,8 +298,15 @@ export default async function CardLanding({ locale, holder }: CardLandingProps) 
             {isEs ? 'Mensaje de Texto' : `Text ${holder.firstName}`}
           </a>
           <a href={GOOGLE_REVIEW_URL} target="_blank" rel="noopener noreferrer" className="gold-button" style={BIG_BUTTON}>
-            <AppIcon name="star" className="text-[1.15rem]" />
-            {isEs ? 'Dejar una Reseña en Google' : 'Leave a Google Review'}
+            {/* Star and pill raised 1.4px: flex centring sits them on the
+                line box, 1.4px below the middle of the capitals (measured;
+                owner, 2026-11-01: stars + Google logo must sit level). */}
+            <AppIcon name="star" className="-translate-y-[1.4px] text-[1.15rem]" />
+            {/* Google's logo on a white pill — on the gold button its yellow
+                "o" would vanish (owner, 2026-11-01). Once in this section. */}
+            {isEs
+              ? <>Dejar una Reseña en <GoogleWordmark pill height="1.15em" className="-translate-y-[1.4px]" /></>
+              : <>Leave a <GoogleWordmark pill height="1.15em" className="-translate-y-[1.4px]" /> Review</>}
           </a>
           {/* Read the reviews, right under the ask to leave one. An internal
               page, so a Next Link like the tiles; outline, not gold, so the

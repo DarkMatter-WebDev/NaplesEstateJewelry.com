@@ -11,6 +11,7 @@ import TradingViewTicker from '@/components/trading/TradingViewTicker';
 import { AppIcon } from '@/components/AppIcon';
 import ClayMark from '@/components/ClayMark';
 import { phoneHoursLabel } from '@/lib/business-location';
+import GoogleWordmark from '@/components/GoogleWordmark';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -268,7 +269,7 @@ export default async function BullionPage({ params }: Props) {
                 className="inline-flex items-center gap-2 text-[#735c00] hover:text-[#1a1c1c] transition-colors text-xs uppercase tracking-widest border-b border-[#735c00]/30 hover:border-[#735c00] pb-1"
               >
                 <AppIcon name="star" className="text-base" fill="currentColor" />
-                {isEs ? 'Leer reseñas en Google' : 'Read what clients say on Google'}
+                <span>{isEs ? 'Leer reseñas en ' : 'Read what clients say on '}<GoogleWordmark height="1.5em" /></span>
                 <AppIcon name="arrow_outward" className="text-base" />
               </a>
             </div>
