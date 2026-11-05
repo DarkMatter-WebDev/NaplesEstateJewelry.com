@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import type { FulfillmentStatus } from '@/types/sales';
 import { buildFulfillmentUpdateEmailContent } from '@/lib/order-fulfillment-email';
+import { isDeliveryTrackingConfigured } from '@/lib/easypost';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -71,7 +72,7 @@ export async function POST(req: Request, { params }: Props) {
     ...order,
     shipping_carrier: 'shipping_carrier' in order ? order.shipping_carrier : null,
     tracking_number: 'tracking_number' in order ? order.tracking_number : null,
-  }, status);
+  }, status, { deliveryUpdates: isDeliveryTrackingConfigured() });
 
   try {
     const { Resend } = await import('resend');

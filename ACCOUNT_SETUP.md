@@ -81,6 +81,11 @@ PAYPAL_CLIENT_ID=
 PAYPAL_CLIENT_SECRET=
 PAYPAL_ENV=sandbox
 PAYPAL_WEBHOOK_ID=
+# Delivery tracking emails (EasyPost, 2026-11-05) — production key "EZAK…";
+# the webhook secret is any long random string, then Admin -> Settings ->
+# Delivery Tracking -> Connect. Unset = no automatic delivery emails.
+EASYPOST_API_KEY=
+EASYPOST_WEBHOOK_SECRET=
 ```
 
 Only `NEXT_PUBLIC_*` values are exposed to browser code. Never use a Supabase

@@ -8,6 +8,7 @@ import AdminStoreHoursPanel from './AdminStoreHoursPanel';
 import AdminHomeBannerPanel from './AdminHomeBannerPanel';
 import AdminGoogleReviewsPanel from './AdminGoogleReviewsPanel';
 import AdminSpecialPricePanel from './AdminSpecialPricePanel';
+import AdminDeliveryTrackingPanel from './AdminDeliveryTrackingPanel';
 import MarketingSettingsPanel from './MarketingSettingsPanel';
 import EtsySettingsPanel from './EtsySettingsPanel';
 import EbaySettingsPanel from './EbaySettingsPanel';
@@ -345,6 +346,7 @@ export default function AdminSettingsPanel() {
         <AdminHomeBannerPanel />
         <AdminGoogleReviewsPanel />
         <AdminSpecialPricePanel />
+        <AdminDeliveryTrackingPanel />
         <MarketingSettingsPanel />
         <EtsySettingsPanel />
         <EbaySettingsPanel />

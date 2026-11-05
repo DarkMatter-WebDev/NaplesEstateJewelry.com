@@ -4,7 +4,14 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-11-02 (2)**.
+> compaction. Last reconciled: **2026-11-05 (2)**. Before that, **2026-11-02 (2)**.
+
+## Delivery emails: our own Out-for-delivery and Delivered emails from carrier scans via EasyPost — the webhook is a nudge, the tracker is re-read (2026-11-05)
+
+- **Owner:** wanted the "out for delivery / delivered" emails other shops send, from our own domain with our own content, at the cheapest long-term cost → **EasyPost** ($0.01–$0.03 per shipment; works with PayPal-printed USPS labels). USPS direct was rejected (Mailer-ID onboarding, 2026 access changes, may not see PayPal's labels, no retries); Shippo bills outside labels; 17TRACK's free tier is a 100-number trial.
+- **Design = mockup 4 (approved):** shipped email gets a Track Your Package button + progress line; out-for-delivery says someone must sign (every shipped order needs a signature — the site promises it); delivered has the owner's "Not in your hands yet?" box + the Google review link; tracking number on one line when it fits, never wrapped; labels never wrap; values on their label's baseline. New subjects "Your order … has shipped / is out for delivery / was delivered".
+- ⛔ **Never act on a webhook body** — it only names the tracker; re-read it from EasyPost with our key. ⛔ **Never send without the claim** (conditional update first, release on failure). ⛔ Never email for an order no longer Shipped with the SAME number, in the recycle bin, or without an email; never "out for delivery" for a scan > 24 h old or "delivered" > 7 days old.
+- **Times are the scan's local time** (EasyPost's offset kept as TEXT; UTC stamps shown in Eastern) — no Intl. The hourly pg_cron sweep (existing `TEXT_ALERTS_CRON_SECRET`, no new Vault secret) is the backstop; no second scheduler. Runbook `features/delivery-tracking.md`; record `CHANGELOG.md` 2026-11-05 (2).
 
 ## The owner can add a customer to text deals by hand — but the customer still confirms with YES, and only the customer can undo a STOP (2026-11-02)
 

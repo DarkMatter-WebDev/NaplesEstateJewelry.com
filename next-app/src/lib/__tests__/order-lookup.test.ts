@@ -101,7 +101,12 @@ describe('order emails point guests at the lookup, with the brand-cased domain',
   it('both order emails pass the order number through', () => {
     expect(read('src', 'lib', 'order-invoice-email.ts')).toContain('buildOrderEmailFooterHtml(orderNumber)');
     expect(read('src', 'lib', 'order-invoice-email.ts')).toContain('buildOrderEmailFooterTextLines(order.order_number)');
-    expect(read('src', 'lib', 'order-fulfillment-email.ts')).toContain('buildOrderEmailFooterHtml(order.order_number)');
+    // Since 2026-11-05 every fulfillment email goes through one shell, which
+    // takes the order number from each builder.
+    const fulfillment = read('src', 'lib', 'order-fulfillment-email.ts');
+    expect(fulfillment).toContain('buildOrderEmailFooterHtml(orderNumber)');
+    expect(fulfillment).toContain('buildOrderEmailFooterTextLines(order.order_number)');
+    expect(fulfillment.match(/emailShell\(\{\s*title:[^}]*?orderNumber: order\.order_number/g)?.length).toBe(4);
   });
 });
 

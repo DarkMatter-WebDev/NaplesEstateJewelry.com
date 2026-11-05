@@ -5,6 +5,8 @@ import { getVerifiedUser } from '@/lib/auth-claims';
 import OrderDetailPanel from '@/components/admin/OrderDetailPanel';
 import { loadOrderTaxExemption } from '@/lib/tax-exempt-server';
 import { loadOrderGift } from '@/lib/order-gift-server';
+import { loadOrderTracking } from '@/lib/order-tracking-server';
+import { isDeliveryTrackingConfigured } from '@/lib/easypost';
 import { formatPickupHours } from '@/lib/order-invoice-email';
 import { getStoreHours } from '@/lib/store-hours';
 import AdminHeader from '@/components/admin/AdminHeader';
@@ -260,6 +262,8 @@ export default async function AdminOrderDetailPage({ params }: Props) {
         trackingSupported={trackingSupported}
         taxExemption={await loadOrderTaxExemption(supabase, id)}
         gift={await loadOrderGift(supabase, id)}
+        deliveryTracking={await loadOrderTracking(supabase, id)}
+        deliveryTrackingEnabled={isDeliveryTrackingConfigured()}
       />
     </div>
   );

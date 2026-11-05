@@ -21,6 +21,8 @@ import OrderTaxExemptionPanel from '@/components/admin/OrderTaxExemptionPanel';
 import type { TaxExemptSnapshot } from '@/lib/tax-exempt';
 import { heardAboutAdminLabel } from '@/lib/order-heard-about';
 import type { OrderGift } from '@/lib/order-gift';
+import OrderDeliveryTracking from '@/components/admin/OrderDeliveryTracking';
+import type { OrderTrackingRow } from '@/lib/shipment-tracking';
 
 const GOLD = '#735c00';
 const BORDER = 'var(--color-outline-variant)';
@@ -84,6 +86,10 @@ interface Props {
   taxExemption?: TaxExemptSnapshot | null;
   /** "This is a gift" at checkout (lib/order-gift.ts), or null. */
   gift?: OrderGift | null;
+  /** The package's EasyPost tracking row (lib/order-tracking-server.ts), or null. */
+  deliveryTracking?: OrderTrackingRow | null;
+  /** EasyPost connected (EASYPOST_API_KEY set) — the shipped email then promises delivery updates. */
+  deliveryTrackingEnabled?: boolean;
 }
 
 export default function OrderDetailPanel({
@@ -98,6 +104,8 @@ export default function OrderDetailPanel({
   pickupHours,
   taxExemption = null,
   gift = null,
+  deliveryTracking: initialDeliveryTracking = null,
+  deliveryTrackingEnabled = false,
 }: Props) {
   const router = useRouter();
   const supabase = createClient();
@@ -128,6 +136,7 @@ export default function OrderDetailPanel({
   const [emailUpdateMessage, setEmailUpdateMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const [shippingCarrier, setShippingCarrier] = useState(order.shipping_carrier ?? '');
   const [trackingNumber, setTrackingNumber] = useState(order.tracking_number ?? '');
+  const [deliveryTracking, setDeliveryTracking] = useState<OrderTrackingRow | null>(initialDeliveryTracking);
   const [itemDiscounts, setItemDiscounts] = useState<Record<string, string>>(() =>
     Object.fromEntries(initialOrder.order_items.map((item) => [item.id, String(item.discount ?? 0)])),
   );
@@ -143,7 +152,10 @@ export default function OrderDetailPanel({
   const numericItemDiscounts = Object.fromEntries(Object.entries(itemDiscounts).map(([id, value]) => [id, Number(value) || 0]));
   const emailOrder = withInvoiceLineDiscounts(order, numericItemDiscounts);
   const emailContent = buildInvoiceEmailContent(emailOrder, invoiceNumber, { pickupHours });
-  const emailUpdateContent = emailUpdateStatus ? buildFulfillmentUpdateEmailContent(order, emailUpdateStatus) : null;
+  // Same flag the email-update route uses, so the preview matches what is sent.
+  const emailUpdateContent = emailUpdateStatus
+    ? buildFulfillmentUpdateEmailContent(order, emailUpdateStatus, { deliveryUpdates: deliveryTrackingEnabled })
+    : null;
   const persistedLineDiscount = order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(item.discount ?? 0), orderItemLineSubtotal(item)), 0);
   const editedLineDiscount = order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(itemDiscounts[item.id]) || 0, orderItemLineSubtotal(item)), 0);
   const orderLevelDiscount = Math.max(order.discount - persistedLineDiscount, 0);
@@ -335,6 +347,17 @@ export default function OrderDetailPanel({
     const ok = await updateFulfillment(status);
     if (!ok) return;
     setPendingFulfillmentStatus(null);
+    if (status === 'shipped' && deliveryTrackingEnabled && trackingNumber.trim() && order.shipping_method === 'shipping') {
+      // Register the package with EasyPost now (best-effort — the hourly sweep
+      // registers it anyway if this fails or the tab closes).
+      try {
+        const response = await fetch(`/api/admin/orders/${order.id}/tracking`, { method: 'POST' });
+        const result = await response.json().catch(() => null);
+        if (result && 'tracking' in result) setDeliveryTracking(result.tracking ?? null);
+      } catch {
+        // The sweep covers it.
+      }
+    }
     if (shouldNotify) {
       setEmailUpdateStatus(status);
       setEmailUpdateRecipient(order.customer_email ?? '');
@@ -1055,6 +1078,14 @@ export default function OrderDetailPanel({
                     </div>
                   )}
                 </dl>
+              )}
+              {order.fulfillment_status === 'shipped' && order.shipping_method === 'shipping' && order.tracking_number?.trim() && (
+                <OrderDeliveryTracking
+                  orderId={order.id}
+                  tracking={deliveryTracking}
+                  enabled={deliveryTrackingEnabled}
+                  onChange={setDeliveryTracking}
+                />
               )}
               {pendingFulfillmentStatus && (
                 <div className="mt-3 grid gap-4 border px-4 py-4" style={{ borderColor: BORDER, background: 'var(--color-surface-container-low)' }}>

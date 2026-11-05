@@ -1017,6 +1017,13 @@ Visitor lands with ?gclid=… (auto-tagging)      Visitor lands without one
 - **Reconciliation:** `finalizePaidOrder` (client capture + webhook) runs `settleOffersAfterPaidOrder`; pg_cron `nej-offers-sweep` (15 min, TEXT_ALERTS_CRON_SECRET) expires offers/counters, closes offers on sold items, retries refused releases and missed emails. PayPal reference `offer-<uuid>` keeps the webhook's uuid-custom_id order lookup from misfiring.
 - Runbook `features/make-offer.md`.
 
+## Delivery Tracking Emails (2026-11-05)
+
+- **Flow:** Mark Shipped → `POST /api/admin/orders/[id]/tracking` → EasyPost tracker (`lib/easypost.ts`) → row in `public.order_tracking`. Carrier scans arrive at `POST /api/webhooks/easypost` (HMAC `X-Hmac-Signature`, fails closed), which re-reads the tracker from EasyPost and calls `applyTrackerUpdate` (`lib/order-tracking-server.ts`); that stores the scan and sends the out-for-delivery / delivered email (`buildDeliveryUpdateEmailContent`) after claiming it with a conditional update.
+- **Scheduler:** pg_cron `nej-order-tracking-sweep` at :20 hourly → `/api/admin/orders/tracking-sweep` (`TEXT_ALERTS_CRON_SECRET`): registers missed packages (shipped in the last 30 days) and re-reads packages still in transit — the backstop for lost webhooks and frozen functions.
+- **Data:** `order_tracking` (one row per order, service-role writes, admin read via RLS); scan times kept as EasyPost's raw strings (local offset). Automatic emails logged in `order_emails` (`fulfillment_update`, status `out_for_delivery` / `delivered`, `sent_by_email` "Automatic (delivery tracking)").
+- **Config:** `EASYPOST_API_KEY`, `EASYPOST_WEBHOOK_SECRET` (Netlify); webhook registered from Admin → Settings → Delivery Tracking → Connect (`/api/admin/easypost`). Runbook `features/delivery-tracking.md`.
+
 ## Public-shop cache invalidation (2026-07-02)
 
 `/shop` is server-cached (`unstable_cache`, tag `shop-catalog`, `revalidate: 300`).
