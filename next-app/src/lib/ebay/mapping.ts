@@ -715,6 +715,16 @@ export function buildPreflightChecks(
         : undefined,
   });
 
+  // Check Availability (owner, 2026-11-05): a piece another dealer holds is
+  // sold only through the site's Buy link — eBay would sell it instantly.
+  checks.push({
+    check: 'confirm_availability',
+    ok: product.confirm_availability !== true,
+    message: product.confirm_availability === true
+      ? 'This item is set to "Confirm availability first" — it stays off eBay (buyers ask on the site before buying).'
+      : undefined,
+  });
+
   checks.push({
     check: 'status',
     ok: product.status === 'available',

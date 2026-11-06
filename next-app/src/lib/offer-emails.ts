@@ -224,6 +224,130 @@ export function buildOwnerOfferEmail(input: OwnerOfferEmailInput): BuiltEmail {
   return { subject, html, text };
 }
 
+// ---------------------------------------------------------------------------
+// Check Availability (owner, 2026-11-05, mockup 1) — the same frame, no money
+// held at any point. 'countered' here is the owner's "Available — send Buy
+// link"; 'declined' is "Not available".
+// ---------------------------------------------------------------------------
+
+export type AvailabilityEmailInput = {
+  kind: OfferBuyerEmail;
+  isEs: boolean;
+  customerName: string;
+  productTitle: string;
+  productUrl: string;
+  /** The Buy link's price (counter_amount) — 'countered' only. */
+  price?: number | null;
+  ownerNote?: string | null;
+  buyUrl?: string | null;
+  buyUntil?: string | null;
+};
+
+export function buildAvailabilityBuyerEmail(input: AvailabilityEmailInput): BuiltEmail {
+  const { isEs } = input;
+  const name = escapeHtml(firstName(input.customerName));
+  const item = escapeHtml(input.productTitle);
+  const eyebrow = isEs ? 'Consulta de disponibilidad' : 'Availability check';
+  const textFooter = [isEs ? `¿Preguntas? Llame o envíe un texto al ${BUSINESS_PHONE}.` : `Questions? Call or text ${BUSINESS_PHONE}.`, SITE_DOMAIN_LABEL];
+  const note = input.ownerNote ? [ownerNoteLine(input.ownerNote)] : [];
+  const shopUrl = `${getSiteUrl()}${isEs ? '/es' : ''}/shop`;
+
+  if (input.kind === 'received') {
+    const heading = isEs ? 'Lo estamos verificando' : 'We’re checking on it';
+    const subject = isEs ? `Estamos verificando ${input.productTitle}` : `We’re checking on ${input.productTitle}`;
+    const lines = isEs
+      ? [`Hola ${name}, gracias por preguntar por <strong>${item}</strong>.`, 'Estamos confirmando que está lista para enviar. <strong>No se le ha cobrado nada.</strong>']
+      : [`Hi ${name}, thanks for asking about <strong>${item}</strong>.`, 'We’re confirming it’s ready to ship. <strong>You haven’t been charged anything.</strong>'];
+    const watch = isEs ? OFFER_EMAIL_WATCH_LINE_ES : OFFER_EMAIL_WATCH_LINE_EN;
+    const html = frame(eyebrow, heading, lines.map(p).join('') + pCentered(watch) + button(input.productUrl, isEs ? 'Ver la pieza' : 'View the piece'), isEs);
+    const text = [heading, '', ...lines.map(stripTags), watch, '', input.productUrl, '', ...textFooter].join('\n');
+    return { subject, html, text };
+  }
+
+  if (input.kind === 'countered') {
+    const price = formatCheckoutCurrency(input.price ?? 0);
+    const heading = isEs ? 'Buenas noticias: está disponible' : 'Good news — it’s available';
+    const subject = isEs ? `Buenas noticias: ${input.productTitle} está disponible` : `Good news — ${input.productTitle} is available`;
+    const lines = [
+      isEs ? `Hola ${name}, <strong>${item}</strong> está disponible y lista para enviar.` : `Hi ${name}, <strong>${item}</strong> is available and ready to ship.`,
+      ...note,
+      isEs
+        ? `La reservamos solo para usted hasta el <strong>${escapeHtml(input.buyUntil ?? '')}</strong>. Pague con nuestro proceso de pago normal: envío o recogida local, tarjeta o PayPal.`
+        : `It’s held just for you until <strong>${escapeHtml(input.buyUntil ?? '')}</strong>. Pay through our normal checkout — shipping or local pickup, card or PayPal.`,
+    ];
+    const label = isEs ? `Comprar ahora por ${price}` : `Buy now at ${price}`;
+    const url = input.buyUrl ?? input.productUrl;
+    const html = frame(eyebrow, heading, lines.map(p).join('') + button(url, label), isEs);
+    const text = [heading, '', ...lines.map(stripTags), '', `${label}: ${url}`, '', ...textFooter].join('\n');
+    return { subject, html, text };
+  }
+
+  // declined (Not available), expired (not answered in time), item_sold (sold another way).
+  const unanswered = input.kind === 'expired';
+  const heading = unanswered
+    ? (isEs ? 'No pudimos confirmarla a tiempo' : 'We couldn’t confirm it in time')
+    : (isEs ? 'Esta pieza se vendió' : 'This piece has sold');
+  const subject = `${heading} — ${input.productTitle}`;
+  const why = unanswered
+    ? (isEs
+        ? `Lo sentimos: no pudimos confirmar la disponibilidad de <strong>${item}</strong> a tiempo. Llámenos o envíenos un texto y lo verificamos de inmediato.`
+        : `We’re sorry — we weren’t able to confirm <strong>${item}</strong> in time. Call or text us and we’ll check right away.`)
+    : (isEs
+        ? `Gracias por preguntar por <strong>${item}</strong>. Lo sentimos: ya no está disponible.`
+        : `Thank you for asking about <strong>${item}</strong>. We’re sorry — it’s no longer available.`);
+  const lines = [
+    isEs ? `Hola ${name},` : `Hi ${name},`,
+    why,
+    ...(input.kind === 'declined' ? note : []),
+    isEs ? '<strong>Nunca se le cobró nada.</strong>' : '<strong>You were never charged.</strong>',
+  ];
+  const cta = unanswered
+    ? button(input.productUrl, isEs ? 'Ver la pieza' : 'View the piece')
+    : button(shopUrl, isEs ? 'Ver la tienda' : 'Browse the shop');
+  const html = frame(eyebrow, heading, lines.map(p).join('') + cta, isEs);
+  const text = [heading, '', ...lines.map(stripTags), '', unanswered ? input.productUrl : shopUrl, '', ...textFooter].join('\n');
+  return { subject, html, text };
+}
+
+export type OwnerAvailabilityEmailInput = {
+  productTitle: string;
+  inventoryNumber: string | null;
+  listedPrice: number | null;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  message: string | null;
+  adminUrl: string;
+};
+
+export function buildOwnerAvailabilityEmail(input: OwnerAvailabilityEmailInput): BuiltEmail {
+  const item = input.inventoryNumber ? `${input.productTitle} (#${input.inventoryNumber})` : input.productTitle;
+  const listed = input.listedPrice ? `Listed at ${formatCheckoutCurrency(input.listedPrice)}.` : '';
+  const contactParts = [input.customerName, input.customerPhone, input.customerEmail].filter((part) => part && part.trim());
+  const contactHtml = contactParts
+    .map((part) => (part === input.customerPhone ? `<span style="white-space:nowrap;">${escapeHtml(part)}</span>` : escapeHtml(part)))
+    .join(' · ');
+  const subject = `Availability check: ${input.productTitle}`;
+  const lines = [
+    `<strong>${escapeHtml(item)}</strong>`,
+    `${escapeHtml(listed)} ${contactHtml}`,
+    ...(input.message ? [`&ldquo;${escapeHtml(input.message)}&rdquo;`] : []),
+    'No payment has been taken. Answer on the Offers page to send a Buy link — or a “sorry, it sold”.',
+  ];
+  const html = frame('NaplesEstateJewelry.com — Availability check', 'Check with the dealer', lines.map(p).join('') + button(input.adminUrl, 'Open Offers'), false);
+  const text = [
+    'Check with the dealer',
+    item,
+    listed,
+    contactParts.join(' · '),
+    ...(input.message ? [`"${input.message}"`] : []),
+    'No payment has been taken. Answer on the Offers page to send a Buy link — or a "sorry, it sold".',
+    '',
+    `Open Offers: ${input.adminUrl}`,
+  ].filter(Boolean).join('\n');
+  return { subject, html, text };
+}
+
 function ownerNoteLine(note: string): string {
   return `<em>&ldquo;${escapeHtml(note)}&rdquo; — Chris</em>`;
 }

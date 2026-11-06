@@ -9,7 +9,7 @@ import {
   round2,
   type CheckoutOrderItem,
 } from '@/lib/checkout-pricing';
-import { isCheckoutShippingMethod, shippingMethodForDb } from '@/lib/checkout-shipping';
+import { DEFAULT_SHIPPING_METHOD, isCheckoutShippingMethod, shippingMethodForDb } from '@/lib/checkout-shipping';
 import {
   authorizePayPalOrder,
   capturePayPalAuthorization,
@@ -40,10 +40,15 @@ import { normalizePhoneNumber } from '@/lib/phone';
 import { validateUsShippingAddress } from '@/lib/us-address';
 import { getSiteUrl } from '@/lib/order-email-branding';
 import { ownerNotificationRecipient } from '@/lib/order-owner-notification';
-import { buildOfferBuyerEmail, buildOwnerOfferEmail } from '@/lib/offer-emails';
+import { buildAvailabilityBuyerEmail, buildOfferBuyerEmail, buildOwnerAvailabilityEmail, buildOwnerOfferEmail } from '@/lib/offer-emails';
 import {
   OWNER_NOTE_MAX,
   OFFER_ABANDON_AFTER_MINUTES,
+  availabilityLinkExpiresAt,
+  formatOfferDeadline,
+  normalizeOfferKind,
+  ownerAvailabilityTextBody,
+  type OfferKind,
   type OfferItemDetails,
   OFFER_MESSAGE_MAX,
   buyerEmailForStatus,
@@ -90,11 +95,13 @@ export const OFFER_COLUMNS = [
   'total', 'customer_name', 'customer_email', 'customer_phone', 'shipping_address', 'message', 'locale', 'user_id',
   'order_snapshot', 'paypal_order_id', 'authorization_id', 'authorized_at', 'expires_at', 'hold_status',
   'counter_amount', 'counter_note', 'counter_sent_at', 'counter_expires_at', 'order_id', 'decided_at', 'last_error',
-  'owner_notified_at', 'notified_status', 'created_at', 'updated_at',
+  'owner_notified_at', 'notified_status', 'created_at', 'updated_at', 'kind',
 ].join(', ');
 
 export type OfferRow = {
   id: string;
+  /** 'offer' (PayPal hold) or 'availability' (Check Availability, no payment) — lib/offers.ts. */
+  kind: OfferKind;
   product_id: string;
   status: OfferStatus;
   amount: number;
@@ -155,6 +162,7 @@ function normalizeOfferRow(row: Record<string, unknown>): OfferRow {
     total: toNumber(row.total),
     counter_amount: row.counter_amount == null ? null : toNumber(row.counter_amount),
     status: isOfferStatus(row.status) ? row.status : 'pending',
+    kind: normalizeOfferKind(row.kind),
   };
 }
 
@@ -165,10 +173,11 @@ export function isMissingOffersSchemaError(error: { message?: string | null; cod
     || error?.code === 'PGRST205'
     || message.includes('product_offers')
     || message.includes('accepts_offers')
+    || message.includes('confirm_availability')
     || message.includes('offer_id');
 }
 
-export const OFFERS_SQL_HINT = 'Run supabase/make-offer-2026-10.sql in Supabase first.';
+export const OFFERS_SQL_HINT = 'Run supabase/make-offer-2026-10.sql and supabase/availability-check-2026-11.sql in Supabase first.';
 
 export function hashCounterToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
@@ -188,6 +197,8 @@ export type OfferProduct = {
   listedPrice: number | null;
   purchasable: boolean;
   acceptsOffers: boolean;
+  /** The item's "Confirm availability first" box (Check Availability). */
+  confirmAvailability: boolean;
 };
 
 /** Today's checkout prices for these products, the way checkout prices them. */
@@ -199,7 +210,7 @@ export async function loadOfferProducts(
   const result = new Map<string, OfferProduct>();
   if (ids.length === 0) return result;
   const [{ data, error }, spotData] = await Promise.all([
-    client.from('products').select(`${CHECKOUT_PRODUCT_COLUMNS}, title_es, accepts_offers`).in('id', ids),
+    client.from('products').select(`${CHECKOUT_PRODUCT_COLUMNS}, title_es, accepts_offers, confirm_availability`).in('id', ids),
     fetchSpotData(),
   ]);
   if (error) throw error;
@@ -211,6 +222,7 @@ export async function loadOfferProducts(
       listedPrice: price > 0 ? price : null,
       purchasable: isProductPurchasable(raw.status, raw.quantity),
       acceptsOffers: raw.accepts_offers === true,
+      confirmAvailability: raw.confirm_availability === true,
     });
   }
   return result;
@@ -417,6 +429,131 @@ export async function createOffer(
 }
 
 // ---------------------------------------------------------------------------
+// Buyer: Check Availability (owner, 2026-11-05, mockup 1) — no payment
+// ---------------------------------------------------------------------------
+
+export type CreateAvailabilityInput = {
+  productId: string;
+  customer: Record<string, unknown>;
+  message: unknown;
+  locale: string;
+  userId: string | null;
+};
+
+/**
+ * A buyer asks whether a piece another dealer holds is still available. No
+ * PayPal at all: the row opens at once (kind 'availability', status 'open',
+ * 72 hours to answer), the owner gets an email + text, the buyer a "we're
+ * checking" email. The answer is sendAvailabilityLink or declineOffer.
+ */
+export async function createAvailabilityRequest(
+  service: SupabaseClient,
+  input: CreateAvailabilityInput,
+): Promise<OfferResult<{ offerId: string }>> {
+  const isEs = input.locale === 'es';
+  const loaded = await loadOfferProduct(service, input.productId).catch((error) => {
+    if (isMissingOffersSchemaError(error)) return null;
+    throw error;
+  });
+  if (!loaded || !loaded.confirmAvailability) {
+    return fail(404, isEs ? 'Esta pieza se puede comprar directamente.' : 'This piece can be bought directly — no need to ask.', 'not_check_first');
+  }
+  if (!loaded.purchasable) {
+    return fail(409, isEs ? 'Esta pieza ya no está disponible.' : 'This piece is no longer available.', 'unavailable');
+  }
+  if (loaded.listedPrice == null) {
+    return fail(
+      503,
+      isEs
+        ? 'No podemos tomar consultas en línea por esta pieza en este momento. Llame al (239) 404-8505.'
+        : 'We cannot take online requests on this piece right now. Please call (239) 404-8505.',
+      'spot_unavailable',
+    );
+  }
+
+  const customer = input.customer;
+  const name = normalizePersonName(customer.name);
+  if (!name) return fail(400, isEs ? 'Escriba su nombre y apellido.' : 'Enter both a first and last name.');
+  const email = String(customer.email ?? '').trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return fail(400, isEs ? 'Escriba un correo electrónico válido.' : 'Enter a valid email address.');
+  }
+  // Optional — but a number that is typed must be a real one.
+  const rawPhone = String(customer.phone ?? '').trim();
+  const phone = rawPhone ? normalizePhoneNumber(rawPhone) : '';
+  if (phone === null) return fail(400, isEs ? 'Escriba un teléfono válido, o déjelo en blanco.' : 'Enter a valid phone number, or leave it blank.');
+
+  const { data: existing, error: existingError } = await service
+    .from('product_offers')
+    .select('id')
+    .eq('product_id', input.productId)
+    .ilike('customer_email', email)
+    .eq('status', 'open')
+    .limit(1);
+  if (existingError) {
+    if (isMissingOffersSchemaError(existingError)) return fail(503, OFFERS_SQL_HINT);
+    throw existingError;
+  }
+  if (existing && existing.length > 0) {
+    return fail(
+      409,
+      isEs
+        ? 'Ya nos preguntó por esta pieza. Le responderemos pronto por correo electrónico.'
+        : 'You already asked about this piece. We’ll email you soon.',
+      'already_open',
+    );
+  }
+
+  const now = new Date();
+  const price = loaded.listedPrice;
+  const { data: inserted, error: insertError } = await service
+    .from('product_offers')
+    .insert({
+      product_id: input.productId,
+      kind: 'availability',
+      status: 'open',
+      amount: price,
+      listed_price: price,
+      // Not asked yet — the buyer picks pickup or shipping on the Buy link's checkout.
+      shipping_method: DEFAULT_SHIPPING_METHOD,
+      subtotal: price,
+      tax: 0,
+      shipping_fee: 0,
+      total: price,
+      customer_name: name,
+      customer_email: email,
+      customer_phone: phone,
+      shipping_address: null,
+      message: cleanOfferText(input.message, OFFER_MESSAGE_MAX),
+      locale: isEs ? 'es' : 'en',
+      user_id: input.userId,
+      order_snapshot: [],
+      expires_at: offerExpiresAt(now).toISOString(),
+      hold_status: 'none',
+    })
+    .select(OFFER_COLUMNS)
+    .single();
+  if (insertError || !inserted) {
+    if (isMissingOffersSchemaError(insertError)) return fail(503, OFFERS_SQL_HINT);
+    // The one-open-per-buyer index (an open OFFER by the same email on this item).
+    if (insertError?.code === '23505') {
+      return fail(
+        409,
+        isEs ? 'Ya tiene una solicitud abierta por esta pieza. Le responderemos pronto.' : 'You already have a request open on this piece. We’ll answer it soon.',
+        'already_open',
+      );
+    }
+    throw insertError ?? new Error('Availability request was not created.');
+  }
+  const request = normalizeOfferRow(inserted as unknown as Record<string, unknown>);
+  await Promise.allSettled([
+    notifyOwnerOfOffer(service, request, loaded),
+    sendBuyerEmailForStatus(service, request, loaded.product.title, loaded.product.title_es ?? null),
+  ]);
+  return { ok: true, offerId: request.id };
+}
+
+// ---------------------------------------------------------------------------
 // Buyer approved the PayPal window → hold the money
 // ---------------------------------------------------------------------------
 
@@ -577,7 +714,18 @@ async function sendResend(input: { to: string; subject: string; html: string; te
 async function notifyOwnerOfOffer(service: SupabaseClient, offer: OfferRow, product: OfferProduct): Promise<void> {
   if (offer.owner_notified_at) return;
   const inventoryNumber = product.product.inventory_number != null ? String(product.product.inventory_number) : null;
-  const built = buildOwnerOfferEmail({
+  const built = offer.kind === 'availability'
+    ? buildOwnerAvailabilityEmail({
+        productTitle: product.product.title,
+        inventoryNumber,
+        listedPrice: offer.listed_price,
+        customerName: offer.customer_name,
+        customerEmail: offer.customer_email,
+        customerPhone: offer.customer_phone,
+        message: offer.message,
+        adminUrl: adminOffersUrl(),
+      })
+    : buildOwnerOfferEmail({
     offerId: offer.id,
     productTitle: product.product.title,
     inventoryNumber,
@@ -601,7 +749,15 @@ async function notifyOwnerOfOffer(service: SupabaseClient, offer: OfferRow, prod
       text: built.text,
       idempotencyKey: `offer-${offer.id}-owner`,
     }),
-    textOwnerAboutOffer(offer, product.product.title, inventoryNumber),
+    offer.kind === 'availability'
+      ? textOwner(ownerAvailabilityTextBody({
+          title: product.product.title,
+          inventoryNumber,
+          listedPrice: offer.listed_price,
+          customerName: offer.customer_name,
+          adminUrl: adminOffersUrl(),
+        }))
+      : textOwnerAboutOffer(offer, product.product.title, inventoryNumber),
   ]);
   if (emailed.status === 'fulfilled' && emailed.value) {
     await service.from('product_offers').update({ owner_notified_at: new Date().toISOString() }).eq('id', offer.id);
@@ -609,23 +765,25 @@ async function notifyOwnerOfOffer(service: SupabaseClient, offer: OfferRow, prod
 }
 
 async function textOwnerAboutOffer(offer: OfferRow, title: string, inventoryNumber: string | null): Promise<void> {
+  await textOwner(ownerOfferTextBody({
+    amount: offer.amount,
+    title,
+    inventoryNumber,
+    listedPrice: offer.listed_price,
+    customerName: offer.customer_name,
+    shippingMethod: offer.shipping_method,
+    expiresAt: offer.expires_at,
+    adminUrl: adminOffersUrl(),
+  }));
+}
+
+/** One text to the owner's cell (Twilio); best-effort, never throws. */
+async function textOwner(body: string): Promise<void> {
   try {
     const { twilioConfigured, DEFAULT_FORWARD_TO } = await import('@/lib/text-alerts/config');
     if (!twilioConfigured()) return;
     const { sendTwilioMessage } = await import('@/lib/text-alerts/twilio');
-    await sendTwilioMessage({
-      to: process.env.TWILIO_FORWARD_TO?.trim() || DEFAULT_FORWARD_TO,
-      body: ownerOfferTextBody({
-        amount: offer.amount,
-        title,
-        inventoryNumber,
-        listedPrice: offer.listed_price,
-        customerName: offer.customer_name,
-        shippingMethod: offer.shipping_method,
-        expiresAt: offer.expires_at,
-        adminUrl: adminOffersUrl(),
-      }),
-    });
+    await sendTwilioMessage({ to: process.env.TWILIO_FORWARD_TO?.trim() || DEFAULT_FORWARD_TO, body });
   } catch (error) {
     console.error('Offer owner text error:', error);
   }
@@ -645,11 +803,24 @@ async function sendBuyerEmailForStatus(
   // A counter email needs the raw token, which only exists at the moment the
   // counter is made; a retry without it cannot rebuild the link.
   if (kind === 'countered' && !counterToken) return false;
-  const built = buildOfferBuyerEmail({
+  const productTitle = (isEs ? titleEs : null) || title;
+  const built = offer.kind === 'availability'
+    ? buildAvailabilityBuyerEmail({
+        kind,
+        isEs,
+        customerName: offer.customer_name,
+        productTitle,
+        productUrl: productUrl(offer.product_id, isEs),
+        price: offer.counter_amount,
+        ownerNote: offer.counter_note,
+        buyUrl: counterToken ? counterUrl(counterToken, isEs) : null,
+        buyUntil: formatOfferDeadline(offer.counter_expires_at ?? null, isEs),
+      })
+    : buildOfferBuyerEmail({
     kind,
     isEs,
     customerName: offer.customer_name,
-    productTitle: (isEs ? titleEs : null) || title,
+    productTitle,
     productUrl: productUrl(offer.product_id, isEs),
     amount: offer.amount,
     total: offer.total,
@@ -754,6 +925,7 @@ export async function counterOffer(
 ): Promise<OfferResult<{ offer: OfferRow; emailed: boolean; link: string }>> {
   const offer = await loadOffer(service, 'id', offerId);
   if (!offer) return fail(404, 'Offer not found.');
+  if (offer.kind === 'availability') return fail(409, 'This is an availability check — use “Available — send Buy link”.');
   if (!isOfferLive(offer)) return fail(409, 'This offer is no longer open.');
   const product = await loadOfferProduct(service, offer.product_id);
   if (!product?.purchasable) return fail(409, 'This item is no longer available.');
@@ -803,12 +975,58 @@ export async function resendCounter(
   return { ok: true, offer: updated, emailed, link: counterUrl(token, updated.locale === 'es') };
 }
 
+/**
+ * Check Availability → "Available — send Buy link" (owner, 2026-11-05): the
+ * counter-offer link at TODAY's price, good for 48 hours, with the owner's
+ * optional note. Paying it goes through the normal checkout
+ * (/api/paypal/create-order with the token) and the sale settles as
+ * 'counter_bought'. Nobody else can buy the piece meanwhile — the checkout
+ * refuses a "Confirm availability first" item without its link.
+ */
+export async function sendAvailabilityLink(
+  service: SupabaseClient,
+  offerId: string,
+  input: { note?: unknown } = {},
+): Promise<OfferResult<{ offer: OfferRow; emailed: boolean; link: string }>> {
+  const offer = await loadOffer(service, 'id', offerId);
+  if (!offer) return fail(404, 'Request not found.');
+  if (offer.kind !== 'availability') return fail(409, 'This is an offer, not an availability check.');
+  if (!isOfferLive(offer)) return fail(409, 'This request is no longer open.');
+  const product = await loadOfferProduct(service, offer.product_id);
+  if (!product?.purchasable) return fail(409, 'This item is no longer marked available on the site.');
+  const price = product.listedPrice;
+  if (price == null) return fail(503, 'Live metal pricing is unavailable right now, so the price cannot be locked. Try again in a few minutes.');
+
+  const token = newCounterToken();
+  const sentAt = new Date();
+  const sent = await closeWithRelease(service, offer, 'countered', {
+    counter_amount: price,
+    counter_note: cleanOfferText(input.note, OWNER_NOTE_MAX),
+    counter_token_hash: hashCounterToken(token),
+    counter_sent_at: sentAt.toISOString(),
+    counter_expires_at: availabilityLinkExpiresAt(sentAt).toISOString(),
+  });
+  if (!sent) return fail(409, 'The request changed while sending. Reload the page.');
+  const emailed = await sendBuyerEmailForStatus(service, sent, product.product.title, product.product.title_es ?? null, token);
+  return { ok: true, offer: sent, emailed, link: counterUrl(token, sent.locale === 'es') };
+}
+
+/**
+ * Close every open request / live link on these products if they are no longer
+ * for sale (the "Not available → also mark Sold" path runs it at once instead
+ * of waiting for the 15-minute sweep).
+ */
+export async function closeOffersForProducts(service: SupabaseClient, productIds: string[]): Promise<number> {
+  return closeOffersOnUnavailableProducts(service, productIds, null);
+}
+
 export async function acceptOffer(
   service: SupabaseClient,
   offerId: string,
 ): Promise<OfferResult<{ offer: OfferRow; orderId: string; orderNumber: string; itemConflict?: boolean }>> {
   const offer = await loadOffer(service, 'id', offerId);
   if (!offer) return fail(404, 'Offer not found.');
+  if (offer.kind === 'availability') return fail(409, 'An availability check holds no payment — send a Buy link instead.');
   if (offer.status !== 'open') return fail(409, `This offer is ${offer.status.replace('_', ' ')}, not open.`);
   if (!isOfferLive(offer)) {
     await expireOffer(service, offer);
@@ -932,7 +1150,7 @@ export type LiveCounter = {
 
 export type CounterLookup =
   | { state: 'live'; counter: LiveCounter }
-  | { state: 'expired' | 'sold' | 'used' | 'missing' };
+  | { state: 'expired' | 'sold' | 'used' | 'missing'; kind?: OfferKind };
 
 export async function findCounterByToken(service: SupabaseClient, token: string): Promise<CounterLookup> {
   if (!token || token.length < 16 || token.length > 128) return { state: 'missing' };
@@ -947,11 +1165,12 @@ export async function findCounterByToken(service: SupabaseClient, token: string)
   }
   if (!data) return { state: 'missing' };
   const offer = normalizeOfferRow(data as unknown as Record<string, unknown>);
-  if (offer.status === 'counter_bought') return { state: 'used' };
-  if (offer.status === 'item_sold') return { state: 'sold' };
-  if (!isCounterLive(offer)) return { state: 'expired' };
+  const kind = offer.kind;
+  if (offer.status === 'counter_bought') return { state: 'used', kind };
+  if (offer.status === 'item_sold') return { state: 'sold', kind };
+  if (!isCounterLive(offer)) return { state: 'expired', kind };
   const product = await loadOfferProduct(service, offer.product_id);
-  if (!product?.purchasable) return { state: 'sold' };
+  if (!product?.purchasable) return { state: 'sold', kind };
   return { state: 'live', counter: { offer, product } };
 }
 

@@ -1017,6 +1017,12 @@ Visitor lands with ?gclid=… (auto-tagging)      Visitor lands without one
 - **Reconciliation:** `finalizePaidOrder` (client capture + webhook) runs `settleOffersAfterPaidOrder`; pg_cron `nej-offers-sweep` (15 min, TEXT_ALERTS_CRON_SECRET) expires offers/counters, closes offers on sold items, retries refused releases and missed emails. PayPal reference `offer-<uuid>` keeps the webhook's uuid-custom_id order lookup from misfiring.
 - Runbook `features/make-offer.md`.
 
+## Check Availability (2026-11-05)
+
+- **Data:** `products.confirm_availability` (per item, anon/auth read grant); requests are `product_offers` rows with `kind = 'availability'` — status `open` with NO PayPal hold.
+- **Flow:** item page / shop card → `/availability/[id]` → `POST /api/availability` (`createAvailabilityRequest`) → owner email + text, buyer "checking" email → Admin → Offers: `available` (`sendAvailabilityLink`: the counter token at today's price, 48 h → `/offer/counter/[token]` → normal checkout → `counter_bought` via `settleOffersAfterPaidOrder`) or `unavailable` (decline + optional `adminUpdateProductStatus(…,'sold')`).
+- **Enforcement:** `/api/paypal/create-order` refuses a ticked item without its counter token; eBay/Etsy pre-flight refuse ticked items; `/meta-checkout` redirects a ticked Meta Buy tap to the form. The 15-minute `nej-offers-sweep` expires requests/links. Runbook `features/availability-check.md`.
+
 ## Delivery Tracking Emails (2026-11-05)
 
 - **Flow:** Mark Shipped → `POST /api/admin/orders/[id]/tracking` → EasyPost tracker (`lib/easypost.ts`) → row in `public.order_tracking`. Carrier scans arrive at `POST /api/webhooks/easypost` (HMAC `X-Hmac-Signature`, fails closed), which re-reads the tracker from EasyPost and calls `applyTrackerUpdate` (`lib/order-tracking-server.ts`); that stores the scan and sends the out-for-delivery / delivered email (`buildDeliveryUpdateEmailContent`) after claiming it with a conditional update.

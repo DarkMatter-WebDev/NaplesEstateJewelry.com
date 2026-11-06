@@ -5,13 +5,14 @@ import {
   OFFER_DESCRIPTION_CLAMP_CHARS,
   OFFER_FILTERS,
   OFFER_FILTER_LABELS,
-  OFFER_STATUS_LABELS,
+  AVAILABILITY_LINK_HOURS,
   OWNER_NOTE_MAX,
   displayBuyerName,
   formatOfferDeadline,
   formatWholeDollars,
   offerDeleteBlock,
   offerItemChips,
+  offerStatusLabel,
   offerValueLine,
   hoursLeft,
   percentOfListed,
@@ -52,6 +53,8 @@ import { AppIcon } from '@/components/AppIcon';
 
 type AdminOffer = {
   id: string;
+  /** 'availability' = Check Availability (2026-11-05): no money held; answered with a Buy link or "Not available". */
+  kind?: 'offer' | 'availability';
   product_id: string;
   status: OfferStatus;
   amount: number;
@@ -80,7 +83,8 @@ type AdminOffer = {
   product_details: OfferItemDetails | null;
 };
 
-type Panel = { id: string; kind: 'accept' | 'counter' | 'decline' } | null;
+type PanelKind = 'accept' | 'counter' | 'decline' | 'available' | 'unavailable';
+type Panel = { id: string; kind: PanelKind } | null;
 type Deleting = { ids: string[]; title: string; first: string | null; body: string; confirm: string } | null;
 
 /** The tab's own word for the bulk button: "Delete all 6 declined". */
@@ -133,6 +137,8 @@ export default function OffersPanel({ adminBasePath }: { adminBasePath: string }
   const [panel, setPanel] = useState<Panel>(null);
   const [counterAmount, setCounterAmount] = useState('');
   const [note, setNote] = useState('');
+  // "Not available → also mark this item Sold" — ticked by default (mockup 1).
+  const [markSold, setMarkSold] = useState(true);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
   const [deleting, setDeleting] = useState<Deleting>(null);
@@ -172,10 +178,11 @@ export default function OffersPanel({ adminBasePath }: { adminBasePath: string }
     void run();
   }, [filter, load]);
 
-  function openPanel(id: string, kind: 'accept' | 'counter' | 'decline') {
+  function openPanel(id: string, kind: PanelKind) {
     setPanel({ id, kind });
     setCounterAmount('');
     setNote('');
+    setMarkSold(true);
   }
 
   function askDeleteOne(offer: AdminOffer) {
@@ -186,7 +193,7 @@ export default function OffersPanel({ adminBasePath }: { adminBasePath: string }
     setDeleting({
       ids: [offer.id],
       title: 'Delete this offer?',
-      first: `${name} · ${formatCheckoutCurrency(offer.amount)} · ${OFFER_STATUS_LABELS[offer.status]}${decided}`,
+      first: `${name} · ${offer.kind === 'availability' ? 'Availability check' : formatCheckoutCurrency(offer.amount)} · ${offerStatusLabel(offer.status, offer.kind)}${decided}`,
       body: paid
         ? `It is removed from Offers for good. ${offer.order_number ? `Order ${offer.order_number}` : 'The paid order'} stays under Orders with its payment and receipt — only the offer record goes.`
         : 'It is removed from Offers for good. It cannot be undone, and the buyer is not told — they already got their email.',
@@ -234,14 +241,14 @@ export default function OffersPanel({ adminBasePath }: { adminBasePath: string }
     }
   }
 
-  async function act(offer: AdminOffer, action: 'accept' | 'decline' | 'counter' | 'resend-counter') {
+  async function act(offer: AdminOffer, action: 'accept' | 'decline' | 'counter' | 'resend-counter' | 'available' | 'unavailable') {
     setBusy(true);
     setNotice(null);
     try {
       const res = await fetch(`/api/admin/offers/${encodeURIComponent(offer.id)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, amount: counterAmount, note }),
+        body: JSON.stringify({ action, amount: counterAmount, note, markSold: action === 'unavailable' ? markSold : undefined }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.ok) throw new Error(data?.error ?? 'That did not work.');
@@ -256,6 +263,21 @@ export default function OffersPanel({ adminBasePath }: { adminBasePath: string }
         });
       } else if (action === 'decline') {
         setNotice({ ok: true, text: `Declined — ${first}'s hold was released and they were emailed${note.trim() ? ' your message' : ''}.` });
+      } else if (action === 'unavailable') {
+        setNotice({
+          ok: !data.markSoldError,
+          text: data.markSoldError
+            ? `${first} was emailed that it’s no longer available, but the item could not be marked Sold: ${data.markSoldError}`
+            : `${first} was emailed that it’s no longer available${note.trim() ? ' with your message' : ''}.${data.markedSold ? ' The item is marked Sold.' : ''}`,
+        });
+      } else if (action === 'available') {
+        setNotice({
+          ok: data.emailed !== false,
+          text: data.emailed === false
+            ? `The Buy link is saved, but the email did not send. Send ${first} this link yourself:`
+            : `Buy link sent — ${first} can buy it at ${formatCheckoutCurrency(data.offer?.counter_amount ?? offer.amount)} for the next ${AVAILABILITY_LINK_HOURS} hours${note.trim() ? ' (with your message)' : ''}. Nobody else can buy it meanwhile.`,
+          link: data.link,
+        });
       } else {
         setNotice({
           ok: data.emailed !== false,
@@ -383,6 +405,7 @@ export default function OffersPanel({ adminBasePath }: { adminBasePath: string }
             const panelOpen = panel?.id === offer.id;
             const detailsOpen = openDetails.has(offer.id);
             const clockTone = open ? (urgent ? 'urgent' : 'open') : countered ? 'countered' : 'closed';
+            const availability = offer.kind === 'availability';
             return (
               <div key={offer.id} className="offer-card border bg-white" style={{ borderColor: BORDER }} data-panel={panelOpen ? 'open' : 'closed'} data-details={detailsOpen ? 'open' : 'closed'} data-deletable={offerDeleteBlock(offer) ? 'false' : 'true'}>
                 <div className="offer-grid">
@@ -394,6 +417,16 @@ export default function OffersPanel({ adminBasePath }: { adminBasePath: string }
                   )}
 
                   <div className="offer-title min-w-0">
+                    {availability && (
+                      <span
+                        className="offer-kind-chip"
+                        style={countered || offer.status === 'counter_bought'
+                          ? { background: '#e8f1e6', color: '#2f5d2a' }
+                          : { background: '#f6edcc', color: '#735c00' }}
+                      >
+                        {countered ? 'Buy link sent' : offer.status === 'counter_bought' ? 'Bought' : 'Availability check'}
+                      </span>
+                    )}
                     <p className="font-bold leading-snug" style={{ color: 'var(--color-on-surface)' }}>{offer.product_title}</p>
                     {offer.product_inventory_number && (
                       <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>#{offer.product_inventory_number}</p>
@@ -482,6 +515,17 @@ export default function OffersPanel({ adminBasePath }: { adminBasePath: string }
                     );
                   })()}
 
+                  {availability ? (
+                    <div className="offer-money text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                      <div className="offer-money-top">
+                        <span className="offer-amount" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-primary)' }}>
+                          {formatCheckoutCurrency(offer.counter_amount ?? listed ?? offer.amount)}
+                        </span>
+                        <span className="offer-pct">{offer.counter_amount != null ? 'Buy link price' : 'listed today'}</span>
+                      </div>
+                      <p className="offer-sub">No payment held · {offer.status === 'counter_bought' ? 'paid through the Buy link' : 'asked before buying'}</p>
+                    </div>
+                  ) : (
                   <div className="offer-money text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
                     <div className="offer-money-top">
                       <span className="offer-amount" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-primary)' }}>{formatCheckoutCurrency(offer.amount)}</span>
@@ -497,17 +541,20 @@ export default function OffersPanel({ adminBasePath }: { adminBasePath: string }
                           : <>hold released</>}
                     </p>
                   </div>
+                  )}
 
                   <div className="offer-clock text-xs" data-tone={clockTone}>
                     {open ? (
                       <p><span className="offer-clock-label">⏱ {left} h left</span> · answer by {formatOfferDeadline(offer.expires_at)}</p>
+                    ) : countered && availability ? (
+                      <p><span className="offer-clock-label">Link good for {left} h</span> · until {formatOfferDeadline(offer.counter_expires_at)}</p>
                     ) : countered ? (
                       <p><span className="offer-clock-label">Countered {formatCheckoutCurrency(offer.counter_amount ?? 0)}</span> · link {left} h left, until {formatOfferDeadline(offer.counter_expires_at)}</p>
                     ) : (
                       <>
                         <p>
                           <span className="offer-clock-label">
-                            {OFFER_STATUS_LABELS[offer.status]}
+                            {offerStatusLabel(offer.status, offer.kind)}
                             {offer.status === 'counter_bought' && offer.counter_amount ? ` · ${formatCheckoutCurrency(offer.counter_amount)}` : ''}
                           </span>
                           {offer.decided_at && <> · {formatOfferDeadline(offer.decided_at)}</>}
@@ -524,8 +571,12 @@ export default function OffersPanel({ adminBasePath }: { adminBasePath: string }
                   <div className="offer-buyer text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
                     <span className="offer-buyer-name">{name}</span>
                     <span className="offer-sep"> · </span>
-                    <a href={`tel:${offer.customer_phone}`} className="underline">{offer.customer_phone}</a>
-                    <span className="offer-sep"> · </span>
+                    {offer.customer_phone ? (
+                      <>
+                        <a href={`tel:${offer.customer_phone}`} className="underline" style={{ whiteSpace: 'nowrap' }}>{offer.customer_phone}</a>
+                        <span className="offer-sep"> · </span>
+                      </>
+                    ) : null}
                     <a href={`mailto:${offer.customer_email}`} className="underline offer-email">{offer.customer_email}</a>
                     {offer.message && <p className="offer-quote">&ldquo;{offer.message}&rdquo;</p>}
                     {offer.counter_note && (offer.status !== 'open') && (
@@ -535,7 +586,15 @@ export default function OffersPanel({ adminBasePath }: { adminBasePath: string }
 
                   {(open || (countered && left > 0)) && (
                     <div className="offer-actions">
-                      {open && (
+                      {open && availability && (
+                        <>
+                          <button type="button" className="gold-button offer-accept" disabled={busy} onClick={() => openPanel(offer.id, 'available')}>
+                            Available — send Buy link
+                          </button>
+                          <button type="button" className="outline-button" disabled={busy} onClick={() => openPanel(offer.id, 'unavailable')}>Not available</button>
+                        </>
+                      )}
+                      {open && !availability && (
                         <>
                           <button type="button" className="gold-button offer-accept" disabled={busy} onClick={() => openPanel(offer.id, 'accept')}>
                             Accept &amp; charge<span className="offer-phone-only">&nbsp;{formatCheckoutCurrency(offer.total)}</span>
@@ -566,6 +625,40 @@ export default function OffersPanel({ adminBasePath }: { adminBasePath: string }
                     </button>
                   )}
                 </div>
+
+                {panelOpen && panel.kind === 'available' && (
+                  <div className="offer-panel" style={{ borderColor: '#9cc2a8', background: '#f4f8f5' }}>
+                    <strong>Send {first} a Buy link?</strong>{' '}
+                    {first} gets an email with a private <strong>Buy now</strong> button at today&apos;s price
+                    {listed != null ? <> (<strong>{formatCheckoutCurrency(listed)}</strong>)</> : null}, good for <strong>{AVAILABILITY_LINK_HOURS} hours</strong>. Nobody else can buy the piece meanwhile; {first} picks pickup or shipping and pays the normal way.
+                    {!offer.product_available && <p className="mt-1" style={{ color: 'var(--color-error)' }}>This item is no longer marked available — mark it Available first.</p>}
+                    <MessageBox id={`available-note-${offer.id}`} first={first} value={note} onChange={setNote} />
+                    <div className="offer-panel-buttons">
+                      <button type="button" className="gold-button" disabled={busy} onClick={() => void act(offer, 'available')}>{busy ? 'Sending…' : 'Yes, send the Buy link'}</button>
+                      <button type="button" className="outline-button" disabled={busy} onClick={() => setPanel(null)}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+
+                {panelOpen && panel.kind === 'unavailable' && (
+                  <div className="offer-panel" style={{ borderColor: BORDER, background: '#fafaf8' }}>
+                    <strong>Tell {first} it&apos;s no longer available?</strong> {first} gets a polite &ldquo;sorry, that piece has sold&rdquo; email.
+                    <MessageBox id={`unavailable-note-${offer.id}`} first={first} value={note} onChange={setNote} />
+                    <label className="mt-3 flex items-start gap-2 text-sm" style={{ color: 'var(--color-on-surface)' }}>
+                      <input
+                        type="checkbox"
+                        checked={markSold}
+                        onChange={(event) => setMarkSold(event.target.checked)}
+                        style={{ accentColor: 'var(--color-primary)', marginTop: '0.2rem' }}
+                      />
+                      <span>Also mark this item <strong>Sold</strong> so it comes off the shop</span>
+                    </label>
+                    <div className="offer-panel-buttons">
+                      <button type="button" className="gold-button" disabled={busy} onClick={() => void act(offer, 'unavailable')}>{busy ? 'Sending…' : 'Yes, send it'}</button>
+                      <button type="button" className="outline-button" disabled={busy} onClick={() => setPanel(null)}>Cancel</button>
+                    </div>
+                  </div>
+                )}
 
                 {panelOpen && panel.kind === 'accept' && (
                   <div className="offer-panel" style={{ borderColor: '#e9c349', background: '#fffbea' }}>
@@ -683,6 +776,10 @@ export default function OffersPanel({ adminBasePath }: { adminBasePath: string }
         .offer-money-top { display: flex; flex-direction: column; }
         .offer-pct { white-space: nowrap; }
         .offer-sub { margin-top: 0.1rem; }
+        .offer-kind-chip {
+          display: inline-flex; margin-bottom: 0.3rem; padding: 0.15rem 0.5rem; border-radius: 999px;
+          font-size: 0.6rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap;
+        }
         .offer-clock-label { font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; }
         .offer-clock[data-tone='open'] .offer-clock-label { color: #8a6a00; }
         .offer-clock[data-tone='urgent'] .offer-clock-label { color: var(--color-error); }

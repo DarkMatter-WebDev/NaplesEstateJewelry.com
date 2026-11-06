@@ -32,6 +32,10 @@ export interface CartItem {
   // isProductPurchasable() and normalizeProductQuantity(), so omitting it never
   // regresses a one-of-a-kind item.
   stockQuantity?: number | null;
+  // "Confirm availability first" (2026-11-05): the item is never added to a
+  // cart — CartButton shows Check Availability instead. Set only where the
+  // shop read includes the flag; the checkout route enforces it regardless.
+  checkFirst?: boolean;
   // How many units of this listing the buyer wants to purchase. Defaults to 1
   // and is always clamped to 1..stockQuantity. Distinct from stockQuantity
   // (what's available). Optional on input for backward-compatible callers;

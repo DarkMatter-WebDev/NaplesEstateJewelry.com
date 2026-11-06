@@ -293,10 +293,11 @@ const SHOP_PRODUCT_COLUMNS = [
   'quantity',
   'sort_order',
   'created_at',
+  'confirm_availability',
 ].join(', ');
 const SHOP_PRODUCT_COLUMNS_WITHOUT_ITEM_YEAR = SHOP_PRODUCT_COLUMNS
   .split(', ')
-  .filter((column) => column !== 'item_year' && column !== 'quantity' && column !== 'sold_price' && column !== 'width_mm')
+  .filter((column) => column !== 'item_year' && column !== 'quantity' && column !== 'sold_price' && column !== 'width_mm' && column !== 'confirm_availability')
   .join(', ');
 
 // Narrow column set for the facet-only catalog fetch (Brand + Item Type dropdown
@@ -325,6 +326,17 @@ function isMissingItemYearColumnError(error: { message?: string | null } | null 
     || Boolean(error?.message?.toLowerCase().includes('quantity'))
     || Boolean(error?.message?.toLowerCase().includes('sold_price'))
     || Boolean(error?.message?.toLowerCase().includes('width_mm'));
+}
+
+// "Confirm availability first" (availability-check-2026-11.sql): before that SQL
+// runs ONLY this column is dropped — every card keeps its real quantity, sold
+// price and width, and simply shows Add to Cart as before.
+function isMissingConfirmAvailabilityColumnError(error: { message?: string | null } | null | undefined) {
+  return Boolean(error?.message?.toLowerCase().includes('confirm_availability'));
+}
+
+function withoutConfirmAvailability(columns: string): string {
+  return columns.split(', ').filter((column) => column !== 'confirm_availability').join(', ');
 }
 
 // The catalog read is the single most expensive part of a cold /shop render: a
@@ -387,12 +399,16 @@ async function queryShopCatalog(filterKey: ShopCatalogFilterKey, columns: string
       .in('status', visibleStatuses),
   ]);
 
-  let products = productResult.data as unknown[] | null;
-  let errorMessage = productResult.error?.message ?? null;
-  if (isMissingItemYearColumnError(productResult.error)) {
-    const fallback = await buildProductQuery(columnsWithoutItemYear);
+  let firstResult = productResult;
+  if (isMissingConfirmAvailabilityColumnError(firstResult.error)) {
+    firstResult = await buildProductQuery(withoutConfirmAvailability(columns));
+  }
+  let products = firstResult.data as unknown[] | null;
+  let errorMessage = firstResult.error?.message ?? null;
+  if (isMissingItemYearColumnError(firstResult.error)) {
+    const fallback = await buildProductQuery(withoutConfirmAvailability(columnsWithoutItemYear));
     products = (fallback.data as unknown[] | null)?.map(
-      (product) => ({ ...(product as Record<string, unknown>), item_year: null, quantity: 1, sold_price: null, width_mm: null }),
+      (product) => ({ ...(product as Record<string, unknown>), item_year: null, quantity: 1, sold_price: null, width_mm: null, confirm_availability: false }),
     ) ?? null;
     errorMessage = fallback.error?.message ?? null;
   }

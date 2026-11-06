@@ -20,7 +20,7 @@ export const dynamic = 'force-dynamic';
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
   return {
-    title: locale === 'es' ? 'Su contraoferta' : 'Your counter-offer',
+    title: locale === 'es' ? 'Su enlace de compra' : 'Your Buy link',
     robots: { index: false, follow: false },
     // The token is the whole permission — never let it travel in a Referer.
     referrer: 'no-referrer',
@@ -66,6 +66,7 @@ export default async function CounterOfferPage({ params }: Props) {
           listedPrice: product.listedPrice ?? offer.listed_price ?? offer.counter_amount ?? 0,
         }}
         counter={{
+          kind: offer.kind === 'availability' ? 'availability' : 'counter',
           token: decodeURIComponent(token),
           amount: offer.counter_amount ?? 0,
           until: formatOfferDeadline(offer.counter_expires_at, isEs),
@@ -85,6 +86,19 @@ export default async function CounterOfferPage({ params }: Props) {
         }}
       />
     );
+  } else if (lookup.kind === 'availability') {
+    // Check Availability's Buy link (2026-11-05) — no "counter-offer" words.
+    const title = lookup.state === 'sold'
+      ? (isEs ? 'Lo sentimos, esta pieza se vendió' : 'Sorry, this piece has sold')
+      : lookup.state === 'used'
+        ? (isEs ? 'Esta pieza ya se pagó' : 'This piece has been paid for')
+        : (isEs ? 'Este enlace de compra venció' : 'This Buy link has expired');
+    const body = lookup.state === 'used'
+      ? (isEs ? 'Su recibo está en su correo electrónico.' : 'Your receipt is in your email.')
+      : (isEs
+          ? 'No se le ha cobrado nada. Llámenos o envíenos un texto y vemos si aún está disponible.'
+          : 'You have not been charged. Call or text us and we’ll check whether it’s still available.');
+    content = <OfferUnavailable isEs={isEs} title={title} body={body} productHref={null} />;
   } else {
     const title = lookup.state === 'sold'
       ? (isEs ? 'Lo sentimos, esta pieza se vendió' : 'Sorry, this piece has sold')

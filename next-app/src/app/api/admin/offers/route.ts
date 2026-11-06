@@ -22,7 +22,10 @@ export async function GET(req: Request) {
       // works the same before the SQL has added the column.
       const { data: flagged, error: flagError } = await service.from('products').select('id').eq('accepts_offers', true);
       const acceptsOffers = flagError ? [] : (flagged ?? []).map((row) => String(row.id));
-      return NextResponse.json({ ...(await countOpenOffers(service)), acceptsOffers });
+      // "Confirm availability first" (2026-11-05), the same way — absent before its SQL runs.
+      const { data: checkFirst, error: checkFirstError } = await service.from('products').select('id').eq('confirm_availability', true);
+      const confirmAvailability = checkFirstError ? [] : (checkFirst ?? []).map((row) => String(row.id));
+      return NextResponse.json({ ...(await countOpenOffers(service)), acceptsOffers, confirmAvailability });
     }
     const raw = url.searchParams.get('filter') ?? 'open';
     const filter: OfferFilter = (OFFER_FILTERS as readonly string[]).includes(raw) ? raw as OfferFilter : 'open';

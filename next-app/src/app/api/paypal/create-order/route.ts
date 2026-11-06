@@ -236,6 +236,31 @@ export async function POST(req: Request) {
     counterOfferId = offer.id;
   }
 
+  // ---- Check Availability (owner, 2026-11-05): a "Confirm availability first"
+  // item is sold ONLY through the private Buy link the owner sends after
+  // checking with the dealer holding it. Anything else (a cart, a stale tab,
+  // the Meta shop) is refused here — the route is the enforcement, the hidden
+  // Add to Cart button is convenience. Before the SQL adds the column the read
+  // errors and nothing is flagged, exactly as before.
+  if (!counterOfferId) {
+    const { data: checkFirst, error: checkFirstError } = await service
+      .from('products')
+      .select('id, title')
+      .in('id', orderLines.map((line) => line.productId))
+      .eq('confirm_availability', true);
+    if (!checkFirstError && checkFirst && checkFirst.length > 0) {
+      const isEs = body.locale === 'es';
+      const title = String(checkFirst[0].title ?? '');
+      return NextResponse.json({
+        error: isEs
+          ? `Antes de comprar “${title}”, confirmamos que esté disponible. Quítela del carrito y toque “Consultar disponibilidad” en su página — sin pago para preguntar.`
+          : `We confirm “${title}” is available before it can be bought. Remove it from your cart and tap “Check Availability” on its page — no payment needed to ask.`,
+        code: 'check_availability_first',
+        productIds: checkFirst.map((row) => String(row.id)),
+      }, { status: 409 });
+    }
+  }
+
   const discountResolver = counterOfferId ? null : makeDiscountResolver(service, discountCode, customer.email);
 
   // ---- Tax-exempt (lib/tax-exempt.ts). ⛔ The only way checkout drops the

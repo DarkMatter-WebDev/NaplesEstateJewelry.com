@@ -108,6 +108,7 @@ const PRODUCT_DETAIL_COLUMNS = [
   'sold_price',
   'quantity',
   'accepts_offers',
+  'confirm_availability',
 ].join(', ');
 
 // Columns introduced by later migrations that may not exist yet on an
@@ -127,6 +128,7 @@ const OPTIONAL_PRODUCT_DETAIL_COLUMNS = [
   'sold_price',
   'width_mm',
   'accepts_offers',
+  'confirm_availability',
 ];
 
 const PRODUCT_DETAIL_COLUMNS_REQUIRED = PRODUCT_DETAIL_COLUMNS
@@ -152,6 +154,18 @@ const PRODUCT_DETAIL_COLUMNS_WITHOUT_OFF_ASKING = PRODUCT_DETAIL_COLUMNS
 
 function isMissingOffAskingColumnError(error: { message?: string | null } | null | undefined) {
   return Boolean(error?.message?.toLowerCase().includes('special_price_override_discount'));
+}
+
+// "Confirm availability first" (availability-check-2026-11.sql) degrades the
+// same way: before that SQL runs only this column is dropped (the item shows
+// Add to Cart as before) — never the whole optional set with Make an Offer.
+const PRODUCT_DETAIL_COLUMNS_WITHOUT_CONFIRM = PRODUCT_DETAIL_COLUMNS
+  .split(', ')
+  .filter((column) => column !== 'confirm_availability')
+  .join(', ');
+
+function isMissingConfirmAvailabilityColumnError(error: { message?: string | null } | null | undefined) {
+  return Boolean(error?.message?.toLowerCase().includes('confirm_availability'));
 }
 
 // Wrapped in React.cache so generateMetadata() and the page component share a
@@ -183,6 +197,20 @@ const fetchPublicProduct = cache(async (id: string) => {
     } as typeof result;
   }
 
+  if (isMissingConfirmAvailabilityColumnError(result.error)) {
+    const withoutConfirm = await supabase
+      .from('products')
+      .select(PRODUCT_DETAIL_COLUMNS_WITHOUT_CONFIRM)
+      .eq('id', id)
+      .single();
+    result = {
+      ...withoutConfirm,
+      data: withoutConfirm.data
+        ? ({ ...(withoutConfirm.data as unknown as Record<string, unknown>), confirm_availability: false } as unknown as typeof result.data)
+        : null,
+    } as typeof result;
+  }
+
   if (isMissingOptionalColumnError(result.error)) {
     const fallback = await supabase
       .from('products')
@@ -206,6 +234,7 @@ const fetchPublicProduct = cache(async (id: string) => {
             quantity: 1,
             width_mm: null,
             accepts_offers: false,
+            confirm_availability: false,
           } as Product
         : null,
       error: fallback.error,
@@ -397,6 +426,8 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
   const isSold = isProductSold(p.status);
   const price = getStorefrontDisplayPrice(p, spotData, visibility.hideSoldItemPrices, locale);
   const isPurchasable = isProductPurchasable(p.status, p.quantity);
+  // "Confirm availability first" (owner, 2026-11-05): Check Availability, never a cart.
+  const checkFirst = p.confirm_availability === true;
   const stockQuantity = normalizeProductQuantity(p.quantity);
   const productImages = p.image_urls?.length ? p.image_urls : p.images ?? [];
   const firstImagePadding = productImagePaddingForImage(p.image_padding, p.image_padding_by_image, productImages[0], 0);
@@ -780,8 +811,23 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                   </p>
                 )}
                 {isPurchasable ? (
+                  <>
                   <div className="product-cta-grid mt-3">
-                    <CartButton item={cartItem} variant="detail" locale={locale} />
+                    {/* Check Availability (owner, 2026-11-05, mockup 1): a piece
+                        another dealer holds is never added to a cart — the
+                        buyer asks first, no payment, and pays through the Buy
+                        link the owner emails. The checkout route enforces it. */}
+                    {checkFirst ? (
+                      <Link
+                        href={`${localePrefix}/availability/${encodeURIComponent(p.id)}`}
+                        rel="nofollow"
+                        className="gold-button product-check-availability"
+                      >
+                        {isEs ? 'Consultar disponibilidad' : 'Check Availability'}
+                      </Link>
+                    ) : (
+                      <CartButton item={cartItem} variant="detail" locale={locale} />
+                    )}
                     <WishlistButton item={wishlistItem} variant="button" locale={locale} />
                     <Link href={`${contactHref}?item=${encodeURIComponent(p.title)}`} rel="nofollow" className="outline-button">
                       {isEs ? 'Consultar' : 'Inquire'}
@@ -790,6 +836,20 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                       {isEs ? 'Llamar' : 'Call'}
                     </a>
                   </div>
+                  {checkFirst && (
+                    <p
+                      className="product-check-note mt-2 text-center text-xs leading-snug"
+                      style={{ color: 'var(--color-on-surface-variant)' }}
+                    >
+                      {isEs
+                        ? 'Confirmaremos que esta pieza esté lista para enviar, normalmente en menos de una hora. '
+                        : 'We’ll confirm this piece is ready to ship — usually within the hour. '}
+                      <strong style={{ color: 'var(--color-on-surface)' }}>
+                        {isEs ? 'No se necesita pago para preguntar.' : 'No payment needed to ask.'}
+                      </strong>
+                    </p>
+                  )}
+                  </>
                 ) : (
                   <div className="product-cta-grid product-cta-grid-pair mt-3">
                     <Link href={`${contactHref}?item=${encodeURIComponent(p.title)}`} rel="nofollow" className="outline-button">

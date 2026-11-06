@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useCart, type CartItem } from '@/context/CartContext';
 import { QuantityStepper } from '@/components/checkout/OrderSummary';
 import { isProductPurchasable, normalizeProductQuantity } from '@/types/product';
@@ -47,6 +48,56 @@ export default function CartButton({ item, variant = 'card', locale = 'en', incl
         notifyAdded(item.title);
       }
     }
+  }
+
+  // Check Availability (owner, 2026-11-05): a piece another dealer holds goes
+  // to its short ask-first form, never into a cart. One already in a cart from
+  // before the box was ticked keeps its Remove button.
+  if (item.checkFirst && canPurchase && !inCart) {
+    const href = `${isEs ? '/es' : ''}/availability/${encodeURIComponent(item.id)}`;
+    if (variant === 'icon') return null;
+    if (variant === 'detail') {
+      return (
+        <Link href={href} rel="nofollow" className="gold-button detail-cart-button flex items-center gap-2">
+          {isEs ? 'Consultar disponibilidad' : 'Check Availability'}
+        </Link>
+      );
+    }
+    if (variant === 'list') {
+      return (
+        <Link
+          href={href}
+          rel="nofollow"
+          className="shop-list-cart-button flex items-center justify-center gap-1.5"
+          style={{
+            borderRadius: '6px',
+            padding: '0.5rem 0.85rem',
+            fontFamily: 'var(--font-label)',
+            fontSize: '0.62rem',
+            fontWeight: 800,
+            letterSpacing: '0.09em',
+            textTransform: 'uppercase',
+            whiteSpace: 'nowrap',
+            border: '1px solid transparent',
+            background: 'linear-gradient(135deg, #dcb336, #b5890c)',
+            color: '#fffdf7',
+            boxShadow: '0 6px 14px rgba(181, 137, 12, 0.18)',
+          }}
+        >
+          <span>{isEs ? 'Consultar' : 'Check Availability'}</span>
+        </Link>
+      );
+    }
+    return (
+      <Link
+        href={href}
+        rel="nofollow"
+        className="outline-button shop-card-cart-button text-xs flex w-full min-h-9 items-center justify-center gap-1 whitespace-nowrap"
+      >
+        <span className="shop-card-cart-label-full">{isEs ? 'Consultar disponibilidad' : 'Check Availability'}</span>
+        <span className="shop-card-cart-label-compact" aria-hidden="true">{isEs ? 'Consultar' : 'Check'}</span>
+      </Link>
+    );
   }
 
   if (variant === 'detail') {

@@ -114,6 +114,7 @@ export default function ProductCard({
     image_padding: thumbPadding,
     status: normalizedStatus,
     stockQuantity: product.quantity,
+    checkFirst: product.confirm_availability === true,
     priceLabel: price,
     category: product.category,
     metal_type: product.metal_type,

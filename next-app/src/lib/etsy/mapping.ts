@@ -876,6 +876,16 @@ export function buildPreflightChecks(
     message: hasDefaults ? undefined : 'No shipping profile / return policy / readiness state chosen. Choose them in Settings -> Etsy Sync.',
   });
 
+  // Check Availability (owner, 2026-11-05): a piece another dealer holds is
+  // sold only through the site's Buy link — Etsy would sell it instantly.
+  checks.push({
+    check: 'confirm_availability',
+    ok: product.confirm_availability !== true,
+    message: product.confirm_availability === true
+      ? 'This item is set to "Confirm availability first" — it stays off Etsy (buyers ask on the site before buying).'
+      : undefined,
+  });
+
   const status = normalizeProductStatus(product.status);
   checks.push({
     check: 'status',

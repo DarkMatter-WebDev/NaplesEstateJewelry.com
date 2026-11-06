@@ -12,6 +12,8 @@ interface Props {
   lines: { item: CartItem; quantity: number }[];
   /** Titles (or refs) of pieces that are no longer for sale. */
   unavailable: string[];
+  /** "Confirm availability first" pieces (2026-11-05): never carted — each links to its ask-first form. */
+  checkFirst?: { id: string; title: string }[];
 }
 
 /**
@@ -21,7 +23,7 @@ interface Props {
  * the page only to say a piece has sold (the same calm card as
  * OfferUnavailable).
  */
-export default function MetaCheckoutHandoff({ locale, lines, unavailable }: Props) {
+export default function MetaCheckoutHandoff({ locale, lines, unavailable, checkFirst = [] }: Props) {
   const { hydrated, isIn, add } = useCart();
   const router = useRouter();
   const done = useRef(false);
@@ -29,7 +31,7 @@ export default function MetaCheckoutHandoff({ locale, lines, unavailable }: Prop
   const isEs = locale === 'es';
   const prefix = isEs ? '/es' : '';
   const checkoutHref = `${prefix}/checkout`;
-  const goingStraight = lines.length > 0 && unavailable.length === 0;
+  const goingStraight = lines.length > 0 && unavailable.length === 0 && checkFirst.length === 0;
 
   useEffect(() => {
     if (!hydrated || done.current) return;
@@ -58,7 +60,9 @@ export default function MetaCheckoutHandoff({ locale, lines, unavailable }: Prop
     ? (unavailable.length === 1
       ? (isEs ? 'Esta pieza ya se vendió' : 'This piece has already sold')
       : (isEs ? 'Algunas piezas ya se vendieron' : 'Some pieces have already sold'))
-    : (isEs ? 'No encontramos esa pieza' : 'We couldn’t find that piece');
+    : checkFirst.length > 0
+      ? (isEs ? 'Un paso más' : 'One more step')
+      : (isEs ? 'No encontramos esa pieza' : 'We couldn’t find that piece');
 
   return (
     <div className="max-w-xl mx-auto text-center px-6 py-16">
@@ -70,6 +74,24 @@ export default function MetaCheckoutHandoff({ locale, lines, unavailable }: Prop
         <ul className="mb-8 space-y-1" style={{ color: 'var(--color-on-surface-variant)' }}>
           {unavailable.map((name) => <li key={name}>{name}</li>)}
         </ul>
+      )}
+      {checkFirst.length > 0 && (
+        <div className="mb-8">
+          <p className="mb-3" style={{ color: 'var(--color-on-surface-variant)' }}>
+            {isEs
+              ? 'Confirmamos que estas piezas estén disponibles antes de venderlas. No se necesita pago para preguntar.'
+              : 'We confirm these pieces are available before they can be bought. No payment needed to ask.'}
+          </p>
+          <ul className="space-y-2">
+            {checkFirst.map((piece) => (
+              <li key={piece.id}>
+                <Link href={`${prefix}/availability/${encodeURIComponent(piece.id)}`} className="font-bold underline" style={{ color: 'var(--color-primary)' }}>
+                  {isEs ? 'Consultar disponibilidad' : 'Check Availability'}: {piece.title}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
       <div className="flex flex-wrap justify-center gap-3">
         {lines.length > 0 ? (

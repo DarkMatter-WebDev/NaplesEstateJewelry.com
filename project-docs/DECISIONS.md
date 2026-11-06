@@ -4,7 +4,16 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-11-05 (2)**. Before that, **2026-11-02 (2)**.
+> compaction. Last reconciled: **2026-11-05 (4)**. Before that, **2026-11-05 (2)**. Before that, **2026-11-02 (2)**.
+
+## Check Availability: a piece another dealer holds is ASKED about first (no payment) and sold only through the owner's Buy link (2026-11-05)
+
+- **Owner:** some listed pieces are with another dealer; confirm the dealer still has it before promising it. Per item, box **Confirm availability first**.
+- **Why no PayPal hold (owner's call):** making a buyer "pay" for a piece that may be gone frustrates them — they ask with name + email, nothing else, and pay only after the owner confirms. Trade-off accepted: an ask is not binding.
+- **The answer:** **Available** = the counter-offer Buy link at TODAY's price, **48 h**, nobody else can buy meanwhile; **Not available** = "this piece has sold" email, "Also mark Sold" ticked by default. 72 h unanswered → "couldn't confirm in time". Buyers are emailed, never texted (offer texts stay shelved).
+- ⛔ **The checkout route is the enforcement** (`check_availability_first`): never sell a ticked item without its Buy link. ⛔ Never Accept/Counter an availability row (no hold exists).
+- **Channels:** kept off **eBay and Etsy** (they sell instantly; pre-flight refuses). **Stays on Instagram/Facebook** (owner, 2026-11-05): `/meta-checkout` sends a Buy tap to the form — if Meta ever flags that checkout, take ticked items out of the Meta feed. Google feed keeps them (links to the item page).
+- **Data:** one `product_offers` table, `kind` 'offer' | 'availability' — reuses the counter link, the sweep and the Offers screen. Runbook `features/availability-check.md`; record `CHANGELOG.md` 2026-11-05 (4).
 
 ## Delivery emails: our own Out-for-delivery and Delivered emails from carrier scans via EasyPost — the webhook is a nudge, the tracker is re-read (2026-11-05)
 

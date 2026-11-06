@@ -1,8 +1,8 @@
 # Delivery Tracking Emails (Shipped → Out for delivery → Delivered)
 
-> Status: **BUILT + STAGED 2026-11-05 (2), not pushed.** Needs the SQL file, the
-> push, an EasyPost account + two Netlify variables, and one Connect click —
-> `TASKS.md` top block. Owner-approved design: mockup 4 (2026-11-05).
+> Status: **SQL RUN + DEPLOYED 2026-11-05 (owner-reported).** Still needs an
+> EasyPost account + two Netlify variables + redeploy, and one Connect click —
+> `TASKS.md` top block. Until then only the redesigned Shipped email is live. Owner-approved design: mockup 4 (2026-11-05).
 
 ## What the customer gets
 

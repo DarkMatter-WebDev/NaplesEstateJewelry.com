@@ -98,6 +98,10 @@ export async function GET(request: Request): Promise<Response> {
     return new Response('feed source unavailable', { status: 503 });
   }
 
+  // Check Availability (owner, 2026-11-05): "Confirm availability first" items
+  // STAY in both feeds (owner: keep them on Instagram/Facebook). A Buy tap in
+  // the Meta shop lands on /meta-checkout, which sends a ticked piece to its
+  // Check Availability form instead of the cart.
   const products = rows as unknown as FeedRow[];
 
   // Fail closed on stale spot exactly like eBay/Etsy price pushes do — but

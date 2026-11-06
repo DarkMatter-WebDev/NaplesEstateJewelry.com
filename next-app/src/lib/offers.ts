@@ -40,6 +40,55 @@ export const COUNTER_NOTE_MAX = OWNER_NOTE_MAX;
 
 const HOUR_MS = 60 * 60 * 1000;
 
+/**
+ * Two kinds of row share product_offers (supabase/availability-check-2026-11.sql):
+ *  - `offer`: Make an Offer — a PayPal HOLD the owner accepts, counters or declines.
+ *  - `availability`: Check Availability (owner, 2026-11-05) on an item another
+ *    dealer holds — NO payment. The owner checks with the dealer, then either
+ *    sends a private Buy link at today's price (the counter-offer link, status
+ *    'countered') or a "this piece has sold" email (status 'declined').
+ */
+export type OfferKind = 'offer' | 'availability';
+
+export function normalizeOfferKind(value: unknown): OfferKind {
+  return value === 'availability' ? 'availability' : 'offer';
+}
+
+/** How long an availability Buy link holds the piece for the buyer (owner default, mockup 1). */
+export const AVAILABILITY_LINK_HOURS = 48;
+
+export function availabilityLinkExpiresAt(sentAt: Date): Date {
+  return new Date(sentAt.getTime() + AVAILABILITY_LINK_HOURS * HOUR_MS);
+}
+
+/** The admin's words for an availability request's status (the offer words would mislead). */
+export const AVAILABILITY_STATUS_LABELS: Partial<Record<OfferStatus, string>> = {
+  open: 'Waiting for you',
+  countered: 'Buy link sent',
+  counter_bought: 'Bought',
+  counter_expired: 'Link expired',
+  declined: 'Not available',
+  expired: 'Not answered in time',
+  item_sold: 'Item sold',
+};
+
+export function offerStatusLabel(status: OfferStatus, kind: OfferKind = 'offer'): string {
+  return (kind === 'availability' ? AVAILABILITY_STATUS_LABELS[status] : null) ?? OFFER_STATUS_LABELS[status];
+}
+
+/** The text to the owner's cell when someone asks (mockup 1). Plain words, one message. */
+export function ownerAvailabilityTextBody(input: {
+  title: string;
+  inventoryNumber: string | null;
+  listedPrice: number | null;
+  customerName: string;
+  adminUrl: string;
+}): string {
+  const item = input.inventoryNumber ? `${input.title} (#${input.inventoryNumber})` : input.title;
+  const listed = input.listedPrice ? `, listed ${formatCheckoutCurrency(input.listedPrice)}` : '';
+  return `NEJ availability check: ${item}${listed}. ${input.customerName}. Answer: ${input.adminUrl}`;
+}
+
 export const OFFER_STATUSES = [
   'pending',
   'open',
@@ -358,14 +407,19 @@ export function ownerOfferTextBody(input: {
  * Null = deletable; otherwise the reason, in the owner's words.
  */
 export function offerDeleteBlock(
-  offer: { status: string; hold_status?: string | null; counter_expires_at?: string | null },
+  offer: { status: string; hold_status?: string | null; counter_expires_at?: string | null; kind?: string | null },
   now: Date = new Date(),
 ): string | null {
+  const availability = offer.kind === 'availability';
   if (offer.status === 'open' || offer.status === 'pending') {
-    return "Open offers can't be deleted — PayPal is holding the buyer's money. Decline releases it.";
+    return availability
+      ? "Answer this request first — Not available closes it, then it can be deleted."
+      : "Open offers can't be deleted — PayPal is holding the buyer's money. Decline releases it.";
   }
   if (offer.status === 'countered' && isCounterLive({ status: offer.status, counter_expires_at: offer.counter_expires_at ?? null }, now)) {
-    return "This counter's Buy-now link is still live. It can be deleted once the 72 hours pass.";
+    return availability
+      ? `This Buy link is still live. It can be deleted once the ${AVAILABILITY_LINK_HOURS} hours pass.`
+      : "This counter's Buy-now link is still live. It can be deleted once the 72 hours pass.";
   }
   if (offer.hold_status === 'held' || offer.hold_status === 'release_failed') {
     return 'PayPal has not released this hold yet — it can be deleted once the release goes through.';

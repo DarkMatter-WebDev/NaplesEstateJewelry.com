@@ -82,6 +82,7 @@ export default function ProductListRow({ product, spotData, locale, hideSoldItem
     image_padding: thumbPadding,
     status: normalizedStatus,
     stockQuantity: product.quantity,
+    checkFirst: product.confirm_availability === true,
     priceLabel: price,
     category: product.category,
     metal_type: product.metal_type,

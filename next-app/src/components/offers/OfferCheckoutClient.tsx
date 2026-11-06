@@ -47,6 +47,8 @@ export type OfferItem = {
 };
 
 export type CounterDetails = {
+  /** 'availability' = Check Availability's Buy link at today's price (2026-11-05), not a haggled counter. */
+  kind?: 'counter' | 'availability';
   token: string;
   amount: number;
   until: string;
@@ -97,6 +99,7 @@ export default function OfferCheckoutClient({
   const prefix = isEs ? '/es' : '';
   const productHref = `${prefix}/shop/${encodeURIComponent(item.id)}`;
   const prefill = counter?.prefill;
+  const availabilityLink = mode === 'counter' && counter?.kind === 'availability';
 
   const [amountText, setAmountText] = useState('');
   const [message, setMessage] = useState('');
@@ -236,7 +239,11 @@ export default function OfferCheckoutClient({
           {isEs ? '< Volver a la pieza' : '< Back to the piece'}
         </Link>
         <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mt-2 mb-5" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
-          {mode === 'offer' ? (isEs ? 'Hacer una oferta' : 'Make an Offer') : (isEs ? 'Su contraoferta' : 'Your counter-offer')}
+          {mode === 'offer'
+            ? (isEs ? 'Hacer una oferta' : 'Make an Offer')
+            : availabilityLink
+              ? (isEs ? 'Está disponible' : 'It’s available')
+              : (isEs ? 'Su contraoferta' : 'Your counter-offer')}
         </h1>
 
         <div className="offer-layout">
@@ -252,6 +259,12 @@ export default function OfferCheckoutClient({
                   {mode === 'offer' ? (
                     <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
                       {isEs ? 'Precio actual' : 'Listed at'} <strong>{formatCheckoutCurrency(item.listedPrice)}</strong> · {isEs ? 'pieza única' : 'one of a kind'}
+                    </p>
+                  ) : availabilityLink ? (
+                    <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+                      <strong style={{ color: GOLD }}>{formatCheckoutCurrency(counter?.amount ?? 0)}</strong>
+                      <br />
+                      {isEs ? `Reservada para usted hasta el ${counter?.until}` : `Held just for you until ${counter?.until}`}
                     </p>
                   ) : (
                     <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>

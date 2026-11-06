@@ -188,6 +188,7 @@ const OPTIONAL_PRODUCT_COLUMNS = [
   'quantity',
   'width_mm',
   'accepts_offers',
+  'confirm_availability',
 ] as const;
 
 function isMissingOptionalColumnError(error: { message?: string | null } | null | undefined) {
@@ -203,6 +204,10 @@ function withoutOptionalColumns<T extends Record<string, unknown>>(payload: T): 
 
 function isMissingAcceptsOffersColumnError(error: { message?: string | null } | null | undefined) {
   return Boolean(error?.message?.toLowerCase().includes('accepts_offers'));
+}
+
+function isMissingConfirmAvailabilityColumnError(error: { message?: string | null } | null | undefined) {
+  return Boolean(error?.message?.toLowerCase().includes('confirm_availability'));
 }
 
 function isMissingWidthColumnError(error: { message?: string | null } | null | undefined) {
@@ -242,6 +247,12 @@ const TRADE_IN_OFF_ASKING_SQL_NOTICE =
 function withoutWidthColumn<T extends Record<string, unknown>>(payload: T): T {
   const rest: Record<string, unknown> = { ...payload };
   delete rest.width_mm;
+  return rest as T;
+}
+
+function withoutConfirmAvailabilityColumn<T extends Record<string, unknown>>(payload: T): T {
+  const rest: Record<string, unknown> = { ...payload };
+  delete rest.confirm_availability;
   return rest as T;
 }
 
@@ -830,6 +841,7 @@ function emptyProduct(): Omit<Product, 'created_at' | 'updated_at'> {
     public_notes_es: null,
     featured: false,
     accepts_offers: false,
+    confirm_availability: false,
     sort_order: 0,
   };
 }
@@ -1073,6 +1085,13 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
         const on = new Set((data.acceptsOffers as unknown[]).map(String));
         setProducts((current) => current.map((product) => (
           (product.accepts_offers === true) === on.has(product.id) ? product : { ...product, accepts_offers: on.has(product.id) }
+        )));
+      }
+      // "Confirm availability first" (2026-11-05) — the table's "Check first" chip.
+      if (Array.isArray(data.confirmAvailability)) {
+        const on = new Set((data.confirmAvailability as unknown[]).map(String));
+        setProducts((current) => current.map((product) => (
+          (product.confirm_availability === true) === on.has(product.id) ? product : { ...product, confirm_availability: on.has(product.id) }
         )));
       }
     } catch {
@@ -3512,6 +3531,12 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
           setSaving(false);
           return;
         }
+        if (isMissingConfirmAvailabilityColumnError(error) && payload.confirm_availability === true) {
+          // Inside the editor: flash() paints behind the open editor.
+          setFormErrors(['Run supabase/availability-check-2026-11.sql in Supabase before ticking “Confirm availability first”.']);
+          setSaving(false);
+          return;
+        }
         if (isMissingWidthColumnError(error) && payload.width_mm != null) {
           flash('Run supabase/product-width-mm-2026-07.sql before saving a product width.', false);
           setSaving(false);
@@ -3521,7 +3546,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
           ? withoutOffAskingColumns(payload)
           : isMissingWidthColumnError(error)
             ? withoutWidthColumn(payload)
-            : withoutOptionalColumns(payload);
+            : isMissingConfirmAvailabilityColumnError(error)
+              ? withoutConfirmAvailabilityColumn(payload)
+              : withoutOptionalColumns(payload);
         const retry = await supabase.from('products').insert(retryPayload);
         error = retry.error;
       }
@@ -3549,6 +3576,11 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
             setSaving(false);
             return;
           }
+          if (isMissingConfirmAvailabilityColumnError(error) && payload.confirm_availability === true) {
+            setFormErrors(['Run supabase/availability-check-2026-11.sql in Supabase before ticking “Confirm availability first”.']);
+            setSaving(false);
+            return;
+          }
           if (isMissingWidthColumnError(error) && payload.width_mm != null) {
             flash('Run supabase/product-width-mm-2026-07.sql before saving a product width.', false);
             setSaving(false);
@@ -3558,7 +3590,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
             ? withoutOffAskingColumns(payload)
             : isMissingWidthColumnError(error)
               ? withoutWidthColumn(payload)
-              : withoutOptionalColumns(payload);
+              : isMissingConfirmAvailabilityColumnError(error)
+                ? withoutConfirmAvailabilityColumn(payload)
+                : withoutOptionalColumns(payload);
           const retry = await supabase.from('products').update(retryPayload).eq('id', originalProductId);
           error = retry.error;
         }
@@ -4826,6 +4860,15 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                         <span className="font-extrabold" style={{ color: 'var(--color-primary)' }}>On</span>
                       ) : (
                         <span style={{ color: 'var(--color-on-surface-variant)' }}>–</span>
+                      )}
+                      {p.confirm_availability === true && (
+                        <span
+                          className="ml-1.5 inline-flex rounded-full px-1.5 py-px text-[0.6rem] font-extrabold uppercase tracking-wide"
+                          style={{ background: '#f6edcc', color: '#735c00' }}
+                          title="Confirm availability first — buyers ask before they can buy"
+                        >
+                          Check first
+                        </span>
                       )}
                       {(openOffersByProduct[p.id] ?? 0) > 0 && (
                         <a
@@ -6371,6 +6414,25 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                           <a href={`${adminBasePath}/offers`} className="underline" style={{ color: 'var(--color-primary)' }}>see Offers</a>.
                         </>
                       )}
+                    </p>
+                  )}
+                  {/* Check Availability (owner, 2026-11-05, mockup 1): for a
+                      piece another dealer holds. Add to Cart becomes Check
+                      Availability; the buyer pays only through the Buy link
+                      sent from Offers. Kept off eBay and Etsy; in the Instagram/
+                      Facebook shop a Buy tap opens the ask-first form. */}
+                  <label className="mt-1 flex items-center gap-2 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+                    <input
+                      type="checkbox"
+                      checked={editing.confirm_availability === true}
+                      onChange={(e) => setEditing({ ...editing, confirm_availability: e.target.checked })}
+                      style={{ accentColor: 'var(--color-primary)' }}
+                    />
+                    Confirm availability first
+                  </label>
+                  {editing.confirm_availability === true && (
+                    <p className="text-[0.7rem] leading-snug" style={{ color: 'var(--color-on-surface-variant)' }}>
+                      For pieces another dealer holds. &ldquo;Add to Cart&rdquo; becomes &ldquo;Check Availability&rdquo;; buyers pay only through the link you send from Offers. Kept off eBay and Etsy (end a listing already live there by hand); on Instagram/Facebook a Buy tap opens the Check Availability form.
                     </p>
                   )}
                 </div>

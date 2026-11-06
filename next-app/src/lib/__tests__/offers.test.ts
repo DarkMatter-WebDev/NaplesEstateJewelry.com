@@ -356,7 +356,9 @@ describe('source guards', () => {
   it('the product page shows Make an Offer only on a purchasable item with the box ticked', () => {
     const page = read('src', 'app', '[locale]', 'shop', '[id]', 'page.tsx');
     expect(page).toContain('{isPurchasable && p.accepts_offers === true && (');
-    expect(page).toContain("'accepts_offers',\n];");
+    // accepts_offers stays in the optional-column list (Check Availability's
+    // column joined it on 2026-11-05, with its own one-column fallback).
+    expect(page).toMatch(/'accepts_offers',\r?\n\s*'confirm_availability',\r?\n\];/);
     expect(page).toContain('/offer/${encodeURIComponent(p.id)}');
   });
 

@@ -146,6 +146,8 @@ export interface Product {
   ebay_offer_min_fixed?: number | null;
   /** Site shop "Make an Offer" is on for this item — the editor's "Accept offers" box (supabase/make-offer-2026-10.sql, lib/offers.ts). Absent until that SQL runs. */
   accepts_offers?: boolean | null;
+  /** "Confirm availability first" (supabase/availability-check-2026-11.sql): Check Availability replaces Add to Cart. */
+  confirm_availability?: boolean | null;
   featured: boolean | null;
   sort_order: number;
   created_at: string;

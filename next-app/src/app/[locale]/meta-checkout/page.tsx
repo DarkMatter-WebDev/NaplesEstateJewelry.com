@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
 import MetaCheckoutHandoff from '@/components/checkout/MetaCheckoutHandoff';
@@ -40,6 +41,7 @@ export default async function MetaCheckoutPage({ params, searchParams }: Props) 
 
   const lines: { item: CartItem; quantity: number }[] = [];
   const unavailable: string[] = [];
+  const checkFirst: { id: string; title: string }[] = [];
 
   if (requested.length > 0) {
     const supabase = createPublicClient();
@@ -67,6 +69,7 @@ export default async function MetaCheckoutPage({ params, searchParams }: Props) 
     // nothing in either list the page shows "couldn't find" + shop / call.
     const readFailed = Boolean(byInventory.error || byId.error);
 
+    const candidates: { item: CartItem; quantity: number }[] = [];
     for (const line of readFailed ? [] : requested) {
       // Newest first, as /p/<inventory#> resolves a reused number.
       const product = line.inventoryNumber != null
@@ -74,18 +77,43 @@ export default async function MetaCheckoutPage({ params, searchParams }: Props) 
         : rows.find((row) => row.id === line.ref);
       if (product && isProductVisibleInShop(product.status) && isProductPurchasable(product.status, product.quantity)) {
         const price = getStorefrontDisplayPrice(product, spotData, visibility.hideSoldItemPrices, locale);
-        lines.push({ item: productCartItem(product, price), quantity: line.quantity });
+        candidates.push({ item: productCartItem(product, price), quantity: line.quantity });
       } else {
         unavailable.push(product ? (locale === 'es' && product.title_es ? product.title_es : product.title) : line.ref);
       }
     }
+
+    // Check Availability (owner, 2026-11-05): a "Confirm availability first"
+    // piece never goes in the cart — the shopper asks first on its short form
+    // (no payment). Read on its own so a missing column (before
+    // availability-check-2026-11.sql runs) changes nothing.
+    if (candidates.length > 0) {
+      const { data: flagged, error: flaggedError } = await supabase
+        .from('products')
+        .select('id')
+        .in('id', candidates.map((line) => line.item.id))
+        .eq('confirm_availability', true);
+      const flaggedIds = new Set(flaggedError ? [] : (flagged ?? []).map((row) => String(row.id)));
+      for (const line of candidates) {
+        if (flaggedIds.has(line.item.id)) {
+          checkFirst.push({ id: line.item.id, title: (locale === 'es' && line.item.title_es) || line.item.title });
+        } else {
+          lines.push(line);
+        }
+      }
+    }
+  }
+
+  // The usual Meta cart is ONE piece: straight to its form.
+  if (checkFirst.length === 1 && lines.length === 0 && unavailable.length === 0) {
+    redirect(`${locale === 'es' ? '/es' : ''}/availability/${encodeURIComponent(checkFirst[0].id)}`);
   }
 
   return (
     <>
       <SiteHeader />
       <main className="site-header-offset">
-        <MetaCheckoutHandoff locale={locale} lines={lines} unavailable={unavailable} />
+        <MetaCheckoutHandoff locale={locale} lines={lines} unavailable={unavailable} checkFirst={checkFirst} />
       </main>
       <SiteFooter locale={locale} />
     </>

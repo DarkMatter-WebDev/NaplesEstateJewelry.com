@@ -4,6 +4,10 @@
 > Rules: `DECISIONS.md` → *"Make an Offer on the site shop"*. Code map:
 > `STRUCTURE.md` → the *Make an Offer* row.
 
+> **2026-11-05:** the same `product_offers` table also holds **Check Availability**
+> requests (`kind = 'availability'`, no hold) — see `features/availability-check.md`.
+> Accept / Counter never apply to those; their card has its own two buttons.
+
 ## What it does
 
 Like eBay: **the buyer's payment is held when they make the offer, and charged
