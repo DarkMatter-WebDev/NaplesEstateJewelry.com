@@ -2,16 +2,19 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import AdminHeader from '@/components/admin/AdminHeader';
 import CertificateStatusButton from '@/components/admin/tax-exempt/CertificateStatusButton';
+import CertificatePhotoEditor from '@/components/admin/tax-exempt/CertificatePhotoEditor';
 import { loadInstantSalePage } from '@/components/admin/instant-sale/load-instant-sale-page';
 import { createServiceClient } from '@/lib/supabase/service';
 import { isAccountRequest, REQUEST_COLUMNS, type TaxExemptRequestRow } from '@/lib/tax-exempt-server';
 import {
   CERTIFICATE_COLUMNS,
-  PAPER_COPY_MIME,
   TAX_CERT_TYPE_LABELS,
   TAX_EXEMPT_SOURCE_LABELS,
   certificateIsUsable,
+  copyOnFileLabel,
+  editableCertificate,
   exemptShortTag,
+  hasCopyOnFile,
   formatCertDate,
   parseTaxExemptSnapshot,
   requestRefLabel,
@@ -162,9 +165,17 @@ export default async function AdminTaxExemptPage({ params }: Props) {
                           <td className="p-3">
                             <span className="block">{TAX_EXEMPT_SOURCE_LABELS[row.source]} · {formatCertDate(row.approved_at)}</span>
                             {row.approved_by_email && <span className="block text-xs" style={hint}>by {row.approved_by_email}</span>}
-                            <span className="block text-xs" style={hint}>{[row.photo_path ? 'Photo' : null, !row.photo_path && row.photo_mime === PAPER_COPY_MIME ? 'Paper copy filed' : null, row.physical_copy_seen ? 'Physical copy seen' : null, !row.photo_path && row.photo_mime !== PAPER_COPY_MIME && row.fl_auth_number ? `FL auth ${row.fl_auth_number}` : null, row.user_id ? 'Saved to their account' : null].filter(Boolean).join(' · ') || '—'}</span>
-                            {row.photo_path && (
-                              <a href={`/api/admin/tax-exempt/photo?path=${encodeURIComponent(row.photo_path)}`} target="_blank" rel="noopener noreferrer" className="text-xs font-bold underline" style={{ color: 'var(--color-primary)' }}>View certificate</a>
+                            <span className="block text-xs" style={hint}>{[copyOnFileLabel({ photoPath: row.photo_path, photoMime: row.photo_mime }), row.physical_copy_seen ? 'Physical copy seen' : null, !hasCopyOnFile(row) && row.fl_auth_number ? `FL auth ${row.fl_auth_number}` : null, row.user_id ? 'Saved to their account' : null].filter(Boolean).join(' · ') || '—'}</span>
+                            {row.photo_path ? (
+                              <span className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs">
+                                <a href={`/api/admin/tax-exempt/photo?path=${encodeURIComponent(row.photo_path)}`} target="_blank" rel="noopener noreferrer" className="font-bold underline" style={{ color: 'var(--color-primary)' }}>View certificate</a>
+                                <span style={hint}>·</span>
+                                <CertificatePhotoEditor certificate={editableCertificate(row)} orderNumbers={used.map((order) => order.order_number)} label="Replace photo / edit" variant="link" />
+                              </span>
+                            ) : (
+                              <span className="mt-2 block">
+                                <CertificatePhotoEditor certificate={editableCertificate(row)} orderNumbers={used.map((order) => order.order_number)} label="Add photo & details" />
+                              </span>
                             )}
                           </td>
                           <td className="p-3">

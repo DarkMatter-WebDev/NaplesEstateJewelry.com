@@ -15,6 +15,7 @@ import {
   TAX_EXEMPT_APPROVAL_HOURS,
   certificateIsUsable,
   certificateUsableThrough,
+  editableCertificate,
   exemptShortTag,
   formatCertDate,
   hasCopyOnFile,
@@ -22,11 +23,14 @@ import {
   opensAtLabel,
   ownerApprovalTextBody,
   parseTaxExemptSnapshot,
+  refreshSnapshotFromEdit,
   requestRefLabel,
   snapshotFromCertificate,
+  type CertificateEditPatch,
   type CertificateRead,
   type CertificateChecks,
   type CertificateRow,
+  type EditableCertificate,
   type TaxCertType,
   type TaxExemptRequestStatus,
   type TaxExemptSaleChoice,
@@ -249,6 +253,74 @@ export async function resolveSaleCertificate(
     savedForReuse: choice.saveForNextTime,
     approvedBy: context.approvedBy,
   });
+}
+
+/**
+ * Admin → Tax Exempt / the order's Tax exemption card → "Add photo & details"
+ * (owner, 2026-11-09): save the completed certificate, then bring the new
+ * details + copy into the snapshot of every tax-exempt order that used it
+ * (`refreshSnapshotFromEdit` keeps what belongs to each sale). A replaced
+ * photo's file is KEPT in the private bucket (owner: tax records are never
+ * deleted). Tax amounts on the orders never change here.
+ */
+export async function updateCertificateDetails(
+  service: SupabaseClient,
+  id: string,
+  patch: CertificateEditPatch,
+  editedBy: string | null,
+): Promise<{ certificate: CertificateRow; ordersUpdated: number; orderErrors: number } | { error: string }> {
+  const { data, error } = await service.from('tax_exempt_certificates').update(patch).eq('id', id).select(CERTIFICATE_COLUMNS).maybeSingle();
+  if (error || !data) {
+    console.error('[tax-exempt] certificate edit failed', error?.message);
+    return { error: 'Could not save the certificate. Try again.' };
+  }
+  const { data: orders, error: ordersError } = await service
+    .from('orders')
+    .select('id, tax_exempt_snapshot')
+    .eq('tax_exempt_certificate_id', id)
+    .eq('tax_exempt', true)
+    .limit(500);
+  if (ordersError) console.error('[tax-exempt] certificate orders lookup failed', ordersError.message);
+  let ordersUpdated = 0;
+  let orderErrors = ordersError ? 1 : 0;
+  const now = new Date();
+  for (const order of (orders ?? []) as { id: string; tax_exempt_snapshot: unknown }[]) {
+    const snapshot = parseTaxExemptSnapshot(order.tax_exempt_snapshot);
+    if (!snapshot) continue;
+    const { error: updateError } = await service
+      .from('orders')
+      .update({ tax_exempt_snapshot: refreshSnapshotFromEdit(snapshot, patch, { by: editedBy, now }) })
+      .eq('id', order.id);
+    if (updateError) {
+      orderErrors += 1;
+      console.error('[tax-exempt] order snapshot refresh failed', order.id, updateError.message);
+    } else {
+      ordersUpdated += 1;
+    }
+  }
+  return { certificate: data as unknown as CertificateRow, ordersUpdated, orderErrors };
+}
+
+/**
+ * The order page's "Add certificate photo": the certificate behind an exempt
+ * order (as it is NOW, not the snapshot) and every exempt order that used it.
+ * Null when the order has no certificate or the SQL has not run (tolerant).
+ * Admin pages only — the caller has checked the admin.
+ */
+export async function loadCertificateEditorForOrder(
+  service: SupabaseClient,
+  certificateId: string | null,
+): Promise<{ certificate: EditableCertificate; orderNumbers: string[] } | null> {
+  if (!certificateId) return null;
+  const [row, orders] = await Promise.all([
+    findCertificate(service, certificateId),
+    service.from('orders').select('order_number').eq('tax_exempt_certificate_id', certificateId).eq('tax_exempt', true).order('created_at', { ascending: true }).limit(50),
+  ]);
+  if (!row) return null;
+  return {
+    certificate: editableCertificate(row),
+    orderNumbers: ((orders.data ?? []) as { order_number: string }[]).map((order) => order.order_number),
+  };
 }
 
 /** The certificate a signed-in customer saved to their account, if it can still be used. */

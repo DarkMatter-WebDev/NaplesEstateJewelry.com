@@ -160,9 +160,31 @@ export const FL_CERT_VERIFY_URL = 'https://floridarevenue.com/taxes/certificates
  */
 export const PAPER_COPY_MIME = 'paper-copy';
 
+/**
+ * A photo added AFTER the sale to a certificate whose paper copy is filed
+ * (owner, 2026-11-09: "keep both words so I know a paper is on file too"):
+ * `photo_mime` = the file's type + this suffix, e.g. `image/webp;paper-copy`.
+ * Same column, still no SQL.
+ */
+export const PAPER_COPY_SUFFIX = ';paper-copy';
+
+/** The customer's paper copy is filed in the store (with or without a photo). */
+export function paperCopyFiled(mime: string | null | undefined): boolean {
+  return mime === PAPER_COPY_MIME || (mime ?? '').endsWith(PAPER_COPY_SUFFIX);
+}
+
 /** The store holds a copy of this certificate: a photo/PDF, or a filed paper copy. */
 export function hasCopyOnFile(row: { photo_path?: string | null; photo_mime?: string | null }): boolean {
-  return Boolean(row.photo_path) || row.photo_mime === PAPER_COPY_MIME;
+  return Boolean(row.photo_path) || paperCopyFiled(row.photo_mime);
+}
+
+/** "Photo · Paper copy filed" — what copy the store holds, for admin screens. Null = none. */
+export function copyOnFileLabel(row: { photoPath: string | null; photoMime: string | null }): string | null {
+  const parts = [
+    row.photoPath ? (/^application\/pdf/.test(row.photoMime ?? '') || row.photoPath.toLowerCase().endsWith('.pdf') ? 'PDF' : 'Photo') : null,
+    paperCopyFiled(row.photoMime) ? 'Paper copy filed' : null,
+  ].filter(Boolean);
+  return parts.length ? parts.join(' · ') : null;
 }
 
 /**
@@ -316,6 +338,9 @@ export type TaxExemptSnapshot = {
   requestRef: string | null;
   /** The Florida tax this sale would have carried. */
   taxNotCharged: number;
+  /** The certificate photo / details were added or changed after the sale (2026-11-09). */
+  editedAt?: string | null;
+  editedBy?: string | null;
 };
 
 /** `TX-1042`. */
@@ -349,8 +374,8 @@ export function exemptReceiptLine(snapshot: TaxExemptSnapshot): string {
     snapshot.certNumber,
     snapshot.businessName,
     snapshot.expiresOn ? `valid through ${formatCertDate(snapshot.expiresOn)}` : null,
-    !snapshot.photoPath && snapshot.photoMime === PAPER_COPY_MIME ? 'paper copy on file' : null,
-    !snapshot.photoPath && snapshot.photoMime !== PAPER_COPY_MIME && snapshot.physicalCopySeen ? 'physical copy seen' : null,
+    !snapshot.photoPath && paperCopyFiled(snapshot.photoMime) ? 'paper copy on file' : null,
+    !snapshot.photoPath && !paperCopyFiled(snapshot.photoMime) && snapshot.physicalCopySeen ? 'physical copy seen' : null,
     snapshot.flAuthNumber ? `FL auth ${snapshot.flAuthNumber}` : null,
   ].filter(Boolean);
   return `Tax-exempt sale · ${parts.join(' · ')}`;
@@ -379,6 +404,8 @@ export function parseTaxExemptSnapshot(raw: unknown): TaxExemptSnapshot | null {
     approvedBy: text('approvedBy'),
     requestRef: text('requestRef'),
     taxNotCharged: Number.isFinite(Number(s.taxNotCharged)) ? Number(s.taxNotCharged) : 0,
+    // Only on snapshots completed after the sale (2026-11-09).
+    ...(text('editedAt') ? { editedAt: text('editedAt'), editedBy: text('editedBy') } : {}),
   };
 }
 
@@ -564,6 +591,134 @@ export function normalizeTaxExemptSaleInput(raw: unknown, now: Date = new Date()
       flAuthNumber,
       saveForNextTime: source.saveForNextTime !== false,
     },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Adding the photo / details AFTER the sale (owner, 2026-11-09, mockup 1)
+// ---------------------------------------------------------------------------
+
+/** The certificate as the "Add photo & details" window needs it (serializable — server page → client). */
+export type EditableCertificate = Pick<
+  CertificateRow,
+  'id' | 'cert_type' | 'business_name' | 'cert_number' | 'expires_on' | 'fl_auth_number' | 'photo_path' | 'photo_mime' | 'physical_copy_seen' | 'customer_name'
+>;
+
+export function editableCertificate(row: CertificateRow): EditableCertificate {
+  return {
+    id: row.id,
+    cert_type: row.cert_type,
+    business_name: row.business_name,
+    cert_number: row.cert_number,
+    expires_on: row.expires_on,
+    fl_auth_number: row.fl_auth_number,
+    photo_path: row.photo_path,
+    photo_mime: row.photo_mime,
+    physical_copy_seen: row.physical_copy_seen,
+    customer_name: row.customer_name,
+  };
+}
+
+/** What the certificate row becomes after Admin → Tax Exempt's "Add photo & details" window. */
+export type CertificateEditPatch = {
+  cert_type: TaxCertType | null;
+  business_name: string | null;
+  cert_number: string | null;
+  expires_on: string | null;
+  fl_auth_number: string | null;
+  photo_path: string | null;
+  photo_mime: string | null;
+};
+
+/**
+ * The window's payload → the new certificate fields, or why it cannot be saved.
+ *
+ * - A new photo must be one this window just uploaded (`certificates/<uuid>`).
+ *   Its type comes from the stored file's extension (the server encoded and
+ *   verified it). A filed paper copy STAYS noted (`PAPER_COPY_SUFFIX`).
+ * - Same rules as the sale box: Florida only; with a photo the name and number
+ *   are required; with no copy at all the Florida authorization number is.
+ * - An expiry date in the past is ACCEPTED here: the certificate may have been
+ *   valid on the day of the sale (the table then shows it as Expired).
+ * - Revoked / source / customer / approval fields are never touched.
+ */
+export function normalizeCertificateEdit(
+  raw: unknown,
+  current: Pick<CertificateRow, 'photo_path' | 'photo_mime'>,
+): { value: CertificateEditPatch } | { error: string } {
+  if (!raw || typeof raw !== 'object') return { error: 'Nothing to save.' };
+  const source = raw as Record<string, unknown>;
+
+  const aiState = String(source.aiState ?? '').toUpperCase();
+  if (/^[A-Z]{2}$/.test(aiState) && aiState !== 'FL') {
+    return { error: 'That is not a Florida certificate. Florida only accepts Florida-issued certificates.' };
+  }
+
+  const newPath = String(source.photoPath ?? '').trim() || null;
+  if (newPath && !isAdminCertificatePath(newPath)) return { error: 'The certificate photo did not upload. Take it again.' };
+
+  const type = String(source.certType ?? '');
+  const certType = type === 'resale' || type === 'exemption' ? type : null;
+  const businessName = optionalText(source.businessName, 120);
+  const numberText = optionalText(source.certNumber, 40);
+  const certNumber = numberText ? cleanCertNumber(numberText) : null;
+  if (numberText && !certNumber) return { error: 'The certificate number does not look right (letters, digits and dashes).' };
+  const expiresText = optionalText(source.expiresOn, 10);
+  const expiresOn = expiresText ? cleanIsoDate(expiresText) : null;
+  if (expiresText && !expiresOn) return { error: 'The valid-through date does not look right.' };
+  const authText = optionalText(source.flAuthNumber, 40);
+  const flAuthNumber = authText ? cleanAuthNumber(authText) : null;
+  if (authText && !flAuthNumber) return { error: 'The Florida authorization number does not look right (letters, digits and dashes).' };
+
+  const photoPath = newPath ?? current.photo_path;
+  const paper = paperCopyFiled(current.photo_mime);
+  let photoMime = current.photo_mime;
+  if (newPath) {
+    const fileType = newPath.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/webp';
+    photoMime = paper ? `${fileType}${PAPER_COPY_SUFFIX}` : fileType;
+  }
+
+  if (photoPath && (!businessName || !certNumber)) {
+    return { error: 'Fill in the name and the certificate number (or retake the photo).' };
+  }
+  if (!photoPath && !paper && !flAuthNumber) {
+    return { error: 'This certificate has no copy on file: add a photo, or enter the Florida authorization number.' };
+  }
+  return {
+    value: {
+      cert_type: certType,
+      business_name: businessName,
+      cert_number: certNumber,
+      expires_on: expiresOn,
+      fl_auth_number: flAuthNumber,
+      photo_path: photoPath,
+      photo_mime: photoMime,
+    },
+  };
+}
+
+/**
+ * An order's snapshot after its certificate was completed later: the
+ * certificate's details and copy are brought in; what belongs to THE SALE
+ * stays (tax not charged, how and when it was approved, physical copy seen,
+ * and a Florida authorization number entered for that one sale).
+ */
+export function refreshSnapshotFromEdit(
+  snapshot: TaxExemptSnapshot,
+  patch: CertificateEditPatch,
+  edit: { by: string | null; now?: Date },
+): TaxExemptSnapshot {
+  return {
+    ...snapshot,
+    certType: patch.cert_type,
+    businessName: patch.business_name,
+    certNumber: patch.cert_number,
+    expiresOn: patch.expires_on,
+    photoPath: patch.photo_path,
+    photoMime: patch.photo_mime,
+    flAuthNumber: snapshot.flAuthNumber ?? patch.fl_auth_number,
+    editedAt: (edit.now ?? new Date()).toISOString(),
+    editedBy: edit.by,
   };
 }
 

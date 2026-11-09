@@ -16,7 +16,12 @@ import {
   ownerApprovalTextBody,
   FL_CERT_VERIFY_URL,
   PAPER_COPY_MIME,
+  PAPER_COPY_SUFFIX,
+  copyOnFileLabel,
   hasCopyOnFile,
+  normalizeCertificateEdit,
+  paperCopyFiled,
+  refreshSnapshotFromEdit,
   parseCertificateReadJson,
   parseTaxExemptSnapshot,
   requestRefLabel,
@@ -335,5 +340,71 @@ describe('guards in the code and the SQL', () => {
     expect(route).toContain('cart: null');
     expect(route).toContain('save_to_account: true');
     expect(route).not.toContain('resolveCheckoutExemption(');
+  });
+});
+
+describe('adding the photo and details after the sale (2026-11-09)', () => {
+  const PAPER_ROW = { photo_path: null, photo_mime: PAPER_COPY_MIME };
+  const details = { certType: 'resale', businessName: 'Soriano Designs LLC', certNumber: '78-8012345678-9', expiresOn: '2026-12-31', flAuthNumber: '' };
+
+  it('keeps "paper copy filed" when a photo is added (owner: keep both words)', () => {
+    const result = normalizeCertificateEdit({ ...details, photoPath: PHOTO, aiState: 'FL' }, PAPER_ROW);
+    expect('value' in result && result.value).toMatchObject({ photo_path: PHOTO, photo_mime: `image/webp${PAPER_COPY_SUFFIX}`, cert_type: 'resale', cert_number: '78-8012345678-9' });
+    const mime = 'value' in result ? result.value.photo_mime : null;
+    expect(paperCopyFiled(mime)).toBe(true);
+    expect(hasCopyOnFile({ photo_path: PHOTO, photo_mime: mime })).toBe(true);
+    expect(copyOnFileLabel({ photoPath: PHOTO, photoMime: mime })).toBe('Photo · Paper copy filed');
+    expect(copyOnFileLabel({ photoPath: null, photoMime: PAPER_COPY_MIME })).toBe('Paper copy filed');
+    expect(copyOnFileLabel({ photoPath: PHOTO, photoMime: 'image/webp' })).toBe('Photo');
+    expect(copyOnFileLabel({ photoPath: null, photoMime: null })).toBeNull();
+  });
+
+  it('a certificate with no paper copy gets the plain file type; a PDF stays a PDF', () => {
+    const pdf = PHOTO.replace('.webp', '.pdf');
+    const result = normalizeCertificateEdit({ ...details, photoPath: pdf }, { photo_path: null, photo_mime: null });
+    expect('value' in result && result.value.photo_mime).toBe('application/pdf');
+  });
+
+  it('follows the sale box rules: Florida only, name + number with a photo, a copy or an auth number', () => {
+    expect(normalizeCertificateEdit({ ...details, photoPath: PHOTO, aiState: 'GA' }, PAPER_ROW)).toMatchObject({ error: expect.stringContaining('Florida') });
+    expect(normalizeCertificateEdit({ ...details, photoPath: PHOTO, certNumber: '' }, PAPER_ROW)).toMatchObject({ error: expect.stringContaining('certificate number') });
+    expect(normalizeCertificateEdit({ ...details, photoPath: 'requests/x.webp' }, PAPER_ROW)).toMatchObject({ error: expect.stringContaining('did not upload') });
+    // Only seen, no copy: the authorization number may not be blanked.
+    expect(normalizeCertificateEdit({ certType: '', businessName: '', certNumber: '', flAuthNumber: '' }, { photo_path: null, photo_mime: null })).toMatchObject({ error: expect.stringContaining('authorization number') });
+    // Details only, no new photo, on the paper-copy row: fine.
+    expect(normalizeCertificateEdit({ ...details }, PAPER_ROW)).toMatchObject({ value: { photo_path: null, photo_mime: PAPER_COPY_MIME } });
+    // An expired date is accepted (it may have been valid on the day of the sale).
+    expect(normalizeCertificateEdit({ ...details, expiresOn: '2025-12-31' }, PAPER_ROW)).toMatchObject({ value: { expires_on: '2025-12-31' } });
+  });
+
+  it("refreshes an order's snapshot but keeps what belongs to the sale", () => {
+    const before: TaxExemptSnapshot = {
+      certificateId: 'c1', certType: null, businessName: null, certNumber: null, issuingState: 'FL', expiresOn: null,
+      physicalCopySeen: true, photoPath: null, photoMime: PAPER_COPY_MIME, flAuthNumber: 'SALE-123456',
+      approvedVia: 'in_store', approvedAt: '2026-11-09T18:53:40Z', approvedBy: 'owner@example.com', requestRef: null, taxNotCharged: 42.5,
+    };
+    const edit = normalizeCertificateEdit({ ...details, photoPath: PHOTO, flAuthNumber: 'CERT-999999' }, PAPER_ROW);
+    if (!('value' in edit)) throw new Error(edit.error);
+    const after = refreshSnapshotFromEdit(before, edit.value, { by: 'owner@example.com', now: NOW });
+    expect(after).toMatchObject({
+      businessName: 'Soriano Designs LLC', certType: 'resale', photoPath: PHOTO, photoMime: `image/webp${PAPER_COPY_SUFFIX}`,
+      taxNotCharged: 42.5, approvedVia: 'in_store', approvedAt: '2026-11-09T18:53:40Z', physicalCopySeen: true,
+      flAuthNumber: 'SALE-123456', editedAt: NOW.toISOString(), editedBy: 'owner@example.com',
+    });
+    expect(parseTaxExemptSnapshot(JSON.parse(JSON.stringify(after)))).toEqual(after);
+  });
+
+  it('the save route is admin-only, never touches tax amounts or the checkout door', () => {
+    const route = readFileSync(join(process.cwd(), 'src', 'app', 'api', 'admin', 'tax-exempt', 'certificates', '[id]', 'route.ts'), 'utf8');
+    expect(route).toContain('requireAdmin()');
+    expect(route).toContain('normalizeCertificateEdit');
+    expect(route).not.toMatch(/\btax\s*:|subtotal|total\s*:/);
+    const server = readFileSync(join(process.cwd(), 'src', 'lib', 'tax-exempt-server.ts'), 'utf8');
+    const fn = server.slice(server.indexOf('export async function updateCertificateDetails'), server.indexOf('export async function loadCertificateEditorForOrder'));
+    expect(fn).toContain("update({ tax_exempt_snapshot:");
+    expect(fn).not.toMatch(/tax_exempt\s*:|\.update\(\{\s*tax\b|resolveCheckoutExemption/);
+    // Uploads go through the same WebP-verified store as Instant Sale.
+    const editor = readFileSync(join(process.cwd(), 'src', 'components', 'admin', 'tax-exempt', 'CertificatePhotoEditor.tsx'), 'utf8');
+    expect(editor).toContain("'/api/admin/tax-exempt/read'");
   });
 });

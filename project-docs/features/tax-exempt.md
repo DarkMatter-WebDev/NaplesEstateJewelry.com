@@ -115,6 +115,27 @@ anyone (same as any cart).
   auto-deleted once used. A website upload never sent is removed after 7 days;
   a retake removes the replaced upload unless a certificate uses it.
 
+## 5. Adding the photo after the sale (2026-11-09)
+
+When there was no time for a photo at the counter (e.g. "Customer showed me the
+physical certificate" + "I kept a paper copy for our files"):
+
+- **Admin → Tax Exempt** → the certificate's row → **Add photo & details**
+  (a row that already has a photo: **Replace photo / edit**), or
+- **Admin → Orders → the order → Tax exemption card → Add certificate photo**
+  (only on orders already recorded tax-exempt; a taxed order is not turned
+  exempt here).
+
+Both open the same window: **Take photo** / **Choose photo or PDF** → the AI
+fills Type, Name, Number, Valid through (same read and ✓/✕ lines as Instant
+Sale) → check them → **Save certificate**. Saving updates the certificate and
+the Tax exemption card on every order that used it ("Details added" shows the
+date and who). The tax amounts never change. The Florida-only rule still blocks
+a non-Florida certificate; an expired date can be saved (it may have been valid
+on the day of the sale). A filed paper copy stays noted next to the photo
+("Photo · Paper copy filed"). A replaced photo is kept in the private bucket;
+Cancel removes only the photo taken in that window.
+
 ## Setup
 
 - ⛔ Run **`supabase/tax-exempt-2026-10.sql`** in the Supabase SQL editor

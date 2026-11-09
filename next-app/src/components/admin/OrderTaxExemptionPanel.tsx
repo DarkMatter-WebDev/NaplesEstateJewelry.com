@@ -1,10 +1,13 @@
 import Link from 'next/link';
 import { formatCurrency } from '@/types/sales';
+import CertificatePhotoEditor from '@/components/admin/tax-exempt/CertificatePhotoEditor';
 import {
-  PAPER_COPY_MIME,
   TAX_CERT_TYPE_LABELS,
   TAX_EXEMPT_SOURCE_LABELS,
+  copyOnFileLabel,
   formatCertDate,
+  paperCopyFiled,
+  type EditableCertificate,
   type TaxExemptSnapshot,
 } from '@/lib/tax-exempt';
 import { paperDateLine } from '@/lib/order-receipt-paper';
@@ -18,18 +21,32 @@ const BORDER = 'var(--color-outline-variant)';
  * Reads the snapshot stored on the order, so it stays right even if the
  * certificate is later withdrawn. "View certificate" opens a five-minute
  * signed link (admins only); the file itself is kept, never auto-deleted.
+ *
+ * "Add certificate photo" / "Replace photo" (owner, 2026-11-09, mockup 1)
+ * opens the same window as Admin → Tax Exempt: it completes the certificate
+ * and this card after the sale. Tax amounts never change.
  */
-export default function OrderTaxExemptionPanel({ snapshot, adminBasePath }: { snapshot: TaxExemptSnapshot; adminBasePath: string }) {
+export default function OrderTaxExemptionPanel({
+  snapshot,
+  adminBasePath,
+  editor = null,
+}: {
+  snapshot: TaxExemptSnapshot;
+  adminBasePath: string;
+  editor?: { certificate: EditableCertificate; orderNumbers: string[] } | null;
+}) {
+  const copy = copyOnFileLabel({ photoPath: snapshot.photoPath, photoMime: snapshot.photoMime });
   const rows: [string, string][] = [
     ['Type', snapshot.certType ? `${TAX_CERT_TYPE_LABELS[snapshot.certType].long} (${TAX_CERT_TYPE_LABELS[snapshot.certType].form})` : 'Not recorded'],
     ['Name', snapshot.businessName ?? 'Not recorded'],
     ['Number', snapshot.certNumber ?? 'Not recorded'],
     ['Valid through', formatCertDate(snapshot.expiresOn) ?? '—'],
-    ['Copy on file', snapshot.photoPath ? 'Photo' : snapshot.photoMime === PAPER_COPY_MIME ? 'Paper copy (filed in store)' : 'None'],
+    ['Copy on file', copy ? copy.replace('Paper copy filed', 'Paper copy (filed in store)') : 'None'],
     ['Physical copy seen', snapshot.physicalCopySeen ? 'Yes' : 'No'],
     ['Florida auth #', snapshot.flAuthNumber ?? '—'],
     ['Approved', [TAX_EXEMPT_SOURCE_LABELS[snapshot.approvedVia], snapshot.requestRef, paperDateLine(snapshot.approvedAt)].filter(Boolean).join(' · ')],
     ...(snapshot.approvedBy ? [['By', snapshot.approvedBy] as [string, string]] : []),
+    ...(snapshot.editedAt ? [['Details added', [paperDateLine(snapshot.editedAt), snapshot.editedBy].filter(Boolean).join(' · ')] as [string, string]] : []),
     ['Tax not charged', formatCurrency(snapshot.taxNotCharged)],
   ];
   return (
@@ -46,19 +63,25 @@ export default function OrderTaxExemptionPanel({ snapshot, adminBasePath }: { sn
           </div>
         ))}
       </div>
-      <div className="mt-4 flex flex-wrap gap-2 border-t pt-4" style={{ borderColor: BORDER }}>
+      <div className="mt-4 flex flex-wrap items-center gap-2 border-t pt-4" style={{ borderColor: BORDER }}>
         {snapshot.photoPath ? (
-          <a href={`/api/admin/tax-exempt/photo?path=${encodeURIComponent(snapshot.photoPath)}`} target="_blank" rel="noopener noreferrer" className="outline-button text-xs">
-            View certificate
-          </a>
+          <>
+            <a href={`/api/admin/tax-exempt/photo?path=${encodeURIComponent(snapshot.photoPath)}`} target="_blank" rel="noopener noreferrer" className="outline-button text-xs">
+              View certificate
+            </a>
+            {editor && <CertificatePhotoEditor certificate={editor.certificate} orderNumbers={editor.orderNumbers} label="Replace photo" variant="link" />}
+          </>
         ) : (
-          <span className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-            {snapshot.photoMime === PAPER_COPY_MIME
-              ? "No photo — the customer's paper copy is filed in the store."
-              : snapshot.flAuthNumber
-                ? 'No copy — documented by the Florida authorization number above.'
-                : 'No photo — the physical copy was seen in store.'}
-          </span>
+          <>
+            {editor && <CertificatePhotoEditor certificate={editor.certificate} orderNumbers={editor.orderNumbers} label="Add certificate photo" />}
+            <span className="basis-full text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+              {paperCopyFiled(snapshot.photoMime)
+                ? "No photo — the customer's paper copy is filed in the store."
+                : snapshot.flAuthNumber
+                  ? 'No copy — documented by the Florida authorization number above.'
+                  : 'No photo — the physical copy was seen in store.'}
+            </span>
+          </>
         )}
         <Link href={`${adminBasePath}/tax-exempt`} className="text-xs underline self-center" style={{ color: GOLD }}>All certificates</Link>
       </div>

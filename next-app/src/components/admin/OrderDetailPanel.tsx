@@ -18,7 +18,7 @@ import { describeShippingService } from '@/lib/shipping-service';
 import { adminUpdateProductsStatus } from '@/app/actions/admin-products';
 import { AppIcon } from '@/components/AppIcon';
 import OrderTaxExemptionPanel from '@/components/admin/OrderTaxExemptionPanel';
-import type { TaxExemptSnapshot } from '@/lib/tax-exempt';
+import type { EditableCertificate, TaxExemptSnapshot } from '@/lib/tax-exempt';
 import { heardAboutAdminLabel } from '@/lib/order-heard-about';
 import type { OrderGift } from '@/lib/order-gift';
 import OrderDeliveryTracking from '@/components/admin/OrderDeliveryTracking';
@@ -84,6 +84,8 @@ interface Props {
   pickupHours: string;
   /** The tax exemption noted on this order (lib/tax-exempt.ts), or null. */
   taxExemption?: TaxExemptSnapshot | null;
+  /** The certificate behind it, for "Add certificate photo" (2026-11-09), or null. */
+  taxExemptionEditor?: { certificate: EditableCertificate; orderNumbers: string[] } | null;
   /** "This is a gift" at checkout (lib/order-gift.ts), or null. */
   gift?: OrderGift | null;
   /** The package's EasyPost tracking row (lib/order-tracking-server.ts), or null. */
@@ -103,6 +105,7 @@ export default function OrderDetailPanel({
   trackingSupported = true,
   pickupHours,
   taxExemption = null,
+  taxExemptionEditor = null,
   gift = null,
   deliveryTracking: initialDeliveryTracking = null,
   deliveryTrackingEnabled = false,
@@ -1243,7 +1246,7 @@ export default function OrderDetailPanel({
             </div>
           </aside>
 
-          {taxExemption && <OrderTaxExemptionPanel snapshot={taxExemption} adminBasePath={adminBasePath} />}
+          {taxExemption && <OrderTaxExemptionPanel snapshot={taxExemption} adminBasePath={adminBasePath} editor={taxExemptionEditor} />}
 
           <section className="border p-5" style={{ borderColor: BORDER, background: 'white' }}>
             <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>Email History</h2>

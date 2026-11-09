@@ -3,7 +3,8 @@ import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { getVerifiedUser } from '@/lib/auth-claims';
 import OrderDetailPanel from '@/components/admin/OrderDetailPanel';
-import { loadOrderTaxExemption } from '@/lib/tax-exempt-server';
+import { loadCertificateEditorForOrder, loadOrderTaxExemption } from '@/lib/tax-exempt-server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { loadOrderGift } from '@/lib/order-gift-server';
 import { loadOrderTracking } from '@/lib/order-tracking-server';
 import { isDeliveryTrackingConfigured } from '@/lib/easypost';
@@ -241,6 +242,8 @@ export default async function AdminOrderDetailPage({ params }: Props) {
     }
   }
 
+  const taxExemption = await loadOrderTaxExemption(supabase, id);
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-background, #fafaf8)' }}>
       <AdminHeader
@@ -260,7 +263,8 @@ export default async function AdminOrderDetailPage({ params }: Props) {
         locale={locale}
         recycleBinSupported={recycleBinSupported}
         trackingSupported={trackingSupported}
-        taxExemption={await loadOrderTaxExemption(supabase, id)}
+        taxExemption={taxExemption}
+        taxExemptionEditor={taxExemption ? await loadCertificateEditorForOrder(createServiceClient(), taxExemption.certificateId) : null}
         gift={await loadOrderGift(supabase, id)}
         deliveryTracking={await loadOrderTracking(supabase, id)}
         deliveryTrackingEnabled={isDeliveryTrackingConfigured()}
