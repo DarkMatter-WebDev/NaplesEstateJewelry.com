@@ -48,8 +48,8 @@ export default async function JewelryAppraisalPage({ params }: Props) {
       mark: 'photo-location' as ClayMarkName,
       titleEn: 'Walk in, or send photos first',
       titleEs: 'Entre sin cita o envíe fotos primero',
-      descEn: 'Come by the Shirley St showroom during open hours, or text a few photos to (239) 404-8505 for a ballpark before you make the trip.',
-      descEs: 'Visite el salón de Shirley St durante el horario de atención, o envíe unas fotos al (239) 404-8505 para una idea del valor antes de venir.',
+      descEn: 'Come by the Shirley St showroom during open hours, or text a few photos to (239) 404-8505 for a first look before you make the trip. The final number comes once we see it in person.',
+      descEs: 'Visite el salón de Shirley St durante el horario de atención, o envíe unas fotos al (239) 404-8505 para un primer vistazo antes de venir. El número final llega cuando lo vemos en persona.',
     },
     {
       mark: 'flask' as ClayMarkName,

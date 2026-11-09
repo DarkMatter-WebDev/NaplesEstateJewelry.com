@@ -4,7 +4,13 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-11-08 (1)**. Before that, **2026-11-05 (5)**. Before that, **2026-11-05 (2)**. Before that, **2026-11-02 (2)**.
+> compaction. Last reconciled: **2026-11-09 (1)**. Before that, **2026-11-08 (1)**. Before that, **2026-11-05 (5)**. Before that, **2026-11-05 (2)**. Before that, **2026-11-02 (2)**.
+
+## Photo / online submissions are a "first look": the evaluation is almost always in person; out-of-area sellers are told so plainly (2026-11-09)
+
+- **Owner:** people from all over the country submit items with no intention of coming in; the purpose of the free evaluation is to get sellers in the door. Wording approved from mockups 1–2: one-line note box **"Photos are a first look — most pieces still need to be seen in person."** (option C, chosen over a 72- and a 34-word version); "Outside Southwest Florida" note = option A (**note only, no required tick** — option B's tick "I understand the final evaluation happens in person in Naples" was offered and not chosen).
+- **The rules:** ⛔ never promise a price, "ballpark" or "range" from photos alone; photos give "a first look", the final number comes in person (showroom or SWFL home). Photos stay optional (2026-09-11 rule unchanged). Allowed: "now and then that's enough for an accurate number" (FAQ only) — never name an example item unless the owner gives one. The `/faq` question string lives in ONE constant (`PHOTOS_QUESTION_EN`) because the data, JSON-LD and JSX all match on it. `/sellbymail` is the deliberate exception: no note box, its own label/button/success text.
+- **Out-of-area note:** `outOfAreaNote(isEs, area)` — only `outside-swfl` gets "we usually can't give an evaluation from photos alone for sellers outside the area… if you'll be visiting Naples, tell us when"; `swfl-other` keeps the softer local note. Record `CHANGELOG.md` 2026-11-09 (1).
 
 ## Admin → Messages: every message starts COLLAPSED and opens to labelled lines in the owner-email order; opening never marks it read (2026-11-08)
 
@@ -753,6 +759,10 @@ evidence: `SEO_LEAD_AUDIT.md` 2026-09-21.
 - NEJ links to it from ONE place: a body sentence on `/estate-services` (EN + ES).
   ⛔ Never from `/silver-services` or its guides (NEJ's best non-brand page), and
   never in schema/`sameAs`, the footer or the sitemap.
+  **Re-confirmed 2026-11-08** (owner asked about adding links, was shown the
+  existing one, then: *"forget making any changes.. we're good with how it
+  is"*) — do not re-propose more sister-site links (the inherited-jewelry
+  guide and `/about` were offered and declined).
 
 ## Google Ads runs with NO site tag; the pages that rank are never edited for ads; the goal is any seller contact (2026-09-20)
 

@@ -106,7 +106,7 @@ export function LocationField({ locale, tone = 'default', idPrefix }: {
             className="rounded-xl px-3 py-2 text-sm"
             style={{ border: '1px solid rgba(115, 92, 0, 0.24)', background: '#fbf5e7', color: '#4d4635' }}
           >
-            {outOfAreaNote(isEs)}
+            {outOfAreaNote(isEs, area || null)}
           </p>
         </div>
       )}

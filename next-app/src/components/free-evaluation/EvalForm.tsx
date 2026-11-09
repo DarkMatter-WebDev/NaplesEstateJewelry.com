@@ -129,21 +129,52 @@ export default function EvalForm({ locale, submitted, variant = 'free-evaluation
               ? (isEs
                 ? 'Revisaremos sus fotos y le contactaremos para enviarle su etiqueta prepagada.'
                 : "We'll review your photos and be in touch about sending your prepaid label.")
+              // 2026-11-09 (owner, mockup 1 "After"): photos are a first look —
+              // set up the showroom visit as the next step.
               : isEs
-                ? 'Revisaremos su información y nos comunicaremos con usted pronto.'
-                : "We'll review your submission and be in touch soon."}
+                ? 'Gracias — daremos un primer vistazo y nos comunicaremos con usted pronto. La mayoría de las piezas deben verse en persona antes de poder darle un número final, así que probablemente le invitaremos a pasar por el salón.'
+                : "Thank you — we'll take a first look and be in touch soon. Most pieces need to be seen in person before we can give you a final number, so we'll likely invite you to stop by the showroom."}
             onSendAnother={sendAnother}
           />
         </div>
       ) : (
         <>
+          {/* "Photos are a first look" (2026-11-09, owner-approved mockup 2,
+              option C): read BEFORE anyone uploads, so out-of-town sellers
+              know the evaluation happens in person. Not on /sellbymail —
+              mail-in is that page's whole point. */}
+          {!byMail && (
+            <p
+              data-first-look-note
+              className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm"
+              style={{ border: '1px solid rgba(115, 92, 0, 0.28)', background: '#fbf5e7', color: 'var(--color-on-surface)' }}
+            >
+              <span className="grid h-7 w-7 flex-none place-items-center rounded-full" style={{ background: '#f1e3b4' }} aria-hidden="true">
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="#735c00" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12Z" />
+                  <circle cx="12" cy="12" r="2.8" />
+                </svg>
+              </span>
+              <span>
+                <strong className="font-bold" style={{ fontFamily: 'var(--font-headline)', fontSize: '0.95rem' }}>
+                  {isEs ? 'Las fotos son un primer vistazo' : 'Photos are a first look'}
+                </strong>
+                {isEs
+                  ? ' — la mayoría de las piezas aún deben verse en persona.'
+                  : ' — most pieces still need to be seen in person.'}
+              </span>
+            </p>
+          )}
+
           {/* Photo upload */}
           <div className="grid gap-1">
             <span
               className="text-[0.7rem] font-bold uppercase tracking-[0.14em]"
               style={{ color: '#5e5e5d', fontFamily: 'var(--font-label)' }}
             >
-              {isEs ? 'Fotos — opcionales, pero ayudan' : 'Photos — optional but helpful'}
+              {byMail
+                ? (isEs ? 'Fotos — opcionales, pero ayudan' : 'Photos — optional but helpful')
+                : (isEs ? 'Fotos — opcionales, para un primer vistazo' : 'Photos — optional, for a first look')}
             </span>
             <label
               className="flex flex-col items-center justify-center rounded-2xl text-center cursor-pointer transition-colors"
@@ -305,7 +336,7 @@ export default function EvalForm({ locale, submitted, variant = 'free-evaluation
               ? (isEs ? 'Enviando…' : 'Sending…')
               : byMail
                 ? (isEs ? 'Enviar Fotos' : 'Send Photos')
-                : (isEs ? 'Enviar para Tasación Gratuita' : 'Send for Free Appraisal')}
+                : (isEs ? 'Solicitar Mi Tasación Gratuita' : 'Request My Free Appraisal')}
           </button>
         </>
       )}

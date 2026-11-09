@@ -133,8 +133,8 @@ export default function MessageUsForm({ locale, storeHours }: Props) {
           </h1>
           <p className="responsive-copy max-w-xl mx-auto mb-4" style={{ color: 'var(--color-on-surface-variant)' }}>
             {isEs
-              ? 'Envíenos un mensaje y adjunte fotos si lo desea. Le responderemos lo antes posible.'
-              : 'Send us a note and attach photos if you like. We\'ll get back to you as soon as we can.'}
+              ? 'Envíenos un mensaje y adjunte fotos si lo desea — nos dan un primer vistazo. Le responderemos lo antes posible.'
+              : 'Send us a note and attach photos if you like — they give us a first look. We\'ll get back to you as soon as we can.'}
           </p>
           <div className="mb-8 flex flex-col items-center gap-2">
             <a href="tel:2394048505" className="outline-button">
@@ -273,7 +273,9 @@ export default function MessageUsForm({ locale, storeHours }: Props) {
             {/* Optional photos */}
             <div className="grid gap-1">
               <label className="form-label" htmlFor="message-photos">
-                {isEs ? 'Adjuntar fotos (opcional)' : 'Attach photos (optional)'}
+                {isEs
+                  ? 'Adjuntar fotos (opcional — la mayoría de las piezas aún deben verse en persona)'
+                  : 'Attach photos (optional — most pieces still need to be seen in person)'}
               </label>
               <label
                 htmlFor="message-photos"

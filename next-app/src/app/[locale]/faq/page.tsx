@@ -29,6 +29,9 @@ interface Props {
   params: Promise<{ locale: string }>;
 }
 
+/** The photos question — one string, so the data and its JSX twin never drift. */
+const PHOTOS_QUESTION_EN = 'Can you evaluate my items from photos?';
+
 const FAQ_ITEMS = [
   {
     questionEn: 'Is the consultation free?',
@@ -37,10 +40,13 @@ const FAQ_ITEMS = [
     answerEs: 'Sí. Todas las consultas, evaluaciones y ofertas son 100% gratuitas y sin obligación. Si no podemos acordar un precio, no debe nada.',
   },
   {
-    questionEn: 'How do I get a quick quote without an appointment?',
-    questionEs: '¿Cómo obtengo una cotización rápida sin cita?',
-    answerEn: 'Text clear photos of your items to (239) 404-8505. Include close-ups of any maker\'s marks, stamps, or signatures. In most cases, we can provide a preliminary range within the same day.',
-    answerEs: 'Envíe fotos claras de sus artículos al (239) 404-8505. Incluya primeros planos de cualquier marca del fabricante, sellos o firmas. En la mayoría de los casos, podemos proporcionar un rango preliminar el mismo día.',
+    // 2026-11-09 (owner, mockup 1): photos are a first look; the final
+    // evaluation is almost always in person. The JSX below renders this answer
+    // with a tap-to-call link — keep both in step (matched by PHOTOS_QUESTION_EN).
+    questionEn: PHOTOS_QUESTION_EN,
+    questionEs: '¿Pueden evaluar mis artículos con fotos?',
+    answerEn: 'Photos give us a first look. Text clear photos of your items to (239) 404-8505, with close-ups of any maker\'s marks, stamps, or signatures, and we\'ll tell you what we can see — usually the same day. Now and then that\'s enough for an accurate number, but most pieces need to be tested, weighed and examined in person, so the final evaluation happens at our Naples showroom or at your home in Southwest Florida.',
+    answerEs: 'Las fotos nos dan un primer vistazo. Envíe fotos claras de sus artículos al (239) 404-8505, con primeros planos de cualquier marca del fabricante, sellos o firmas, y le diremos lo que podemos ver — normalmente el mismo día. A veces eso basta para dar un número preciso, pero la mayoría de las piezas deben probarse, pesarse y examinarse en persona, así que la evaluación final se hace en nuestro salón de Naples o en su hogar en el suroeste de Florida.',
   },
   {
     questionEn: 'How is payment delivered?',
@@ -140,15 +146,15 @@ export default async function FaqPage({ params }: Props) {
                      />
                   </summary>
                   <div className="px-6 pb-6 text-[#4d4635] leading-relaxed text-sm">
-                    {questionEn === 'How do I get a quick quote without an appointment?' ? (
+                    {questionEn === PHOTOS_QUESTION_EN ? (
                       <>
                         {isEs
-                          ? 'Envíe fotos claras de sus artículos al '
-                          : 'Text clear photos of your items to '}
+                          ? 'Las fotos nos dan un primer vistazo. Envíe fotos claras de sus artículos al '
+                          : 'Photos give us a first look. Text clear photos of your items to '}
                         <a href="tel:2394048505" className="text-[#735c00] underline">(239) 404-8505</a>
                         {isEs
-                          ? '. Incluya primeros planos de cualquier marca del fabricante, sellos o firmas. En la mayoría de los casos, podemos proporcionar un rango preliminar el mismo día.'
-                          : ". Include close-ups of any maker's marks, stamps, or signatures. In most cases, we can provide a preliminary range within the same day."}
+                          ? ', con primeros planos de cualquier marca del fabricante, sellos o firmas, y le diremos lo que podemos ver — normalmente el mismo día. A veces eso basta para dar un número preciso, pero la mayoría de las piezas deben probarse, pesarse y examinarse en persona, así que la evaluación final se hace en nuestro salón de Naples o en su hogar en el suroeste de Florida.'
+                          : ", with close-ups of any maker's marks, stamps, or signatures, and we'll tell you what we can see — usually the same day. Now and then that's enough for an accurate number, but most pieces need to be tested, weighed and examined in person, so the final evaluation happens at our Naples showroom or at your home in Southwest Florida."}
                       </>
                     ) : questionEn === 'What types of items do you purchase?' ? (
                       <>

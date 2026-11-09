@@ -153,7 +153,19 @@ export function inquirySubjectSuffix(
   return parts.length ? ` · ${parts.join(' · ')}` : '';
 }
 
-export function outOfAreaNote(isEs: boolean): string {
+/**
+ * The note under "City & state". "Outside Southwest Florida" gets its own
+ * plain wording (2026-11-09, owner-approved mockup 1, option A — note only, no
+ * required tick): we evaluate in person, so photos alone usually can't give an
+ * out-of-area seller an evaluation. "Elsewhere in SWFL" keeps the older note —
+ * those sellers are still local.
+ */
+export function outOfAreaNote(isEs: boolean, area?: LocationArea | null): string {
+  if (isOutsideServiceArea(area)) {
+    return isEs
+      ? 'Evaluamos y compramos en persona — en nuestro salón de Naples o en hogares de todo el suroeste de Florida — así que normalmente no podemos dar una evaluación solo con fotos a vendedores fuera de la zona. Si va a visitar Naples, díganos cuándo y con gusto le atenderemos entonces.'
+      : "We evaluate and buy in person — at our Naples showroom, or in homes across Southwest Florida — so we usually can't give an evaluation from photos alone for sellers outside the area. If you'll be visiting Naples, tell us when and we'd be glad to see you then.";
+  }
   return isEs
     ? 'Compramos en persona en la zona de Naples y Fort Myers. Si está más lejos, díganos dónde se encuentra y le diremos si podemos ayudarle.'
     : "We buy in person in the Naples and Fort Myers area. If you're farther away, tell us where you are and we'll let you know whether we can help.";

@@ -8,6 +8,7 @@ import {
   isOutsideServiceArea,
   locationAreaOptions,
   locationNeedsDetail,
+  outOfAreaNote,
   parseLocationArea,
   parseLocationDetail,
   parsePreferredContact,
@@ -87,5 +88,18 @@ describe('inquiry-fields — display strings', () => {
     expect(inquiryPreferenceLines(null, null, null)).toEqual([]);
     expect(inquirySubjectSuffix('naples', null, 'text')).toBe(' · prefers Text · Naples');
     expect(inquirySubjectSuffix(null, null, null)).toBe('');
+  });
+});
+
+describe('inquiry-fields — out-of-area note (2026-11-09)', () => {
+  it('tells sellers outside Southwest Florida that photos alone usually cannot get an evaluation', () => {
+    expect(outOfAreaNote(false, 'outside-swfl')).toContain("we usually can't give an evaluation from photos alone");
+    expect(outOfAreaNote(true, 'outside-swfl')).toContain('no podemos dar una evaluación solo con fotos');
+  });
+  it('keeps the older, softer note for "Elsewhere in Southwest Florida" (still local) and with no area', () => {
+    const old = "We buy in person in the Naples and Fort Myers area. If you're farther away, tell us where you are and we'll let you know whether we can help.";
+    expect(outOfAreaNote(false, 'swfl-other')).toBe(old);
+    expect(outOfAreaNote(false)).toBe(old);
+    expect(outOfAreaNote(true, 'swfl-other')).toContain('Compramos en persona');
   });
 });

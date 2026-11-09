@@ -795,8 +795,8 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
               </h2>
               <p className="text-base leading-relaxed" style={{ color: '#c9c2b3' }}>
                 {isEs
-                  ? 'Cuéntenos qué tiene y cuál es el mejor momento para llamarle — le devolvemos la llamada. Las fotos son opcionales.'
-                  : "Tell us what you have and the best time to reach you — we'll call you back. Photos are optional."}
+                  ? 'Cuéntenos qué tiene y cuál es el mejor momento para llamarle — le devolvemos la llamada. Las fotos son opcionales y nos dan un primer vistazo antes de que venga.'
+                  : "Tell us what you have and the best time to reach you — we'll call you back. Photos are optional, and they give us a first look before you come in."}
               </p>
             </div>
             <EvalForm locale={locale} submitted={isSubmitted} />

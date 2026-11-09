@@ -128,8 +128,8 @@ export default async function SellCityPage({ params }: Props) {
       mark: 'phone-signal',
       titleEn: 'Call or request an estimate',
       titleEs: 'Llame o solicite un estimado',
-      descEn: `Call (239) 404-8505 or send a few photos. We give you a ballpark before we ever meet.`,
-      descEs: `Llame al (239) 404-8505 o envíe algunas fotos. Le damos una idea del valor antes de reunirnos.`,
+      descEn: `Call (239) 404-8505 or send a few photos for a first look. The final number comes when we see it in person — at the showroom or your home.`,
+      descEs: `Llame al (239) 404-8505 o envíe algunas fotos para un primer vistazo. El número final llega cuando lo vemos en persona — en el salón o en su hogar.`,
     },
     {
       mark: 'house',

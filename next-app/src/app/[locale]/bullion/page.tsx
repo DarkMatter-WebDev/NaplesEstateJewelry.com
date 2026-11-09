@@ -244,8 +244,8 @@ export default async function BullionPage({ params }: Props) {
             </h2>
             <p className="text-[#4d4635] text-lg mb-10 max-w-2xl mx-auto leading-relaxed">
               {isEs
-                ? 'Envíe fotos de sus monedas, barras, plata esterlina, chatarra de oro, platino o paladio. Le daremos una primera lectura práctica y, cuando sea necesario, programaremos una evaluación privada.'
-                : 'Text photos of your coins, bars, sterling, scrap gold, platinum, or palladium. We will give you a practical first read and, when needed, schedule a private evaluation against the current market.'}
+                ? 'Envíe fotos de sus monedas, barras, plata esterlina, chatarra de oro, platino o paladio. Le daremos una primera lectura práctica y, para la mayoría de los artículos, programaremos una evaluación privada en persona.'
+                : 'Text photos of your coins, bars, sterling, scrap gold, platinum, or palladium. We will give you a practical first read and, for most items, schedule a private evaluation in person against the current market.'}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center flex-wrap">
               <Link
