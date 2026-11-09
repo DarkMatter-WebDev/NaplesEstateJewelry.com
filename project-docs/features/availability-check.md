@@ -1,8 +1,8 @@
 # Check Availability — pieces another dealer holds (2026-11-05)
 
-> Status: **BUILT + STAGED 2026-11-05 (4), not pushed.** ⛔ Run
-> `supabase/availability-check-2026-11.sql` **before** the push (see *Before the
-> SQL runs*). Owner-approved design: mockup 1 (2026-11-05), defaults as drawn.
+> Status: **SQL RUN + DEPLOYED 2026-11-05 (owner: SQL first, then the push).**
+> Not yet used for real — the first ticked item and its first request are the
+> check (`TASKS.md`). Owner-approved design: mockup 1 (2026-11-05), defaults as drawn.
 
 ## What it does
 

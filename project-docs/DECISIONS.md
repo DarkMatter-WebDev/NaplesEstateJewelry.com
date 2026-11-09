@@ -4,7 +4,13 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-11-05 (4)**. Before that, **2026-11-05 (2)**. Before that, **2026-11-02 (2)**.
+> compaction. Last reconciled: **2026-11-08 (1)**. Before that, **2026-11-05 (5)**. Before that, **2026-11-05 (2)**. Before that, **2026-11-02 (2)**.
+
+## Admin → Messages: every message starts COLLAPSED and opens to labelled lines in the owner-email order; opening never marks it read (2026-11-08)
+
+- **Owner-approved (mockup 4):** collapsed row = chip, title, New, date (+ photo count), Mark Read / Open Order, ▼ arrow. Open = Appointment (+ note), Name, Phone (tap-to-call), Email (tap-to-email / "Not provided"), Location, Preferred contact, Source → **Message** box → **Photos (N)**. Name and email live ONLY in the labelled lines (no longer on the date line). Everything starts collapsed, New ones too; opening does NOT mark read — the New tag stays until Mark Read.
+- **Display-only:** `admin_notifications.body` stays plain text exactly as the routes write it; `lib/admin-message-body.ts` reads it. ⛔ Keep the parser strict — a label is lifted only from the builders' own blocks (last paragraph all Phone/Location/Preferred contact/Source; first paragraph starting "Appointment requested:"), so a customer's own "Note:" / "Phone:" lines and order/bounce sentences stay as text. A NEW labelled line added to a body builder (`contact-message`, `inquire`) must be added to the parser's label list too, or that whole paragraph falls back to plain text.
+- Record `CHANGELOG.md` 2026-11-08 (1).
 
 ## Check Availability: a piece another dealer holds is ASKED about first (no payment) and sold only through the owner's Buy link (2026-11-05)
 

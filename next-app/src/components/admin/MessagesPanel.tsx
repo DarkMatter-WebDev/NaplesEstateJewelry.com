@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
 import { formatOrderDate } from '@/types/sales';
 import { AppIcon } from '@/components/AppIcon';
+import { cleanAppointmentNote, parseMessageBody, telHref } from '@/lib/admin-message-body';
 
 const GOLD = '#735c00';
 const BORDER = 'var(--color-outline-variant)';
@@ -60,6 +61,234 @@ function TypeChip({ type }: { type: string }) {
   );
 }
 
+/** Types whose body is a customer's own message (contact + lead forms). */
+const CUSTOMER_MESSAGE_TYPES = new Set(['message', 'inquiry']);
+
+const FIELD_LABEL_CLASS =
+  'pt-2 md:pt-[3px] text-[0.625rem] font-bold uppercase tracking-[0.16em]';
+const FIELD_LINK_STYLE = { color: GOLD, fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: '3px' } as const;
+const SECTION_LABEL_CLASS = 'mt-4 mb-1.5 text-[0.625rem] font-bold uppercase tracking-[0.16em]';
+
+/**
+ * One message as an accordion card (2026-11-08, owner-approved mockup 4).
+ * Collapsed: chip, title, New, date (+ photo count) and the row's buttons.
+ * Open: the labelled lines in the owner-email order — Appointment, Name, Phone,
+ * Email, Location, Preferred contact, Source — then the customer's Message box,
+ * then Photos. Order / bounce notices keep their text (line breaks shown).
+ * Name and email live ONLY in the labelled lines (no longer on the date line).
+ */
+function MessageCard({
+  item,
+  isTrash,
+  isSelected,
+  isOpen,
+  adminBasePath,
+  onToggleSelect,
+  onToggleOpen,
+  onMarkRead,
+}: {
+  item: AdminNotification;
+  isTrash: boolean;
+  isSelected: boolean;
+  isOpen: boolean;
+  adminBasePath: string;
+  onToggleSelect: () => void;
+  onToggleOpen: () => void;
+  onMarkRead: () => void;
+}) {
+  const parsed = parseMessageBody(item.body);
+  const photos = [...new Set([...imageList(item.image_urls), ...parsed.photoUrls])];
+  const isCustomerMessage = CUSTOMER_MESSAGE_TYPES.has(item.type);
+  const { fields } = parsed;
+  const panelId = `message-${item.id}`;
+
+  const showOpenOrder = !isTrash && Boolean(item.order_id);
+  const showMarkRead = !isTrash && !item.is_read;
+  const stop = (event: React.MouseEvent) => event.stopPropagation();
+
+  const rows: { label: string; value: React.ReactNode }[] = [];
+  if (fields.appointment) {
+    rows.push({
+      label: 'Appointment',
+      value: (
+        <>
+          <span className="font-semibold">{fields.appointment}</span>
+          {fields.appointmentNote && (
+            <span className="block text-[0.8125rem] mt-0.5" style={{ color: '#8a5a00' }}>
+              {cleanAppointmentNote(fields.appointmentNote)}
+            </span>
+          )}
+        </>
+      ),
+    });
+  }
+  if (item.customer_name) rows.push({ label: 'Name', value: item.customer_name });
+  if (fields.phone) {
+    const href = telHref(fields.phone);
+    rows.push({
+      label: 'Phone',
+      value: href ? <a href={href} style={FIELD_LINK_STYLE}>{fields.phone}</a> : fields.phone,
+    });
+  }
+  if (item.customer_email) {
+    rows.push({
+      label: 'Email',
+      value: <a href={`mailto:${item.customer_email}`} style={FIELD_LINK_STYLE}>{item.customer_email}</a>,
+    });
+  } else if (isCustomerMessage) {
+    rows.push({ label: 'Email', value: <span className="italic" style={{ color: '#8c8676' }}>Not provided</span> });
+  }
+  if (fields.location) rows.push({ label: 'Location', value: fields.location });
+  if (fields.preferredContact) rows.push({ label: 'Preferred contact', value: fields.preferredContact });
+  if (fields.source) rows.push({ label: 'Source', value: fields.source });
+
+  return (
+    <article
+      className="border p-4"
+      style={{
+        borderColor: isSelected ? (isTrash ? GOLD : RED) : item.is_read ? BORDER : GOLD,
+        background: isSelected
+          ? `color-mix(in srgb, ${isTrash ? GOLD : RED} 4%, white)`
+          : item.is_read ? 'white' : 'color-mix(in srgb, var(--color-primary) 5%, white)',
+      }}
+    >
+      <div className="flex gap-3 items-start">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={onToggleSelect}
+          className="mt-1 accent-[#735c00] h-4 w-4 shrink-0 cursor-pointer"
+          aria-label={`Select: ${item.title}`}
+        />
+
+        <div className="flex-1 min-w-0">
+          {/* Header: a click anywhere on it opens/closes; the title button is the keyboard control. */}
+          <div
+            className="group relative flex flex-col gap-3 md:flex-row md:items-start cursor-pointer"
+            onClick={onToggleOpen}
+          >
+            <div className="min-w-0 flex-1 pr-10 md:pr-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <TypeChip type={item.type} />
+                <h2 className="font-bold" style={{ color: 'var(--color-on-surface)', fontFamily: 'var(--font-headline)' }}>
+                  <button
+                    type="button"
+                    aria-expanded={isOpen}
+                    aria-controls={panelId}
+                    onClick={(event) => { event.stopPropagation(); onToggleOpen(); }}
+                    className="text-left cursor-pointer transition-colors group-hover:text-[#735c00] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#735c00]"
+                  >
+                    {item.title}
+                  </button>
+                </h2>
+                {!isTrash && !item.is_read && (
+                  <span className="px-2 py-0.5 text-[0.58rem] font-bold uppercase tracking-widest" style={{ background: GOLD, color: 'white' }}>
+                    New
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 text-xs" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+                {formatOrderDate(item.created_at)}
+                {photos.length > 0 && (
+                  <span className="font-semibold" style={{ color: GOLD }}>
+                    {` · ${photos.length} photo${photos.length === 1 ? '' : 's'}`}
+                  </span>
+                )}
+              </p>
+            </div>
+
+            {(showOpenOrder || showMarkRead) && (
+              <div className="flex flex-wrap items-center gap-2 shrink-0" onClick={stop}>
+                {showOpenOrder && (
+                  <Link href={`${adminBasePath}/orders/${item.order_id}`} className="gold-button text-sm">
+                    Open Order
+                  </Link>
+                )}
+                {showMarkRead && (
+                  <button type="button" onClick={onMarkRead} className="outline-button text-sm">
+                    Mark Read
+                  </button>
+                )}
+              </div>
+            )}
+
+            <span
+              aria-hidden="true"
+              className="absolute top-0 right-0 md:static shrink-0 flex h-[30px] w-[30px] items-center justify-center rounded-full border bg-white transition-[transform,border-color] duration-150 group-hover:border-[#735c00]"
+              style={{ borderColor: BORDER, color: GOLD, transform: isOpen ? 'rotate(180deg)' : undefined }}
+            >
+              <AppIcon name="expand_more" style={{ fontSize: '1.15rem' }} />
+            </span>
+          </div>
+
+          {isOpen && (
+            <div id={panelId} className="mt-3 border-t pt-0.5" style={{ borderColor: '#ece6d6' }}>
+              {rows.length > 0 && (
+                <dl className="mt-3 grid grid-cols-1 md:grid-cols-[9.5rem_1fr] md:gap-x-4 gap-y-0.5 md:gap-y-1.5 text-sm max-w-[40rem]">
+                  {rows.map((row) => (
+                    <div key={row.label} className="contents">
+                      <dt className={FIELD_LABEL_CLASS} style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+                        {row.label}
+                      </dt>
+                      <dd className="m-0 leading-snug [overflow-wrap:anywhere]" style={{ color: 'var(--color-on-surface)' }}>
+                        {row.value}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+
+              {parsed.text && (isCustomerMessage ? (
+                <>
+                  <p className={SECTION_LABEL_CLASS} style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>Message</p>
+                  <div
+                    className="border px-3.5 py-3 text-sm leading-relaxed whitespace-pre-line max-w-[40rem] [overflow-wrap:anywhere]"
+                    style={{ borderColor: BORDER, borderLeft: `3px solid ${GOLD}`, background: '#fbf9f4', color: 'var(--color-on-surface)' }}
+                  >{parsed.text}</div>
+                </>
+              ) : (
+                <p
+                  className="mt-3 text-sm leading-relaxed whitespace-pre-line max-w-[40rem] [overflow-wrap:anywhere]"
+                  style={{ color: 'var(--color-on-surface-variant)' }}
+                >{parsed.text}</p>
+              ))}
+
+              {photos.length > 0 && (
+                <>
+                  <p className={SECTION_LABEL_CLASS} style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+                    Photos ({photos.length})
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {photos.map((url, i) => (
+                      <a
+                        key={url}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="lift-tile block overflow-hidden rounded-md border"
+                        style={{ width: '5rem', height: '5rem', borderColor: BORDER, background: '#faf7f0' }}
+                      >
+                        <Image
+                          src={url}
+                          alt={`${item.title} photo ${i + 1}`}
+                          width={80}
+                          height={80}
+                          unoptimized
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      </a>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </article>
+  );
+}
+
 type View = 'inbox' | 'trash';
 
 export default function MessagesPanel({
@@ -84,6 +313,9 @@ export default function MessagesPanel({
   const [items, setItems] = useState(notifications);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  // Every message starts COLLAPSED (owner, 2026-11-08); a click opens it.
+  // Opening never marks it read — the New tag stays until Mark Read.
+  const [openIds, setOpenIds] = useState<Set<string>>(new Set());
 
   // Keep the rendered list in sync with the server. Next.js soft-navigation
   // between ?view=inbox and ?view=trash — and router.refresh() after an action —
@@ -105,6 +337,15 @@ export default function MessagesPanel({
 
   function toggleOne(id: string) {
     setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleOpen(id: string) {
+    setOpenIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -240,87 +481,17 @@ export default function MessagesPanel({
 
         <div className="flex flex-col gap-3">
           {items.map((item) => (
-            <article
+            <MessageCard
               key={item.id}
-              className="border p-4"
-              style={{
-                borderColor: selected.has(item.id) ? (isTrash ? GOLD : RED) : item.is_read ? BORDER : GOLD,
-                background: selected.has(item.id)
-                  ? `color-mix(in srgb, ${isTrash ? GOLD : RED} 4%, white)`
-                  : item.is_read ? 'white' : 'color-mix(in srgb, var(--color-primary) 5%, white)',
-              }}
-            >
-              <div className="flex gap-3 items-start">
-                <input
-                  type="checkbox"
-                  checked={selected.has(item.id)}
-                  onChange={() => toggleOne(item.id)}
-                  className="mt-1 accent-[#735c00] h-4 w-4 shrink-0 cursor-pointer"
-                  aria-label={`Select: ${item.title}`}
-                />
-
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between flex-1 min-w-0">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <TypeChip type={item.type} />
-                      <h2 className="font-bold" style={{ color: 'var(--color-on-surface)', fontFamily: 'var(--font-headline)' }}>
-                        {item.title}
-                      </h2>
-                      {!isTrash && !item.is_read && (
-                        <span className="px-2 py-0.5 text-[0.58rem] font-bold uppercase tracking-widest" style={{ background: GOLD, color: 'white' }}>
-                          New
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-1 text-xs" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
-                      {formatOrderDate(item.created_at)}
-                      {item.customer_name ? ` · ${item.customer_name}` : ''}
-                      {item.customer_email ? ` · ${item.customer_email}` : ''}
-                    </p>
-                    {item.body && (
-                      <p className="mt-3 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
-                        {item.body}
-                      </p>
-                    )}
-                    {imageList(item.image_urls).length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {imageList(item.image_urls).map((url, i) => (
-                          <a
-                            key={url}
-                            href={url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block overflow-hidden rounded-md border"
-                            style={{ width: '5rem', height: '5rem', borderColor: BORDER, background: '#faf7f0' }}
-                          >
-                            <Image
-                              src={url}
-                              alt={`${item.title} photo ${i + 1}`}
-                              width={80}
-                              height={80}
-                              unoptimized
-                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                            />
-                          </a>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap gap-2 shrink-0">
-                    {!isTrash && item.order_id && (
-                      <Link href={`${adminBasePath}/orders/${item.order_id}`} className="gold-button text-sm">
-                        Open Order
-                      </Link>
-                    )}
-                    {!isTrash && !item.is_read && (
-                      <button type="button" onClick={() => markRead(item.id)} className="outline-button text-sm">
-                        Mark Read
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </article>
+              item={item}
+              isTrash={isTrash}
+              isSelected={selected.has(item.id)}
+              isOpen={openIds.has(item.id)}
+              adminBasePath={adminBasePath}
+              onToggleSelect={() => toggleOne(item.id)}
+              onToggleOpen={() => toggleOpen(item.id)}
+              onMarkRead={() => markRead(item.id)}
+            />
           ))}
 
           {items.length === 0 && (
