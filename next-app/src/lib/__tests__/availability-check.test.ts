@@ -201,6 +201,43 @@ describe('wiring guards', () => {
     }
   });
 
+  // Owner, 2026-11-10: "Inquire" chip, one-label button (version A), no
+  // duplicate Inquire button on the item page — and the card stylesheet bug.
+  it('the card button stylesheet renders from the Check Availability branch too', () => {
+    const button = read('src/components/shop/CartButton.tsx');
+    const branch = button.slice(
+      button.indexOf('if (item.checkFirst && canPurchase && !inCart)'),
+      button.indexOf("if (variant === 'detail') {\n    return (\n      <div"),
+    );
+    // Only the grid's first card writes the stylesheet; this branch can be that card.
+    expect(branch).toContain('{includeCardStyles && <CardButtonStyles />}');
+    // One label at every width — the full/compact pair printed "Check Availability Check".
+    expect(branch).toContain('className="shop-card-check-label"');
+    expect(branch).not.toContain('shop-card-cart-label-compact');
+    expect(button).toContain('function CardButtonStyles()');
+  });
+
+  it('ticked pieces read "Inquire", never "Available", on the card, list row and item page', () => {
+    const card = read('src/components/shop/ProductCard.tsx');
+    expect(card).toContain('const isCheckFirst = isPurchasable && product.confirm_availability === true;');
+    expect(card).toContain("{isEs ? 'Consultar' : 'Inquire'}");
+    expect(card).toContain('{!isSold && !isCheckFirst && (');
+    // Its own class: `shop-card-status-available` is hidden on phones.
+    expect(card).toContain('shop-card-status-inquire');
+    const row = read('src/components/shop/ProductListRow.tsx');
+    expect(row).toMatch(/product\.confirm_availability === true\s*\? \(isEs \? 'Consultar' : 'Inquire'\)/);
+    const page = read('src/app/[locale]/shop/[id]/page.tsx');
+    expect(page).toContain("? checkFirst ? (isEs ? 'Consultar' : 'Inquire') : (isEs ? 'Disponible' : 'Available')");
+  });
+
+  it('the item page drops its separate Inquire button for a ticked piece', () => {
+    const page = read('src/app/[locale]/shop/[id]/page.tsx');
+    expect(page).toContain("product-cta-grid mt-3${checkFirst ? ' product-cta-grid-check' : ''}");
+    expect(page).toMatch(/\{!checkFirst && \(\s*<Link href=\{`\$\{contactHref\}\?item=/);
+    const css = read('src/app/globals.css');
+    expect(css).toContain('.product-cta-grid.product-cta-grid-check {');
+  });
+
   it('ticked items stay in the Meta shop; a Buy tap there opens the ask-first form, never the cart', () => {
     const feed = read('src/app/api/merchant-feed/route.ts');
     expect(feed).not.toContain(".eq('confirm_availability'");

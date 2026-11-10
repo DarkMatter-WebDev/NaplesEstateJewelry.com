@@ -1,6 +1,30 @@
 
 # Changelog
 
+## 2026-11-10 (2) — Check Availability pieces: "Inquire" chip, one-label button, no duplicate Inquire button + card-button stylesheet bug FIXED — BUILT + STAGED, not pushed; no SQL, no env vars
+
+- **Owner:** *"we need to adjust how a product with "check availability" checked appears on the product gallery page... where the chip says "available", maybe change to "inquire".. and adjust the redundant "check availability check" button.. propose what youll do before we make changes.. also check the full product page"*. Proposal + mockup 1 (card computer/phone, product page before/after) → owner asked for the full words on the phone button → mockup 2 (A one line / B two lines, measured) → owner: *"A, one line"*.
+- **Bug found (live, Chrome, read-only):** the card button stylesheet is written only by the grid's FIRST card (`includeCardStyles={index === 0}`, `ShopProductGrid.tsx`), and `CartButton`'s Check Availability branch returned before it. On **Newest arrivals** the Nicolis Cola necklace (item #151, the one ticked piece) sorts first, so all 24 cards on that page lost their button styling — every card read **"ADD TO CART ADD"** in an oversized button, and the necklace read "CHECK AVAILABILITY CHECK". The default sort looked normal because the necklace is not first there.
+- **Before → after:**
+  - **Card button:** "CHECK AVAILABILITY CHECK" (two labels, unstyled) → ONE label **"Check Availability"** with a mail icon, same size/height as "Add" (computer and phone). Spanish "Consultar disponibilidad"; at ≤370px wide it drops to 0.47rem so it fits the 360px phone's ~135px button. Measured on dev: 360px EN label 87px in a 145px button, ES 107px (7.52px text) in 145px; 375px ES 118px in 152px; all `scrollWidth ≤ clientWidth`; button 25px tall = the neighbour's "Add".
+  - **Stylesheet:** now a `CardButtonStyles` component rendered by EVERY card branch, so it loads whatever sorts first. Dev with the necklace first: labels "Check Availability, Add, Add, Add…", all buttons 30px.
+  - **Card chip:** "AVAILABLE" → **"INQUIRE"** ("CONSULTAR"), same gold. New class `shop-card-status-inquire` so it is NOT hidden on phones (the "Available" chip is hidden there for the cart icon, which these pieces don't have).
+  - **List view row chip:** "Available" → **"Inquire"** (`ProductListRow.tsx`).
+  - **Item page:** green "AVAILABLE" chip → gold **"INQUIRE"** (`--color-primary`); buttons "Check Availability · Save · Inquire · Call" → **"Check Availability · Save · Call"** (`product-cta-grid-check`: 2 columns on a narrow panel, `2fr 1fr 1fr` from 470px). Make an Offer and "No payment needed to ask." unchanged. Regular items unchanged (checked: Available · Add to Cart · Save · Inquire · Call).
+- **Not changed:** the product's schema/feeds (still in stock — the piece IS for sale), the `/availability/<id>` form, Make an Offer.
+- **Files:** `components/shop/CartButton.tsx`, `components/shop/ProductCard.tsx`, `components/shop/ProductListRow.tsx`, `app/[locale]/shop/[id]/page.tsx`, `app/globals.css`, `lib/__tests__/availability-check.test.ts` (+3).
+- Gate (from `next-app`): `npx tsc --noEmit` 0 errors · `npm run lint` 0 errors (the 4 pre-existing `<img>` warnings in `TextDealsManager.tsx`) · `npx vitest run` **2361/2361** (203 files; 3 new) · `npm run build` exit 0 (dev stopped first, restarted after). Dev checks: computer 1024/1278px + phone 360/375px, EN + ES, shop grid and item page; the list view was not opened (covered by a test).
+- **To reverse:** in `CartButton.tsx` restore the full/compact label pair in the check-first card branch and drop `<CardButtonStyles />` there (⚠️ that brings the stylesheet bug back); in `ProductCard.tsx` remove the `isCheckFirst` chip and the `!isCheckFirst` guard; in `ProductListRow.tsx` and the item page remove the `confirm_availability` / `checkFirst` "Inquire" branches; on the item page remove `{!checkFirst && (…)}` around Inquire and the `product-cta-grid-check` class; delete the `.product-cta-grid-check` rules in `globals.css`; remove the 3 tests.
+- Staging synced after this entry.
+
+## 2026-11-10 (1) — Owner: Tax Exempt "add the certificate photo after the sale" pushed + deployed; first use done (Tina Soriano)
+
+- **Owner:** *"pushed and deployed, tested and added tax pic successfully.. form filled in"*. This is the build from 2026-11-09 (3), which needed no SQL and no env vars.
+- **Before:** Tina Soriano's certificate was on file as a paper copy only, with no photo. **After:** her certificate photo is saved and the form is filled in, as reported by the owner.
+- Claude did not check production or the admin pages; this entry records the owner's report only. No code changed in this entry. `TASKS.md` block 2026-11-09 (3) → 🟢, nothing open.
+- **To reverse:** the code change is reversed as described under 2026-11-09 (3). The saved photo stays in the private `tax-certificates` bucket; to replace it, use **Replace photo / edit** on her row.
+- Staging re-synced after this entry.
+
 ## 2026-11-09 (3) — Tax Exempt: add the certificate photo (and details) AFTER the sale — from the certificates table AND from the order — BUILT + STAGED, not pushed; no SQL, no env vars
 
 - **Owner:** *"i want to be able to add info for a tax id certificate into the table after the sale has already happened.. maybe add a link to the order to update tax id cert (via pic).. also i want to be able to add in the pic in the main table of tax ID info.. currently we have one in there for tina soriano... i got the physical copy from her and didnt have time to enter it in"*. Plan repeated back + mockup 1 (table row, the window in two steps, the order card, phone) → owner: *"yes, build it as shown... 1.. OK.. 2: ok, 3: KEEP BOTH WORDS SO I KNOW A PAPER IS ON FILE TOO"* = (1) the order button only on orders already recorded tax-exempt (a TAXED order is never turned exempt here: that would be a tax refund); (2) a replaced photo's file is KEPT in the private bucket; (3) a photo added to a paper-copy certificate keeps "Paper copy filed".

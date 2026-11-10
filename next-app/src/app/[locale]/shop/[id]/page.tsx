@@ -702,15 +702,16 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                          were the same swatch a few pixels apart. Sold keeps its
                          near-black chip unchanged. */
                       background: isPurchasable
-                        ? 'var(--color-spec-status)'
+                        ? (checkFirst ? 'var(--color-primary)' : 'var(--color-spec-status)')
                         : (isDarkPage ? '#dcd9d2' : 'var(--color-on-surface)'),
                       color: isPurchasable
-                        ? 'var(--color-spec-on-status)'
+                        ? (checkFirst ? 'var(--color-on-primary)' : 'var(--color-spec-on-status)')
                         : (isDarkPage ? '#1a1c1c' : 'var(--color-surface)'),
                     }}
                   >
                     {isPurchasable
-                      ? (isEs ? 'Disponible' : 'Available')
+                      // Check Availability pieces say "Inquire" (owner, 2026-11-10), in gold.
+                      ? checkFirst ? (isEs ? 'Consultar' : 'Inquire') : (isEs ? 'Disponible' : 'Available')
                       : isSold ? (isEs ? 'Vendido' : 'Sold') : productStatusLabel(p.status)}
                   </span>
                   {/* Metal / karat / length each print in their own color, so four
@@ -812,11 +813,14 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                 )}
                 {isPurchasable ? (
                   <>
-                  <div className="product-cta-grid mt-3">
+                  <div className={`product-cta-grid mt-3${checkFirst ? ' product-cta-grid-check' : ''}`}>
                     {/* Check Availability (owner, 2026-11-05, mockup 1): a piece
                         another dealer holds is never added to a cart — the
                         buyer asks first, no payment, and pays through the Buy
-                        link the owner emails. The checkout route enforces it. */}
+                        link the owner emails. The checkout route enforces it.
+                        Its row has NO separate Inquire button (owner,
+                        2026-11-10): Check Availability already is the inquiry,
+                        so the row is Check Availability · Save · Call. */}
                     {checkFirst ? (
                       <Link
                         href={`${localePrefix}/availability/${encodeURIComponent(p.id)}`}
@@ -829,9 +833,11 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                       <CartButton item={cartItem} variant="detail" locale={locale} />
                     )}
                     <WishlistButton item={wishlistItem} variant="button" locale={locale} />
-                    <Link href={`${contactHref}?item=${encodeURIComponent(p.title)}`} rel="nofollow" className="outline-button">
-                      {isEs ? 'Consultar' : 'Inquire'}
-                    </Link>
+                    {!checkFirst && (
+                      <Link href={`${contactHref}?item=${encodeURIComponent(p.title)}`} rel="nofollow" className="outline-button">
+                        {isEs ? 'Consultar' : 'Inquire'}
+                      </Link>
+                    )}
                     <a href="tel:2394048505" className="outline-button">
                       {isEs ? 'Llamar' : 'Call'}
                     </a>

@@ -12,7 +12,11 @@ first** on the item and:
 
 - **Add to Cart becomes Check Availability** (gold, same place), with the line
   "We'll confirm this piece is ready to ship — usually within the hour. **No
-  payment needed to ask.**" Save, Inquire, Call and Make an Offer stay.
+  payment needed to ask.**" Save, Call and Make an Offer stay. **Since
+  2026-11-10:** the item page has no separate Inquire button (Check
+  Availability is the inquiry), and the status chip on the card, list row and
+  item page reads **INQUIRE** (gold), not "Available". The card button is one
+  label, "Check Availability", with a mail icon (`DECISIONS.md` 2026-11-10).
 - The buyer fills a short form (`/availability/<id>`): first + last name, email,
   phone (optional), message (optional). **No payment, no PayPal.** They see
   "We're checking on it — keep an eye on your email" and get the same by email.

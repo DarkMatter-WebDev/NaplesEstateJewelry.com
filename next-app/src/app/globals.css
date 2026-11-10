@@ -1123,6 +1123,20 @@ button:focus-visible > .hover-underline-grow,
     grid-column: auto;
   }
 }
+/* Check Availability pieces (2026-11-10) have three actions — Check
+   Availability · Save · Call, no separate Inquire. Below the container
+   threshold the first spans the row and Save + Call share the next one (two
+   columns, not three, or a third empty cell is left behind); above it the
+   three sit on one row with the gold button widest. */
+.product-cta-grid.product-cta-grid-check {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@container (min-width: 470px) {
+  .product-cta-grid.product-cta-grid-check {
+    grid-template-columns: 2fr 1fr 1fr;
+  }
+}
+
 /* The sold-out panel offers two actions rather than four, and one of them is a
    sentence ("Inquire about a similar piece") rather than a one-word label. It
    therefore needs far more room per cell than the four-action row: it stacks to

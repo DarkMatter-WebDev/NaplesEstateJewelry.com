@@ -4,7 +4,12 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-11-09 (3)**. Before that, **2026-11-09 (1)**. Before that, **2026-11-08 (1)**. Before that, **2026-11-05 (5)**. Before that, **2026-11-05 (2)**. Before that, **2026-11-02 (2)**.
+> compaction. Last reconciled: **2026-11-10 (2)**. Before that, **2026-11-09 (3)**. Before that, **2026-11-09 (1)**. Before that, **2026-11-08 (1)**. Before that, **2026-11-05 (5)**. Before that, **2026-11-05 (2)**. Before that, **2026-11-02 (2)**.
+
+## Check Availability pieces say "Inquire", never "Available"; one button label; no separate Inquire button (2026-11-10)
+
+- **Owner-approved (mockup 1 + mockup 2 version A, "A, one line"):** a ticked "Confirm availability first" piece shows a gold **INQUIRE** / **CONSULTAR** chip on the shop card, the list row and the item page — never "Available", which contradicts a button asking the buyer to check. Card button = ONE label **"Check Availability"** with a mail icon at every width, the same height as "Add" (fits a 360px phone on one line; Spanish shrinks at ≤370px). Item page row = **Check Availability · Save · Call** — no separate Inquire (contact form) button, because Check Availability already is the inquiry. Make an Offer stays (11-05 rule unchanged).
+- ⛔ **The card-button stylesheet comes only from the grid's FIRST card** (`includeCardStyles`). Every `CartButton` card branch must render `<CardButtonStyles />`, or a page whose first card takes that branch loses ALL its card-button styling ("ADD TO CART ADD" on every card — happened live on Newest arrivals until 2026-11-10). A test guards it. Record `CHANGELOG.md` 2026-11-10 (2).
 
 ## Photo / online submissions are a "first look": the evaluation is almost always in person; out-of-area sellers are told so plainly (2026-11-09)
 

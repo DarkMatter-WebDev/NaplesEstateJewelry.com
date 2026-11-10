@@ -88,15 +88,24 @@ export default function CartButton({ item, variant = 'card', locale = 'en', incl
         </Link>
       );
     }
+    // ONE label at every width (owner, 2026-11-10, version A): "Check
+    // Availability" fits a 360px phone's card button on one line at the
+    // same size as "Add" (measured: ~100px of ~135px). The old full/compact
+    // pair printed BOTH words ("Check Availability Check") whenever the
+    // stylesheet below was missing. Spanish is longer — `.shop-card-check-label`
+    // shrinks it on the narrowest two-across phones.
     return (
-      <Link
-        href={href}
-        rel="nofollow"
-        className="outline-button shop-card-cart-button text-xs flex w-full min-h-9 items-center justify-center gap-1 whitespace-nowrap"
-      >
-        <span className="shop-card-cart-label-full">{isEs ? 'Consultar disponibilidad' : 'Check Availability'}</span>
-        <span className="shop-card-cart-label-compact" aria-hidden="true">{isEs ? 'Consultar' : 'Check'}</span>
-      </Link>
+      <>
+        <Link
+          href={href}
+          rel="nofollow"
+          className="outline-button shop-card-cart-button text-xs flex w-full min-h-9 items-center justify-center gap-1 whitespace-nowrap"
+        >
+          <AppIcon name="mail" style={{ fontSize: '13px', lineHeight: 1 }} aria-hidden="true" />
+          <span className="shop-card-check-label" data-es={isEs || undefined}>{isEs ? 'Consultar disponibilidad' : 'Check Availability'}</span>
+        </Link>
+        {includeCardStyles && <CardButtonStyles />}
+      </>
     );
   }
 
@@ -225,7 +234,21 @@ export default function CartButton({ item, variant = 'card', locale = 'en', incl
           {inCart ? (isEs ? 'Quitar' : 'Remove') : canPurchase ? (isEs ? 'Agregar' : 'Add') : (isEs ? 'No' : 'N/A')}
         </span>
       </button>
-      {includeCardStyles && <style>{`
+      {includeCardStyles && <CardButtonStyles />}
+    </div>
+  );
+}
+
+/**
+ * The card button's stylesheet. Only the grid's FIRST card renders it
+ * (`includeCardStyles`, ShopProductGrid), so every branch that can be that
+ * first card must render it too. Until 2026-11-10 the Check Availability
+ * branch returned early without it: with that piece sorted first (Newest
+ * arrivals) all 24 cards lost their button styling and read "ADD TO CART ADD".
+ */
+function CardButtonStyles() {
+  return (
+      <style>{`
         .shop-card-cart-button {
           min-width: 0;
           width: 100%;
@@ -266,8 +289,13 @@ export default function CartButton({ item, variant = 'card', locale = 'en', incl
         .shop-card-cart-label-compact {
           display: inline;
         }
-      `}</style>}
-    </div>
+        /* "Consultar disponibilidad" needs ~131px; a 360px phone gives ~135px. */
+        @media (max-width: 370px) {
+          .shop-card-check-label[data-es] {
+            font-size: 0.47rem;
+          }
+        }
+      `}</style>
   );
 }
 

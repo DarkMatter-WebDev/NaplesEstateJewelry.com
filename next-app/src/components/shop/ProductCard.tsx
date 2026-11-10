@@ -88,6 +88,7 @@ export default function ProductCard({
   const isSoldPriceHidden = isSold && hideSoldItemPrices;
   const isPurchasable = isProductPurchasable(product.status, product.quantity);
   const stockQuantity = normalizeProductQuantity(product.quantity);
+  const isCheckFirst = isPurchasable && product.confirm_availability === true;
   const isModern = variant === 'modern';
   const brand = product.brand?.trim() ?? '';
   const fallbackFlagLabel = getProductCardFlagFallback(product);
@@ -329,7 +330,25 @@ export default function ProductCard({
             {isEs ? 'Vendido' : 'Sold'}
           </div>
         )}
-        {!isSold && (
+        {/* Check Availability pieces (owner, 2026-11-10): "Inquire", not
+            "Available" — the card must not say available and then ask the
+            buyer to check. Its own class, NOT `shop-card-status-available`:
+            that one is hidden on phones because the cart icon takes its
+            corner, and these pieces have no cart icon, so the chip stays. */}
+        {isCheckFirst && (
+          <div
+            className="shop-card-status-tag shop-card-status-inquire absolute top-3 left-3 z-10 text-[0.6rem] font-bold tracking-widest uppercase px-2 py-0.5"
+            style={{
+              background: isModern ? 'linear-gradient(135deg, #d5a820, #ad8507)' : 'var(--color-primary)',
+              color: isModern ? '#fffdf7' : 'var(--color-on-primary)',
+              borderRadius: isModern ? '4px' : undefined,
+              boxShadow: isModern ? '0 8px 18px rgba(115, 92, 0, 0.16)' : undefined,
+            }}
+          >
+            {isEs ? 'Consultar' : 'Inquire'}
+          </div>
+        )}
+        {!isSold && !isCheckFirst && (
           <div
             className="shop-card-status-tag shop-card-status-available absolute top-3 left-3 z-10 text-[0.6rem] font-bold tracking-widest uppercase px-2 py-0.5"
             style={{

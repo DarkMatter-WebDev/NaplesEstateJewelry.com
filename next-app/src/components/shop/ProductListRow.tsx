@@ -145,9 +145,12 @@ export default function ProductListRow({ product, spotData, locale, hideSoldItem
             {isSold
               ? (isEs ? 'Vendido' : 'Sold')
               : isPurchasable
-                ? stockQuantity > 1
-                  ? (isEs ? `${stockQuantity} disponibles` : `${stockQuantity} in stock`)
-                  : (isEs ? 'Disponible' : 'Available')
+                // Check Availability pieces say "Inquire" (owner, 2026-11-10) — same as the card.
+                ? product.confirm_availability === true
+                  ? (isEs ? 'Consultar' : 'Inquire')
+                  : stockQuantity > 1
+                    ? (isEs ? `${stockQuantity} disponibles` : `${stockQuantity} in stock`)
+                    : (isEs ? 'Disponible' : 'Available')
                 : productStatusLabel(product.status)}
           </span>
           <span className="shop-list-metal">{metalLabel}</span>
