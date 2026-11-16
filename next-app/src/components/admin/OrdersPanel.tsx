@@ -15,6 +15,13 @@ import { calculateFlSalesTax, isFloridaState } from '@/lib/checkout-pricing';
 import { adminGetManualOrderProducts, adminUpdateProductsStatus } from '@/app/actions/admin-products';
 import { AppIcon } from '@/components/AppIcon';
 import { EMPTY_SELECTION, bulkDeleteConfirmText, bulkDeleteLabel, selectionState, toggleAll, toggleId } from '@/lib/trash-selection';
+import {
+  MARKETPLACE_LABEL,
+  marketplaceOrderUrl,
+  marketplaceRecordMatches,
+  mergeOrdersAndMarketplace,
+  type MarketplaceSaleRecord,
+} from '@/lib/marketplace-sale-records';
 
 const GOLD = '#735c00';
 const BORDER = 'var(--color-outline-variant)';
@@ -32,6 +39,8 @@ interface Props {
   view?: OrdersView;
   trashCount?: number;
   recycleBinSupported?: boolean;
+  /** eBay / Etsy sales, mixed into the list (2026-11-16) — records only, no buyer data. */
+  marketplaceRecords?: MarketplaceSaleRecord[];
 }
 
 type OrdersView = 'active' | 'trash';
@@ -80,6 +89,7 @@ export default function OrdersPanel({
   view = 'active',
   trashCount = 0,
   recycleBinSupported = true,
+  marketplaceRecords = [],
 }: Props) {
   const router = useRouter();
   const supabase = createClient();
@@ -187,6 +197,15 @@ export default function OrdersPanel({
     }
     return true;
   });
+
+  // eBay / Etsy sales (owner, 2026-11-16, option B): mixed in by date. They
+  // have no site payment/fulfillment/order status, so any of those filters
+  // hides them; the search box matches their order id, item and marketplace.
+  const statusFilterOn = Boolean(paymentFilter || fulfillmentFilter || orderFilter);
+  const filteredMarketplace = isTrash || statusFilterOn
+    ? []
+    : marketplaceRecords.filter((record) => marketplaceRecordMatches(record, search));
+  const listEntries = mergeOrdersAndMarketplace(filteredOrders, filteredMarketplace);
 
   async function openCreateOrder() {
     setShowCreate(true);
@@ -546,7 +565,7 @@ export default function OrdersPanel({
         </div>
 
         <div className="mb-3 flex items-center justify-between text-xs md:hidden" style={{ color: 'var(--color-on-surface-variant)' }}>
-          <span>{filteredOrders.length} {filteredOrders.length === 1 ? 'order' : 'orders'}</span>
+          <span>{listEntries.length} {listEntries.length === 1 ? 'order' : 'orders'}</span>
           {isTrash ? (
             <label className="flex items-center gap-2">
               <input
@@ -564,7 +583,10 @@ export default function OrdersPanel({
         </div>
 
         <div className="grid gap-3 md:hidden">
-          {filteredOrders.map((order) => (
+          {listEntries.map((entry) => {
+            if (entry.kind === 'marketplace') return <MarketplaceSaleCard key={entry.record.key} record={entry.record} />;
+            const order = entry.order;
+            return (
             <article key={order.id} className="rounded-lg border bg-white p-4 shadow-sm" style={{ borderColor: BORDER }}>
               <div className="flex items-start justify-between gap-3">
                 {isTrash && (
@@ -662,8 +684,9 @@ export default function OrdersPanel({
                 </>
               )}
             </article>
-          ))}
-          {filteredOrders.length === 0 && <EmptyOrders isTrash={isTrash} />}
+            );
+          })}
+          {listEntries.length === 0 && <EmptyOrders isTrash={isTrash} />}
         </div>
 
         <div className="hidden overflow-x-auto border md:block" style={{ borderColor: BORDER, background: 'white' }}>
@@ -690,7 +713,10 @@ export default function OrdersPanel({
               </tr>
             </thead>
             <tbody>
-              {filteredOrders.map((order) => (
+              {listEntries.map((entry) => {
+                if (entry.kind === 'marketplace') return <MarketplaceSaleRow key={entry.record.key} record={entry.record} />;
+                const order = entry.order;
+                return (
                 <tr
                   key={order.id}
                   className={isTrash
@@ -771,8 +797,9 @@ export default function OrdersPanel({
                     )}
                   </td>
                 </tr>
-              ))}
-              {filteredOrders.length === 0 && (
+                );
+              })}
+              {listEntries.length === 0 && (
                 <tr>
                   <td colSpan={isTrash ? 11 : 10} className="px-4 py-12 text-center" style={{ color: 'var(--color-on-surface-variant)' }}>
                     No orders found.
@@ -1076,6 +1103,126 @@ function Filter({ label, value, setValue, options }: { label: string; value: str
         <option value="">All</option>
         {options.map((option) => <option key={option} value={option}>{orderStatusLabel(option)}</option>)}
       </select>
+    </div>
+  );
+}
+
+const MARKETPLACE_CHIP: Record<MarketplaceSaleRecord['channel'], string> = { ebay: '#0654ba', etsy: '#d5641c' };
+
+function MarketplaceChip({ record }: { record: MarketplaceSaleRecord }) {
+  return (
+    <span className="inline-flex items-center rounded px-2 py-0.5 text-[0.62rem] font-extrabold uppercase tracking-wide text-white"
+      style={{ background: MARKETPLACE_CHIP[record.channel], fontFamily: 'var(--font-label)' }}>
+      {MARKETPLACE_LABEL[record.channel]}
+    </span>
+  );
+}
+
+function marketplaceLabels(record: MarketplaceSaleRecord) {
+  const name = MARKETPLACE_LABEL[record.channel];
+  if (record.status === 'refunded') return { payment: `Refunded on ${name}`, fulfillment: `On ${name}`, status: 'Refunded' };
+  if (record.status === 'cancelled') return { payment: `Cancelled on ${name}`, fulfillment: `On ${name}`, status: 'Cancelled' };
+  return { payment: `Paid on ${name}`, fulfillment: `On ${name}`, status: 'Sold' };
+}
+
+function PlainBadge({ label }: { label: string }) {
+  return (
+    <span className="inline-flex px-2 py-1 text-[0.62rem] font-bold uppercase tracking-wide"
+      style={{ background: 'var(--color-surface-container-low)', color: 'var(--color-on-surface-variant)' }}>
+      {label}
+    </span>
+  );
+}
+
+function MarketplaceLink({ record, className }: { record: MarketplaceSaleRecord; className?: string }) {
+  return (
+    <a
+      href={marketplaceOrderUrl(record.channel, record.externalOrderId)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={className ?? 'hover-underline-grow text-xs font-bold uppercase tracking-wide'}
+      style={{ color: GOLD, fontFamily: 'var(--font-label)' }}
+    >
+      View on {MARKETPLACE_LABEL[record.channel]} ↗
+    </a>
+  );
+}
+
+/** An eBay / Etsy sale in the desktop table: what sold, when, how much — no customer. */
+function MarketplaceSaleRow({ record }: { record: MarketplaceSaleRecord }) {
+  const labels = marketplaceLabels(record);
+  return (
+    <tr className="border-t" style={{ borderColor: BORDER, background: '#fffdf5' }}>
+      <td className="px-4 py-3">
+        <MarketplaceChip record={record} />
+        <div className="mt-1 font-bold" style={{ color: GOLD }}>{record.externalOrderId}</div>
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>{formatOrderDate(record.soldAt)}</td>
+      <td className="px-4 py-3" style={{ color: 'var(--color-on-surface-variant)' }}>-</td>
+      <td className="px-4 py-3" style={{ color: 'var(--color-on-surface-variant)' }}>-</td>
+      <td className="px-4 py-3 max-w-[18rem]" style={{ color: 'var(--color-on-surface)' }}>
+        {record.items.map((item, i) => <div key={i} className="leading-snug">{item}</div>)}
+      </td>
+      <td className="px-4 py-3 font-semibold" style={{ color: GOLD }}>{record.total != null ? formatCurrency(record.total) : '-'}</td>
+      <td className="px-4 py-3"><PlainBadge label={labels.payment} /></td>
+      <td className="px-4 py-3"><PlainBadge label={labels.fulfillment} /></td>
+      <td className="px-4 py-3"><PlainBadge label={labels.status} /></td>
+      <td className="px-4 py-3 whitespace-nowrap"><MarketplaceLink record={record} /></td>
+    </tr>
+  );
+}
+
+/** An eBay / Etsy sale on a phone. */
+function MarketplaceSaleCard({ record }: { record: MarketplaceSaleRecord }) {
+  const labels = marketplaceLabels(record);
+  return (
+    <article className="rounded-lg border p-4 shadow-sm" style={{ borderColor: BORDER, background: '#fffdf5' }}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <MarketplaceChip record={record} />
+          <h2 className="mt-1 text-lg font-bold leading-tight break-all" style={{ color: GOLD }}>
+            {record.externalOrderId}
+          </h2>
+          <p className="mt-1 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+            {formatOrderDate(record.soldAt)}
+          </p>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="text-[0.58rem] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+            Price
+          </p>
+          <strong className="mt-1 block text-base" style={{ color: GOLD }}>
+            {record.total != null ? formatCurrency(record.total) : '-'}
+          </strong>
+        </div>
+      </div>
+      <div className="mt-4">
+        <p className="text-[0.58rem] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+          Item
+        </p>
+        {record.items.map((item, i) => (
+          <p key={i} className="mt-1 text-sm leading-relaxed" style={{ color: 'var(--color-on-surface)' }}>{item}</p>
+        ))}
+      </div>
+      <div className="mt-4 grid grid-cols-3 gap-2">
+        <MarketplaceStatusBlock label="Payment" value={labels.payment} />
+        <MarketplaceStatusBlock label="Fulfillment" value={labels.fulfillment} />
+        <MarketplaceStatusBlock label="Status" value={labels.status} />
+      </div>
+      <MarketplaceLink record={record} className="outline-button mt-4 w-full justify-center text-sm" />
+    </article>
+  );
+}
+
+function MarketplaceStatusBlock({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-md border bg-white p-2" style={{ borderColor: 'rgba(115, 92, 0, 0.12)' }}>
+      <span className="block text-[0.54rem] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+        {label}
+      </span>
+      <span className="mt-1 block text-[0.68rem] font-bold uppercase leading-tight" style={{ color: 'var(--color-on-surface)' }}>
+        {value}
+      </span>
     </div>
   );
 }

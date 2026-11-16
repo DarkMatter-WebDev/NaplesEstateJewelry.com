@@ -374,10 +374,29 @@ for the old rows until retention removes them. Guarded by
 `account_deletion` log rows (7 days) is `supabase/log-retention-2026-09.sql`
 (owner-run SQL).
 
+**2026-11-16 — OPTED OUT ("I do not persist eBay data"), exemption GRANTED
+by eBay** on the production keyset (PostnSync, Developer Portal → Alerts &
+Notifications → Marketplace Account Deletion; done by Claude in the owner's
+desk Chrome on the owner's request). Why: ~1,700–2,200 calls a day, ~1 s each
+on the Next.js server function, for a handler that deletes nothing. Basis
+(read-only checks the same day): 0 of 66,866 stored receipts hold a username /
+user id; `ebay_connection.ebay_username` is null; `marketplace_sale_events`
+holds order/line ids, item, quantity, price only; and from 11-16 eBay orders
+and Etsy receipts are trimmed to those fields the moment they arrive
+(`trimEbayOrder` / `trimEtsyReceipt`, `__tests__/marketplace-order-trim.test.ts`).
+⛔ Keep it that way: no buyer field (username, name, address, email, phone)
+may ever be stored from an eBay order — doing so needs the subscription back
+first. Notices were still arriving 15 min after the grant (~120/hour), so the
+route stays until they stop (`TASKS.md`), then the route, its tests and
+`EBAY_VERIFICATION_TOKEN` can go.
+
 **2026-07-16 correction:** the first live implementation stored raw
 account-deletion payloads in `webhook_events.payload`; a read-only audit found
 10,922 existing rows with eBay user identifiers. Code is fixed for future rows,
 but the existing rows need the owner-confirmed scrub tracked in `TASKS.md`.
+**Done 2026-09-14:** the retention job's first run took the rows still holding
+deleted users' identifiers from 22,552 to 0 (`CHANGELOG.md` 2026-09-14); re-read
+2026-11-16: 0 of 66,866.
 
 Phase 3's order-ingest route is **not built** (Q15 — deferred, manual
 handling is fine; the `orders_cursor` column is the only seam left in

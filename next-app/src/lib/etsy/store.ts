@@ -31,6 +31,8 @@ export interface EtsyConnectionRow {
   auto_mark_sold?: boolean;
   /** Receipts created after this instant are read by the sales sweep; null = not armed yet. */
   sales_cursor?: string | null;
+  /** When the one-time fill-in of past sales for Admin → Orders ran; null = not yet, absent = SQL not run (2026-11-16). */
+  sales_backfilled_at?: string | null;
   connected_at: string | null;
   updated_at: string;
 }

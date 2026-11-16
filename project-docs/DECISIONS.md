@@ -4,7 +4,15 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-11-10 (2)**. Before that, **2026-11-09 (3)**. Before that, **2026-11-09 (1)**. Before that, **2026-11-08 (1)**. Before that, **2026-11-05 (5)**. Before that, **2026-11-05 (2)**. Before that, **2026-11-02 (2)**.
+> compaction. Last reconciled: **2026-11-16 (1)**. Before that, **2026-11-10 (2)**. Before that, **2026-11-09 (3)**. Before that, **2026-11-09 (1)**. Before that, **2026-11-08 (1)**. Before that, **2026-11-05 (5)**. Before that, **2026-11-05 (2)**. Before that, **2026-11-02 (2)**.
+
+## eBay / Etsy sales are RECORDS mixed into Admin → Orders — what sold, when, how much; NEVER buyer data; eBay account-deletion opt-out granted (2026-11-16)
+
+- **Owner (verbatim):** *"add a record in our "orders" on my site that shows / lists an item that has sold on ebay / etsy.. no need to record buyer data though.. just a simple record letting me know it sold, when, and how much"*; mockup → **"option b, mixed in"**. Each eBay / Etsy order is one row in the Orders list, placed by date, with an eBay (blue) / Etsy (orange) chip, the marketplace order number, item title(s), price before shipping and fees, "Paid on eBay · On eBay · Sold" (or Refunded / Cancelled), and **View on eBay / Etsy ↗**. Customer and email show "-".
+- ⛔ **They are NOT `orders` rows** — no receipt, no tax totals (eBay/Etsy collect Florida tax), no buyers list, no Delete. They come from `marketplace_sale_events` (`lib/marketplace-sale-records.ts`, server read `marketplace-sale-records-server.ts`). Status filters hide them; search finds them; the Recycle Bin never shows them.
+- ⛔ **No buyer data, ever:** eBay orders and Etsy receipts are cut to order/line id, date, status, item/SKU/title, quantity, price the moment they arrive (`trimEbayOrder` / `trimEtsyReceipt`). This is the basis of the eBay Marketplace Account Deletion **exemption ("I do not persist eBay data"), GRANTED 2026-11-16** — storing a buyer field from eBay would break that attestation (eBay: "penalties or having your account disabled").
+- Items listed on the marketplace by hand (not linked to a product) are recorded too (`outcome = 'unmatched'`, product untouched). A one-time fill-in reads past sales (eBay 89 days, Etsy 2 years) as **records only** (`outcome = 'recorded'`) — it never marks a product sold (the 09-12 rule: sales before arming were the owner's). A refund or cancellation is shown only when the fill-in sees it; the 30-minute sweep reads new orders only, so a LATER return does not change a row (known limit, owner told).
+- Record `CHANGELOG.md` 2026-11-16 (1); SQL `supabase/marketplace-sale-records-2026-11.sql`.
 
 ## Check Availability pieces say "Inquire", never "Available"; one button label; no separate Inquire button (2026-11-10)
 

@@ -34,13 +34,21 @@ export interface MarketplaceSaleLine {
   title: string | null;
 }
 
-/** An order line we could not tie to a product — logged, never acted on. */
+/**
+ * An order line we could not tie to a product (listed on the marketplace by
+ * hand) — never acted on, but recorded so it shows on Admin → Orders.
+ */
 export interface UnmatchedSaleLine {
   channel: SaleChannel;
   externalOrderId: string;
   externalLineId: string;
   reference: string;
   title: string | null;
+  quantity: number;
+  /** Unit price the buyer paid for the item, in USD. */
+  salePrice: number | null;
+  /** When the marketplace created the order (ISO). */
+  createdAt: string;
 }
 
 /** OAuth scope each connection must hold before orders can be read. */
@@ -133,6 +141,9 @@ export function selectEtsySaleLines(receipts: readonly EtsyReceipt[], listingToP
           externalLineId: String(line.transaction_id),
           reference: line.listing_id != null ? `listing ${line.listing_id}` : (line.sku ?? 'no listing id'),
           title: line.title ?? null,
+          quantity,
+          salePrice: etsyMoney(line.price),
+          createdAt: etsyCreatedAt(receipt),
         });
         continue;
       }
@@ -225,6 +236,9 @@ export function selectEbaySaleLines(
           externalLineId: line.lineItemId,
           reference: line.sku ? `sku ${line.sku}` : line.legacyItemId ? `item ${line.legacyItemId}` : 'no sku or item id',
           title: line.title ?? null,
+          quantity,
+          salePrice: ebayMoney(line.lineItemCost, quantity),
+          createdAt: order.creationDate ?? new Date(0).toISOString(),
         });
         continue;
       }
@@ -241,6 +255,107 @@ export function selectEbaySaleLines(
     }
   }
   return { sales, unmatched, skippedOrders };
+}
+
+// ---------------------------------------------------------------------------
+// Sale RECORDS — what Admin → Orders lists (owner, 2026-11-16: "a simple record
+// letting me know it sold, when, and how much"; no buyer data). One row per
+// order line in `marketplace_sale_events` (supabase/marketplace-sale-records-2026-11.sql).
+// ---------------------------------------------------------------------------
+
+/** Outcome of a line that was only RECORDED (the fill-in of past sales) — the product was never touched. */
+export const RECORD_ONLY_OUTCOME = 'recorded';
+/** Outcome of a line whose item is not linked to a product here (listed on the marketplace by hand). */
+export const UNMATCHED_OUTCOME = 'unmatched';
+
+/** How far back the one-time fill-in of past sales reads. eBay's order search covers 90 days. */
+export const BACKFILL_DAYS: Record<SaleChannel, number> = { ebay: 89, etsy: 730 };
+
+export interface SaleRecordInsert {
+  channel: SaleChannel;
+  external_order_id: string;
+  external_line_id: string;
+  product_id: string | null;
+  quantity: number;
+  sale_price: number | null;
+  outcome: string;
+  title: string | null;
+  sold_at: string;
+  item_reference: string | null;
+}
+
+/** The display columns a line carries — used to fill a row `apply_marketplace_sale` created without them. */
+export function saleRecordDetails(line: MarketplaceSaleLine | UnmatchedSaleLine): Pick<SaleRecordInsert, 'title' | 'sold_at' | 'item_reference'> {
+  return {
+    title: line.title,
+    sold_at: line.createdAt,
+    item_reference: 'reference' in line ? line.reference : null,
+  };
+}
+
+/** A record-only row: a matched past sale (`recorded`) or an unlinked item (`unmatched`). Never buyer data. */
+export function saleRecordInsert(line: MarketplaceSaleLine | UnmatchedSaleLine): SaleRecordInsert {
+  const matched = 'productId' in line;
+  return {
+    channel: line.channel,
+    external_order_id: line.externalOrderId,
+    external_line_id: line.externalLineId,
+    product_id: matched ? line.productId : null,
+    quantity: Math.max(1, Math.floor(line.quantity || 1)),
+    sale_price: line.salePrice,
+    outcome: matched ? RECORD_ONLY_OUTCOME : UNMATCHED_OUTCOME,
+    ...saleRecordDetails(line),
+  };
+}
+
+/**
+ * Lines of the fill-in of past sales that the regular sweep has NOT already
+ * handled: created before `before` (the regular read's start). Anything newer
+ * belongs to the regular sweep, which applies it — a record-only row there
+ * would make `apply_marketplace_sale` see a duplicate and skip the product.
+ */
+export function linesBefore<T extends { createdAt: string }>(lines: readonly T[], before: Date): T[] {
+  return lines.filter((line) => {
+    const at = Date.parse(line.createdAt);
+    return Number.isFinite(at) && at < before.getTime();
+  });
+}
+
+export type MarketplaceStatus = 'refunded' | 'cancelled';
+
+/** An order that is no longer a sale (refunded in full or cancelled) — shown on the record it already has. */
+export interface ReversedOrder {
+  channel: SaleChannel;
+  externalOrderId: string;
+  status: MarketplaceStatus;
+}
+
+export function etsyReceiptReversal(receipt: EtsyReceipt): MarketplaceStatus | null {
+  const status = (receipt.status ?? '').trim().toLowerCase();
+  if (status === 'fully refunded') return 'refunded';
+  if (status === 'canceled' || status === 'cancelled') return 'cancelled';
+  return null;
+}
+
+export function ebayOrderReversal(order: EbayOrder): MarketplaceStatus | null {
+  const payment = (order.orderPaymentStatus ?? '').toUpperCase();
+  if (payment === 'FULLY_REFUNDED') return 'refunded';
+  const cancel = (order.cancelStatus?.cancelState ?? 'NONE_REQUESTED').toUpperCase();
+  if (cancel === 'CANCELED' || cancel === 'CANCELLED') return 'cancelled';
+  return null;
+}
+
+export function selectReversedOrders(channel: 'etsy', orders: readonly EtsyReceipt[]): ReversedOrder[];
+export function selectReversedOrders(channel: 'ebay', orders: readonly EbayOrder[]): ReversedOrder[];
+export function selectReversedOrders(channel: SaleChannel, orders: readonly (EtsyReceipt | EbayOrder)[]): ReversedOrder[] {
+  const out: ReversedOrder[] = [];
+  for (const order of orders) {
+    const status = channel === 'etsy' ? etsyReceiptReversal(order as EtsyReceipt) : ebayOrderReversal(order as EbayOrder);
+    if (!status) continue;
+    const externalOrderId = channel === 'etsy' ? String((order as EtsyReceipt).receipt_id) : (order as EbayOrder).orderId;
+    out.push({ channel, externalOrderId, status });
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------

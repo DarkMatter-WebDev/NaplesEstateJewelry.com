@@ -3,8 +3,13 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { createServiceClient } from '@/lib/supabase/service';
 import {
+  BACKFILL_DAYS,
   countSaleOutcome,
   emptySalesSweepSummary,
+  linesBefore,
+  saleRecordDetails,
+  saleRecordInsert,
+  selectReversedOrders,
   formatSalesSweepSummary,
   hasSalesScope,
   salesReadFrom,
@@ -14,9 +19,11 @@ import {
   type MarketplaceSaleLine,
   type SaleApplyOutcome,
   type SaleChannel,
+  type ReversedOrder,
   type SalesSweepSummary,
   type UnmatchedSaleLine,
 } from '@/lib/marketplace-sales';
+import type { EbayOrder, EtsyReceipt } from '@/lib/marketplace-sales';
 import { ensureFreshAccessToken as ensureEtsyToken } from '@/lib/etsy/auth';
 import { getShopReceipts } from '@/lib/etsy/client';
 import {
@@ -91,6 +98,94 @@ async function applyLine(service: SupabaseClient, line: MarketplaceSaleLine): Pr
   return row;
 }
 
+// ---------------------------------------------------------------------------
+// Sale records for Admin → Orders (2026-11-16). Never buyer data. Every write
+// here is best-effort: until supabase/marketplace-sale-records-2026-11.sql is
+// run the columns/grant are missing, and that must not break the sweep.
+// ---------------------------------------------------------------------------
+const SALE_EVENTS = 'marketplace_sale_events';
+const SALE_KEY = 'channel,external_order_id,external_line_id';
+
+/** Fill title / date / reference on the row `apply_marketplace_sale` just wrote (it has no such parameters). */
+async function fillRecordDetails(service: SupabaseClient, line: MarketplaceSaleLine): Promise<void> {
+  try {
+    await service
+      .from(SALE_EVENTS)
+      .update(saleRecordDetails(line))
+      .eq('channel', line.channel)
+      .eq('external_order_id', line.externalOrderId)
+      .eq('external_line_id', line.externalLineId)
+      .is('title', null);
+  } catch {
+    // best-effort (see above)
+  }
+}
+
+/** Insert record-only rows, skipping ones that exist. Returns how many were new, or -1 if the write failed. */
+async function recordSaleRows(service: SupabaseClient, rows: ReturnType<typeof saleRecordInsert>[]): Promise<number> {
+  if (rows.length === 0) return 0;
+  try {
+    const { data, error } = await service
+      .from(SALE_EVENTS)
+      .upsert(rows, { onConflict: SALE_KEY, ignoreDuplicates: true })
+      .select('id');
+    if (error) return -1;
+    return (data ?? []).length;
+  } catch {
+    return -1;
+  }
+}
+
+/**
+ * The one-time fill-in of past sales: RECORDS ONLY — no product is touched
+ * (the owner handled sales before auto-mark-sold was armed). Lines the regular
+ * read already covered are left to it (`linesBefore`). Rows that exist but
+ * predate the record columns get their title/date, and orders refunded or
+ * cancelled since show as such.
+ */
+async function backfillRecords(
+  service: SupabaseClient,
+  io: ChannelIo,
+  channel: SaleChannel,
+  lines: { sales: MarketplaceSaleLine[]; unmatched: UnmatchedSaleLine[] },
+  reversed: ReversedOrder[],
+  regularReadFrom: Date,
+): Promise<boolean> {
+  const fresh = [...linesBefore(lines.sales, regularReadFrom), ...linesBefore(lines.unmatched, regularReadFrom)].map(saleRecordInsert);
+  const added = await recordSaleRows(service, fresh);
+  if (added < 0) return false;
+
+  // Rows written before the record columns existed (by apply_marketplace_sale).
+  const { data: bare, error: bareError } = await service
+    .from(SALE_EVENTS)
+    .select('external_order_id, external_line_id')
+    .eq('channel', channel)
+    .is('title', null);
+  if (bareError) return false;
+  const byKey = new Map([...lines.sales, ...lines.unmatched].map((line) => [`${line.externalOrderId}|${line.externalLineId}`, line]));
+  for (const row of (bare ?? []) as Array<{ external_order_id: string; external_line_id: string }>) {
+    const line = byKey.get(`${row.external_order_id}|${row.external_line_id}`);
+    if (!line) continue;
+    await service.from(SALE_EVENTS).update(saleRecordDetails(line))
+      .eq('channel', channel).eq('external_order_id', row.external_order_id).eq('external_line_id', row.external_line_id);
+  }
+
+  for (const status of ['refunded', 'cancelled'] as const) {
+    const ids = reversed.filter((r) => r.status === status).map((r) => r.externalOrderId);
+    if (ids.length === 0) continue;
+    await service.from(SALE_EVENTS).update({ marketplace_status: status })
+      .eq('channel', channel).in('external_order_id', ids).is('marketplace_status', null);
+  }
+
+  await io.log({
+    action: 'marketplace_sales',
+    outcome: 'ok',
+    message: `Filled in ${added} past ${io.name} sale${added === 1 ? '' : 's'} for Admin → Orders (records only — no product changed).`,
+    detail: { added, refundedOrCancelled: reversed.length },
+  });
+  return true;
+}
+
 function revalidateProduct(productId: string): void {
   revalidateTag('shop-catalog', { expire: 0 });
   revalidatePath(`/shop/${productId}`);
@@ -146,6 +241,7 @@ async function applyAll(
     }
     try {
       const row = await applyLine(service, line);
+      await fillRecordDetails(service, line);
       countSaleOutcome(summary, row.outcome);
       if (row.outcome === 'sold') {
         await io.log({
@@ -189,6 +285,10 @@ async function applyAll(
   }
 
   for (const line of unmatched) {
+    // Recorded so the sale shows on Admin → Orders; logged only the first time
+    // it is seen (the 10-minute overlap re-reads it on the next sweep).
+    const recorded = await recordSaleRows(service, [saleRecordInsert(line)]);
+    if (recorded === 0) continue;
     await io.log({
       action: 'marketplace_sale',
       outcome: 'warning',
@@ -216,6 +316,45 @@ async function logSkipOnce(service: SupabaseClient, table: 'etsy_sync_log' | 'eb
     .maybeSingle();
   if ((data as { message?: string | null } | null)?.message === message) return;
   await io.log({ action: 'marketplace_sales', outcome: 'warning', message });
+}
+
+/** Etsy listing id → product id, for just the listings these receipts name. */
+async function etsyListingMap(service: SupabaseClient, receipts: readonly EtsyReceipt[]): Promise<Map<number, string>> {
+  const listingIds = new Set<number>();
+  for (const receipt of receipts) for (const t of receipt.transactions ?? []) if (t.listing_id != null) listingIds.add(t.listing_id);
+  const listingToProduct = new Map<number, string>();
+  if (listingIds.size === 0) return listingToProduct;
+  const { data } = await service.from('etsy_listings').select('product_id, etsy_listing_id').in('etsy_listing_id', Array.from(listingIds));
+  for (const l of (data ?? []) as Array<{ product_id: string; etsy_listing_id: number | null }>) {
+    if (l.etsy_listing_id != null) listingToProduct.set(l.etsy_listing_id, l.product_id);
+  }
+  return listingToProduct;
+}
+
+/** eBay SKU / item id → product id, for just the lines these orders name. */
+async function ebayProductMaps(service: SupabaseClient, orders: readonly EbayOrder[]): Promise<{ skuToProduct: Map<string, string>; itemToProduct: Map<string, string> }> {
+  const skus = new Set<string>();
+  const itemIds = new Set<string>();
+  for (const order of orders) {
+    for (const line of order.lineItems ?? []) {
+      if (line.sku) skus.add(line.sku);
+      if (line.legacyItemId) itemIds.add(String(line.legacyItemId));
+    }
+  }
+  const skuToProduct = new Map<string, string>();
+  const itemToProduct = new Map<string, string>();
+  if (skus.size === 0 && itemIds.size === 0) return { skuToProduct, itemToProduct };
+  let query = service.from('ebay_listings').select('product_id, ebay_sku, ebay_listing_id');
+  const filters: string[] = [];
+  if (skus.size > 0) filters.push(`ebay_sku.in.(${Array.from(skus).map((s) => `"${s.replace(/"/g, '')}"`).join(',')})`);
+  if (itemIds.size > 0) filters.push(`ebay_listing_id.in.(${Array.from(itemIds).map((s) => `"${s}"`).join(',')})`);
+  query = query.or(filters.join(','));
+  const { data } = await query;
+  for (const l of (data ?? []) as Array<{ product_id: string; ebay_sku: string; ebay_listing_id: string | null }>) {
+    if (l.ebay_sku) skuToProduct.set(l.ebay_sku, l.product_id);
+    if (l.ebay_listing_id) itemToProduct.set(l.ebay_listing_id, l.product_id);
+  }
+  return { skuToProduct, itemToProduct };
 }
 
 function skipped(reason: string): SalesSweepResult {
@@ -253,22 +392,32 @@ export async function sweepEtsySales(connection?: EtsyConnectionRow | null): Pro
 
   try {
     const { accessToken, shopId } = await ensureEtsyToken(service);
-    const receipts = await getShopReceipts({ shopId, accessToken, minCreated: salesReadFrom(row.sales_cursor) });
+    const regularReadFrom = salesReadFrom(row.sales_cursor);
+    const receipts = await getShopReceipts({ shopId, accessToken, minCreated: regularReadFrom });
 
-    const listingIds = new Set<number>();
-    for (const receipt of receipts) for (const t of receipt.transactions ?? []) if (t.listing_id != null) listingIds.add(t.listing_id);
-    const listingToProduct = new Map<number, string>();
-    if (listingIds.size > 0) {
-      const { data } = await service.from('etsy_listings').select('product_id, etsy_listing_id').in('etsy_listing_id', Array.from(listingIds));
-      for (const l of (data ?? []) as Array<{ product_id: string; etsy_listing_id: number | null }>) {
-        if (l.etsy_listing_id != null) listingToProduct.set(l.etsy_listing_id, l.product_id);
-      }
-    }
-
-    const selection = selectEtsySaleLines(receipts, listingToProduct);
+    const selection = selectEtsySaleLines(receipts, await etsyListingMap(service, receipts));
     const result = await applyAll(service, io, 'etsy', selection.sales, selection.unmatched, receipts.length, deadlineAt);
     // Advance only after a successful read; a failed run re-reads from the old cursor.
     await updateEtsyConnection(service, { sales_cursor: startedAt.toISOString() });
+
+    // One-time fill-in of past sales for Admin → Orders (records only).
+    // `undefined` = the column is not there yet (SQL not run) → skip.
+    if (row.sales_backfilled_at === null && Date.now() < deadlineAt) {
+      try {
+        const past = await getShopReceipts({
+          shopId,
+          accessToken,
+          minCreated: new Date(startedAt.getTime() - BACKFILL_DAYS.etsy * 86_400_000),
+          maxPages: 20,
+          includeUnpaid: true,
+        });
+        const pastSelection = selectEtsySaleLines(past, await etsyListingMap(service, past));
+        const done = await backfillRecords(service, io, 'etsy', pastSelection, selectReversedOrders('etsy', past), regularReadFrom);
+        if (done) await updateEtsyConnection(service, { sales_backfilled_at: new Date().toISOString() });
+      } catch (err) {
+        await io.log({ action: 'marketplace_sales', outcome: 'warning', message: `Filling in past Etsy sales failed (will retry next sweep): ${err instanceof Error ? err.message : String(err)}` });
+      }
+    }
     return result;
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Etsy sales sweep failed.';
@@ -306,34 +455,31 @@ export async function sweepEbaySales(connection?: EbayConnectionRow | null): Pro
 
   try {
     const { accessToken } = await ensureEbayToken(service);
-    const orders = await getOrders({ accessToken, createdAfter: salesReadFrom(row.orders_cursor) });
+    const regularReadFrom = salesReadFrom(row.orders_cursor);
+    const orders = await getOrders({ accessToken, createdAfter: regularReadFrom });
 
-    const skus = new Set<string>();
-    const itemIds = new Set<string>();
-    for (const order of orders) {
-      for (const line of order.lineItems ?? []) {
-        if (line.sku) skus.add(line.sku);
-        if (line.legacyItemId) itemIds.add(String(line.legacyItemId));
-      }
-    }
-    const skuToProduct = new Map<string, string>();
-    const itemToProduct = new Map<string, string>();
-    if (skus.size > 0 || itemIds.size > 0) {
-      let query = service.from('ebay_listings').select('product_id, ebay_sku, ebay_listing_id');
-      const filters: string[] = [];
-      if (skus.size > 0) filters.push(`ebay_sku.in.(${Array.from(skus).map((s) => `"${s.replace(/"/g, '')}"`).join(',')})`);
-      if (itemIds.size > 0) filters.push(`ebay_listing_id.in.(${Array.from(itemIds).map((s) => `"${s}"`).join(',')})`);
-      query = query.or(filters.join(','));
-      const { data } = await query;
-      for (const l of (data ?? []) as Array<{ product_id: string; ebay_sku: string; ebay_listing_id: string | null }>) {
-        if (l.ebay_sku) skuToProduct.set(l.ebay_sku, l.product_id);
-        if (l.ebay_listing_id) itemToProduct.set(l.ebay_listing_id, l.product_id);
-      }
-    }
-
-    const selection = selectEbaySaleLines(orders, skuToProduct, itemToProduct);
+    const maps = await ebayProductMaps(service, orders);
+    const selection = selectEbaySaleLines(orders, maps.skuToProduct, maps.itemToProduct);
     const result = await applyAll(service, io, 'ebay', selection.sales, selection.unmatched, orders.length, deadlineAt);
     await updateEbayConnection(service, { orders_cursor: startedAt.toISOString() });
+
+    // One-time fill-in of past sales for Admin → Orders (records only).
+    // `undefined` = the column is not there yet (SQL not run) → skip.
+    if (row.sales_backfilled_at === null && Date.now() < deadlineAt) {
+      try {
+        const past = await getOrders({
+          accessToken,
+          createdAfter: new Date(startedAt.getTime() - BACKFILL_DAYS.ebay * 86_400_000),
+          maxPages: 10,
+        });
+        const pastMaps = await ebayProductMaps(service, past);
+        const pastSelection = selectEbaySaleLines(past, pastMaps.skuToProduct, pastMaps.itemToProduct);
+        const done = await backfillRecords(service, io, 'ebay', pastSelection, selectReversedOrders('ebay', past), regularReadFrom);
+        if (done) await updateEbayConnection(service, { sales_backfilled_at: new Date().toISOString() });
+      } catch (err) {
+        await io.log({ action: 'marketplace_sales', outcome: 'warning', message: `Filling in past eBay sales failed (will retry next sweep): ${err instanceof Error ? err.message : String(err)}` });
+      }
+    }
     return result;
   } catch (err) {
     const message = err instanceof Error ? err.message : 'eBay sales sweep failed.';

@@ -314,6 +314,27 @@ export async function ebayFetch<T>(opts: EbayRequestOptions): Promise<EbayRespon
 }
 
 /**
+ * The non-personal part of an eBay order — the ONLY fields that leave
+ * getOrders(). Anything about the buyer is dropped here on purpose.
+ */
+export function trimEbayOrder(order: EbayOrder): EbayOrder {
+  return {
+    orderId: String(order.orderId),
+    creationDate: order.creationDate,
+    orderPaymentStatus: order.orderPaymentStatus ?? null,
+    cancelStatus: order.cancelStatus ? { cancelState: order.cancelStatus.cancelState ?? null } : null,
+    lineItems: (order.lineItems ?? []).map((line) => ({
+      lineItemId: String(line.lineItemId),
+      legacyItemId: line.legacyItemId ?? null,
+      sku: line.sku ?? null,
+      title: line.title ?? null,
+      quantity: line.quantity,
+      lineItemCost: line.lineItemCost ? { value: line.lineItemCost.value, currency: line.lineItemCost.currency } : null,
+    })),
+  };
+}
+
+/**
  * Orders created at or after `createdAfter` (Sell Fulfillment getOrders;
  * requires `sell.fulfillment.readonly`). Follows eBay's `next` link up to
  * `maxPages`. Shape is trimmed to what lib/marketplace-sales.ts reads.
@@ -333,7 +354,11 @@ export async function getOrders(params: {
   };
   for (let page = 0; page < maxPages && path; page += 1) {
     const res: EbayResponse<Page> = await ebayFetch<Page>({ method: 'GET', path, accessToken: params.accessToken, query });
-    orders.push(...(res.data?.orders ?? []));
+    // eBay sends the buyer (username, ship-to name/address/phone/email) with
+    // every order. Keep only the non-personal fields the sales sweep reads, so
+    // buyer data never travels past this line ("we do not persist eBay data",
+    // the basis of the account-deletion opt-out, 2026-11-16).
+    orders.push(...(res.data?.orders ?? []).map(trimEbayOrder));
     // `next` is an absolute URL carrying its own query string.
     path = res.data?.next ?? null;
     query = undefined;

@@ -283,6 +283,28 @@ export async function etsyFetch<T = unknown>(opts: EtsyRequestOptions): Promise<
 }
 
 /**
+ * The non-personal part of an Etsy receipt — the ONLY fields that leave
+ * getShopReceipts(). Buyer name, address and email are dropped here.
+ */
+export function trimEtsyReceipt(receipt: EtsyReceipt): EtsyReceipt {
+  return {
+    receipt_id: receipt.receipt_id,
+    status: receipt.status ?? null,
+    is_paid: receipt.is_paid,
+    created_timestamp: receipt.created_timestamp,
+    create_timestamp: receipt.create_timestamp,
+    transactions: (receipt.transactions ?? []).map((t) => ({
+      transaction_id: t.transaction_id,
+      listing_id: t.listing_id ?? null,
+      sku: t.sku ?? null,
+      title: t.title ?? null,
+      quantity: t.quantity,
+      price: t.price ? { amount: t.price.amount, divisor: t.price.divisor, currency_code: t.price.currency_code } : null,
+    })),
+  };
+}
+
+/**
  * Paid shop receipts created at or after `minCreated` (getShopReceipts;
  * requires the `transactions_r` scope). Pages through Etsy's 100-per-call
  * cap oldest-first. Shape is trimmed to what lib/marketplace-sales.ts reads.
@@ -292,6 +314,8 @@ export async function getShopReceipts(params: {
   accessToken: string;
   minCreated: Date;
   maxPages?: number;
+  /** Also return unpaid receipts (the fill-in of past sales reads cancellations too). Default: paid only. */
+  includeUnpaid?: boolean;
 }): Promise<EtsyReceipt[]> {
   const receipts: EtsyReceipt[] = [];
   const limit = 100;
@@ -302,7 +326,7 @@ export async function getShopReceipts(params: {
       accessToken: params.accessToken,
       query: {
         min_created: Math.floor(params.minCreated.getTime() / 1000),
-        was_paid: true,
+        ...(params.includeUnpaid ? {} : { was_paid: true }),
         limit,
         offset: page * limit,
         sort_on: 'created',
@@ -310,7 +334,9 @@ export async function getShopReceipts(params: {
       },
     });
     const batch = res.data?.results ?? [];
-    receipts.push(...batch);
+    // Etsy receipts carry the buyer's name, address and email. Keep only the
+    // non-personal fields the sales sweep reads (2026-11-16, same rule as eBay).
+    receipts.push(...batch.map(trimEtsyReceipt));
     if (batch.length < limit) break;
   }
   return receipts;

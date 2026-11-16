@@ -71,7 +71,8 @@ describe('Etsy receipts', () => {
       etsyListings,
     );
     expect(sales).toEqual([]);
-    expect(unmatched).toEqual([{ channel: 'etsy', externalOrderId: '5551', externalLineId: '92', reference: 'listing 4242', title: 'Hand-listed brooch' }]);
+    // 2026-11-16: an unmatched line also carries quantity / price / date so it can be RECORDED for Admin → Orders.
+    expect(unmatched).toEqual([expect.objectContaining({ channel: 'etsy', externalOrderId: '5551', externalLineId: '92', reference: 'listing 4242', title: 'Hand-listed brooch', quantity: 1 })]);
   });
 
   it('accepts the older create_timestamp spelling and a missing price', () => {
