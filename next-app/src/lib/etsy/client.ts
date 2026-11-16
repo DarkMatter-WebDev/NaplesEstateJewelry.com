@@ -301,6 +301,8 @@ export function trimEtsyReceipt(receipt: EtsyReceipt): EtsyReceipt {
       quantity: t.quantity,
       price: t.price ? { amount: t.price.amount, divisor: t.price.divisor, currency_code: t.price.currency_code } : null,
     })),
+    // Amounts only — Etsy's free-text refund reason is dropped.
+    refunds: (receipt.refunds ?? []).map((r) => ({ amount: r?.amount ? { amount: r.amount.amount, divisor: r.amount.divisor } : null })),
   };
 }
 

@@ -48,6 +48,19 @@ export function marketplaceOrderUrl(channel: MarketplaceChannel, externalOrderId
     : `https://www.etsy.com/your/orders/sold?order_id=${id}`;
 }
 
+const NAMED_ENTITIES: Record<string, string> = { amp: '&', quot: '"', apos: "'", lt: '<', gt: '>', nbsp: ' ' };
+
+/** Etsy sends listing titles HTML-encoded ("&quot;Esmeralda&quot;"); React would show the codes literally. */
+export function decodeTitleEntities(text: string): string {
+  return text.replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z]+);/gi, (match, code: string) => {
+    if (code[0] === '#') {
+      const n = code[1] === 'x' || code[1] === 'X' ? parseInt(code.slice(2), 16) : parseInt(code.slice(1), 10);
+      return Number.isFinite(n) && n > 0 && n < 0x110000 ? String.fromCodePoint(n) : match;
+    }
+    return NAMED_ENTITIES[code.toLowerCase()] ?? match;
+  });
+}
+
 function toMoney(value: number | string | null | undefined): number | null {
   if (value == null || value === '') return null;
   const n = typeof value === 'number' ? value : Number(value);
@@ -71,9 +84,9 @@ export function buildMarketplaceSaleRecords(
     const key = `${channel}:${row.external_order_id}`;
     const quantity = Math.max(1, Math.floor(Number(row.quantity) || 1));
     const price = toMoney(row.sale_price);
-    const title = row.title?.trim()
+    const title = decodeTitleEntities(row.title?.trim()
       || (row.product_id ? productTitles.get(row.product_id) : undefined)
-      || 'Item';
+      || 'Item');
     const soldAt = row.sold_at || row.created_at;
     const status = row.marketplace_status === 'refunded' || row.marketplace_status === 'cancelled' ? row.marketplace_status : 'sold';
 

@@ -66,6 +66,11 @@ describe('buildMarketplaceSaleRecords', () => {
     expect(records[0].total).toBeNull();
   });
 
+  it('decodes Etsy\'s HTML-encoded titles for display', () => {
+    const [record] = buildMarketplaceSaleRecords([row({ title: 'Armani &quot;Esmeralda&quot; Sculpture &amp; Base &#39;95' })]);
+    expect(record.items).toEqual(['Armani "Esmeralda" Sculpture & Base \'95']);
+  });
+
   it('a record carries no buyer field at all', () => {
     const [record] = buildMarketplaceSaleRecords([row({})]);
     expect(Object.keys(record).sort()).toEqual(['channel', 'externalOrderId', 'items', 'key', 'soldAt', 'status', 'total']);
@@ -135,6 +140,20 @@ describe('sale records written by the sweep', () => {
     const before = new Date('2026-11-16T15:50:00Z');
     expect(linesBefore(selection.sales, before)).toHaveLength(0);
     expect(linesBefore(selection.unmatched, before)).toHaveLength(1);
+  });
+
+  it('an Etsy "Partially Refunded" receipt whose refunds cover the item is a return (the 09-17 chain)', () => {
+    const chain = {
+      receipt_id: 4176386677,
+      status: 'Partially Refunded',
+      is_paid: true,
+      transactions: [{ transaction_id: 1, listing_id: 1, quantity: 1, price: { amount: 191064, divisor: 100 } }],
+      refunds: [{ amount: { amount: 203722, divisor: 100 } }],
+    } as EtsyReceipt;
+    const smallRefund = { ...chain, receipt_id: 5, refunds: [{ amount: { amount: 1500, divisor: 100 } }] } as EtsyReceipt;
+    expect(selectReversedOrders('etsy', [chain, smallRefund])).toEqual([
+      { channel: 'etsy', externalOrderId: '4176386677', status: 'refunded' },
+    ]);
   });
 
   it('spots refunded / cancelled orders on both marketplaces', () => {

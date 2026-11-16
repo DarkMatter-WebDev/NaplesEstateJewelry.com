@@ -89,6 +89,8 @@ export interface EtsyReceipt {
   created_timestamp?: number;
   create_timestamp?: number;
   transactions?: EtsyReceiptTransaction[];
+  /** Refund amounts only (Etsy's reason note is dropped on arrival). */
+  refunds?: Array<{ amount?: { amount: number; divisor: number } | null }> | null;
 }
 
 /** Receipt statuses that are NOT a sale we should act on. Etsy's casing varies, so compare lower-cased. */
@@ -334,6 +336,14 @@ export function etsyReceiptReversal(receipt: EtsyReceipt): MarketplaceStatus | n
   const status = (receipt.status ?? '').trim().toLowerCase();
   if (status === 'fully refunded') return 'refunded';
   if (status === 'canceled' || status === 'cancelled') return 'cancelled';
+  // Etsy says "Partially Refunded" when a return refunds the whole item but
+  // not every fee (the 09-17 chain: $2,037.22 refunded on a $1,910.64 item,
+  // owner: "the buyer returned it"). Refunds covering the items = refunded.
+  if (status === 'partially refunded') {
+    const refunded = (receipt.refunds ?? []).reduce((sum, r) => sum + (etsyMoney(r?.amount ?? null) ?? 0), 0);
+    const items = (receipt.transactions ?? []).reduce((sum, t) => sum + (etsyMoney(t.price) ?? 0) * Math.max(1, Math.floor(Number(t.quantity) || 1)), 0);
+    if (items > 0 && refunded + 0.005 >= items) return 'refunded';
+  }
   return null;
 }
 

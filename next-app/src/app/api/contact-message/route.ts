@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { LEAD_NOTIFICATION_EMAIL } from '@/lib/lead-notification';
 import { createServiceClient } from '@/lib/supabase/service';
 import { createAdminNotification } from '@/lib/admin-notify';
 import { PRODUCT_IMAGES_BUCKET } from '@/lib/product-image-storage';
@@ -38,7 +39,8 @@ import { getStoreHours } from '@/lib/store-hours';
 
 export const runtime = 'nodejs';
 
-const OWNER_EMAIL = 'rcman12589@gmail.com';
+// The owner's copy goes to the shared lead inbox (info@, 2026-11-16 — was a typed-in Gmail address).
+const OWNER_EMAIL = LEAD_NOTIFICATION_EMAIL;
 // Resend's verified sending domain is naplesestatejewelry.com (migrated 2026-08-05).
 const FROM = 'Naples Estate Jewelry <noreply@naplesestatejewelry.com>';
 

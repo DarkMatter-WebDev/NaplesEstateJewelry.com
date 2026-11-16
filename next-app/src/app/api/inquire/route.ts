@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { LEAD_NOTIFICATION_EMAIL } from '@/lib/lead-notification';
 import { createPublicClient } from '@/lib/supabase/public';
 import { createServiceClient } from '@/lib/supabase/service';
 import { createAdminNotification } from '@/lib/admin-notify';
@@ -39,7 +40,8 @@ const MAX_PHONE = 60;
 const MAX_EMAIL = 320;
 const MAX_MESSAGE = 5000;
 
-const OWNER_EMAIL = 'rcman12589@gmail.com';
+// The owner's copy goes to the shared lead inbox (info@, 2026-11-16 — was a typed-in Gmail address).
+const OWNER_EMAIL = LEAD_NOTIFICATION_EMAIL;
 // Sending domain is naplesestatejewelry.com in Resend (migrated 2026-08-05); the
 // .co domain is no longer verified there, so a .co From address will not send.
 const FROM = 'Naples Estate Jewelry <noreply@naplesestatejewelry.com>';
