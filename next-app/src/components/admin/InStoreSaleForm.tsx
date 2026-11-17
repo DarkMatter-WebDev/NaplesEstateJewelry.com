@@ -6,15 +6,15 @@ import type { SpotData } from '@/types/product';
 import { formatCurrency } from '@/types/sales';
 import {
   IN_STORE_PAYMENT_LABELS,
-  IN_STORE_PAYMENT_METHODS,
   IN_STORE_SHIPPING_LABELS,
+  salePaymentsCollectPhrase,
   inStoreChargesTax,
   inStoreTableShippingFee,
   inStoreTotals,
   parseInStorePrice,
   parseInStoreShippingFee,
-  type InStorePaymentMethod,
   type InStoreShippingChoice,
+  type SalePaymentPart,
 } from '@/lib/in-store-sale';
 import { round2 } from '@/lib/checkout-pricing';
 import { normalizeUsState } from '@/lib/us-address';
@@ -39,6 +39,12 @@ import TaxExemptSaleBox, {
   taxExemptProblem,
 } from '@/components/admin/instant-sale/TaxExemptSaleBox';
 import { exemptShortTag } from '@/lib/tax-exempt';
+import SalePaymentsEditor, {
+  newSalePayments,
+  salePaymentParts,
+  salePaymentsPayload,
+  salePaymentsProblem,
+} from '@/components/admin/instant-sale/SalePaymentsEditor';
 
 export type { InStoreProduct } from '@/components/admin/instant-sale/SaleItemsEditor';
 
@@ -55,7 +61,8 @@ type Recorded = {
   stationRequest: SalePrintRequestRef | null;
   stationError: string | null;
   total: number;
-  paidBy: InStorePaymentMethod;
+  /** One part for a single method; several for a split (2026-11-16). */
+  payments: SalePaymentPart[];
   customer: string;
   /** Shipped sales only: the address lines and the charge chosen. */
   shipTo: { lines: string[]; shipping: string } | null;
@@ -101,7 +108,8 @@ export default function InStoreSaleForm({
   const [zip, setZip] = useState('');
   const [shipping, setShipping] = useState<InStoreShippingChoice>('insured');
   const [customFee, setCustomFee] = useState('');
-  const [paidBy, setPaidBy] = useState<InStorePaymentMethod>('zettle');
+  // "Paid by": one method, or a split across several (owner, 2026-11-16).
+  const [payments, setPayments] = useState(() => newSalePayments('zettle'));
   const [note, setNote] = useState('');
   // "Tax-exempt sale" (owner, 2026-10-27): Florida certificate, AI-read photo or physical copy.
   const [taxBox, setTaxBox] = useState(newTaxExemptBox);
@@ -130,6 +138,8 @@ export default function InStoreSaleForm({
   const totals = priceValue != null && shippingFee != null
     ? inStoreTotals(priceValue, { shippingFee, chargesTax })
     : null;
+  const paymentParts = salePaymentParts(payments, totals?.total ?? null);
+  const paymentsProblem = salePaymentsProblem(payments, totals?.total ?? null);
 
   function changeEmail(next: string) {
     if (!email.trim() && next.trim()) setEmailCopy(true);
@@ -139,7 +149,7 @@ export default function InStoreSaleForm({
 
   function clearAll() {
     setItems([newSaleItem()]);
-    setFirstName(''); setLastName(''); setPhone(''); setEmail(''); setEmailCopy(false); setPaidBy('zettle'); setNote('');
+    setFirstName(''); setLastName(''); setPhone(''); setEmail(''); setEmailCopy(false); setPayments(newSalePayments('zettle')); setNote('');
     setDelivery('pickup'); setMailingOn(false); setLine1(''); setLine2(''); setCity(''); setShipState(''); setZip('');
     setShipping('insured'); setCustomFee('');
     setTaxBox(newTaxExemptBox());
@@ -175,6 +185,7 @@ export default function InStoreSaleForm({
       setError(shipping === 'custom' ? 'Enter the shipping charge, e.g. 25.' : 'Express overnight is not offered at $5,000 and up. Pick another shipping charge.');
       return;
     }
+    if (paymentsProblem || !paymentParts) { setError(paymentsProblem ?? 'Enter each payment amount.'); return; }
     setBusy(action);
     setPrintNote(null);
     try {
@@ -191,7 +202,7 @@ export default function InStoreSaleForm({
             shipping,
             shippingFee: customFee,
           },
-          paidBy,
+          ...salePaymentsPayload(payments, totals.total),
           note,
           taxExempt: taxExemptPayload(taxBox),
           print,
@@ -213,7 +224,7 @@ export default function InStoreSaleForm({
         emailCopy: emailCopy && Boolean(email.trim()),
         summary: items.map((item) => (item.mode === 'listed' && item.selected ? `#${item.selected.inventory_number ?? '—'} · ${item.selected.title}` : saleItemLabel(item))),
         total: totals.total,
-        paidBy,
+        payments: paymentParts,
         customer: `${firstName.trim()} ${lastName.trim()} · ${phone.trim()}`,
         shipTo: data.shipped
           ? {
@@ -255,7 +266,14 @@ export default function InStoreSaleForm({
             <span className="text-right">{recorded.summary.map((line, index) => <span key={`${index}-${line}`} className="block">{line}</span>)}</span>
           </div>
           <div className="flex justify-between gap-3"><span style={hintStyle}>Customer</span><span className="text-right">{recorded.customer}</span></div>
-          <div className="flex justify-between gap-3"><span style={hintStyle}>Paid by</span><span>{IN_STORE_PAYMENT_LABELS[recorded.paidBy]}</span></div>
+          <div className="flex justify-between gap-3">
+            <span style={hintStyle}>Paid by</span>
+            <span className="text-right">
+              {recorded.payments.length > 1
+                ? recorded.payments.map((part, index) => <span key={`${index}-${part.method}`} className="block">{IN_STORE_PAYMENT_LABELS[part.method]} {formatCurrency(part.amount)}</span>)
+                : IN_STORE_PAYMENT_LABELS[recorded.payments[0]?.method ?? 'zettle']}
+            </span>
+          </div>
           {recorded.exempt && <div className="flex justify-between gap-3"><span style={hintStyle}>Tax</span><span className="font-bold" style={{ color: '#16653c' }}>{recorded.exempt}</span></div>}
           {recorded.shipTo && (
             <div className="flex justify-between gap-3">
@@ -371,24 +389,8 @@ export default function InStoreSaleForm({
         />
 
         <section className="rounded-[1.25rem] border bg-white p-5 grid gap-4" style={cardStyle}>
-          <h2 className="text-lg font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>4. Paid by</h2>
-          <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2" role="group" aria-label="Paid by">
-            {IN_STORE_PAYMENT_METHODS.map((method) => {
-              const on = paidBy === method;
-              return (
-                <button
-                  key={method}
-                  type="button"
-                  onClick={() => setPaidBy(method)}
-                  aria-pressed={on}
-                  className="rounded-full border px-4 py-2.5 text-[0.7rem] font-bold uppercase tracking-[0.08em]"
-                  style={{ fontFamily: 'var(--font-label)', borderColor: on ? 'var(--color-primary)' : 'var(--color-outline-variant)', background: on ? '#fbf5dd' : '#fff', color: on ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}
-                >
-                  {IN_STORE_PAYMENT_LABELS[method]}
-                </button>
-              );
-            })}
-          </div>
+          <h2 className="text-lg font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>{payments.split ? '4. Paid by · split' : '4. Paid by'}</h2>
+          <SalePaymentsEditor draft={payments} onChange={(next) => { setPayments(next); setError(null); }} total={totals?.total ?? null} />
           <label className="block">
             <span className={label} style={labelStyle}>Note<Optional /></span>
             <input className="form-field" value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} placeholder="Traded in a ring, $200 credit applied" />
@@ -429,22 +431,34 @@ export default function InStoreSaleForm({
             <span>{totals ? formatCurrency(totals.tax) : '—'}</span>
           </div>
           <div className="flex justify-between border-t pt-3 text-2xl font-bold" style={{ ...cardStyle, fontFamily: 'var(--font-headline)' }}><span>Total</span><span>{totals ? formatCurrency(totals.total) : '—'}</span></div>
+          {payments.split && paymentParts && paymentParts.map((part, index) => (
+            <div key={`${index}-${part.method}`} className={`flex justify-between text-sm${index === 0 ? ' border-t border-dashed pt-2' : ''}`} style={{ ...cardStyle, ...hintStyle }}>
+              <span>{IN_STORE_PAYMENT_LABELS[part.method]}</span><span>{formatCurrency(part.amount)}</span>
+            </div>
+          ))}
           <span className="text-xs" style={hintStyle}>
-            {paidBy === 'zettle' && totals
-              ? <>Collect <strong>{formatCurrency(totals.total)}</strong> on Zettle before recording.</>
-              : paidBy === 'store_credit'
-                ? 'Recording does not take a payment — the customer’s store credit covers it.'
-                : 'Recording does not take a payment — the money is already in hand.'}
+            {payments.split
+              ? paymentParts && !paymentsProblem
+                ? <>Collect <strong>{salePaymentsCollectPhrase(paymentParts)}</strong> before recording.</>
+                : 'Split payment — the amounts must add up to the total before recording.'
+              : payments.paidBy === 'zettle' && totals
+                ? <>Collect <strong>{formatCurrency(totals.total)}</strong> on Zettle before recording.</>
+                : payments.paidBy === 'store_credit'
+                  ? 'Recording does not take a payment — the customer’s store credit covers it.'
+                  : 'Recording does not take a payment — the money is already in hand.'}
           </span>
+          {payments.split && paymentsProblem && paymentParts && (
+            <div className="rounded-lg px-3 py-2 text-sm" role="alert" style={{ background: 'color-mix(in srgb, var(--color-error) 10%, transparent)', color: 'var(--color-error)' }}>{paymentsProblem}</div>
+          )}
           {error && (
             <div className="rounded-lg px-3 py-2 text-sm" role="alert" style={{ background: 'color-mix(in srgb, var(--color-error) 10%, transparent)', color: 'var(--color-error)' }}>{error}</div>
           )}
           <div className="grid gap-2 pt-1">
-            <button type="submit" className="gold-button text-xs" disabled={Boolean(busy)}>{busy === 'record' ? 'Recording…' : totals ? `Record sale · ${formatCurrency(totals.total)}` : 'Record sale'}</button>
-            <button type="button" className="outline-button text-xs" style={{ borderWidth: '1.5px', borderColor: '#b5890c' }} disabled={Boolean(busy)} onClick={() => void record('print')}>
+            <button type="submit" className="gold-button text-xs" disabled={Boolean(busy) || (payments.split && Boolean(paymentsProblem))}>{busy === 'record' ? 'Recording…' : totals ? `Record sale · ${formatCurrency(totals.total)}` : 'Record sale'}</button>
+            <button type="button" className="outline-button text-xs" style={{ borderWidth: '1.5px', borderColor: '#b5890c' }} disabled={Boolean(busy) || (payments.split && Boolean(paymentsProblem))} onClick={() => void record('print')}>
               {busy === 'print' ? 'Recording…' : 'Record & print receipt'}
             </button>
-            <button type="button" className="outline-button text-xs" style={{ borderWidth: '1.5px', borderColor: '#b5890c' }} disabled={Boolean(busy)} onClick={() => void record('station')}>
+            <button type="button" className="outline-button text-xs" style={{ borderWidth: '1.5px', borderColor: '#b5890c' }} disabled={Boolean(busy) || (payments.split && Boolean(paymentsProblem))} onClick={() => void record('station')}>
               {busy === 'station' ? 'Recording…' : 'Record & send to desktop printer'}
             </button>
             <button type="button" className="text-xs underline justify-self-start" style={hintStyle} onClick={clearAll} disabled={Boolean(busy)}>Clear</button>

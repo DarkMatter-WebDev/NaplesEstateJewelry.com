@@ -7,6 +7,7 @@ import { buildPaperReceipt, isPaidStatus } from '@/lib/order-receipt-paper';
 import { hoursLine } from '@/lib/business-location';
 import { getStoreHours } from '@/lib/store-hours';
 import { loadOrderTaxExemption } from '@/lib/tax-exempt-server';
+import { SPLIT_PAYMENTS_COLUMN } from '@/lib/in-store-sale';
 import type { Order, OrderItem } from '@/types/sales';
 import CustomerModeTabGuard from '@/components/admin/buy-receipts/CustomerModeTabGuard';
 import PrintInvoiceClient from './PrintInvoiceClient';
@@ -26,6 +27,7 @@ const INVOICE_COLUMNS = [
   'total',
   'payment_status',
   'payment_method',
+  SPLIT_PAYMENTS_COLUMN,
   'fulfillment_status',
   'order_status',
   'shipping_method',

@@ -4,6 +4,7 @@ import { hoursLine } from '@/lib/business-location';
 import { getStoreHours } from '@/lib/store-hours';
 import { buildPaperReceipt, type PaperReceipt, type PaperReceiptOrder } from '@/lib/order-receipt-paper';
 import { loadOrderTaxExemption } from '@/lib/tax-exempt-server';
+import { SPLIT_PAYMENTS_COLUMN } from '@/lib/in-store-sale';
 
 const PAPER_COLUMNS = [
   'order_number',
@@ -18,6 +19,7 @@ const PAPER_COLUMNS = [
   'payment_status',
   'fulfillment_status',
   'payment_method',
+  SPLIT_PAYMENTS_COLUMN,
   'shipping_method',
   'shipping_address',
   'created_at',

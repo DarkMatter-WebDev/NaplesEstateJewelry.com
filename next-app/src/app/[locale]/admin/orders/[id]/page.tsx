@@ -10,6 +10,7 @@ import { loadOrderTracking } from '@/lib/order-tracking-server';
 import { isDeliveryTrackingConfigured } from '@/lib/easypost';
 import { formatPickupHours } from '@/lib/order-invoice-email';
 import { getStoreHours } from '@/lib/store-hours';
+import { SPLIT_PAYMENTS_COLUMN } from '@/lib/in-store-sale';
 import AdminHeader from '@/components/admin/AdminHeader';
 import type { Order, OrderItem } from '@/types/sales';
 import type { Product } from '@/types/product';
@@ -34,6 +35,7 @@ const ORDER_DETAIL_COLUMNS = [
   'fulfillment_status',
   'order_status',
   'payment_method',
+  SPLIT_PAYMENTS_COLUMN,
   'payment_reference',
   'shipping_method',
   'shipping_carrier',

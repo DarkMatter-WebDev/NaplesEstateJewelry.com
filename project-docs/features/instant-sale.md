@@ -27,8 +27,17 @@
 3. **Customer.** First / last name and cell as before. **Email** is optional;
    **Email copy** ticks itself as soon as an email is typed. Untick it to keep
    the email on the order but send no receipt now (send it later from the order).
-4. **Pickup or ship**, **Paid by**, **Note** — unchanged. Shipping fees go by the
-   items' total.
+4. **Pickup or ship**, **Paid by**, **Note**. Shipping fees go by the
+   items' total. **Paid by** is one method (tap the chip) or — 2026-11-16 —
+   **＋ Split payment** for two or more: each line is a method + an amount
+   (up to 4 lines; the same method may repeat, e.g. two cards on Zettle).
+   The **last line fills itself with what is left** (type $500 cash and the
+   card line shows the rest) until you type in it. The green bar says when it
+   adds up; a red bar says how much is still to assign (or too much) and the
+   Record buttons stay off until it matches the total to the cent. Removing
+   lines down to one = one method again; **Back to one method** does the same.
+   The Total panel lists each payment and says what to collect
+   ("Collect $1,302.00 on Zettle and $500.00 in cash before recording").
 5. Take the card on Zettle (the total is on the button), then **Record sale** —
    or **Record & print receipt**: it records the sale and opens the print
    dialog with the one-page receipt (date, how it was paid, the items with
@@ -106,7 +115,20 @@
   itself stays the same).
 - **Record payment** — for Zelle, a check, cash… Pick how it was paid and
   record it: items sold, listings end, the customer gets the receipt. The order
-  then reads "Invoice · Zelle".
+  then reads "Invoice · Zelle". **＋ Split payment** (2026-11-16) works as on
+  the In-store form (e.g. $1,000 check + the rest by Zelle); the button reads
+  "Record $1,802.00 · Split" and the order "Invoice · Split".
+
+### Split payment — where it shows (2026-11-16)
+
+- **Paper receipt** and **emailed receipt:** one "Paid by" line per payment
+  ("In store · Cash $500.00", "In store · Card · Zettle $1,302.00"); the email
+  says "Paid in full by Cash $500.00 and Card · Zettle $1,302.00 on …".
+- **Admin → Orders → the order:** *Payment method: In store · Split* and
+  *Reference: In store · Cash $500.00 + Card · Zettle $1,302.00*.
+- Saved as `payment_method in_store_split` / `remote_split`, the parts in
+  `payment_response.payments` — no new column, no SQL. Online checkout is never
+  split (`DECISIONS.md` 2026-11-16 split-payment entry).
 - **Cancel invoice** — the link stops working and the unpaid order is cancelled.
   Nothing is emailed.
 - Paid **online**, the invoice closes by itself: the customer gets the normal

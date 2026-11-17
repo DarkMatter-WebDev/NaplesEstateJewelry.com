@@ -14,7 +14,7 @@ import {
   type StoreHoursSchedule,
 } from '@/lib/business-location';
 import { describeOrderShippingService } from '@/lib/checkout-shipping';
-import { IN_STORE_PAYMENT_LABELS, type InStorePaymentMethod } from '@/lib/in-store-sale';
+import { IN_STORE_PAYMENT_LABELS, formatSalePayments, readSalePaymentParts, type InStorePaymentMethod } from '@/lib/in-store-sale';
 import { paperDateLine } from '@/lib/order-receipt-paper';
 import { exemptReceiptLine, type TaxExemptSnapshot } from '@/lib/tax-exempt';
 import { giftReceiptNote, type OrderGift } from '@/lib/order-gift';
@@ -155,6 +155,15 @@ export function formatPickupHours(schedule: StoreHoursSchedule): string {
 // preview), so it cannot fetch the schedule itself. Server callers pass
 // `opts.pickupHours` from `getStoreHours()`; without it the block shows the
 // built-in default hours.
+/** "Card · Zettle", or a split's parts: "Cash $500.00 and Card · Zettle $1,302.00" (2026-11-16). */
+function inStorePaidByText(method: string, splitPayments: unknown): string {
+  if (method === 'split') {
+    const parts = readSalePaymentParts(splitPayments);
+    return parts ? formatSalePayments(parts).replace(/ \+ (?=[^+]*$)/, ' and ').replace(/ \+ /g, ', ') : 'several payments';
+  }
+  return IN_STORE_PAYMENT_LABELS[method as InStorePaymentMethod] ?? 'in store';
+}
+
 export function buildInvoiceEmailContent(
   order: InvoiceEmailOrder,
   fallbackInvoiceNumber?: string | null,
@@ -241,7 +250,7 @@ export function buildInvoiceEmailContent(
   // Sent from a no-reply address, so don't invite replies — direct to phone/text.
   const paidNote = paid
     ? inStoreMethod
-      ? `Paid in full by ${IN_STORE_PAYMENT_LABELS[inStoreMethod] ?? 'in store'} on ${paperDateLine(order.created_at).split(' · ')[0] || 'the day of the sale'} — thank you.`
+      ? `Paid in full by ${inStorePaidByText(inStoreMethod, order.split_payments)} on ${paperDateLine(order.created_at).split(' · ')[0] || 'the day of the sale'} — thank you.`
       : 'Your payment has been received in full — thank you.'
     : '';
   // A checkout gift (2026-10-29): the buyer's record of who it goes to and

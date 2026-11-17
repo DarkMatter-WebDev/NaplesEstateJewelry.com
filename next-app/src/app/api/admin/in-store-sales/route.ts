@@ -6,8 +6,10 @@ import { buildSaleItemPayloads, createOrderErrorStatus, recordOfflinePayment } f
 import {
   IN_STORE_PAYMENT_LABELS,
   IN_STORE_SHIPPING_LABELS,
+  formatSalePayments,
   inStorePaymentMethodValue,
   normalizeInStoreSaleInput,
+  salePaymentReference,
 } from '@/lib/in-store-sale';
 import { formatCurrency } from '@/types/sales';
 import { loadPaperReceipt } from '@/lib/order-receipt-paper-server';
@@ -39,6 +41,9 @@ import { exemptShortTag, snapshotFromCertificate } from '@/lib/tax-exempt';
  * one-page paper (`lib/order-receipt-paper.ts`) for the form to print.
  * `sendToStation: true` ("Record & send to desktop printer", 2026-10-26) also
  * queues that paper for the Print Station (`lib/sale-print-requests.ts`).
+ * Split payment (owner, 2026-11-16): `payments: [{ method, amount }, …]` in
+ * place of `paidBy`, adding up to the total computed here — saved as
+ * `in_store_split` with the parts in payment_response. No new SQL.
  */
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -53,7 +58,7 @@ export async function POST(req: Request) {
   const sale = input.value;
 
   const service = createServiceClient();
-  const paidByLabel = IN_STORE_PAYMENT_LABELS[sale.paidBy];
+  const paidByLabel = sale.paidBy === 'split' ? `Split · ${formatSalePayments(sale.payments)}` : IN_STORE_PAYMENT_LABELS[sale.paidBy];
 
   const lines = await buildSaleItemPayloads(service, sale.items);
   if ('error' in lines) return NextResponse.json({ error: lines.error }, { status: lines.status });
@@ -138,8 +143,9 @@ export async function POST(req: Request) {
     orderNumber,
     listedIds: lines.listedIds,
     paidBy: sale.paidBy,
+    payments: sale.payments,
     paymentMethodValue: inStorePaymentMethodValue(sale.paidBy),
-    reference: `In store · ${paidByLabel}`,
+    reference: salePaymentReference('In store', sale.paidBy, sale.payments),
     captureIdPrefix: 'in-store',
     // A shipped sale stays `pending` (as created) until Mark Shipped.
     pickedUp: !shipped,

@@ -21,7 +21,7 @@ import { formatProductItemYear } from '@/types/product';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 import { cityLine, landmarkPhrase, SHOWROOM_TIME_ZONE, streetLine } from '@/lib/business-location';
 import { BUSINESS_PHONE, SITE_DOMAIN_LABEL } from '@/lib/order-email-branding';
-import { paymentMethodLabel } from '@/lib/in-store-sale';
+import { paidByLines } from '@/lib/in-store-sale';
 import { exemptReceiptLine, type TaxExemptSnapshot } from '@/lib/tax-exempt';
 
 export type PaperReceiptOrder = Pick<
@@ -29,7 +29,10 @@ export type PaperReceiptOrder = Pick<
   | 'order_number' | 'customer_name' | 'customer_email' | 'customer_phone' | 'subtotal' | 'tax' | 'shipping_fee'
   | 'discount' | 'total' | 'payment_status' | 'fulfillment_status' | 'payment_method' | 'shipping_method'
   | 'shipping_address' | 'created_at'
-> & { order_items: Pick<OrderItem, 'inventory_number' | 'title_snapshot' | 'item_year_snapshot' | 'metal_snapshot' | 'purity_snapshot' | 'gram_weight_snapshot' | 'price_snapshot' | 'quantity' | 'discount' | 'image_snapshot'>[] };
+> & {
+  /** A split payment's parts (`SPLIT_PAYMENTS_COLUMN`, 2026-11-16) — one "Paid by" line each. */
+  split_payments?: unknown;
+} & { order_items: Pick<OrderItem, 'inventory_number' | 'title_snapshot' | 'item_year_snapshot' | 'metal_snapshot' | 'purity_snapshot' | 'gram_weight_snapshot' | 'price_snapshot' | 'quantity' | 'discount' | 'image_snapshot'>[] };
 
 export type PaperReceipt = { title: string; css: string; body: string };
 
@@ -123,7 +126,7 @@ ${anyPhoto ? `<td class="ph">${image ? `<img src="${esc(image)}" alt="">` : ''}<
   }).join('');
 
   const count = items.reduce((sum, item) => sum + qtyOf(item), 0);
-  const paidBy = paid ? paymentMethodLabel(order.payment_method) : 'Not paid yet';
+  const paidBy = paid ? paidByLines(order) : ['Not paid yet'];
   const delivery = ships
     ? `<div class="lab">Ship to</div>${shipTo.length > 0 ? shipTo.map(esc).join('<br>') : 'Address to come'}`
     : `<div class="lab">Delivery</div>${fulfilled === 'picked_up' || fulfilled === 'delivered' ? 'Picked up in store' : 'Pickup at the showroom'}`;
@@ -145,7 +148,7 @@ ${anyPhoto ? `<td class="ph">${image ? `<img src="${esc(image)}" alt="">` : ''}<
 </div>
 <div class="info">
   <div><div class="lab">${paid ? 'Sold to' : 'Bill to'}</div>${esc(order.customer_name || '—')}${contact ? `<br>${contact}` : ''}</div>
-  <div><div class="lab">Paid by</div>${esc(paidBy)}</div>
+  <div><div class="lab">Paid by</div>${paidBy.map(esc).join('<br>')}</div>
   <div>${delivery}</div>
 </div>
 <table><thead><tr><th></th>${anyPhoto ? '<th></th>' : ''}<th>Item</th><th class="m">Price</th></tr></thead><tbody>${rows}</tbody></table>

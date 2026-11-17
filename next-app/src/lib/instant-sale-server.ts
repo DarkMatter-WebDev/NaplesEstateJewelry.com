@@ -4,7 +4,7 @@ import { revalidatePath, revalidateTag } from 'next/cache';
 import { finalizePaidOrder } from '@/lib/order-finalize';
 import { scheduleProductStatusHooks } from '@/lib/product-status-hooks';
 import { getProductImages, getProductMetal, getProductWeight } from '@/lib/sales';
-import type { InStoreItem, InStorePaymentMethod } from '@/lib/in-store-sale';
+import type { InStoreItem, SalePaidBy, SalePaymentPart } from '@/lib/in-store-sale';
 import { isProductPurchasable, type Product } from '@/types/product';
 
 // Instant Sale (owner, 2026-10-21): the server steps the In-store sale and the
@@ -92,10 +92,12 @@ export async function recordOfflinePayment(
     orderId: string;
     orderNumber: string;
     listedIds: string[];
-    paidBy: InStorePaymentMethod;
-    /** `in_store_zettle`, `remote_zelle`, … */
+    /** One method, or 'split' (owner, 2026-11-16) with its parts in `payments`. */
+    paidBy: SalePaidBy;
+    payments: SalePaymentPart[];
+    /** `in_store_zettle`, `remote_zelle`, `in_store_split`, … */
     paymentMethodValue: string;
-    /** "In store · Zelle" / "Invoice · Zelle". */
+    /** "In store · Zelle" / "Invoice · Zelle" / "In store · Cash $500.00 + Card · Zettle $1,302.00". */
     reference: string;
     captureIdPrefix: 'in-store' | 'remote';
     pickedUp: boolean;
@@ -107,7 +109,16 @@ export async function recordOfflinePayment(
   const { data: captured, error: captureError } = await service.rpc('capture_paypal_order', {
     p_order_id: input.orderId,
     p_capture_id: `${input.captureIdPrefix}:${input.orderNumber}`,
-    p_payment_response: { source: input.captureIdPrefix === 'remote' ? 'remote_sale' : 'in_store', paid_by: input.paidBy, note: input.note, recorded_by: input.recordedBy },
+    // A split keeps its parts here (`payments`) — receipts read them back
+    // through SPLIT_PAYMENTS_COLUMN. capture_paypal_order stores this object
+    // as orders.payment_response.
+    p_payment_response: {
+      source: input.captureIdPrefix === 'remote' ? 'remote_sale' : 'in_store',
+      paid_by: input.paidBy,
+      ...(input.paidBy === 'split' ? { payments: input.payments } : {}),
+      note: input.note,
+      recorded_by: input.recordedBy,
+    },
   });
   if (captureError) {
     console.error('instant sale capture_paypal_order error:', captureError);

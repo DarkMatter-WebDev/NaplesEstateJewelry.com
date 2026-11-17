@@ -3,28 +3,31 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { formatCurrency } from '@/types/sales';
-import { IN_STORE_PAYMENT_LABELS, IN_STORE_PAYMENT_METHODS, type InStorePaymentMethod } from '@/lib/in-store-sale';
+import { IN_STORE_PAYMENT_LABELS, type SalePaidBy } from '@/lib/in-store-sale';
+import SalePaymentsEditor, { newSalePayments, salePaymentsPayload, salePaymentsProblem } from '@/components/admin/instant-sale/SalePaymentsEditor';
 import { formatRemoteDue, type RemoteInvoiceCardData } from '@/lib/remote-sale';
 import { copyTextToClipboard } from '@/lib/clipboard';
 
 const hintStyle = { color: 'var(--color-on-surface-variant)' } as const;
 const cardStyle = { borderColor: 'var(--color-outline-variant)' } as const;
 
-type Done = { kind: 'recorded'; method: InStorePaymentMethod; receiptEmailed: boolean } | { kind: 'cancelled' };
+type Done = { kind: 'recorded'; method: SalePaidBy; receiptEmailed: boolean } | { kind: 'cancelled' };
 
 /**
  * One remote-sale invoice (owner mockup v2, screen 6): who, what, the total,
  * the link's state, and Copy pay link · Resend email · Record payment ·
  * Cancel invoice. Record payment is for money taken outside the site (Zelle,
  * check…): recorded the way an in-store sale is. Paid online, the invoice
- * closes by itself and leaves this list.
+ * closes by itself and leaves this list. Split payment (owner, 2026-11-16):
+ * the same editor as the In-store form, adding up to the invoice total.
  */
 export default function RemoteInvoiceCard({ invoice: initial, adminBasePath }: { invoice: RemoteInvoiceCardData; adminBasePath: string }) {
   const [invoice, setInvoice] = useState(initial);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const [panel, setPanel] = useState<'record' | 'cancel' | null>(null);
-  const [method, setMethod] = useState<InStorePaymentMethod>('zelle');
+  const [payments, setPayments] = useState(() => newSalePayments('zelle'));
+  const paymentsProblem = salePaymentsProblem(payments, invoice.total);
   const [done, setDone] = useState<Done | null>(null);
 
   async function act(action: 'resend' | 'cancel' | 'record') {
@@ -35,7 +38,7 @@ export default function RemoteInvoiceCard({ invoice: initial, adminBasePath }: {
       const res = await fetch(`/api/admin/remote-sales/${invoice.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(action === 'record' ? { action, paidBy: method } : { action }),
+        body: JSON.stringify(action === 'record' ? { action, ...salePaymentsPayload(payments, invoice.total) } : { action }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setMessage({ text: data.error ?? 'That did not work. Try again.', ok: false }); return; }
@@ -45,7 +48,7 @@ export default function RemoteInvoiceCard({ invoice: initial, adminBasePath }: {
       } else if (action === 'cancel') {
         setDone({ kind: 'cancelled' });
       } else {
-        setDone({ kind: 'recorded', method, receiptEmailed: Boolean(data.receiptEmailed) });
+        setDone({ kind: 'recorded', method: payments.split ? 'split' : payments.paidBy, receiptEmailed: Boolean(data.receiptEmailed) });
       }
       setPanel(null);
     } catch {
@@ -82,7 +85,7 @@ export default function RemoteInvoiceCard({ invoice: initial, adminBasePath }: {
         <span className="text-sm"><strong>{invoice.customer}</strong></span>
         <span className="flex flex-wrap gap-1.5">
           {done?.kind === 'recorded'
-            ? chip(`Paid · ${IN_STORE_PAYMENT_LABELS[done.method]}`, 'paid')
+            ? chip(`Paid · ${done.method === 'split' ? 'Split' : IN_STORE_PAYMENT_LABELS[done.method]}`, 'paid')
             : done?.kind === 'cancelled'
               ? chip('Cancelled', 'cancelled')
               : (
@@ -127,22 +130,9 @@ export default function RemoteInvoiceCard({ invoice: initial, adminBasePath }: {
           {panel === 'record' && (
             <div className="grid gap-2 rounded-xl border p-3" style={{ ...cardStyle, background: 'var(--color-surface-container-low)' }}>
               <span className="text-xs" style={hintStyle}>Paid outside the site? Pick how, then record it. The items are marked sold and the customer gets the receipt.</span>
-              <div className="flex flex-wrap gap-2" role="group" aria-label="Paid by">
-                {IN_STORE_PAYMENT_METHODS.map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    aria-pressed={method === m}
-                    onClick={() => setMethod(m)}
-                    className="rounded-full border px-3 py-1.5 text-[0.65rem] font-bold uppercase tracking-[0.08em]"
-                    style={{ fontFamily: 'var(--font-label)', borderColor: method === m ? 'var(--color-primary)' : 'var(--color-outline-variant)', background: method === m ? '#fbf5dd' : '#fff', color: method === m ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}
-                  >
-                    {IN_STORE_PAYMENT_LABELS[m]}
-                  </button>
-                ))}
-              </div>
-              <button type="button" className="gold-button text-xs" disabled={Boolean(busy)} onClick={() => void act('record')}>
-                {busy === 'record' ? 'Recording…' : `Record ${formatCurrency(invoice.total)} · ${IN_STORE_PAYMENT_LABELS[method]}`}
+              <SalePaymentsEditor draft={payments} onChange={(next) => { setPayments(next); setMessage(null); }} total={invoice.total} compact totalWord="invoice" />
+              <button type="button" className="gold-button text-xs" disabled={Boolean(busy) || (payments.split && Boolean(paymentsProblem))} onClick={() => void act('record')}>
+                {busy === 'record' ? 'Recording…' : `Record ${formatCurrency(invoice.total)} · ${payments.split ? 'Split' : IN_STORE_PAYMENT_LABELS[payments.paidBy]}`}
               </button>
             </div>
           )}

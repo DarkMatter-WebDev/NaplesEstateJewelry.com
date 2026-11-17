@@ -10,6 +10,7 @@ import {
 import { getStoreHours } from '@/lib/store-hours';
 import { loadOrderTaxExemption } from '@/lib/tax-exempt-server';
 import { loadOrderGift } from '@/lib/order-gift-server';
+import { SPLIT_PAYMENTS_COLUMN } from '@/lib/in-store-sale';
 
 const ORDER_INVOICE_COLUMNS = [
   'id',
@@ -27,6 +28,7 @@ const ORDER_INVOICE_COLUMNS = [
   'fulfillment_status',
   'order_status',
   'payment_method',
+  SPLIT_PAYMENTS_COLUMN,
   'payment_reference',
   'shipping_method',
   'shipping_address',

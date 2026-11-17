@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { createServiceClient } from '@/lib/supabase/service';
 import { recordOfflinePayment } from '@/lib/instant-sale-server';
-import { IN_STORE_PAYMENT_LABELS, IN_STORE_PAYMENT_METHODS, remotePaymentMethodValue, type InStorePaymentMethod } from '@/lib/in-store-sale';
+import { normalizeSalePayments, remotePaymentMethodValue, salePaymentReference } from '@/lib/in-store-sale';
 import { remoteLinkExpiry, type RemoteLinkDays } from '@/lib/remote-sale';
 import { cardData, findRemoteInvoiceById, sendRemoteInvoiceEmail } from '@/lib/remote-sale-server';
 
@@ -14,7 +14,9 @@ import { cardData, findRemoteInvoiceById, sendRemoteInvoiceEmail } from '@/lib/r
  *   record — paid outside the site (Zelle, check, …): recorded exactly like an
  *            in-store sale (items sold, listings end, receipt emailed), with
  *            payment_method `remote_<method>`. Fulfillment stays pending: the
- *            customer has not collected it yet.
+ *            customer has not collected it yet. `payments: [{ method,
+ *            amount }, …]` records a split (owner, 2026-11-16) that must add
+ *            up to the invoice total → `remote_split`.
  * A paid invoice is never touched here; paid online it closed itself.
  */
 export const runtime = 'nodejs';
@@ -63,16 +65,17 @@ export async function POST(req: Request, { params }: Props) {
   }
 
   if (action === 'record') {
-    const paidBy = String(body?.paidBy ?? '') as InStorePaymentMethod;
-    if (!IN_STORE_PAYMENT_METHODS.includes(paidBy)) return NextResponse.json({ error: 'Pick how it was paid.' }, { status: 400 });
-    const label = IN_STORE_PAYMENT_LABELS[paidBy];
+    const payment = normalizeSalePayments(body, Number(found.order.total));
+    if ('error' in payment) return NextResponse.json({ error: payment.error }, { status: 400 });
+    const { paidBy, payments } = payment.value;
     const paid = await recordOfflinePayment(service, {
       orderId: found.order.id,
       orderNumber: found.order.order_number,
       listedIds: found.items.flatMap((item) => (item.product_id ? [item.product_id] : [])),
       paidBy,
+      payments,
       paymentMethodValue: remotePaymentMethodValue(paidBy),
-      reference: `Invoice · ${label}`,
+      reference: salePaymentReference('Invoice', paidBy, payments),
       captureIdPrefix: 'remote',
       pickedUp: false,
       note: null,

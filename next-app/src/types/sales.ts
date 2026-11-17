@@ -51,6 +51,8 @@ export interface Order {
   order_status: OrderStatus;
   payment_method: string | null;
   payment_reference: string | null;
+  /** Split payment parts — only when selected via `SPLIT_PAYMENTS_COLUMN` (lib/in-store-sale.ts). */
+  split_payments?: unknown;
   shipping_method: ShippingMethod;
   shipping_carrier?: string | null;
   tracking_number?: string | null;

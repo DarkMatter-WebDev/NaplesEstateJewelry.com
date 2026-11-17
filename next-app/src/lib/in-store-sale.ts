@@ -50,8 +50,17 @@ export const IN_STORE_PAYMENT_LABELS: Record<InStorePaymentMethod, string> = {
   store_credit: 'Store credit',
 };
 
-/** orders.payment_method value for an in-store sale, e.g. `in_store_zettle`. */
-export function inStorePaymentMethodValue(method: InStorePaymentMethod): string {
+/**
+ * How a sale was paid: one method, or `'split'` — two or more payments
+ * (owner, 2026-11-16: "record multiple payment methods"), e.g. $500 cash +
+ * the rest on Zettle. A split is stored as `payment_method in_store_split`
+ * (or `remote_split`) with the parts in `orders.payment_response.payments`
+ * and a readable `payment_reference`. No new column.
+ */
+export type SalePaidBy = InStorePaymentMethod | 'split';
+
+/** orders.payment_method value for an in-store sale, e.g. `in_store_zettle` / `in_store_split`. */
+export function inStorePaymentMethodValue(method: SalePaidBy): string {
   return `in_store_${method}`;
 }
 
@@ -64,15 +73,139 @@ export function paymentMethodLabel(value: string | null | undefined): string {
   if (value === 'invoice') return 'Invoice';
   const inStore = value.match(/^(in_store|remote)_(\w+)$/);
   if (inStore) {
-    const method = inStore[2] as InStorePaymentMethod;
-    return `${inStore[1] === 'remote' ? 'Invoice' : 'In store'} · ${IN_STORE_PAYMENT_LABELS[method] ?? method}`;
+    const method = inStore[2];
+    const name = method === 'split' ? 'Split' : IN_STORE_PAYMENT_LABELS[method as InStorePaymentMethod] ?? method;
+    return `${inStore[1] === 'remote' ? 'Invoice' : 'In store'} · ${name}`;
   }
   return value;
 }
 
-/** orders.payment_method for a remote sale's invoice paid outside the site, e.g. `remote_zelle`. */
-export function remotePaymentMethodValue(method: InStorePaymentMethod): string {
+/** orders.payment_method for a remote sale's invoice paid outside the site, e.g. `remote_zelle` / `remote_split`. */
+export function remotePaymentMethodValue(method: SalePaidBy): string {
   return `remote_${method}`;
+}
+
+// ---- Split payment (owner, 2026-11-16) -----------------------------------
+
+/** Payments on one sale (owner pick 2026-11-16). */
+export const SALE_PAYMENTS_MAX = 4;
+/** One payment of a split. The same method may appear twice (two cards on Zettle). */
+export type SalePaymentPart = { method: InStorePaymentMethod; amount: number };
+
+const PAYMENT_AMOUNT_MAX = 10_000_000;
+const cents = (value: number) => Math.round(value * 100);
+
+/** A typed payment amount: "$500", "1,302.00" → 500 / 1302; blank, zero or words → null. */
+export function parseSalePaymentAmount(raw: unknown): number | null {
+  const text = String(raw ?? '').replace(/[$,\s]/g, '');
+  if (!/^\d+(\.\d{1,2})?$/.test(text)) return null;
+  const value = Number(text);
+  if (!Number.isFinite(value) || value <= 0 || value > PAYMENT_AMOUNT_MAX) return null;
+  return round2(value);
+}
+
+function money(value: number): string {
+  return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/** "The payments add up to $1,700.00 — $102.00 short of the $1,802.00 total." — one wording for the form and the server; null when it adds up. */
+export function salePaymentsMismatch(sum: number, total: number): string | null {
+  const gap = round2(total - sum);
+  if (cents(gap) === 0) return null;
+  return `The payments add up to ${money(sum)} — ${money(Math.abs(gap))} ${gap > 0 ? 'short of' : 'over'} the ${money(total)} total.`;
+}
+
+/**
+ * How the sale was paid, checked against the total the SERVER computed:
+ * `payments: [{ method, amount }, …]` (a split — must add up to the cent) or
+ * the single `paidBy` the form always sent. A one-line `payments` list is a
+ * single method. Every sale comes back with its parts (one part = the total).
+ */
+export function normalizeSalePayments(
+  body: unknown,
+  total: number,
+): { value: { paidBy: SalePaidBy; payments: SalePaymentPart[] } } | { error: string } {
+  const source = (body ?? {}) as Record<string, unknown>;
+  if (Array.isArray(source.payments) && source.payments.length > 0) {
+    const list = source.payments as unknown[];
+    if (list.length > SALE_PAYMENTS_MAX) return { error: `Up to ${SALE_PAYMENTS_MAX} payments on one sale.` };
+    const parts: SalePaymentPart[] = [];
+    for (let index = 0; index < list.length; index += 1) {
+      const row = (list[index] ?? {}) as Record<string, unknown>;
+      const prefix = list.length > 1 ? `Payment ${index + 1}: ` : '';
+      const method = String(row.method ?? '') as InStorePaymentMethod;
+      if (!IN_STORE_PAYMENT_METHODS.includes(method)) return { error: `${prefix}${prefix ? 'pick' : 'Pick'} how it was paid.` };
+      const amount = parseSalePaymentAmount(row.amount);
+      if (amount == null) return { error: `${prefix}${prefix ? 'enter' : 'Enter'} the amount, e.g. 500.` };
+      parts.push({ method, amount });
+    }
+    const mismatch = salePaymentsMismatch(round2(parts.reduce((sum, part) => sum + part.amount, 0)), total);
+    if (mismatch) return { error: mismatch };
+    return { value: { paidBy: parts.length > 1 ? 'split' : parts[0].method, payments: parts } };
+  }
+  const paidBy = String(source.paidBy ?? '') as InStorePaymentMethod;
+  if (!IN_STORE_PAYMENT_METHODS.includes(paidBy)) return { error: 'Pick how it was paid.' };
+  return { value: { paidBy, payments: [{ method: paidBy, amount: round2(total) }] } };
+}
+
+/** "Cash $500.00 + Card · Zettle $1,302.00". */
+export function formatSalePayments(parts: SalePaymentPart[]): string {
+  return parts.map((part) => `${IN_STORE_PAYMENT_LABELS[part.method]} ${money(part.amount)}`).join(' + ');
+}
+
+/** orders.payment_reference: "In store · Cash" or "In store · Cash $500.00 + Card · Zettle $1,302.00". */
+export function salePaymentReference(prefix: 'In store' | 'Invoice', paidBy: SalePaidBy, parts: SalePaymentPart[]): string {
+  return paidBy === 'split' ? `${prefix} · ${formatSalePayments(parts)}` : `${prefix} · ${IN_STORE_PAYMENT_LABELS[paidBy]}`;
+}
+
+const COLLECT_PHRASE: Record<InStorePaymentMethod, string> = {
+  zettle: 'on Zettle',
+  cash: 'in cash',
+  zelle: 'by Zelle',
+  check: 'by check',
+  cashapp: 'by Cash App',
+  venmo: 'by Venmo',
+  store_credit: 'in store credit',
+};
+
+/** "$1,302.00 on Zettle and $500.00 in cash" — the card first, as it is the one still to run. */
+export function salePaymentsCollectPhrase(parts: SalePaymentPart[]): string {
+  const ordered = [...parts].sort((a, b) => Number(b.method === 'zettle') - Number(a.method === 'zettle'));
+  const phrases = ordered.map((part) => `${money(part.amount)} ${COLLECT_PHRASE[part.method]}`);
+  return phrases.length > 1 ? `${phrases.slice(0, -1).join(', ')} and ${phrases[phrases.length - 1]}` : phrases[0] ?? '';
+}
+
+/** The parts saved on a split order (`payment_response.payments`), or null when it is not a readable split. */
+export function readSalePaymentParts(value: unknown): SalePaymentPart[] | null {
+  if (!Array.isArray(value) || value.length < 2) return null;
+  const parts: SalePaymentPart[] = [];
+  for (const row of value) {
+    const source = (row ?? {}) as Record<string, unknown>;
+    const method = String(source.method ?? '') as InStorePaymentMethod;
+    const amount = Number(source.amount);
+    if (!IN_STORE_PAYMENT_METHODS.includes(method) || !Number.isFinite(amount) || amount <= 0) return null;
+    parts.push({ method, amount: round2(amount) });
+  }
+  return parts;
+}
+
+/**
+ * Select alias for the parts: `payment_response->payments` only, never the
+ * whole response (on a web order that is PayPal's full capture reply).
+ */
+export const SPLIT_PAYMENTS_COLUMN = 'split_payments:payment_response->payments';
+
+/**
+ * The "Paid by" lines for a receipt: one line per payment on a split
+ * ("In store · Cash $500.00", "In store · Card · Zettle $1,302.00"), otherwise
+ * the single label. `split_payments` is `SPLIT_PAYMENTS_COLUMN`'s value.
+ */
+export function paidByLines(order: { payment_method?: string | null; split_payments?: unknown }): string[] {
+  const split = /^(in_store|remote)_split$/.exec(String(order.payment_method ?? ''));
+  const parts = split ? readSalePaymentParts(order.split_payments) : null;
+  if (!split || !parts) return [paymentMethodLabel(order.payment_method)];
+  const prefix = split[1] === 'remote' ? 'Invoice' : 'In store';
+  return parts.map((part) => `${prefix} · ${IN_STORE_PAYMENT_LABELS[part.method]} ${money(part.amount)}`);
 }
 
 export const IN_STORE_METALS = ['Gold', 'Silver', 'Other'] as const;
@@ -159,7 +292,9 @@ export type InStoreSaleInput = {
   items: InStoreItem[];
   customer: { name: string; phone: string; email: string | null };
   delivery: InStoreDelivery;
-  paidBy: InStorePaymentMethod;
+  /** One method, or 'split' with the parts in `payments` (always filled: one part = the total). */
+  paidBy: SalePaidBy;
+  payments: SalePaymentPart[];
   note: string | null;
   /** "Email copy" (owner, 2026-10-21): send the receipt to the customer's email now. */
   emailCopy: boolean;
@@ -372,9 +507,6 @@ export function normalizeInStoreSaleInput(body: unknown): { value: InStoreSaleIn
   if ('error' in customer) return customer;
   const { name, phone, email } = customer.value;
 
-  const paidBy = String(source.paidBy ?? '') as InStorePaymentMethod;
-  if (!IN_STORE_PAYMENT_METHODS.includes(paidBy)) return { error: 'Pick how it was paid.' };
-
   const delivery = normalizeSaleDelivery(source.delivery, subtotal);
   if ('error' in delivery) return delivery;
 
@@ -385,12 +517,17 @@ export function normalizeInStoreSaleInput(body: unknown): { value: InStoreSaleIn
   const owes = inStoreChargesTax(delivery.value.method, delivery.value.address?.state);
   const totals = inStoreTotals(subtotal, { shippingFee, chargesTax: owes && !taxExempt.value });
   const taxNotCharged = owes && taxExempt.value ? inStoreTotals(subtotal, { shippingFee, chargesTax: true }).tax : 0;
+  // Checked against the total computed HERE, so a split the form showed as
+  // adding up must still add up to what is recorded.
+  const paid = normalizeSalePayments(source, totals.total);
+  if ('error' in paid) return paid;
   return {
     value: {
       items: items.value,
       customer: { name, phone: phone as string, email },
       delivery: delivery.value,
-      paidBy,
+      paidBy: paid.value.paidBy,
+      payments: paid.value.payments,
       note: optionalText(source.note, IN_STORE_NOTE_MAX),
       // A request without the box (before 2026-10-21) kept the old rule: an email means a receipt.
       emailCopy: Boolean(email) && source.emailCopy !== false,
