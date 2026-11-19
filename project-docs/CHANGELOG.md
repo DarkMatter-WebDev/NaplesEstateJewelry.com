@@ -1,6 +1,21 @@
 
 # Changelog
 
+## 2026-11-18 (6) — Hero carousel on iPhone: the ONE hitch when the first new photo comes round — upcoming photos now load and decode ahead of time — BUILT + STAGED, not pushed; no SQL, no env vars
+
+- **Owner:** *"live in the browser stutter is gone, but on iphone, i see the stutter just once, when the first "new" photo from the carousel comes onto the screen... just the first one"* → explanation → *"Yes, try the fix"*.
+- **Reading (code + phone-width Chrome preview; Safari cannot be traced from this PC):** the photos on the ring at load are loaded and (first two) decoded before the reveal; the first photo swapped in at the hidden back is the first one the phone decodes WHILE the ring spins — at first paint, ~8 s after the swap, at the 1080 px variant on a 3× iPhone (desktop gets 640). The offscreen preloader used next/image's default `loading="lazy"` at `left:-9999px`, so it could be skipped: in the 375 px preview 1 of 5 upcoming photos was still unloaded 3.5 s after load.
+- **Before:** preloader `lazy`, mounted at once; nothing decoded a swapped-in photo before it painted.
+- **Now (`next-app/carousel/components/Carousel.tsx`):** `decodeAhead` (`img.decode()`, errors ignored) on the ring cards' `onLoad` (fires for every photo swapped in at the back) and on the preloader; preloader `loading="eager"` + `fetchPriority="low"`, mounted only 1.5 s after the page's `load` event and only once its slideshow is live (`preloadArmed`, one-way), so it never competes with visible photos or loads for offscreen panes. Guards: `src/lib/__tests__/carousel-card-layer.test.ts` +3 (decode on both, eager/low preloader, arming gate).
+- **Checked (dev, Chrome):** 375 px — all 5 preloader photos loaded (`eager` / `low`); each swap called `decode()` on the card the same moment it changed photo while still facing BACK, plus the preloader's next photo; no errors. 1384 px trace — 1,201 frames, 0 skipped, 0 missing tiles (11-18 (4) fix intact).
+- **Gate (from `next-app`):** `npx tsc --noEmit` 0 errors · `npm run lint` 0 errors (the 4 pre-existing `<img>` warnings) · `npx vitest run` **2421/2421** (209 files) · `npm run build` exit 0 (609 pages; dev stopped first, restarted after).
+- **Not verified:** the iPhone itself — the owner's phone after the deploy is the only check (WebKit ≠ Chromium). Also unmeasured: PageSpeed (the preloader now loads after `load`, low priority — should not touch LCP; re-check only if a PSI run drops, never off one run).
+- **To reverse:** in `Carousel.tsx` remove `decodeAhead`, `PRELOAD_ARM_DELAY_MS`, the `preloadArmed` state/effect and the preloader's `loading` / `fetchPriority` / `onLoad` props + the card's `onLoad`; drop the 3 tests.
+
+## 2026-11-18 (5) — Owner: hero carousel hitch fix (11-18 (4)) pushed + deployed
+
+- **Owner:** *"pushed and deployed"*. Production not checked by Claude (not asked). Open (`TASKS.md` top block): the owner watches the homepage slideshow ~20 s on the computer where the hitch showed, then on the iPhone; and the first real eBay / Etsy delete in Admin → Orders (11-18 (2) block). Nothing staged-but-unpushed except docs; no SQL, no env vars.
+
 ## 2026-11-18 (4) — Homepage hero carousel: the tiny hitch each time a photo comes onto the screen FIXED (`will-change: transform` on each ring card) — BUILT + STAGED, not pushed; no SQL, no env vars
 
 - **Owner:** *"a very slight, extremely barely noticeable stutter each time a new photo completely comes onto the screen ... I see it both in the live version in the browser and in the version here ... Investigate this without changing anything"* → findings → *"Yes, add the fix"*.

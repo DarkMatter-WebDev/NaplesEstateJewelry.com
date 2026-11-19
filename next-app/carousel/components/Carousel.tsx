@@ -103,6 +103,28 @@ const CARD_IMAGE_QUALITY = 82;
  */
 const VISIBILITY_THRESHOLDS = [0, 0.005, 0.01, 0.02, 0.04, 0.08, 0.15, 0.3, 0.6, 1];
 
+/**
+ * Upcoming photos are decoded BEFORE they come round to the front
+ * (2026-11-18, owner on iPhone: "i see the stutter just once, when the first
+ * new photo from the carousel comes onto the screen"). A browser decodes an
+ * image when it first paints it; a card that has just swapped its photo at the
+ * hidden back is not painted until it swings into view (~8 s later), so the
+ * first never-before-shown photo was decoded on the spot — at 1080 px on a 3×
+ * iPhone — and held a frame. `decode()` does that work while the card is still
+ * hidden. Used on the ring cards AND the offscreen preloader (same URL → same
+ * decoded image). Failures are ignored: the photo still paints as before.
+ */
+function decodeAhead(event: { currentTarget: HTMLImageElement }) {
+  event.currentTarget.decode?.().catch(() => undefined);
+}
+
+/**
+ * The offscreen preloader mounts this long after the page's `load` event, and
+ * only once its slideshow is live, so warming the NEXT photos never competes
+ * with the photos the visitor is waiting for (or with an offscreen pane).
+ */
+const PRELOAD_ARM_DELAY_MS = 1500;
+
 export function Carousel({
   items,
   showPrice,
@@ -155,6 +177,23 @@ export function Carousel({
     return () => mq.removeEventListener("change", update);
   }, []);
   const hardPaused = paused || fpsFrozen || reducedMotion;
+
+  // Preloader arming (see PRELOAD_ARM_DELAY_MS). One-way: once armed it stays
+  // mounted, so a pane that scrolls away and back keeps its warmed photos.
+  const [preloadArmed, setPreloadArmed] = useState(false);
+  useEffect(() => {
+    if (preloadArmed || paused) return;
+    let timer = 0;
+    const arm = () => {
+      timer = window.setTimeout(() => setPreloadArmed(true), PRELOAD_ARM_DELAY_MS);
+    };
+    if (document.readyState === "complete") arm();
+    else window.addEventListener("load", arm, { once: true });
+    return () => {
+      window.removeEventListener("load", arm);
+      window.clearTimeout(timer);
+    };
+  }, [preloadArmed, paused]);
 
   useEffect(() => {
     if (items) return; // controlled mode: caller supplies the items
@@ -533,6 +572,8 @@ export function Carousel({
                 quality={CARD_IMAGE_QUALITY}
                 loading={imageLoading.loading}
                 fetchPriority={imageLoading.fetchPriority}
+                // Fires again for each photo swapped in at the hidden back.
+                onLoad={decodeAhead}
                 draggable={false}
               />
               {showThePrice && item.priceLabel && (
@@ -571,7 +612,7 @@ export function Carousel({
 
       {/* Off-screen preloader: warms the upcoming images (same sizes/quality as
           the cards, so it fetches the exact same optimized variant). */}
-      {preloadItems.length > 0 && (
+      {preloadArmed && preloadItems.length > 0 && (
         <div
           aria-hidden
           style={{ position: "fixed", left: "-9999px", top: 0, width: 1, height: 1, overflow: "hidden", opacity: 0, pointerEvents: "none" }}
@@ -594,6 +635,14 @@ export function Carousel({
                 fill
                 sizes="(max-width: 640px) 80vw, (max-width: 1024px) 50vw, 35vw"
                 quality={CARD_IMAGE_QUALITY}
+                // Was the next/image default `lazy`: parked at left:-9999px it
+                // could be skipped indefinitely (Chrome mobile preview: 1 of 5
+                // still unloaded 3.5 s in), so the "preload" often did not
+                // happen. Eager + low priority, and it mounts only after page
+                // load (preloadArmed), so it never competes with visible photos.
+                loading="eager"
+                fetchPriority="low"
+                onLoad={decodeAhead}
                 style={{ objectFit: "contain" }}
               />
             </span>

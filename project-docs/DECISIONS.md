@@ -4,7 +4,7 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-11-18 (4)**. Before that, **2026-11-18 (2)**. Before that, **2026-11-16 (5)**. Before that, **2026-11-16 (1)**. Before that, **2026-11-10 (2)**. Before that, **2026-11-09 (3)**. Before that, **2026-11-09 (1)**. Before that, **2026-11-08 (1)**. Before that, **2026-11-05 (5)**. Before that, **2026-11-05 (2)**. Before that, **2026-11-02 (2)**.
+> compaction. Last reconciled: **2026-11-18 (6)**. Before that, **2026-11-18 (4)**. Before that, **2026-11-18 (2)**. Before that, **2026-11-16 (5)**. Before that, **2026-11-16 (1)**. Before that, **2026-11-10 (2)**. Before that, **2026-11-09 (3)**. Before that, **2026-11-09 (1)**. Before that, **2026-11-08 (1)**. Before that, **2026-11-05 (5)**. Before that, **2026-11-05 (2)**. Before that, **2026-11-02 (2)**.
 
 ## Hero ring cards keep `will-change: transform` — it removes the once-per-card hitch (2026-11-18)
 
@@ -12,6 +12,7 @@
 - **Rule:** `.card` in `next-app/carousel/components/Carousel.module.css` carries `will-change: transform`. ⛔ Never remove it as "unneeded" or move it to the photo (`.img` — measured: no help). Without it Chrome's compositor misses one card tile per card step (`missing_tile_count: 1`) and the whole ring skips a frame every ~2.7 s; with it, 0 skipped frames, same sharpness, same raster work. Guard `lib/__tests__/carousel-card-layer.test.ts`.
 - **How to check a "stutter" claim:** the page's own frame timing (rAF / long-animation-frame) cannot see it — it lives in the compositor. Record a Chrome trace (throwaway profile, visible window) and count `Display::DrawAndSwap` gaps > 25 ms and `TileBasedLayerImpl::AppendQuads checkerboard` events; test CSS by injecting it into that test browser before changing code. Separate from the weak-machine FREEZE rule below (that one is sustained low FPS, not a single held frame).
 - Record `CHANGELOG.md` 2026-11-18 (4).
+- **iPhone follow-up (2026-11-18 (6), owner: one hitch "just once, when the first new photo ... comes onto the screen"):** upcoming photos are decoded BEFORE they come round — `decodeAhead` (`img.decode()`) on each ring card's `onLoad` (fires for every photo swapped in at the hidden back) and on the preloader; the offscreen preloader is `loading="eager"` + `fetchPriority="low"` (⛔ never back to next/image's default `lazy`: parked at `left:-9999px` it can be skipped) and mounts only after page `load` + 1.5 s and only for a live pane (`preloadArmed`), so it never competes with visible photos. Guards in the same test file. Unverified on the iPhone until the owner looks.
 
 ## eBay / Etsy sales can be DELETED from Admin → Orders (Delete → Recycle Bin → Restore / Delete Forever, with bulk checkboxes) — ⛔ HIDDEN, never erased (2026-11-18)
 

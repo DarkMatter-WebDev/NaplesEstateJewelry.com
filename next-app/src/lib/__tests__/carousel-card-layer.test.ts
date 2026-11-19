@@ -29,3 +29,28 @@ describe('hero carousel card layer', () => {
     expect(ruleBody('.img')).not.toMatch(/will-change/);
   });
 });
+
+// 2026-11-18 (owner on iPhone: "i see the stutter just once, when the first new
+// photo ... comes onto the screen"). The first never-before-shown photo was
+// decoded the moment it first painted. Upcoming photos are now decoded while
+// their card is still hidden, and the offscreen preloader really loads.
+const TSX = readFileSync(join(process.cwd(), 'carousel', 'components', 'Carousel.tsx'), 'utf8');
+
+describe('hero carousel decodes upcoming photos ahead of time', () => {
+  it('ring cards and preloader both decode on load', () => {
+    expect(TSX).toMatch(/function decodeAhead\([^)]*\)\s*\{\s*event\.currentTarget\.decode\?\.\(\)\.catch/);
+    expect(TSX.match(/onLoad=\{decodeAhead\}/g)?.length).toBe(2);
+  });
+
+  it('the preloader is eager + low priority (lazy at left:-9999px could be skipped)', () => {
+    const preloader = TSX.slice(TSX.indexOf('Off-screen preloader'));
+    expect(preloader).toContain('loading="eager"');
+    expect(preloader).toContain('fetchPriority="low"');
+  });
+
+  it('the preloader mounts only after page load, and only for a live pane', () => {
+    expect(TSX).toContain('{preloadArmed && preloadItems.length > 0 && (');
+    expect(TSX).toMatch(/if \(preloadArmed \|\| paused\) return;/);
+    expect(TSX).toMatch(/document\.readyState === "complete"/);
+  });
+});
