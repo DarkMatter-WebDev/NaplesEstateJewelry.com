@@ -30,7 +30,8 @@
 // height via CSS — no travel, no pin, panes B and C hidden — restoring the
 // original static hero.
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import dynamic from 'next/dynamic';
 import HomeHero from './HomeHero';
 import HomeHeroOverlay from './HomeHeroOverlay';
 import {
@@ -38,6 +39,14 @@ import {
   type CarouselSettings,
 } from '../../../carousel/lib/carouselData';
 import { DEFAULT_BG } from '../../../carousel/lib/carouselConfig';
+
+// Hidden frame-timing readout, ONLY for `?heroDebug=1` (2026-11-18, measuring
+// an iPhone-only stutter). Code-split: normal visitors never download it.
+// Server snapshot is always false, so the HTML never differs (no hydration skew).
+const HeroDebugReadout = dynamic(() => import('./HeroDebugReadout'), { ssr: false });
+const subscribeNever = () => () => {};
+const readHeroDebug = () => new URLSearchParams(window.location.search).get('heroDebug') === '1';
+const readHeroDebugOnServer = () => false;
 import { nextHeroSnapPoint, resolveHeroSnapPoints } from '@/lib/home-hero-snap';
 import { onLayoutAffectingResize } from '@/lib/viewport-resize';
 
@@ -411,6 +420,7 @@ export default function HomeHeroStack({
   const [armed, setArmed] = useState(false);
   const [armedC, setArmedC] = useState(false);
   const armedCRef = useRef(false);
+  const heroDebug = useSyncExternalStore(subscribeNever, readHeroDebug, readHeroDebugOnServer);
 
   // The overlay's text theme follows whichever slideshow currently dominates
   // the frame — each crossing hands over at its midpoint. With one solid color
@@ -973,6 +983,7 @@ export default function HomeHeroStack({
         </div>
         </div>
       </div>
+      {heroDebug && <HeroDebugReadout />}
 
       <style>{`
         .home-hero-stack {

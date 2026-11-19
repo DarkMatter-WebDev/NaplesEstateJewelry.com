@@ -1,6 +1,19 @@
 
 # Changelog
 
+## 2026-11-18 (8) — Hidden hero readout `?heroDebug=1` to measure the iPhone "double stutter" at the first transition — BUILT + STAGED, not pushed; no SQL, no env vars
+
+- **Owner:** *"The stutter is still there on iPhone. It's a double stutter ... when the rightmost image gets completely onto the screen ... and then when the new image comes on the screen ... right as the first transition"*; confirmed *"only the first transition, portrait"*; chose **"Build the readout"** over a speculative warm-up fix.
+- **Prime suspect found while building it (not yet proven on the phone):** `HomeHeroStack.tsx` mounts slideshow B via `requestIdleCallback(…, { timeout: 2500 })` and C one idle callback later. **Safari has no `requestIdleCallback`**, so on iPhone the fallback timers fire: B at **2.5 s**, C **0.3 s** later — two whole-carousel mounts (render, 3D ring, eager 1080 px photos) 0.3 s apart, once per visit, a few seconds into the spin = a double hitch at the first transition. Even in Chrome's phone mode the readout's only two slow frames (33 ms, 100 ms) were the B and C mounts (there they happen ~1 s in, before the ring is far along).
+- **What was built:** NEW `next-app/src/components/home/HeroDebugReadout.tsx` — for 30 s records every animation frame's length plus hero events (pane A/B/C mounted / revealed, next-photo helper mounted, photo loads per pane, photo swaps at the back, cards turning front/back, cards coming onto / fully onto / leaving the screen via IntersectionObserver), then shows a report with **Copy report** / **Close** (textarea 16 px — no iOS zoom). Data never leaves the phone. Limit: sees only frames the page drew late; a compositor-only hitch in Safari would show as "slow frames: none". `HomeHeroStack.tsx`: `next/dynamic(…, { ssr: false })` + `useSyncExternalStore` (server snapshot false → no hydration skew); renders only when `?heroDebug=1`.
+- **Checked:** guard `src/lib/__tests__/hero-debug-readout.test.ts` (3: code-split + gated + server-false; no fetch/beacon/XHR/localStorage; fixed 30 s window with teardown). Dev run at 390×844: badge "Recording hero… 23s — don't scroll or tap", then the report (1,795 frames, typical 16.7 ms). Production build: the readout is its own 5.5 KB chunk, referenced 0 times by the built `/en` / `/es` homepage HTML.
+- **Gate (from `next-app`):** `npx tsc --noEmit` 0 errors · `npm run lint` 0 errors (the 4 pre-existing `<img>` warnings) · `npx vitest run` **2424/2424** (210 files) · `npm run build` exit 0 (609 pages; dev stopped first, restarted after).
+- **To remove later (after the iPhone report):** delete `HeroDebugReadout.tsx` + its test, and the `dynamic` / `useSyncExternalStore` / `heroDebug` lines in `HomeHeroStack.tsx`. Planned once the cause is fixed and confirmed.
+
+## 2026-11-18 (7) — Owner: iPhone first-new-photo fix (11-18 (6)) pushed + deployed
+
+- **Owner:** *"pushed and deployed"*. Production not checked by Claude (not asked). Open (`TASKS.md` top block): the owner's iPhone look at the first new photo (fresh tab, ~10–15 s); the first real eBay / Etsy delete in Admin → Orders. Nothing staged-but-unpushed except docs; no SQL, no env vars.
+
 ## 2026-11-18 (6) — Hero carousel on iPhone: the ONE hitch when the first new photo comes round — upcoming photos now load and decode ahead of time — BUILT + STAGED, not pushed; no SQL, no env vars
 
 - **Owner:** *"live in the browser stutter is gone, but on iphone, i see the stutter just once, when the first "new" photo from the carousel comes onto the screen... just the first one"* → explanation → *"Yes, try the fix"*.
