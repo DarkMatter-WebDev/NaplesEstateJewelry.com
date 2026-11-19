@@ -4,7 +4,14 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-11-18 (2)**. Before that, **2026-11-16 (5)**. Before that, **2026-11-16 (1)**. Before that, **2026-11-10 (2)**. Before that, **2026-11-09 (3)**. Before that, **2026-11-09 (1)**. Before that, **2026-11-08 (1)**. Before that, **2026-11-05 (5)**. Before that, **2026-11-05 (2)**. Before that, **2026-11-02 (2)**.
+> compaction. Last reconciled: **2026-11-18 (4)**. Before that, **2026-11-18 (2)**. Before that, **2026-11-16 (5)**. Before that, **2026-11-16 (1)**. Before that, **2026-11-10 (2)**. Before that, **2026-11-09 (3)**. Before that, **2026-11-09 (1)**. Before that, **2026-11-08 (1)**. Before that, **2026-11-05 (5)**. Before that, **2026-11-05 (2)**. Before that, **2026-11-02 (2)**.
+
+## Hero ring cards keep `will-change: transform` — it removes the once-per-card hitch (2026-11-18)
+
+- **Owner:** *"a very slight ... stutter each time a new photo completely comes onto the screen"* → *"Yes, add the fix"*.
+- **Rule:** `.card` in `next-app/carousel/components/Carousel.module.css` carries `will-change: transform`. ⛔ Never remove it as "unneeded" or move it to the photo (`.img` — measured: no help). Without it Chrome's compositor misses one card tile per card step (`missing_tile_count: 1`) and the whole ring skips a frame every ~2.7 s; with it, 0 skipped frames, same sharpness, same raster work. Guard `lib/__tests__/carousel-card-layer.test.ts`.
+- **How to check a "stutter" claim:** the page's own frame timing (rAF / long-animation-frame) cannot see it — it lives in the compositor. Record a Chrome trace (throwaway profile, visible window) and count `Display::DrawAndSwap` gaps > 25 ms and `TileBasedLayerImpl::AppendQuads checkerboard` events; test CSS by injecting it into that test browser before changing code. Separate from the weak-machine FREEZE rule below (that one is sustained low FPS, not a single held frame).
+- Record `CHANGELOG.md` 2026-11-18 (4).
 
 ## eBay / Etsy sales can be DELETED from Admin → Orders (Delete → Recycle Bin → Restore / Delete Forever, with bulk checkboxes) — ⛔ HIDDEN, never erased (2026-11-18)
 

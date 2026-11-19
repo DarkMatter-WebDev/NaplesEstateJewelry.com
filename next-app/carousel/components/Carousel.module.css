@@ -57,6 +57,14 @@
   transform:
     rotateY(calc(var(--i) * var(--ba)))
     translateZ(calc(-1 * (.5 * var(--cardW) + .5em) / tan(.5 * var(--ba))));
+  /* ⛔ Keep (2026-11-18). Without it Chrome rasters only the part of each
+     card it predicts will be visible, and once per card step (30° on a
+     12-card ring, ~2.7 s) the tile of the card coming into view is not ready
+     in time: "missing_tile_count: 1" → one skipped frame → the whole ring
+     visibly hitches. Traced: 6–8 skipped frames per 20 s without, 0 with
+     (two runs each); same sharpness, same raster work. On the photo (.img)
+     instead of the card it does nothing. */
+  will-change: transform;
 }
 
 .card,
