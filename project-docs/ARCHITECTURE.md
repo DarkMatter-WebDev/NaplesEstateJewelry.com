@@ -617,9 +617,9 @@ technical contract, operator setup, and verification limits live in
   `publish`/`update`/`price-only`/`publish-live`), `sync-batch` (Phase 2
   enqueue/drain), `delist` (hide/withdraw/restore), `listings` (bulk status
   map), `eligibility-summary`, `verify-listing`, `verify-all`, `price-push`
-  (cron-secret-guarded), `push-prices`. Plus the Phase 0 compliance webhook
-  `/api/webhooks/ebay-account-deletion` (GET challenge echo, POST
-  signature-verified ack, reuses `webhook_events` for idempotency). Phase
+  (cron-secret-guarded), `push-prices`. The Phase 0 compliance webhook
+  `/api/webhooks/ebay-account-deletion` was REMOVED 2026-11-19 after eBay
+  granted the opt-out (no eBay buyer data is stored — `DECISIONS.md` 2026-11-16). Phase
   3's order-ingest route is deliberately **not built** and remains out of scope.
 - **Admin UI:** `EbaySettingsPanel.tsx` (composed into `/admin/settings` next
   to `EtsySettingsPanel` — connect/disconnect, 5 policy fields incl. the

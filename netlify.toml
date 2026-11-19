@@ -46,8 +46,8 @@
 #
 # The /api/* carve-out serves API calls on the .co host directly (no redirect)
 # because external services still POST to .co endpoints until they are
-# re-registered on .com: the PayPal webhook, the eBay account-deletion
-# endpoint, and the Etsy/eBay OAuth callbacks. Webhook POSTs do not follow
+# re-registered on .com: the PayPal webhook and the Etsy/eBay OAuth
+# callbacks (the eBay account-deletion endpoint was removed 2026-11-19). Webhook POSTs do not follow
 # 301s. Remove the carve-out only after every integration is re-registered
 # on .com (tracked in project-docs/TASKS.md).
 # ---------------------------------------------------------------------------

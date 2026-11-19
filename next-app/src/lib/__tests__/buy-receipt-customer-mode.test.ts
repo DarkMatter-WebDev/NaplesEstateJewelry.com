@@ -686,8 +686,8 @@ describe('the form: "Mailing list" beside "Email copy" (owner, 2026-10-03: layou
     expect(BUY_RECEIPT_SHEET_CSS.match(/\.brs-cell-name\b/g)).toHaveLength(1);
     expect(BUY_RECEIPT_SHEET_CSS.match(/\.brs-cell-email\b/g)).toHaveLength(2);
     // The printed paper has no small boxes and keeps its columns: Name 5, Phone 3, Email 4.
-    expect(sheet).toContain('<div className="brs-c5"><Value>{receipt.seller_name}</Value><span className="brs-label">Name</span></div>');
-    expect(sheet).toContain('<div className="brs-c4"><Value>{receipt.seller_email}</Value><span className="brs-label">Email</span></div>');
+    expect(sheet).toContain('<div className="brs-c5"><Value>{receipt.seller_name}</Value><span className="brs-label">{w.name}</span></div>');
+    expect(sheet).toContain('<div className="brs-c4"><Value>{receipt.seller_email}</Value><span className="brs-label">{w.email}</span></div>');
     // The two narrower layouts are the ones that were there before.
     expect(BUY_RECEIPT_SHEET_CSS).toContain('.buy-receipt-sheet .brs-grid > .brs-c5, .buy-receipt-sheet .brs-grid > .brs-c6 { grid-column: span 12; }');
   });

@@ -13,6 +13,8 @@
 > receipt form that hands the tablet to the seller on a locked screen (see
 > *Customer input mode*). **DEPLOYED** that evening (owner: "pushed and
 > deployed, manually verified in production"); no SQL, no env vars.
+> 2026-11-19 — 🟡 **Spanish-speaking seller** (BUILT + STAGED, not pushed; ⛔ SQL
+> first): "Seller's copy: English / Español" — see *Spanish-speaking seller*.
 > 2026-10-03, night — 🟢 **DEPLOYED** (owner, ~10 PM: "pushed and deployed";
 > `TASKS.md` 2026-10-03 (8), `CHANGELOG.md` 2026-10-03 (10)–(11)): a **"Mailing
 > list" box beside "Email copy"** on the form (the Email box is one column
@@ -74,6 +76,41 @@ edit it, duplicate it, void it, add or replace the ID photo.
 Only the seller's **first and last name**, **one item** and **how it was paid**
 are required. Everything else may be left blank so the form never holds up a
 sale.
+
+## Spanish-speaking seller (2026-11-19)
+
+> 🟡 BUILT + STAGED, not pushed (`CHANGELOG.md` 2026-11-19 (2)). ⛔ SQL
+> `supabase/buy-receipts-seller-language-2026-11.sql` runs BEFORE the deploy.
+
+- **At the counter:** under the paper, beside "Print:", **Seller's copy: English /
+  Español**. It starts on English. Pick **Español** for a seller who reads
+  Spanish, then save / print as usual. On a saved receipt, **Edit** shows the
+  same switch; the receipt page lists "Seller's copy: English / Spanish".
+- **What changes with Español** — nothing else:
+  - the **seller's copy** prints in Spanish ("Recibo de compra", "Copia del
+    vendedor", every label, "Efectivo", "Licencia de conducir", "19 nov 2026 ·
+    2:14 p. m.", the statement in Spanish, "Recibido por", "Gracias por elegir…");
+    the **emailed copy** is Spanish too ("Su recibo de Naples Estate Jewelry —
+    BUY-…");
+  - the **shop copy stays English** and prints the statement again in Spanish,
+    in italics, right under the English one (the seller signs this copy, so
+    they can read it). The form shows the same line.
+  - What you type (name, address, item descriptions, notes) prints as typed.
+  - A seller who joins the mailing list from that receipt joins as Spanish.
+- **Paper:** with the ID photo + thumbprint, a Spanish shop copy holds **1 item**
+  on one sheet (English 2) — from 2 items the pictures move whole to a second
+  sheet; without pictures, **9** items (English 10). Measured on real PDFs.
+- **Kept the same:** ID photo and thumbprint on the shop copy only; one print job;
+  the default print set; customer input mode (the seller does not pick the
+  language there — you do).
+- ⚠️ The Spanish statement (`BUY_RECEIPT_ATTESTATION_ES`, `lib/buy-receipt-language.ts`)
+  is Claude's translation: have your attorney or a certified translator approve
+  it. Florida §538.04 does not fix the form's language or the statement's
+  wording (not legal advice).
+- **Code:** `lib/buy-receipt-language.ts` (all words, both languages) ·
+  `SellerLanguageSwitch.tsx` · `BuyReceiptSheet.tsx` (`PrintSheet` language,
+  `SpanishAttestation`) · `buy-receipt-email.ts` · tests
+  `lib/__tests__/buy-receipt-language.test.ts`.
 
 ## Label placement
 

@@ -353,7 +353,9 @@ optional validated `productIds`) · `price-push` (POST,
 `x-cron-secret` header, not admin-gated — a cron has no browser session) ·
 `push-prices` (POST, admin-gated manual push).
 
-Plus, outside `/api/admin/ebay/`: **`/api/webhooks/ebay-account-deletion`**
+**REMOVED 2026-11-19** (`CHANGELOG.md` 2026-11-19 (1)) — the history below is kept for the record; to bring it back, see that entry's *To reverse*.
+
+Plus, outside `/api/admin/ebay/` (until 2026-11-19): **`/api/webhooks/ebay-account-deletion`**
 (Phase 0 compliance endpoint, not admin-gated — eBay calls it directly). GET
 answers the challenge (`hex(sha256(challengeCode + EBAY_VERIFICATION_TOKEN +
 endpointUrl))`, exact concatenation order, unit-tested). POST verifies
@@ -388,7 +390,7 @@ and Etsy receipts are trimmed to those fields the moment they arrive
 may ever be stored from an eBay order — doing so needs the subscription back
 first. Notices were still arriving 15 min after the grant (~120/hour), so the
 route stays until they stop (`TASKS.md`), then the route, its tests and
-`EBAY_VERIFICATION_TOKEN` can go.
+`EBAY_VERIFICATION_TOKEN` can go. **Done 2026-11-19:** 0 notices in 48 h (11-18 read) → route + tests removed on the owner's yes; the owner deletes the Netlify variable after the push.
 
 **2026-07-16 correction:** the first live implementation stored raw
 account-deletion payloads in `webhook_events.payload`; a read-only audit found

@@ -6,6 +6,7 @@ import { sendBuyReceiptEmail } from '@/lib/buy-receipt-mailer';
 import {
   BUY_RECEIPT_COLUMNS,
   buyReceiptContentColumns,
+  buyReceiptLanguage,
   isReceiptId,
   normalizeBuyReceiptInput,
   type BuyReceiptRow,
@@ -107,7 +108,7 @@ export async function POST(req: Request) {
   // failure never costs the receipt — it is reported.
   let mailingList: 'added' | 'failed' | null = null;
   if (body?.mailingList === true && receipt.seller_email) {
-    const added = await addSellerToMailingList({ email: receipt.seller_email, name: receipt.seller_name });
+    const added = await addSellerToMailingList({ email: receipt.seller_email, name: receipt.seller_name, locale: buyReceiptLanguage(receipt) });
     mailingList = added.ok ? 'added' : 'failed';
   }
   return NextResponse.json({ receipt, emailed, emailError, mailingList }, { status: 201 });

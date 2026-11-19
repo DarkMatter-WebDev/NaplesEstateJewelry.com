@@ -136,7 +136,7 @@ describe('thumbprint: on the form and on paper', () => {
     expect(sheet).toContain('const thumbprint = !sellerCopy && thumbprintUrl ? thumbprintUrl : null;');
     expect(sheet).toContain('<span className="brs-label brs-sign-label">Seller thumbprint</span>');
     // The seller's copy is the SignedBlock alone: no seller line, no pictures.
-    expect(sheet).toContain('{sellerCopy && <SignedBlock dateIso={receipt.created_at} />}');
+    expect(sheet).toContain('{sellerCopy && <SignedBlock dateIso={receipt.created_at} words={w} language={language} />}');
     expect(sheet).toContain('{!sellerCopy && <SignatureBlock dateIso={receipt.created_at} />}');
   });
 

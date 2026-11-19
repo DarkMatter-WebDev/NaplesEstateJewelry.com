@@ -7,6 +7,7 @@ import {
   BUY_RECEIPT_COLUMNS,
   BUY_RECEIPT_ID_BUCKET,
   buyReceiptContentColumns,
+  buyReceiptLanguage,
   buyReceiptIdPhotoFolder,
   isReceiptId,
   normalizeBuyReceiptInput,
@@ -129,7 +130,7 @@ export async function PUT(req: Request, context: Context) {
   }
   let mailingList: 'added' | 'failed' | null = null;
   if (body?.mailingList === true && receipt.seller_email) {
-    const added = await addSellerToMailingList({ email: receipt.seller_email, name: receipt.seller_name });
+    const added = await addSellerToMailingList({ email: receipt.seller_email, name: receipt.seller_name, locale: buyReceiptLanguage(receipt) });
     mailingList = added.ok ? 'added' : 'failed';
   }
   return NextResponse.json({ receipt, emailed, emailError, mailingList });

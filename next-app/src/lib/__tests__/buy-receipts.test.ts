@@ -203,7 +203,7 @@ describe('normalizeBuyReceiptInput', () => {
     expect(Object.keys(columns).sort()).toEqual(
       [
         'items', 'notes', 'payments', 'seller_city', 'seller_dob', 'seller_email', 'seller_id_last4', 'seller_id_type',
-        'seller_name', 'seller_phone', 'seller_state', 'seller_street', 'seller_zip', 'total',
+        'seller_language', 'seller_name', 'seller_phone', 'seller_state', 'seller_street', 'seller_zip', 'total',
       ].sort(),
     );
   });
@@ -312,7 +312,7 @@ describe('print sets', () => {
     expect(readFileSync(join(process.cwd(), 'src', 'lib', 'signature-font.ts'), 'utf8')).toContain('Alex_Brush');
     // Field labels sit UNDER their line, on screen and on paper (owner, 2026-10-01).
     expect(sheet).not.toMatch(/<span className="brs-label">[^<]+<\/span>\s*<(input|select|Value|AutoGrowTextarea)/);
-    expect(sheet).toContain('<Value>{receipt.seller_name}</Value><span className="brs-label">Name</span>');
+    expect(sheet).toContain('<Value>{receipt.seller_name}</Value><span className="brs-label">{w.name}</span>');
     expect(sheet).toContain('<span>Email copy</span>');
   });
 });

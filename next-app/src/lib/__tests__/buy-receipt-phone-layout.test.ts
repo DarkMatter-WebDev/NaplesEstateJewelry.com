@@ -36,10 +36,12 @@ describe('buy receipt phone layout', () => {
     // One shared rule for the paper and the seller's email (lib/buy-receipts.ts).
     expect(sheet).toContain('const showQty = buyReceiptShowsQty(items);');
     expect(readFileSync(join(process.cwd(), 'src', 'lib', 'buy-receipt-email.ts'), 'utf8')).toContain('const showQty = buyReceiptShowsQty(items);');
-    expect(sheet).toContain('{showQty && <th className="brs-qty">Qty</th>}');
+    expect(sheet).toContain('{showQty && <th className="brs-qty">{w.qty}</th>}');
     expect(sheet).toContain('{showQty && <td className="brs-qty brs-text">{item.qty}</td>}');
-    // Exactly one Qty heading in the file: the paper's, behind showQty.
-    expect(sheet.split('>Qty</th>').length - 1).toBe(1);
+    // Exactly one Qty heading in the file: the paper's, behind showQty (its word comes from
+    // BUY_RECEIPT_PAPER_WORDS since the Spanish seller's copy, 2026-11-19).
+    expect(sheet.split('brs-qty">{w.qty}</th>').length - 1).toBe(1);
+    expect(sheet).not.toContain('>Qty</th>');
   });
 
   it('keeps "Items purchased by Naples Estate Jewelry" on one line, shrinking in place', () => {

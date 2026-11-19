@@ -15,6 +15,13 @@
 //   signed, so the form must never block a sale over an optional field;
 // - the seller's ID photo is a PATH in a private bucket, never a URL, and it is
 //   printed only on a copy the owner asked to carry it.
+import {
+  BUY_RECEIPT_PAYMENT_LABELS_ES,
+  normalizeBuyReceiptLanguage,
+  spanishDateFromDayKey,
+  spanishTimeFromEnglish,
+  type BuyReceiptLanguage,
+} from '@/lib/buy-receipt-language';
 import { round2 } from '@/lib/checkout-pricing';
 import { normalizePersonName } from '@/lib/person-name';
 import { normalizePhoneNumber } from '@/lib/phone';
@@ -205,6 +212,8 @@ export type BuyReceiptDraft = {
   items: BuyReceiptDraftItem[];
   payments: BuyReceiptDraftPayment[];
   notes: string;
+  /** The language of the seller's copy (owner, 2026-11-19). The shop copy is always English. */
+  sellerLanguage: BuyReceiptLanguage;
 };
 
 /** A validated receipt, ready to store. */
@@ -223,6 +232,7 @@ export type BuyReceiptInput = {
   total: number;
   payments: BuyReceiptPayment[];
   notes: string | null;
+  sellerLanguage: BuyReceiptLanguage;
 };
 
 /** One `public.buy_receipts` row. */
@@ -248,6 +258,13 @@ export type BuyReceiptRow = {
   total: number;
   payments: BuyReceiptPayment[];
   notes: string | null;
+  /**
+   * The seller's copy prints (and emails) in this language — 'en' or 'es'
+   * (supabase/buy-receipts-seller-language-2026-11.sql, default 'en'). Optional
+   * in the type so an older object without it still means English; read it
+   * through `buyReceiptLanguage(row)`.
+   */
+  seller_language?: BuyReceiptLanguage | null;
   print_requested_at: string | null;
   print_requested_by: string | null;
   print_copies_plain: number;
@@ -273,7 +290,7 @@ export type BuyReceiptRow = {
 /** One select list for the routes, the pages and the station. */
 export const BUY_RECEIPT_COLUMNS =
   'id, seq, receipt_number, status, seller_name, seller_phone, seller_email, seller_street, seller_city, seller_state, '
-  + 'seller_zip, seller_id_type, seller_id_last4, seller_dob, seller_id_photo_path, seller_thumbprint_path, items, total, payments, notes, '
+  + 'seller_zip, seller_id_type, seller_id_last4, seller_dob, seller_id_photo_path, seller_thumbprint_path, items, total, payments, notes, seller_language, '
   + 'print_requested_at, print_requested_by, print_copies_plain, print_copies_with_id, print_copies_seller, emailed_at, emailed_to, print_claimed_at, '
   + 'print_claimed_by, printed_at, print_count, void_reason, voided_at, voided_by, duplicated_from, created_by, '
   + 'created_by_email, updated_by_email, created_at, updated_at';
@@ -325,7 +342,13 @@ export function blankBuyReceiptDraft(): BuyReceiptDraft {
     items: Array.from({ length: BUY_RECEIPT_FORM_ROWS }, () => ({ qty: '', description: '', amount: '' })),
     payments: [{ method: '', reference: '', amount: '' }],
     notes: '',
+    sellerLanguage: 'en',
   };
+}
+
+/** The language a saved receipt's seller's copy prints in. A row from before the column existed is English. */
+export function buyReceiptLanguage(row: Pick<BuyReceiptRow, 'seller_language'>): BuyReceiptLanguage {
+  return normalizeBuyReceiptLanguage(row.seller_language);
 }
 
 function moneyText(value: number): string {
@@ -364,6 +387,7 @@ export function draftFromReceipt(row: BuyReceiptRow): BuyReceiptDraft {
     items,
     payments,
     notes: row.notes ?? '',
+    sellerLanguage: buyReceiptLanguage(row),
   };
 }
 
@@ -533,6 +557,7 @@ export function normalizeBuyReceiptInput(
       total,
       payments,
       notes: notesText ? notesText.slice(0, BUY_RECEIPT_NOTES_MAX) : null,
+      sellerLanguage: normalizeBuyReceiptLanguage(source.sellerLanguage),
     },
   };
 }
@@ -554,28 +579,31 @@ export function buyReceiptContentColumns(input: BuyReceiptInput) {
     total: input.total,
     payments: input.payments,
     notes: input.notes,
+    seller_language: input.sellerLanguage,
   };
 }
 
-/** "Cash" / "Check #2041". */
-export function paymentLabel(method: string, reference: string | null | undefined): string {
-  const label = BUY_RECEIPT_PAYMENT_LABELS[method as BuyReceiptPaymentMethod] ?? method;
+/** "Cash" / "Check #2041" — or, for a Spanish seller's copy, "Efectivo" / "Cheque #2041". */
+export function paymentLabel(method: string, reference: string | null | undefined, language: BuyReceiptLanguage = 'en'): string {
+  const labels = language === 'es' ? BUY_RECEIPT_PAYMENT_LABELS_ES : BUY_RECEIPT_PAYMENT_LABELS;
+  const label = labels[method as BuyReceiptPaymentMethod] ?? method;
   return method === 'check' && reference ? `${label} #${reference}` : label;
 }
 
 /** The "Paid by" line on the paper: one method alone, or each with its amount. */
-export function paymentsLine(payments: readonly BuyReceiptPayment[] | null | undefined): string {
+export function paymentsLine(payments: readonly BuyReceiptPayment[] | null | undefined, language: BuyReceiptLanguage = 'en'): string {
   const list = payments ?? [];
   if (list.length === 0) return '';
-  if (list.length === 1) return paymentLabel(list[0].method, list[0].reference);
+  if (list.length === 1) return paymentLabel(list[0].method, list[0].reference, language);
   return list
-    .map((payment) => `${paymentLabel(payment.method, payment.reference)} ${formatCurrency(payment.amount)}`)
+    .map((payment) => `${paymentLabel(payment.method, payment.reference, language)} ${formatCurrency(payment.amount)}`)
     .join(' · ');
 }
 
-/** "Sep 29, 2026" in Eastern time. */
-export function formatReceiptDate(value: string | Date | null | undefined): string {
+/** "Sep 29, 2026" in Eastern time — "29 sept 2026" for a Spanish seller's copy. */
+export function formatReceiptDate(value: string | Date | null | undefined, language: BuyReceiptLanguage = 'en'): string {
   if (!value) return '';
+  if (language === 'es') return spanishDateFromDayKey(easternDayKey(value));
   return new Intl.DateTimeFormat('en-US', {
     timeZone: BUY_RECEIPT_TIME_ZONE,
     month: 'short',
@@ -595,8 +623,9 @@ export function formatReceiptTime(value: string | Date | null | undefined): stri
 }
 
 /** "Sep 29, 2026 · 2:14 PM" in Eastern time. */
-export function formatReceiptDateTime(value: string | Date | null | undefined): string {
+export function formatReceiptDateTime(value: string | Date | null | undefined, language: BuyReceiptLanguage = 'en'): string {
   if (!value) return '';
+  if (language === 'es') return `${formatReceiptDate(value, 'es')} · ${spanishTimeFromEnglish(formatReceiptTime(value))}`;
   return `${formatReceiptDate(value)} · ${formatReceiptTime(value)}`;
 }
 

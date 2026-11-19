@@ -1,3 +1,4 @@
+import { normalizeBuyReceiptLanguage } from '@/lib/buy-receipt-language';
 import {
   BUY_RECEIPT_COLUMNS,
   BUY_RECEIPT_DESCRIPTION_MAX,
@@ -100,6 +101,8 @@ export function sanitizeBuyReceiptDraft(raw: unknown): BuyReceiptDraft {
     items: items.length > 0 ? items : [{ qty: '', description: '', amount: '' }],
     payments: payments.length > 0 ? payments : [{ method: '', reference: '', amount: '' }],
     notes: text(source.notes, BUY_RECEIPT_NOTES_MAX),
+    // Seller's copy language (2026-11-19). A draft saved before it existed opens in English.
+    sellerLanguage: normalizeBuyReceiptLanguage(source.sellerLanguage),
   };
 }
 

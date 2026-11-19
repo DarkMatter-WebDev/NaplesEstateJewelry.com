@@ -224,6 +224,9 @@ export const BUY_RECEIPT_SHEET_CSS = `
 
 .buy-receipt-sheet .brs-notes { margin-top: 10px; }
 .buy-receipt-sheet .brs-attest { margin: 12px 0 0; font-size: 11.5px; line-height: 1.45; }
+/* The statement again in Spanish, right under the English one, on a shop copy whose seller's copy is
+   Spanish (owner, 2026-11-19, mockup 1). Same size; italic so the two read as one statement twice. */
+.buy-receipt-sheet .brs-attest.brs-attest-es { margin-top: 4px; font-style: italic; }
 .buy-receipt-sheet .brs-signatures {
   display: grid;
   grid-template-columns: 2fr 1fr;
@@ -441,6 +444,8 @@ export const BUY_RECEIPT_SHEET_CSS = `
   .brs-actions > p { grid-column: 1 / -1; }
   .brs-actions > p:last-child { order: 9; }
   .brs-actions select { grid-column: 1 / -1; order: 1; }
+  .brs-actions .brs-act-lang { grid-column: 1 / -1; order: 1; }
+  .brs-actions .brs-act-lang > .brs-lang-buttons { flex: 1; }
   .brs-actions .brs-act-draft { order: 2; }
   .brs-actions .brs-act-clear { order: 3; }
   .brs-actions .brs-act-print { order: 4; }

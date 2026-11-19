@@ -14,6 +14,7 @@
 // - a box passes here only if the receipt's own validator
 //   (`normalizeBuyReceiptInput`) will accept it too, so "Save" on the seller's
 //   screen never hands the owner a form that then refuses to save.
+import { normalizeBuyReceiptLanguage } from '@/lib/buy-receipt-language';
 import type { BuyReceiptDraft } from '@/lib/buy-receipts';
 import { normalizePersonName } from '@/lib/person-name';
 import { normalizePhoneNumber } from '@/lib/phone';
@@ -269,7 +270,8 @@ export function readCustomerModeSnapshot(raw: string | null | undefined): Custom
   if (!items || !payments || items.length === 0 || payments.length === 0) return null;
 
   return {
-    draft: { ...text, items, payments },
+    // The seller's-copy language survives a refresh; a snapshot from before it existed reads as English.
+    draft: { ...text, items, payments, sellerLanguage: normalizeBuyReceiptLanguage(stored.sellerLanguage) },
     emailCopy: source.emailCopy === true,
     mailingList: source.mailingList === true,
     phase: source.phase === 'thanks' ? 'thanks' : 'form',

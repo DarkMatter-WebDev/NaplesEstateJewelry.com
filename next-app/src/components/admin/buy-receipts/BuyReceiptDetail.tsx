@@ -5,6 +5,7 @@ import Link from 'next/link';
 import AdminModal from '@/components/admin/AdminModal';
 import {
   BUY_RECEIPT_VOID_REASON_MAX,
+  buyReceiptLanguage,
   draftFromReceipt,
   formatReceiptDateTime,
   normalizeBuyReceiptInput,
@@ -15,6 +16,7 @@ import {
 import BuyReceiptSheet from './BuyReceiptSheet';
 import IdPhotoField from './IdPhotoField';
 import ReceiptPrintControls from './ReceiptPrintControls';
+import SellerLanguageSwitch from './SellerLanguageSwitch';
 import ThumbprintField from './ThumbprintField';
 import {
   emailReceipt,
@@ -209,6 +211,10 @@ export default function BuyReceiptDetail({ adminBasePath, initialReceipt }: { ad
 
         {editing ? (
           <div className="flex flex-wrap items-center justify-end gap-2">
+            {draft && (
+              <SellerLanguageSwitch value={draft.sellerLanguage} onChange={(sellerLanguage) => setDraft({ ...draft, sellerLanguage })} disabled={saving} />
+            )}
+            <span className="flex-1" />
             <button type="button" className="outline-button text-xs" disabled={saving} onClick={() => { setDraft(null); setError(null); }}>
               Cancel
             </button>
@@ -267,6 +273,7 @@ export default function BuyReceiptDetail({ adminBasePath, initialReceipt }: { ad
             <div className="flex justify-between gap-3"><span style={hintStyle}>Last change</span><span className="text-right">{formatReceiptDateTime(receipt.updated_at)}{receipt.updated_by_email ? ` by ${receipt.updated_by_email}` : ''}</span></div>
           )}
           <div className="flex justify-between gap-3"><span style={hintStyle}>Email</span><span className="text-right">{receipt.emailed_at ? `Emailed to ${receipt.emailed_to} · ${formatReceiptDateTime(receipt.emailed_at)}` : receipt.seller_email ? 'Not emailed' : 'No email address'}</span></div>
+          <div className="flex justify-between gap-3"><span style={hintStyle}>Seller&rsquo;s copy</span><span className="text-right">{buyReceiptLanguage(receipt) === 'es' ? 'Spanish' : 'English'}</span></div>
           <div className="flex justify-between gap-3"><span style={hintStyle}>Printing</span><span className="text-right">{receiptPrintLabel(receipt)}{receipt.printed_at ? ` · last ${formatReceiptDateTime(receipt.printed_at)}` : ''}</span></div>
           {isVoid && (
             <div className="flex justify-between gap-3" style={{ color: 'var(--color-error)' }}><span>Void</span><span className="text-right">{receipt.void_reason}{receipt.voided_at ? ` · ${formatReceiptDateTime(receipt.voided_at)}` : ''}</span></div>

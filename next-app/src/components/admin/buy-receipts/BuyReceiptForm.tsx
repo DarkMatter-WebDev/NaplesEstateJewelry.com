@@ -7,6 +7,7 @@ import { applyIdReadToDraft } from '@/lib/buy-receipt-id-read';
 import {
   BUY_RECEIPT_ONE_PAGE_LINES,
   blankBuyReceiptDraft,
+  buyReceiptLanguage,
   defaultPrintSet,
   draftPaperLines,
   formatReceiptDateTime,
@@ -30,6 +31,7 @@ import BuyReceiptSheet, { type BuyReceiptCustomerView } from './BuyReceiptSheet'
 import BuyReceiptTabs from './BuyReceiptTabs';
 import IdPhotoField from './IdPhotoField';
 import ReceiptPrintControls, { PrintSetSelect, printSetAllowed } from './ReceiptPrintControls';
+import SellerLanguageSwitch from './SellerLanguageSwitch';
 import ThumbprintField from './ThumbprintField';
 import {
   createReceipt,
@@ -608,6 +610,9 @@ export default function BuyReceiptForm({
           <div className="flex justify-between gap-3"><span style={hintStyle}>Paid by</span><span className="text-right">{paymentsLine(receipt.payments)}</span></div>
           <div className="flex justify-between gap-3"><span style={hintStyle}>ID photo</span><span className="text-right">{receipt.seller_id_photo_path ? 'Attached' : 'None'}</span></div>
           <div className="flex justify-between gap-3"><span style={hintStyle}>Thumbprint</span><span className="text-right">{receipt.seller_thumbprint_path ? 'Attached' : 'None'}</span></div>
+          {buyReceiptLanguage(receipt) === 'es' && (
+            <div className="flex justify-between gap-3"><span style={hintStyle}>Seller&rsquo;s copy</span><span className="text-right">Spanish</span></div>
+          )}
           <div className="flex items-center justify-between gap-3">
             <span style={hintStyle}>Email</span>
             <span className="flex items-center gap-2 text-right">
@@ -751,6 +756,10 @@ export default function BuyReceiptForm({
           </button>
           <span className="flex-1" />
           <PrintSetSelect value={setKey} hasIdPhoto={hasPhoto} onChange={setChosenSet} disabled={working} />
+          {/* Seller's copy language (owner, 2026-11-19, mockup 1). Starts on English; Español prints the
+              seller's copy (and the emailed copy) in Spanish and adds the Spanish statement under the
+              English one on the shop copy. Saved with the receipt, so reprints match. */}
+          <SellerLanguageSwitch value={draft.sellerLanguage} onChange={(sellerLanguage) => setDraft((current) => ({ ...current, sellerLanguage }))} disabled={working} />
         </div>
         <div className="brs-actions-row flex flex-wrap items-center gap-2">
           {/* A saved draft is not cleared from here: it stays in the Log, where Delete removes it. */}

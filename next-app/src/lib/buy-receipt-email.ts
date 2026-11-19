@@ -16,12 +16,24 @@
 // flush under the item amounts; "Received by:" as a caption ABOVE the line; the
 // signature sitting on its rule; the footer as three centred lines.
 // Table-based HTML with inline styles so it renders in every mail app.
+//
+// Spanish (owner, 2026-11-19): a receipt whose seller's copy is Spanish
+// (`seller_language = 'es'`) emails in Spanish too — the same layout, the words
+// from `BUY_RECEIPT_EMAIL_WORDS.es`. English is unchanged, word for word.
 import { BUSINESS_NAME, addressOneLine } from '@/lib/business-location';
+import {
+  BUY_RECEIPT_ATTESTATION_SELLER_ES,
+  BUY_RECEIPT_EMAIL_WORDS,
+  idTypeLabel,
+  type BuyReceiptEmailWords,
+  type BuyReceiptLanguage,
+} from '@/lib/buy-receipt-language';
 import { escapeHtml } from '@/lib/marketing-email-html';
 import { BUSINESS_PHONE, SITE_DOMAIN_LABEL, getSiteUrl } from '@/lib/order-email-branding';
 import {
   BUY_RECEIPT_ATTESTATION_SELLER,
   BUY_RECEIPT_SIGNER_NAME,
+  buyReceiptLanguage,
   buyReceiptShowsQty,
   formatDob,
   formatReceiptDate,
@@ -42,43 +54,46 @@ const RULE = '#eadfbd';
 const GOLD = '#735c00';
 
 /** The details that were filled in; a blank optional field is left out. */
-function detailLines(row: BuyReceiptRow): { label: string; value: string }[] {
+function detailLines(row: BuyReceiptRow, w: BuyReceiptEmailWords, language: BuyReceiptLanguage): { label: string; value: string }[] {
   const address = [row.seller_street, [[row.seller_city, row.seller_state].filter(Boolean).join(', '), row.seller_zip].filter(Boolean).join(' ')]
     .filter((part) => part && part.trim())
     .join(', ');
-  const id = [row.seller_id_type, row.seller_id_last4 ? `last 4: ${row.seller_id_last4}` : '', row.seller_dob ? `DOB ${formatDob(row.seller_dob)}` : '']
+  const id = [idTypeLabel(row.seller_id_type, language), row.seller_id_last4 ? `${w.last4} ${row.seller_id_last4}` : '', row.seller_dob ? `${w.dob} ${formatDob(row.seller_dob)}` : '']
     .filter(Boolean)
     .join(' · ');
   return [
-    { label: 'Seller', value: row.seller_name },
-    { label: 'Phone', value: row.seller_phone ?? '' },
-    { label: 'Email', value: row.seller_email ?? '' },
-    { label: 'Address', value: address },
-    { label: 'ID', value: id },
+    { label: w.seller, value: row.seller_name },
+    { label: w.phone, value: row.seller_phone ?? '' },
+    { label: w.email, value: row.seller_email ?? '' },
+    { label: w.address, value: address },
+    { label: w.id, value: id },
   ].filter((line) => line.value.trim() !== '');
 }
 
 export function buildBuyReceiptEmail(row: BuyReceiptRow): BuyReceiptEmail {
   const number = row.receipt_number;
-  const date = formatReceiptDateTime(row.created_at);
-  const signedDate = formatReceiptDate(row.created_at);
+  const language = buyReceiptLanguage(row);
+  const w = BUY_RECEIPT_EMAIL_WORDS[language];
+  const date = formatReceiptDateTime(row.created_at, language);
+  const signedDate = formatReceiptDate(row.created_at, language);
   const items = row.items ?? [];
   // The same rule as the printed paper: no Qty column unless an older receipt has a real quantity.
   const showQty = buyReceiptShowsQty(items);
   const total = formatCurrency(row.total);
-  const paid = paymentsLine(row.payments);
+  const paid = paymentsLine(row.payments, language);
   const siteUrl = getSiteUrl();
   const isVoid = row.status === 'void';
-  const itemsHeading = `Items purchased by ${BUSINESS_NAME}`;
+  const itemsHeading = language === 'es' ? `Artículos comprados por ${BUSINESS_NAME}` : `Items purchased by ${BUSINESS_NAME}`;
+  const attestation = language === 'es' ? BUY_RECEIPT_ATTESTATION_SELLER_ES : BUY_RECEIPT_ATTESTATION_SELLER;
 
-  const subject = `${isVoid ? 'VOID — ' : ''}Your receipt from ${BUSINESS_NAME} — ${number}`;
+  const subject = w.subject(BUSINESS_NAME, number, isVoid);
 
   const small = `font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.45;color:${INK};`;
   const label = `font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.45;color:${MUTED};`;
   const tiny = `font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:1.45;color:${MUTED};`;
   const caption = `font-family:Arial,Helvetica,sans-serif;font-size:9.5px;line-height:1.4;letter-spacing:0.06em;text-transform:uppercase;color:${MUTED};`;
 
-  const detailRows = detailLines(row)
+  const detailRows = detailLines(row, w, language)
     .map((line) => `<tr><td style="${label}padding:2px 10px 2px 0;white-space:nowrap;vertical-align:top;">${escapeHtml(line.label)}</td><td style="${small}padding:2px 0;">${escapeHtml(line.value)}</td></tr>`)
     .join('');
 
@@ -108,9 +123,9 @@ export function buildBuyReceiptEmail(row: BuyReceiptRow): BuyReceiptEmail {
                     </tr>
                   </table>
 
-                  <p style="${small}margin:12px 0 2px;font-size:15px;font-weight:700;">Your receipt &mdash; ${escapeHtml(number)}${isVoid ? ' <span style="color:#a32d2d;">(VOID)</span>' : ''}</p>
-                  <p style="${tiny}margin:0 0 10px;">Seller&rsquo;s copy &middot; ${escapeHtml(date)}</p>
-                  ${isVoid && row.void_reason ? `<p style="${small}margin:0 0 10px;color:#a32d2d;">This receipt was voided: ${escapeHtml(row.void_reason)}</p>` : ''}
+                  <p style="${small}margin:12px 0 2px;font-size:15px;font-weight:700;">${escapeHtml(w.yourReceipt)} &mdash; ${escapeHtml(number)}${isVoid ? ` <span style="color:#a32d2d;">(${escapeHtml(w.voidTag)})</span>` : ''}</p>
+                  <p style="${tiny}margin:0 0 10px;">${w.sellersCopyHtml} &middot; ${escapeHtml(date)}</p>
+                  ${isVoid && row.void_reason ? `<p style="${small}margin:0 0 10px;color:#a32d2d;">${escapeHtml(w.voidedBecause)} ${escapeHtml(row.void_reason)}</p>` : ''}
 
                   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-top:1px solid ${RULE};border-bottom:1px solid ${RULE};">
                     <tr><td style="padding:6px 0;"><table role="presentation" cellspacing="0" cellpadding="0">${detailRows}</table></td></tr>
@@ -119,21 +134,21 @@ export function buildBuyReceiptEmail(row: BuyReceiptRow): BuyReceiptEmail {
                   <p style="${small}margin:12px 0 4px;font-weight:700;">${escapeHtml(itemsHeading)}</p>
                   <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                     <tr>
-                      <td style="${tiny}padding:0 8px 4px 0;border-bottom:1px solid ${RULE};">Item</td>
-                      ${showQty ? `<td align="center" style="${tiny}padding:0 8px 4px;border-bottom:1px solid ${RULE};">Qty</td>` : ''}
-                      <td align="right" style="${tiny}padding:0 0 4px 8px;border-bottom:1px solid ${RULE};">Amount</td>
+                      <td style="${tiny}padding:0 8px 4px 0;border-bottom:1px solid ${RULE};">${escapeHtml(w.item)}</td>
+                      ${showQty ? `<td align="center" style="${tiny}padding:0 8px 4px;border-bottom:1px solid ${RULE};">${escapeHtml(w.qty)}</td>` : ''}
+                      <td align="right" style="${tiny}padding:0 0 4px 8px;border-bottom:1px solid ${RULE};">${escapeHtml(w.amount)}</td>
                     </tr>
                     ${itemRows}
                     <tr>
-                      <td style="${small}padding:8px 8px 0 0;vertical-align:bottom;font-size:14px;font-weight:700;">Paid by: ${escapeHtml(paid)}</td>
-                      <td${showQty ? ' colspan="2"' : ''} align="right" style="${small}padding:8px 0 0 8px;font-size:14px;font-weight:700;white-space:nowrap;">Total paid to seller&nbsp;&nbsp;&nbsp;${escapeHtml(total)}</td>
+                      <td style="${small}padding:8px 8px 0 0;vertical-align:bottom;font-size:14px;font-weight:700;">${escapeHtml(w.paidBy)} ${escapeHtml(paid)}</td>
+                      <td${showQty ? ' colspan="2"' : ''} align="right" style="${small}padding:8px 0 0 8px;font-size:14px;font-weight:700;white-space:nowrap;">${escapeHtml(w.totalPaid)}&nbsp;&nbsp;&nbsp;${escapeHtml(total)}</td>
                     </tr>
                   </table>
 
-                  ${row.notes ? `<p style="${tiny}margin:10px 0 0;">Notes: ${escapeHtml(row.notes).replace(/\n/g, '<br />')}</p>` : ''}
-                  <p style="${tiny}margin:10px 0 0;font-size:10.5px;line-height:1.4;">${escapeHtml(BUY_RECEIPT_ATTESTATION_SELLER)}</p>
+                  ${row.notes ? `<p style="${tiny}margin:10px 0 0;">${escapeHtml(w.notes)} ${escapeHtml(row.notes).replace(/\n/g, '<br />')}</p>` : ''}
+                  <p style="${tiny}margin:10px 0 0;font-size:10.5px;line-height:1.4;">${escapeHtml(attestation)}</p>
 
-                  <p style="${caption}margin:12px 4px 0;">Received by:</p>
+                  <p style="${caption}margin:12px 4px 0;">${escapeHtml(w.receivedBy)}</p>
                   <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                     <tr>
                       <td style="padding:0 4px 0;border-bottom:1px solid ${INK};vertical-align:bottom;font-family:'Alex Brush','Brush Script MT','Segoe Script',cursive;font-size:17px;line-height:0.9;color:#1f2540;">${escapeHtml(BUY_RECEIPT_SIGNER_NAME)}</td>
@@ -141,12 +156,12 @@ export function buildBuyReceiptEmail(row: BuyReceiptRow): BuyReceiptEmail {
                     </tr>
                     <tr>
                       <td style="${label}padding:1px 4px 0;">${escapeHtml(BUY_RECEIPT_SIGNER_NAME)}, ${escapeHtml(BUSINESS_NAME)}</td>
-                      <td align="right" style="${label}padding:1px 4px 0;">Date</td>
+                      <td align="right" style="${label}padding:1px 4px 0;">${escapeHtml(w.date)}</td>
                     </tr>
                   </table>
 
-                  <p style="${tiny}margin:14px 0 0;text-align:center;">Thank you for choosing ${escapeHtml(BUSINESS_NAME)}.</p>
-                  <p style="${tiny}margin:2px 0 0;text-align:center;">Questions? Reply to this email or call <span style="white-space:nowrap;">${escapeHtml(BUSINESS_PHONE)}</span>.</p>
+                  <p style="${tiny}margin:14px 0 0;text-align:center;">${escapeHtml(w.thanks(BUSINESS_NAME))}</p>
+                  <p style="${tiny}margin:2px 0 0;text-align:center;">${escapeHtml(w.questionsHtmlBefore)} <span style="white-space:nowrap;">${escapeHtml(BUSINESS_PHONE)}</span>.</p>
                   <p style="${tiny}margin:2px 0 0;text-align:center;"><a href="${escapeHtml(siteUrl)}" style="color:${GOLD};text-decoration:underline;">${escapeHtml(SITE_DOMAIN_LABEL)}</a></p>
                   <p style="${tiny}margin:0;text-align:center;white-space:nowrap;">${escapeHtml(addressOneLine())}</p>
                 </td>
@@ -159,26 +174,26 @@ export function buildBuyReceiptEmail(row: BuyReceiptRow): BuyReceiptEmail {
   `;
 
   const text = [
-    `${BUSINESS_NAME} — Your receipt ${number}${isVoid ? ' (VOID)' : ''}`,
+    `${BUSINESS_NAME} — ${w.yourReceipt} ${number}${isVoid ? ` (${w.voidTag})` : ''}`,
     `${addressOneLine()} · ${BUSINESS_PHONE}`,
-    `Seller's copy · ${date}`,
+    `${w.sellersCopyText} · ${date}`,
     '',
-    ...(isVoid && row.void_reason ? [`This receipt was voided: ${row.void_reason}`, ''] : []),
-    ...detailLines(row).map((line) => `${line.label}: ${line.value}`),
+    ...(isVoid && row.void_reason ? [`${w.voidedBecause} ${row.void_reason}`, ''] : []),
+    ...detailLines(row, w, language).map((line) => `${line.label}: ${line.value}`),
     '',
     `${itemsHeading}:`,
-    ...items.map((item, index) => `  ${index + 1}. ${item.description}${showQty ? ` — qty ${item.qty}` : ''} — ${formatCurrency(item.amount)}`),
+    ...items.map((item, index) => `  ${index + 1}. ${item.description}${showQty ? ` — ${w.qtyInline} ${item.qty}` : ''} — ${formatCurrency(item.amount)}`),
     '',
-    `Paid by: ${paid}`,
-    `Total paid to seller: ${total}`,
-    ...(row.notes ? ['', `Notes: ${row.notes}`] : []),
+    `${w.paidBy} ${paid}`,
+    `${w.totalPaid}: ${total}`,
+    ...(row.notes ? ['', `${w.notes} ${row.notes}`] : []),
     '',
-    BUY_RECEIPT_ATTESTATION_SELLER,
+    attestation,
     '',
-    `Received by: ${BUY_RECEIPT_SIGNER_NAME}, ${BUSINESS_NAME} · ${signedDate}`,
+    `${w.receivedBy} ${BUY_RECEIPT_SIGNER_NAME}, ${BUSINESS_NAME} · ${signedDate}`,
     '',
-    `Thank you for choosing ${BUSINESS_NAME}.`,
-    `Questions? Reply to this email or call ${BUSINESS_PHONE}.`,
+    w.thanks(BUSINESS_NAME),
+    w.questions(BUSINESS_PHONE),
     `${SITE_DOMAIN_LABEL} · ${addressOneLine()}`,
   ].join('\n');
 

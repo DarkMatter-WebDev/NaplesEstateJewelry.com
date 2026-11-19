@@ -30,8 +30,7 @@
 // height via CSS — no travel, no pin, panes B and C hidden — restoring the
 // original static hero.
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
-import dynamic from 'next/dynamic';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import HomeHero from './HomeHero';
 import HomeHeroOverlay from './HomeHeroOverlay';
 import {
@@ -39,20 +38,12 @@ import {
   type CarouselSettings,
 } from '../../../carousel/lib/carouselData';
 import { DEFAULT_BG } from '../../../carousel/lib/carouselConfig';
-
-// Hidden frame-timing readout, ONLY for `?heroDebug=1` (2026-11-18, measuring
-// an iPhone-only stutter). Code-split: normal visitors never download it.
-// Server snapshot is always false, so the HTML never differs (no hydration skew).
-const HeroDebugReadout = dynamic(() => import('./HeroDebugReadout'), { ssr: false });
-const subscribeNever = () => () => {};
-const readHeroDebug = () => new URLSearchParams(window.location.search).get('heroDebug') === '1';
-const readHeroDebugOnServer = () => false;
+import { nextHeroSnapPoint, resolveHeroSnapPoints } from '@/lib/home-hero-snap';
+import { onLayoutAffectingResize } from '@/lib/viewport-resize';
 
 // Safari slideshow arming (no requestIdleCallback there) — see the arm effects.
 const SAFARI_ARM_C_AFTER_B_MS = 150;
 const SAFARI_ARM_FALLBACK_MS = 4000;
-import { nextHeroSnapPoint, resolveHeroSnapPoints } from '@/lib/home-hero-snap';
-import { onLayoutAffectingResize } from '@/lib/viewport-resize';
 
 type Props = {
   locale: string;
@@ -424,7 +415,6 @@ export default function HomeHeroStack({
   const [armed, setArmed] = useState(false);
   const [armedC, setArmedC] = useState(false);
   const armedCRef = useRef(false);
-  const heroDebug = useSyncExternalStore(subscribeNever, readHeroDebug, readHeroDebugOnServer);
   // Pane A's reveal (HomeHero onReady). Safari arms B/C on it — see below.
   const [paneAReady, setPaneAReady] = useState(false);
   const markPaneAReady = useCallback(() => setPaneAReady(true), []);
@@ -478,7 +468,7 @@ export default function HomeHeroStack({
       idleHandle = window.requestIdleCallback(arm, { timeout: 2500 });
     } else if (paneAReady) {
       // ⛔ Safari (no requestIdleCallback) — 2026-11-18, measured on the
-      // owner's iPhone with ?heroDebug=1: the old fixed 2500ms timer mounted B
+      // owner's iPhone (a temporary ?heroDebug=1 readout, since removed): the old fixed 2500ms timer mounted B
       // (53ms frame) and then C (59ms frame) MID-SPIN — the "double stutter"
       // at the first transition, and the only slow frames in 30 s. Now B mounts
       // the moment pane A is revealed: its fade-in waits 260ms before the ring
@@ -1003,7 +993,6 @@ export default function HomeHeroStack({
         </div>
         </div>
       </div>
-      {heroDebug && <HeroDebugReadout />}
 
       <style>{`
         .home-hero-stack {

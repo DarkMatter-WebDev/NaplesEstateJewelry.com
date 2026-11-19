@@ -10,6 +10,13 @@ import {
   customerFlagPlaceholder,
   type CustomerField,
 } from '@/lib/buy-receipt-customer-mode';
+import {
+  BUY_RECEIPT_ATTESTATION_ES,
+  BUY_RECEIPT_PAPER_WORDS,
+  idTypeLabel,
+  type BuyReceiptLanguage,
+  type BuyReceiptPaperWords,
+} from '@/lib/buy-receipt-language';
 import { BUSINESS_EMAIL, BUSINESS_PHONE } from '@/lib/order-email-branding';
 import { signatureFont } from '@/lib/signature-font';
 import {
@@ -21,6 +28,7 @@ import {
   BUY_RECEIPT_PAYMENT_LABELS,
   BUY_RECEIPT_PAYMENT_METHODS,
   BUY_RECEIPT_SIGNER_NAME,
+  buyReceiptLanguage,
   buyReceiptShowsQty,
   draftTotal,
   formatDob,
@@ -138,7 +146,22 @@ function AutoGrowTextarea({
   );
 }
 
-function Header({ receiptNumber, dateIso, copyTag }: { receiptNumber: string | null; dateIso: string; copyTag?: string }) {
+const EN = BUY_RECEIPT_PAPER_WORDS.en;
+
+function Header({
+  receiptNumber,
+  dateIso,
+  copyTag,
+  words = EN,
+  language = 'en',
+}: {
+  receiptNumber: string | null;
+  dateIso: string;
+  copyTag?: string;
+  /** A Spanish seller's copy (2026-11-19); everything else is English. */
+  words?: BuyReceiptPaperWords;
+  language?: BuyReceiptLanguage;
+}) {
   return (
     <div className="brs-head">
       <div className="brs-brand">
@@ -155,9 +178,9 @@ function Header({ receiptNumber, dateIso, copyTag }: { receiptNumber: string | n
         </div>
       </div>
       <div className="brs-meta">
-        <div className="brs-doc">Purchase receipt</div>
-        <div>No. {receiptNumber ?? <span className="brs-muted">assigned on save</span>}</div>
-        <div>Date: {formatReceiptDateTime(dateIso)}</div>
+        <div className="brs-doc">{words.purchaseReceipt}</div>
+        <div>{words.numberPrefix} {receiptNumber ?? <span className="brs-muted">assigned on save</span>}</div>
+        <div>{words.datePrefix} {formatReceiptDateTime(dateIso, language)}</div>
         {copyTag && <div className="brs-copy-tag">{copyTag}</div>}
       </div>
     </div>
@@ -171,20 +194,20 @@ function Header({ receiptNumber, dateIso, copyTag }: { receiptNumber: string | n
  * date is the receipt's own date, the one already printed at the top.
  * Two grid cells: the caller's grid gives them their widths.
  */
-function SignedReceivedBy({ dateIso }: { dateIso: string }) {
+function SignedReceivedBy({ dateIso, words = EN, language = 'en' }: { dateIso: string; words?: BuyReceiptPaperWords; language?: BuyReceiptLanguage }) {
   return (
     <>
       <div>
         <div className="brs-sign-line brs-signature-ink">
           <span className={`${signatureFont.className} brs-signature`}>{BUY_RECEIPT_SIGNER_NAME}</span>
         </div>
-        <span className="brs-label brs-sign-label">Received by — {BUY_RECEIPT_SIGNER_NAME}, {BUSINESS_NAME}</span>
+        <span className="brs-label brs-sign-label">{words.receivedBy} — {BUY_RECEIPT_SIGNER_NAME}, {BUSINESS_NAME}</span>
       </div>
       <div>
         <div className="brs-sign-line brs-signature-ink">
-          <span className="brs-signature-date">{formatReceiptDate(dateIso)}</span>
+          <span className="brs-signature-date">{formatReceiptDate(dateIso, language)}</span>
         </div>
-        <span className="brs-label brs-sign-label">Date</span>
+        <span className="brs-label brs-sign-label">{words.date}</span>
       </div>
     </>
   );
@@ -207,10 +230,10 @@ function SellerSignAndDate() {
 }
 
 /** The seller's copy: only the shop's printed signature. */
-function SignedBlock({ dateIso }: { dateIso: string }) {
+function SignedBlock({ dateIso, words, language }: { dateIso: string; words: BuyReceiptPaperWords; language: BuyReceiptLanguage }) {
   return (
     <div className="brs-signatures">
-      <SignedReceivedBy dateIso={dateIso} />
+      <SignedReceivedBy dateIso={dateIso} words={words} language={language} />
     </div>
   );
 }
@@ -422,6 +445,8 @@ function EditSheet({
       </div>
 
       <p className="brs-attest">{BUY_RECEIPT_ATTESTATION}</p>
+      {/* Español picked (2026-11-19): the seller reads the statement they sign, on the copy the shop keeps. */}
+      {draft.sellerLanguage === 'es' && <SpanishAttestation />}
       <SignatureBlock dateIso={dateIso} />
       <p className="brs-thanks">Thank you for choosing {BUSINESS_NAME}.</p>
     </>
@@ -521,6 +546,15 @@ function EditSheet({
   );
 }
 
+/** The statement in Spanish, under the English one on a SHOP copy (and the form) when the seller's copy is Spanish. */
+function SpanishAttestation() {
+  return (
+    <p className="brs-attest brs-attest-es" lang="es">
+      {BUY_RECEIPT_ATTESTATION_ES}
+    </p>
+  );
+}
+
 /** The seller's thumbprint on a shop copy, as tall as the ID photo it sits beside. */
 function ThumbprintBlock({ url }: { url: string }) {
   return (
@@ -537,6 +571,10 @@ function PrintSheet({ receipt, idPhotoUrl, showIdPhoto, thumbprintUrl, variant =
   // No Qty column unless an older receipt really has a quantity (the seller's email follows the same rule).
   const showQty = buyReceiptShowsQty(items);
   const sellerCopy = variant === 'seller';
+  // The seller's copy prints in the seller's language (2026-11-19); the shop copy is always English.
+  const receiptLanguage = buyReceiptLanguage(receipt);
+  const language: BuyReceiptLanguage = sellerCopy ? receiptLanguage : 'en';
+  const w = BUY_RECEIPT_PAPER_WORDS[language];
   const withId = !sellerCopy && Boolean(showIdPhoto && idPhotoUrl);
   // The seller's copy never carries the thumbprint either.
   const thumbprint = !sellerCopy && thumbprintUrl ? thumbprintUrl : null;
@@ -546,31 +584,31 @@ function PrintSheet({ receipt, idPhotoUrl, showIdPhoto, thumbprintUrl, variant =
   const isVoid = receipt.status === 'void';
 
   return (
-    <div className="buy-receipt-sheet">
+    <div className="buy-receipt-sheet" lang={language}>
       {isVoid && <div className="brs-void-mark" aria-hidden="true">VOID</div>}
-      <Header receiptNumber={receipt.receipt_number} dateIso={receipt.created_at} copyTag={sellerCopy ? "Seller's copy" : 'Shop copy'} />
-      {isVoid && <p className="brs-void-line">VOID{receipt.void_reason ? ` — ${receipt.void_reason}` : ''}</p>}
+      <Header receiptNumber={receipt.receipt_number} dateIso={receipt.created_at} copyTag={sellerCopy ? w.sellersCopy : 'Shop copy'} words={w} language={language} />
+      {isVoid && <p className="brs-void-line">{w.void}{receipt.void_reason ? ` — ${receipt.void_reason}` : ''}</p>}
 
-      <h2 className="sheet-section-title">Seller</h2>
+      <h2 className="sheet-section-title">{w.seller}</h2>
       <div className="brs-grid">
-        <div className="brs-c5"><Value>{receipt.seller_name}</Value><span className="brs-label">Name</span></div>
-        <div className="brs-c3"><Value>{receipt.seller_phone}</Value><span className="brs-label">Phone</span></div>
-        <div className="brs-c4"><Value>{receipt.seller_email}</Value><span className="brs-label">Email</span></div>
-        <div className="brs-c6"><Value>{receipt.seller_street}</Value><span className="brs-label">Street</span></div>
-        <div className="brs-c6"><Value>{cityStateZip}</Value><span className="brs-label">City, state, ZIP</span></div>
-        <div className="brs-c4"><Value>{receipt.seller_id_type}</Value><span className="brs-label">ID type</span></div>
-        <div className="brs-c2"><Value>{receipt.seller_id_last4}</Value><span className="brs-label">ID last 4</span></div>
-        <div className="brs-c3"><Value>{formatDob(receipt.seller_dob)}</Value><span className="brs-label">Date of birth</span></div>
+        <div className="brs-c5"><Value>{receipt.seller_name}</Value><span className="brs-label">{w.name}</span></div>
+        <div className="brs-c3"><Value>{receipt.seller_phone}</Value><span className="brs-label">{w.phone}</span></div>
+        <div className="brs-c4"><Value>{receipt.seller_email}</Value><span className="brs-label">{w.email}</span></div>
+        <div className="brs-c6"><Value>{receipt.seller_street}</Value><span className="brs-label">{w.street}</span></div>
+        <div className="brs-c6"><Value>{cityStateZip}</Value><span className="brs-label">{w.cityStateZip}</span></div>
+        <div className="brs-c4"><Value>{idTypeLabel(receipt.seller_id_type, language)}</Value><span className="brs-label">{w.idType}</span></div>
+        <div className="brs-c2"><Value>{receipt.seller_id_last4}</Value><span className="brs-label">{w.idLast4}</span></div>
+        <div className="brs-c3"><Value>{formatDob(receipt.seller_dob)}</Value><span className="brs-label">{w.dob}</span></div>
       </div>
 
-      <h2 className="sheet-section-title brs-items-title">Items purchased by {BUSINESS_NAME}</h2>
+      <h2 className="sheet-section-title brs-items-title">{w.itemsPurchasedBy(BUSINESS_NAME)}</h2>
       <table className="brs-items">
         <thead>
           <tr>
             <th className="brs-num">#</th>
-            {showQty && <th className="brs-qty">Qty</th>}
-            <th>Description</th>
-            <th className="brs-amount">Amount</th>
+            {showQty && <th className="brs-qty">{w.qty}</th>}
+            <th>{w.description}</th>
+            <th className="brs-amount">{w.amount}</th>
           </tr>
         </thead>
         <tbody>
@@ -586,22 +624,25 @@ function PrintSheet({ receipt, idPhotoUrl, showIdPhoto, thumbprintUrl, variant =
       </table>
 
       <div className="brs-total">
-        <span className="brs-total-label">Total paid to seller</span>
+        <span className="brs-total-label">{w.totalPaid}</span>
         <span className="brs-total-value">{formatCurrency(receipt.total)}</span>
       </div>
 
       <div className="brs-pay">
-        <Value>{paymentsLine(receipt.payments)}</Value>
-        <span className="brs-label">Paid by</span>
+        <Value>{paymentsLine(receipt.payments, language)}</Value>
+        <span className="brs-label">{w.paidBy}</span>
       </div>
 
       <div className="brs-notes">
         <Value>{receipt.notes}</Value>
-        <span className="brs-label">Notes</span>
+        <span className="brs-label">{w.notes}</span>
       </div>
 
-      <p className="brs-attest">{BUY_RECEIPT_ATTESTATION}</p>
-      {sellerCopy && <SignedBlock dateIso={receipt.created_at} />}
+      {/* A Spanish seller's copy carries the statement in Spanish only; a shop copy keeps the English one and, for a
+          Spanish seller, adds the Spanish one under it — the seller signs THIS copy (2026-11-19). */}
+      <p className="brs-attest">{language === 'es' ? BUY_RECEIPT_ATTESTATION_ES : BUY_RECEIPT_ATTESTATION}</p>
+      {!sellerCopy && receiptLanguage === 'es' && <SpanishAttestation />}
+      {sellerCopy && <SignedBlock dateIso={receipt.created_at} words={w} language={language} />}
       {!sellerCopy && <SignatureBlock dateIso={receipt.created_at} />}
       {/* The pictures this copy carries, side by side UNDER the signatures (owner, 2026-10-06). They are
           the last thing on the sheet on purpose: when a receipt is too long for one page they are the
@@ -620,7 +661,7 @@ function PrintSheet({ receipt, idPhotoUrl, showIdPhoto, thumbprintUrl, variant =
       )}
 
       {/* The thank-you line is for the seller; the shop copy stays in the shop and needs the room. */}
-      {sellerCopy && <p className="brs-thanks">Thank you for choosing {BUSINESS_NAME}.</p>}
+      {sellerCopy && <p className="brs-thanks">{w.thanks(BUSINESS_NAME)}</p>}
     </div>
   );
 }

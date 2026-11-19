@@ -21,14 +21,15 @@ export type MailingListResult = { ok: true } | { ok: false; error: string };
  * `subscribe_homepage_v2` is granted to the service role alone
  * (supabase/text-subscribers-2026-09.sql).
  */
-export async function addSellerToMailingList(input: { email: string; name: string | null }): Promise<MailingListResult> {
+export async function addSellerToMailingList(input: { email: string; name: string | null; locale?: 'en' | 'es' }): Promise<MailingListResult> {
   const failed: MailingListResult = { ok: false, error: 'The email could not be added to the mailing list.' };
   try {
     const service = createServiceClient();
     const { error } = await service.rpc('subscribe_homepage_v2', {
       subscriber_email: input.email,
       subscriber_name: input.name,
-      subscriber_locale: 'en',
+      // A seller whose copy printed in Spanish joins as a Spanish subscriber (2026-11-19).
+      subscriber_locale: input.locale === 'es' ? 'es' : 'en',
       subscriber_phone: null,
       subscriber_sms_consent: false,
       subscriber_sms_consent_text: null,
