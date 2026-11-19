@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import {
   deliveredWhere,
+  formatExpectedDate,
   formatScanPlace,
   formatScanTime,
   trackingStatusLabel,
@@ -62,6 +63,9 @@ export default function OrderDeliveryTracking({
   const deliveredTime = formatScanTime(tracking?.delivered_at);
   const where = deliveredWhere(tracking?.delivered_message);
   const isDelivered = tracking?.status === 'delivered';
+  // 2026-11-19: undefined until supabase/order-tracking-expected-date-2026-11.sql runs.
+  const hasExpectedColumns = Boolean(tracking && 'expected_email_at' in tracking);
+  const expected = isDelivered ? null : formatExpectedDate(tracking?.est_delivery_date);
 
   return (
     <div className="mt-4 border-t pt-4 text-sm" style={{ borderColor: BORDER }}>
@@ -80,6 +84,7 @@ export default function OrderDeliveryTracking({
                 {trackingStatusLabel(tracking.status)}
                 {isDelivered && deliveredTime ? ` · ${deliveredTime.date} · ${deliveredTime.time}` : ''}
                 {isDelivered && where ? ` — ${where}` : ''}
+                {expected ? ` · expected ${expected.short}` : ''}
               </p>
               {!isDelivered && tracking.last_event_message && (
                 <p className="mt-0.5 text-xs" style={muted}>
@@ -89,6 +94,7 @@ export default function OrderDeliveryTracking({
                 </p>
               )}
               <p className="mt-0.5 text-xs" style={muted}>
+                {hasExpectedColumns && <>Expected-date email: {tracking.expected_email_at ? 'sent' : 'not yet'} &middot; </>}
                 Out-for-delivery email: {tracking.out_for_delivery_email_at ? 'sent' : 'not yet'} &middot; Delivered email:{' '}
                 {tracking.delivered_email_at ? 'sent' : 'not yet'}
               </p>

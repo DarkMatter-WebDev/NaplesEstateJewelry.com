@@ -4,7 +4,14 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-11-19 (2)**. Before that, **2026-11-18 (12)**. Before that, **2026-11-18 (10)**. Before that, **2026-11-18 (6)**. Before that, **2026-11-18 (4)**. Before that, **2026-11-18 (2)**. Before that, **2026-11-16 (5)**. Before that, **2026-11-16 (1)**. Before that, **2026-11-10 (2)**. Before that, **2026-11-09 (3)**. Before that, **2026-11-09 (1)**. Before that, **2026-11-08 (1)**. Before that, **2026-11-05 (5)**. Before that, **2026-11-05 (2)**. Before that, **2026-11-02 (2)**.
+> compaction. Last reconciled: **2026-11-19 (7)**. Before that, **2026-11-19 (2)**. Before that, **2026-11-18 (12)**. Before that, **2026-11-18 (10)**. Before that, **2026-11-18 (6)**. Before that, **2026-11-18 (4)**. Before that, **2026-11-18 (2)**. Before that, **2026-11-16 (5)**. Before that, **2026-11-16 (1)**. Before that, **2026-11-10 (2)**. Before that, **2026-11-09 (3)**. Before that, **2026-11-09 (1)**. Before that, **2026-11-08 (1)**. Before that, **2026-11-05 (5)**. Before that, **2026-11-05 (2)**. Before that, **2026-11-02 (2)**.
+
+## Delivery emails, 4 of them: the expected-date email goes ONCE, in transit, with the carrier's date printed as given (2026-11-19)
+
+- **Owner:** asked to email a delivery date when the package is first scanned and the carrier adds one; approved mockup 1 ("the 4-email plan").
+- **Rule:** Shipped → Expected delivery date → Out for delivery → Delivered. Email 2 goes once per order (claim on `order_tracking.expected_email_at`), only for an `in_transit` tracker with a date that is today or later (Eastern), and only if neither later email has gone. ⛔ Never re-send when the carrier moves the date (the out-for-delivery email covers the real day). ⛔ The date is a DAY: `carrier_detail.est_delivery_date_local`, else the date part of `est_delivery_date` — never converted through a time zone. ⛔ No promise of a USPS hold / reschedule option in the email (signature packages; not verified) — the email says call or text us. Progress line stays 3 steps (a 4th wraps on phones).
+- **Why:** every package needs a signature; knowing the day lets the customer be home (fewer missed deliveries / post-office trips).
+- Record `CHANGELOG.md` 2026-11-19 (7); runbook `features/delivery-tracking.md`.
 
 ## Buy receipt for a Spanish-speaking seller: the seller's copy follows the seller's language; the shop copy stays English and adds the Spanish statement (2026-11-19)
 

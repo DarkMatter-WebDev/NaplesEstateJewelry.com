@@ -12,12 +12,14 @@ import { buildDeliveryUpdateEmailContent, type DeliveryEmailKind } from '@/lib/o
 import {
   compactTrackingNumber,
   deliveredWhere,
+  easternDayKey,
   easyPostCarrier,
   FINAL_TRACKING_STATUSES,
   formatScanPlace,
   formatScanTime,
   sameTrackingNumber,
   scanInstant,
+  trackerExpectedDate,
   type OrderTrackingRow,
 } from '@/lib/shipment-tracking';
 
@@ -25,7 +27,7 @@ import {
 //
 //   Mark Shipped ──► registerOrderTracking ──► EasyPost tracker
 //   EasyPost webhook ─┐
-//   hourly pg_cron ───┴► applyTrackerUpdate ──► out-for-delivery / delivered email
+//   hourly pg_cron ───┴► applyTrackerUpdate ──► expected-date / out-for-delivery / delivered email
 //
 // ⛔ The webhook is a nudge, not the record: every update re-reads the tracker
 // from EasyPost with our own key before anything is written or sent, and the
@@ -221,6 +223,16 @@ export async function applyTrackerUpdate(service: SupabaseClient, tracker: EasyP
   }).eq('order_id', row.order_id);
   if (updateError) throw new Error(`Could not update ${TABLE}: ${updateError.message}`);
 
+  // Expected delivery date (2026-11-19). Its own best-effort write: until
+  // supabase/order-tracking-expected-date-2026-11.sql runs the columns do not
+  // exist, and that must never stop the update above or the other emails.
+  const expectedDate = trackerExpectedDate(tracker);
+  const expectedColumnsReady = 'expected_email_at' in row;
+  if (expectedColumnsReady && expectedDate && expectedDate !== row.est_delivery_date) {
+    const { error } = await service.from(TABLE).update({ est_delivery_date: expectedDate }).eq('order_id', row.order_id);
+    if (error) console.error('[tracking] est_delivery_date not saved:', error.message);
+  }
+
   const order = await loadOrder(service, row.order_id);
   // Only while the order is still shipped with THIS number (the owner may have
   // un-marked it, edited the number, or moved it to the recycle bin).
@@ -235,6 +247,27 @@ export async function applyTrackerUpdate(service: SupabaseClient, tracker: EasyP
     const ms = scanInstant(raw);
     return Number.isNaN(ms) || nowMs - ms <= maxAgeMs;
   };
+
+  // Once per order, the first time an in-transit tracker carries a date that
+  // has not passed (Eastern) — never when the package is already out for
+  // delivery / delivered (those emails cover it), never again when it moves.
+  if (
+    expectedColumnsReady
+    && status === 'in_transit'
+    && expectedDate
+    && expectedDate >= easternDayKey(nowMs)
+    && !row.expected_email_at
+    && !row.out_for_delivery_email_at
+    && !row.delivered_email_at
+  ) {
+    if (await sendDeliveryEmail(service, order, row, 'expected_delivery', {
+      when: formatScanTime(latest?.datetime),
+      place: formatScanPlace(latest?.tracking_location?.city, latest?.tracking_location?.state, latest?.tracking_location?.zip),
+      where: null,
+      message: latest?.message ?? null,
+      expectedDate,
+    })) sent.push('expected_delivery');
+  }
 
   if (status === 'out_for_delivery' && !row.out_for_delivery_email_at && recent(outForDelivery?.datetime, OUT_FOR_DELIVERY_MAX_AGE_MS)) {
     const scan = outForDelivery ?? latest;
@@ -257,6 +290,13 @@ export async function applyTrackerUpdate(service: SupabaseClient, tracker: EasyP
   return { ok: true, status, emailsSent: sent };
 }
 
+/** Where each automatic email is claimed (set before sending, cleared on a failed send). */
+const EMAIL_CLAIM_COLUMN: Record<DeliveryEmailKind, string> = {
+  expected_delivery: 'expected_email_at',
+  out_for_delivery: 'out_for_delivery_email_at',
+  delivered: 'delivered_email_at',
+};
+
 async function sendDeliveryEmail(
   service: SupabaseClient,
   order: TrackedOrder,
@@ -269,7 +309,7 @@ async function sendDeliveryEmail(
     console.error('[tracking] RESEND_API_KEY is not set — delivery email not sent.');
     return false;
   }
-  const column = kind === 'out_for_delivery' ? 'out_for_delivery_email_at' : 'delivered_email_at';
+  const column = EMAIL_CLAIM_COLUMN[kind];
 
   // Claim first: only the caller whose update flips NULL → now() sends.
   const claimedAt = new Date().toISOString();

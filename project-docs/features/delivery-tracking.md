@@ -1,25 +1,37 @@
-# Delivery Tracking Emails (Shipped → Out for delivery → Delivered)
+# Delivery Tracking Emails (Shipped → Expected date → Out for delivery → Delivered)
 
-> Status: **SQL RUN + DEPLOYED 2026-11-05 (owner-reported).** Still needs an
-> EasyPost account + two Netlify variables + redeploy, and one Connect click —
-> `TASKS.md` top block. Until then only the redesigned Shipped email is live. Owner-approved design: mockup 4 (2026-11-05).
+> Status: **CONNECTED 2026-11-19 (owner: EasyPost funded, production key, 2 Netlify
+> variables, redeploy, Connect — `CHANGELOG.md` 2026-11-19 (5)–(6)).** Untested until the first
+> real shipment. Owner-approved design: mockup 4 (2026-11-05). **Expected-date email (2026-11-19 (7),
+> mockup 1): BUILT + STAGED, not pushed; SQL `supabase/order-tracking-expected-date-2026-11.sql`.**
 
 ## What the customer gets
 
 | Email | When | Who sends it |
 |---|---|---|
 | **Your order … has shipped** | The owner clicks Mark Shipped (or Edit Shipping Details) and Send, as before | The owner's click |
+| **Your order … is expected Tuesday, November 24** (2026-11-19) | The first time an in-transit tracker carries a carrier delivery date that has not passed (Eastern), and neither later email has gone | Automatic, once per order — never re-sent when the date moves |
 | **Your order … is out for delivery** | The carrier scans the package onto the truck | Automatic, once per order |
 | **Your order … was delivered** | The carrier scans it delivered | Automatic, once per order |
 
-All three come from `noreply@naplesestatejewelry.com` (replies → `info@`), in the
+All four come from `noreply@naplesestatejewelry.com` (replies → `info@`), in the
 order-email look, with our own wording (`lib/order-fulfillment-email.ts`). The
 carrier and EasyPost never email the customer.
 
 - **Shipped:** progress line (1 of 3), Carrier + Tracking number, **Track Your
   Package** button (USPS / UPS / FedEx / DHL tracking page), and "We'll email you
-  again when it's out for delivery and when it's delivered" — that last line only
-  when EasyPost is connected and the order has a number.
+  the expected delivery date as soon as USPS has one, and again when it's out for
+  delivery and when it's delivered" (2026-11-19) — that last line only when
+  EasyPost is connected and the order has a number.
+- **Expected delivery date (2026-11-19 (7)):** "USPS has scanned your package and
+  expects to deliver it on:" + big date box ("USPS's estimate — it can shift by a
+  day"; breaks after the weekday, never inside "November 24"), progress line with
+  Shipped done, Latest scan, Carrier, Tracking number, signature line ("call or text
+  us … we'll help you work it out" — no USPS hold promise), Track button, "We'll
+  email you again the morning it's out for delivery." Date = EasyPost
+  `carrier_detail.est_delivery_date_local`, else the date part of
+  `est_delivery_date`, printed as given (⛔ no time-zone conversion); stored TEXT in
+  `order_tracking.est_delivery_date`, email claimed on `expected_email_at`.
 - **Out for delivery:** "on the delivery truck and should arrive today", Latest
   scan (town, then time, each on its own line), **"Someone will need to be there
   to sign for it."** on EVERY order (the site promises signature on all shipping —

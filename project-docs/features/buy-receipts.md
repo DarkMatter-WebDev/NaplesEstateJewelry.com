@@ -13,8 +13,8 @@
 > receipt form that hands the tablet to the seller on a locked screen (see
 > *Customer input mode*). **DEPLOYED** that evening (owner: "pushed and
 > deployed, manually verified in production"); no SQL, no env vars.
-> 2026-11-19 — 🟡 **Spanish-speaking seller** (BUILT + STAGED, not pushed; ⛔ SQL
-> first): "Seller's copy: English / Español" — see *Spanish-speaking seller*.
+> 2026-11-19 — 🟢 **Spanish-speaking seller** (SQL run + pushed by the owner
+> 11-19): "Seller's copy: English / Español" — see *Spanish-speaking seller*.
 > 2026-10-03, night — 🟢 **DEPLOYED** (owner, ~10 PM: "pushed and deployed";
 > `TASKS.md` 2026-10-03 (8), `CHANGELOG.md` 2026-10-03 (10)–(11)): a **"Mailing
 > list" box beside "Email copy"** on the form (the Email box is one column
@@ -79,8 +79,8 @@ sale.
 
 ## Spanish-speaking seller (2026-11-19)
 
-> 🟡 BUILT + STAGED, not pushed (`CHANGELOG.md` 2026-11-19 (2)). ⛔ SQL
-> `supabase/buy-receipts-seller-language-2026-11.sql` runs BEFORE the deploy.
+> 🟢 SQL run + pushed by the owner 11-19 (`CHANGELOG.md` 2026-11-19 (2)–(3)); not
+> checked live by Claude. First real Spanish receipt still to come.
 
 - **At the counter:** under the paper, beside "Print:", **Seller's copy: English /
   Español**. It starts on English. Pick **Español** for a seller who reads

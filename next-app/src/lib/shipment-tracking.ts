@@ -44,6 +44,12 @@ export interface OrderTrackingRow {
   register_error: string | null;
   out_for_delivery_email_at: string | null;
   delivered_email_at: string | null;
+  /**
+   * supabase/order-tracking-expected-date-2026-11.sql (2026-11-19). Absent
+   * (undefined) until that SQL runs — the expected-date email is then skipped.
+   */
+  est_delivery_date?: string | null;
+  expected_email_at?: string | null;
   checked_at: string | null;
   created_at: string | null;
   updated_at: string | null;
@@ -204,3 +210,66 @@ export function trackingStatusLabel(status: string | null | undefined): string {
 
 /** Statuses after which a tracker stops changing (the sweep stops re-checking these). */
 export const FINAL_TRACKING_STATUSES = new Set(['delivered', 'return_to_sender', 'failure', 'cancelled']);
+
+// ---------------------------------------------------------------------------
+// Expected delivery date (owner, 2026-11-19, the 4-email plan, mockup 1)
+// ---------------------------------------------------------------------------
+// ⛔ A DATE, not an instant: printed exactly as the carrier gives it. Never
+// run it through Date/time zones — "2026-11-24T00:00:00Z" shown in Eastern
+// would read Monday the 23rd.
+
+const LONG_WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const LONG_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+/** "2026-11-24" if `raw` starts with a real calendar date, else null. */
+function dayKeyOf(raw: unknown): string | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(raw ?? '').trim());
+  if (!match) return null;
+  const [, y, m, d] = match;
+  const year = Number(y);
+  const month = Number(m);
+  const day = Number(d);
+  if (month < 1 || month > 12 || day < 1) return null;
+  if (day > new Date(Date.UTC(year, month, 0)).getUTCDate()) return null;
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * The carrier's estimated delivery day from an EasyPost tracker, "YYYY-MM-DD",
+ * or null. Prefers `carrier_detail.est_delivery_date_local` (a plain local
+ * date); falls back to the date part of `est_delivery_date` (a datetime).
+ * docs.easypost.com/docs/trackers: both "(if available)".
+ */
+export function trackerExpectedDate(tracker: {
+  est_delivery_date?: string | null;
+  carrier_detail?: { est_delivery_date_local?: string | null } | null;
+} | null | undefined): string | null {
+  if (!tracker) return null;
+  return dayKeyOf(tracker.carrier_detail?.est_delivery_date_local) ?? dayKeyOf(tracker.est_delivery_date);
+}
+
+export interface ExpectedDateParts {
+  /** "Tuesday, November 24" */
+  long: string;
+  /** "Tue, Nov 24" */
+  short: string;
+}
+
+/** Words for a "YYYY-MM-DD" day (no time zone involved). Null if unreadable. */
+export function formatExpectedDate(dayKey: string | null | undefined): ExpectedDateParts | null {
+  const key = dayKeyOf(dayKey);
+  if (!key) return null;
+  const [year, month, day] = key.split('-').map(Number);
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  return {
+    long: `${LONG_WEEKDAYS[weekday]}, ${LONG_MONTHS[month - 1]} ${day}`,
+    short: `${WEEKDAYS[weekday]}, ${MONTHS[month - 1]} ${day}`,
+  };
+}
+
+/** Today in the shop's zone (US Eastern), "YYYY-MM-DD". */
+export function easternDayKey(nowMs: number = Date.now()): string {
+  const local = new Date(nowMs + easternOffsetHours(nowMs) * 3600_000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${local.getUTCFullYear()}-${pad(local.getUTCMonth() + 1)}-${pad(local.getUTCDate())}`;
+}

@@ -47,6 +47,10 @@ export interface EasyPostTracker {
   carrier?: string | null;
   public_url?: string | null;
   tracking_details?: EasyPostTrackingDetail[] | null;
+  /** Carrier's estimate, a datetime "(if available)" — use trackerExpectedDate(). */
+  est_delivery_date?: string | null;
+  /** Present on "some" trackers; `est_delivery_date_local` is a plain date. */
+  carrier_detail?: { est_delivery_date_local?: string | null } | null;
 }
 
 export interface EasyPostWebhook {
