@@ -44,7 +44,10 @@ describe('OrdersPanel wiring', () => {
   it('uses the shared selection helpers and deletes the selection in one query', () => {
     expect(PANEL).toContain("from '@/lib/trash-selection'");
     expect(PANEL).toContain("aria-label=\"Select all shown\"");
-    expect(PANEL).toContain(".delete().in('id', trashSelection.ids)");
+    // 2026-11-18: eBay / Etsy rows share the bin's selection; the site orders
+    // still go in ONE query, and only the site-order ids reach `orders`.
+    expect(PANEL).toContain(".delete().in('id', orderIds)");
+    expect(PANEL).toContain('const orderIds = trashSelection.ids.filter((id) => !marketplaceKeySet.has(id));');
     // The bulk button is trash-only and always confirms first.
     expect(PANEL).toContain('window.confirm(bulkDeleteConfirmText(trashSelection))');
   });

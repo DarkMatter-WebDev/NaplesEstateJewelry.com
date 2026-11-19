@@ -19,7 +19,9 @@ import {
   MARKETPLACE_LABEL,
   marketplaceOrderUrl,
   marketplaceRecordMatches,
+  marketplaceSalesLabel,
   mergeOrdersAndMarketplace,
+  type MarketplaceHideAction,
   type MarketplaceSaleRecord,
 } from '@/lib/marketplace-sale-records';
 
@@ -39,8 +41,10 @@ interface Props {
   view?: OrdersView;
   trashCount?: number;
   recycleBinSupported?: boolean;
-  /** eBay / Etsy sales, mixed into the list (2026-11-16) — records only, no buyer data. */
+  /** eBay / Etsy sales, mixed into the list (2026-11-16) — records only, no buyer data. In the trash view: the deleted ones. */
   marketplaceRecords?: MarketplaceSaleRecord[];
+  /** Delete / Restore / Delete Forever on eBay / Etsy rows (2026-11-18) — false until supabase/marketplace-sale-hide-2026-11.sql runs. */
+  marketplaceHideSupported?: boolean;
 }
 
 type OrdersView = 'active' | 'trash';
@@ -90,6 +94,7 @@ export default function OrdersPanel({
   trashCount = 0,
   recycleBinSupported = true,
   marketplaceRecords = [],
+  marketplaceHideSupported = false,
 }: Props) {
   const router = useRouter();
   const supabase = createClient();
@@ -122,12 +127,27 @@ export default function OrdersPanel({
   // view. Read through selectionState() so only rows still on screen count.
   const [selectedTrashIds, setSelectedTrashIds] = useState<Set<string>>(() => new Set());
   const [purgingSelected, setPurgingSelected] = useState(false);
+  // eBay / Etsy sales the owner deletes from the site (2026-11-18). Keys are
+  // `record.key` ("ebay:<order id>"); hidden at once here, gone for real on
+  // the server (lib/marketplace-sale-records-server.ts).
+  const [removedMarketplaceKeys, setRemovedMarketplaceKeys] = useState<Set<string>>(() => new Set());
+  const [syncedMarketplace, setSyncedMarketplace] = useState(marketplaceRecords);
+  const [selectedMarketplaceKeys, setSelectedMarketplaceKeys] = useState<Set<string>>(() => new Set());
+  const [confirmMarketplace, setConfirmMarketplace] = useState<MarketplaceSaleRecord[] | null>(null);
+  const [marketplaceBusy, setMarketplaceBusy] = useState(false);
+  const [actingMarketplaceKey, setActingMarketplaceKey] = useState<string | null>(null);
 
   if (initialOrders !== syncedFrom) {
     setSyncedFrom(initialOrders);
     setOrders(initialOrders);
     setConfirmDelete(null);
     setActingOrderId(null);
+  }
+  if (marketplaceRecords !== syncedMarketplace) {
+    setSyncedMarketplace(marketplaceRecords);
+    setRemovedMarketplaceKeys(new Set());
+    setConfirmMarketplace(null);
+    setActingMarketplaceKey(null);
   }
 
   const availableProducts = useMemo(
@@ -201,11 +221,21 @@ export default function OrdersPanel({
   // eBay / Etsy sales (owner, 2026-11-16, option B): mixed in by date. They
   // have no site payment/fulfillment/order status, so any of those filters
   // hides them; the search box matches their order id, item and marketplace.
+  // In the Recycle Bin the page passes the deleted ones (2026-11-18).
   const statusFilterOn = Boolean(paymentFilter || fulfillmentFilter || orderFilter);
-  const filteredMarketplace = isTrash || statusFilterOn
+  const visibleMarketplace = marketplaceRecords.filter((record) => !removedMarketplaceKeys.has(record.key));
+  const filteredMarketplace = statusFilterOn
     ? []
-    : marketplaceRecords.filter((record) => marketplaceRecordMatches(record, search));
+    : visibleMarketplace.filter((record) => marketplaceRecordMatches(record, search));
   const listEntries = mergeOrdersAndMarketplace(filteredOrders, filteredMarketplace);
+  // The list's checkbox column: always in the Recycle Bin; in the list only
+  // for eBay / Etsy rows, and only once the hide SQL has run.
+  const showMarketplaceSelect = !isTrash && marketplaceHideSupported && visibleMarketplace.length > 0;
+  const selectColumn = isTrash || showMarketplaceSelect;
+  const filteredMarketplaceKeys = filteredMarketplace.map((record) => record.key);
+  const marketplaceSelection = showMarketplaceSelect
+    ? selectionState(filteredMarketplaceKeys, selectedMarketplaceKeys)
+    : EMPTY_SELECTION;
 
   async function openCreateOrder() {
     setShowCreate(true);
@@ -448,24 +478,138 @@ export default function OrdersPanel({
 
   // The selection as it stands against the rows currently shown (search and
   // filters applied). "Select all" and "Delete All" mean these rows.
-  const trashSelection = isTrash ? selectionState(filteredOrders.map((order) => order.id), selectedTrashIds) : EMPTY_SELECTION;
+  // eBay / Etsy rows in the bin share the selection (their keys never collide
+  // with order uuids — "ebay:…" / "etsy:…").
+  const trashVisibleIds = [...filteredOrders.map((order) => order.id), ...filteredMarketplaceKeys];
+  const trashSelection = isTrash ? selectionState(trashVisibleIds, selectedTrashIds) : EMPTY_SELECTION;
 
   async function purgeSelectedOrders() {
     if (trashSelection.count === 0 || purgingSelected) return;
     if (!window.confirm(bulkDeleteConfirmText(trashSelection))) return;
     setPurgingSelected(true);
     setMessage(null);
-    const { error } = await supabase.from('orders').delete().in('id', trashSelection.ids);
-    setPurgingSelected(false);
-    if (error) {
-      setMessage({ text: `Could not permanently delete the selected orders: ${error.message}`, ok: false });
-      return;
+    const marketplaceKeySet = new Set(filteredMarketplaceKeys);
+    const orderIds = trashSelection.ids.filter((id) => !marketplaceKeySet.has(id));
+    const marketplaceKeys = trashSelection.ids.filter((id) => marketplaceKeySet.has(id));
+    if (orderIds.length > 0) {
+      const { error } = await supabase.from('orders').delete().in('id', orderIds);
+      if (error) {
+        setPurgingSelected(false);
+        setMessage({ text: `Could not permanently delete the selected orders: ${error.message}`, ok: false });
+        return;
+      }
+      const removed = new Set(orderIds);
+      setOrders((current) => current.filter((existing) => !removed.has(existing.id)));
     }
-    const removed = new Set(trashSelection.ids);
-    setOrders((current) => current.filter((existing) => !removed.has(existing.id)));
+    if (marketplaceKeys.length > 0) {
+      const result = await postMarketplaceAction('purge', marketplaceKeys);
+      if ('error' in result) {
+        setPurgingSelected(false);
+        setSelectedTrashIds(new Set(marketplaceKeys));
+        setMessage({
+          text: `${orderIds.length > 0 ? `${orderIds.length} ${orderIds.length === 1 ? 'order' : 'orders'} permanently deleted, but the` : 'The'} eBay / Etsy sales could not be deleted: ${result.error}`,
+          ok: false,
+        });
+        router.refresh();
+        return;
+      }
+      setRemovedMarketplaceKeys((current) => new Set([...current, ...marketplaceKeys]));
+    }
+    setPurgingSelected(false);
     setSelectedTrashIds(new Set());
     setMessage({ text: `${trashSelection.count} ${trashSelection.count === 1 ? 'order' : 'orders'} permanently deleted.`, ok: true });
     router.refresh();
+  }
+
+  // eBay / Etsy sale records (2026-11-18): the server only HIDES them — the
+  // rows stay as the sales sweep's "already seen" marks; no product changes.
+  async function postMarketplaceAction(action: MarketplaceHideAction, keys: string[]): Promise<{ changed: number } | { error: string }> {
+    try {
+      const res = await fetch('/api/admin/orders/marketplace-sales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, keys }),
+      });
+      const json = await res.json().catch(() => ({})) as { changed?: number; error?: string };
+      if (!res.ok) return { error: json.error ?? `Request failed (${res.status}).` };
+      return { changed: json.changed ?? 0 };
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : 'Network error.' };
+    }
+  }
+
+  async function deleteMarketplaceSales() {
+    if (!confirmMarketplace || marketplaceBusy) return;
+    const records = confirmMarketplace;
+    const keys = records.map((record) => record.key);
+    setMarketplaceBusy(true);
+    setMessage(null);
+    const result = await postMarketplaceAction('delete', keys);
+    setMarketplaceBusy(false);
+    setConfirmMarketplace(null);
+    if ('error' in result) {
+      setMessage({ text: `Could not delete: ${result.error}`, ok: false });
+      return;
+    }
+    setRemovedMarketplaceKeys((current) => new Set([...current, ...keys]));
+    setSelectedMarketplaceKeys((current) => {
+      const next = new Set(current);
+      for (const key of keys) next.delete(key);
+      return next;
+    });
+    setMessage({ text: `${marketplaceSalesLabel(records)} moved to the Recycle Bin. Nothing changed on ${records.some((r) => r.channel === 'ebay') && records.some((r) => r.channel === 'etsy') ? 'eBay or Etsy' : MARKETPLACE_LABEL[records[0].channel]}.`, ok: true });
+    router.refresh();
+  }
+
+  async function restoreMarketplaceSale(record: MarketplaceSaleRecord) {
+    setActingMarketplaceKey(record.key);
+    setMessage(null);
+    const result = await postMarketplaceAction('restore', [record.key]);
+    setActingMarketplaceKey(null);
+    if ('error' in result) {
+      setMessage({ text: `Could not restore: ${result.error}`, ok: false });
+      return;
+    }
+    setRemovedMarketplaceKeys((current) => new Set([...current, record.key]));
+    setSelectedTrashIds((current) => (current.has(record.key) ? toggleId(current, record.key) : current));
+    setMessage({ text: `${marketplaceSalesLabel([record])} restored to Orders.`, ok: true });
+    router.refresh();
+  }
+
+  async function purgeMarketplaceSale(record: MarketplaceSaleRecord) {
+    if (!window.confirm(`Delete ${marketplaceSalesLabel([record])} forever? It will never show on this site again. Nothing changes on ${MARKETPLACE_LABEL[record.channel]}.`)) return;
+    setActingMarketplaceKey(record.key);
+    setMessage(null);
+    const result = await postMarketplaceAction('purge', [record.key]);
+    setActingMarketplaceKey(null);
+    if ('error' in result) {
+      setMessage({ text: `Could not delete forever: ${result.error}`, ok: false });
+      return;
+    }
+    setRemovedMarketplaceKeys((current) => new Set([...current, record.key]));
+    setSelectedTrashIds((current) => (current.has(record.key) ? toggleId(current, record.key) : current));
+    setMessage({ text: `${marketplaceSalesLabel([record])} permanently deleted from this site.`, ok: true });
+    router.refresh();
+  }
+
+  function marketplaceRowProps(record: MarketplaceSaleRecord): MarketplaceRowActions {
+    if (isTrash) {
+      return {
+        mode: 'trash',
+        selected: selectedTrashIds.has(record.key),
+        onToggle: () => setSelectedTrashIds((current) => toggleId(current, record.key)),
+        onRestore: () => void restoreMarketplaceSale(record),
+        onPurge: () => void purgeMarketplaceSale(record),
+        busy: actingMarketplaceKey === record.key,
+      };
+    }
+    if (!marketplaceHideSupported) return { mode: 'none' };
+    return {
+      mode: 'active',
+      selected: selectedMarketplaceKeys.has(record.key),
+      onToggle: () => setSelectedMarketplaceKeys((current) => toggleId(current, record.key)),
+      onDelete: () => setConfirmMarketplace([record]),
+    };
   }
 
   return (
@@ -505,6 +649,16 @@ export default function OrdersPanel({
               </>
             ) : (
               <>
+                {marketplaceSelection.count > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmMarketplace(filteredMarketplace.filter((record) => marketplaceSelection.ids.includes(record.key)))}
+                    className="outline-button social-danger-button w-full justify-center gap-1.5 text-sm md:w-auto"
+                  >
+                    <AppIcon name="delete" className="text-[1.1rem]" aria-hidden="true" />
+                    Delete {marketplaceSelection.count} eBay / Etsy {marketplaceSelection.count === 1 ? 'Sale' : 'Sales'}
+                  </button>
+                )}
                 <Link href={`${ordersPath}?view=trash`} className="outline-button w-full justify-center gap-1.5 text-sm md:w-auto">
                   <AppIcon name="delete" className="text-[1.1rem]" aria-hidden="true" />
                   Recycle Bin{recycleBinSupported && trashCount > 0 ? ` (${trashCount})` : ''}
@@ -573,9 +727,20 @@ export default function OrdersPanel({
                 aria-label="Select all shown"
                 checked={trashSelection.all}
                 ref={(el) => { if (el) el.indeterminate = trashSelection.some; }}
-                onChange={() => setSelectedTrashIds((current) => toggleAll(current, filteredOrders.map((order) => order.id)))}
+                onChange={() => setSelectedTrashIds((current) => toggleAll(current, trashVisibleIds))}
               />
               <span>{trashSelection.count > 0 ? `${trashSelection.count} selected` : 'Select all'}</span>
+            </label>
+          ) : showMarketplaceSelect && filteredMarketplace.length > 0 ? (
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                aria-label="Select all shown eBay / Etsy sales"
+                checked={marketplaceSelection.all}
+                ref={(el) => { if (el) el.indeterminate = marketplaceSelection.some; }}
+                onChange={() => setSelectedMarketplaceKeys((current) => toggleAll(current, filteredMarketplaceKeys))}
+              />
+              <span>{marketplaceSelection.count > 0 ? `${marketplaceSelection.count} selected` : 'Select all eBay / Etsy'}</span>
             </label>
           ) : (
             <span>Tap View for details</span>
@@ -584,7 +749,7 @@ export default function OrdersPanel({
 
         <div className="grid gap-3 md:hidden">
           {listEntries.map((entry) => {
-            if (entry.kind === 'marketplace') return <MarketplaceSaleCard key={entry.record.key} record={entry.record} />;
+            if (entry.kind === 'marketplace') return <MarketplaceSaleCard key={entry.record.key} record={entry.record} actions={marketplaceRowProps(entry.record)} />;
             const order = entry.order;
             return (
             <article key={order.id} className="rounded-lg border bg-white p-4 shadow-sm" style={{ borderColor: BORDER }}>
@@ -700,7 +865,20 @@ export default function OrdersPanel({
                       aria-label="Select all shown"
                       checked={trashSelection.all}
                       ref={(el) => { if (el) el.indeterminate = trashSelection.some; }}
-                      onChange={() => setSelectedTrashIds((current) => toggleAll(current, filteredOrders.map((order) => order.id)))}
+                      onChange={() => setSelectedTrashIds((current) => toggleAll(current, trashVisibleIds))}
+                    />
+                  </th>
+                )}
+                {showMarketplaceSelect && (
+                  <th className="w-10 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all shown eBay / Etsy sales"
+                      title="Select all shown eBay / Etsy sales"
+                      checked={marketplaceSelection.all}
+                      disabled={filteredMarketplace.length === 0}
+                      ref={(el) => { if (el) el.indeterminate = marketplaceSelection.some; }}
+                      onChange={() => setSelectedMarketplaceKeys((current) => toggleAll(current, filteredMarketplaceKeys))}
                     />
                   </th>
                 )}
@@ -714,7 +892,7 @@ export default function OrdersPanel({
             </thead>
             <tbody>
               {listEntries.map((entry) => {
-                if (entry.kind === 'marketplace') return <MarketplaceSaleRow key={entry.record.key} record={entry.record} />;
+                if (entry.kind === 'marketplace') return <MarketplaceSaleRow key={entry.record.key} record={entry.record} actions={marketplaceRowProps(entry.record)} />;
                 const order = entry.order;
                 return (
                 <tr
@@ -743,6 +921,8 @@ export default function OrdersPanel({
                       />
                     </td>
                   )}
+                  {/* Site orders are deleted one at a time (Delete → Recycle Bin, as before). */}
+                  {showMarketplaceSelect && <td className="px-4 py-3" />}
                   <td className="px-4 py-3 font-bold" style={{ color: GOLD }}>{order.order_number}</td>
                   <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>{formatOrderDate(order.created_at)}</td>
                   <td className="px-4 py-3" style={{ color: 'var(--color-on-surface)' }}>{order.customer_name || '-'}</td>
@@ -801,7 +981,7 @@ export default function OrdersPanel({
               })}
               {listEntries.length === 0 && (
                 <tr>
-                  <td colSpan={isTrash ? 11 : 10} className="px-4 py-12 text-center" style={{ color: 'var(--color-on-surface-variant)' }}>
+                  <td colSpan={selectColumn ? 11 : 10} className="px-4 py-12 text-center" style={{ color: 'var(--color-on-surface-variant)' }}>
                     No orders found.
                   </td>
                 </tr>
@@ -1091,6 +1271,43 @@ export default function OrdersPanel({
           </div>
         </div>
       )}
+
+      {confirmMarketplace && confirmMarketplace.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8" style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div role="dialog" aria-modal="true" aria-labelledby="marketplace-delete-title" className="w-full max-w-md rounded-lg border p-6 shadow-xl" style={{ background: 'white', borderColor: BORDER }}>
+            <h2 id="marketplace-delete-title" className="text-lg font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
+              Delete {confirmMarketplace.length === 1 ? 'this sale' : `${confirmMarketplace.length} sales`} from the site?
+            </h2>
+            <p className="mt-3 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+              Move <strong style={{ color: GOLD }}>{marketplaceSalesLabel(confirmMarketplace)}</strong> to the Recycle Bin.
+              You can restore {confirmMarketplace.length === 1 ? 'it' : 'them'} later, or delete forever from there.
+            </p>
+            <p className="mt-2 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+              This only removes the record from this site. Nothing changes on eBay or Etsy, and no product is touched.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmMarketplace(null)}
+                disabled={marketplaceBusy}
+                className="hover-underline-grow text-sm font-bold uppercase tracking-wide disabled:opacity-50"
+                style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void deleteMarketplaceSales()}
+                disabled={marketplaceBusy}
+                className="rounded-md px-4 py-2 text-sm font-bold uppercase tracking-wide text-white transition-[filter,transform] hover:brightness-110 active:translate-y-px disabled:opacity-50"
+                style={{ background: 'var(--color-error)', fontFamily: 'var(--font-label)' }}
+              >
+                {marketplaceBusy ? 'Deleting...' : 'Move to Recycle Bin'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
@@ -1148,11 +1365,37 @@ function MarketplaceLink({ record, className }: { record: MarketplaceSaleRecord;
   );
 }
 
+/**
+ * What an eBay / Etsy row can do (2026-11-18): in the list, a checkbox +
+ * Delete (→ Recycle Bin); in the Recycle Bin, a checkbox + Restore / Delete
+ * Forever; 'none' before supabase/marketplace-sale-hide-2026-11.sql runs.
+ */
+type MarketplaceRowActions =
+  | { mode: 'none' }
+  | { mode: 'active'; selected: boolean; onToggle: () => void; onDelete: () => void }
+  | { mode: 'trash'; selected: boolean; onToggle: () => void; onRestore: () => void; onPurge: () => void; busy: boolean };
+
+function MarketplaceSelectBox({ record, actions, className }: { record: MarketplaceSaleRecord; actions: MarketplaceRowActions; className?: string }) {
+  if (actions.mode === 'none') return null;
+  return (
+    <input
+      type="checkbox"
+      aria-label={`Select ${MARKETPLACE_LABEL[record.channel]} sale ${record.externalOrderId}`}
+      checked={actions.selected}
+      onChange={actions.onToggle}
+      className={className}
+    />
+  );
+}
+
 /** An eBay / Etsy sale in the desktop table: what sold, when, how much — no customer. */
-function MarketplaceSaleRow({ record }: { record: MarketplaceSaleRecord }) {
+function MarketplaceSaleRow({ record, actions }: { record: MarketplaceSaleRecord; actions: MarketplaceRowActions }) {
   const labels = marketplaceLabels(record);
   return (
     <tr className="border-t" style={{ borderColor: BORDER, background: '#fffdf5' }}>
+      {actions.mode !== 'none' && (
+        <td className="px-4 py-3"><MarketplaceSelectBox record={record} actions={actions} /></td>
+      )}
       <td className="px-4 py-3">
         <MarketplaceChip record={record} />
         <div className="mt-1 font-bold" style={{ color: GOLD }}>{record.externalOrderId}</div>
@@ -1167,18 +1410,57 @@ function MarketplaceSaleRow({ record }: { record: MarketplaceSaleRecord }) {
       <td className="px-4 py-3"><PlainBadge label={labels.payment} /></td>
       <td className="px-4 py-3"><PlainBadge label={labels.fulfillment} /></td>
       <td className="px-4 py-3"><PlainBadge label={labels.status} /></td>
-      <td className="px-4 py-3 whitespace-nowrap"><MarketplaceLink record={record} /></td>
+      <td className="px-4 py-3 whitespace-nowrap">
+        {actions.mode === 'trash' ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={actions.onRestore}
+              disabled={actions.busy}
+              className="hover-underline-grow text-xs font-bold uppercase tracking-wide disabled:opacity-50"
+              style={{ color: GOLD, fontFamily: 'var(--font-label)' }}
+            >
+              Restore
+            </button>
+            <span className="opacity-30">|</span>
+            <button
+              type="button"
+              onClick={actions.onPurge}
+              disabled={actions.busy}
+              className="hover-underline-grow text-xs font-bold uppercase tracking-wide disabled:opacity-50"
+              style={{ color: 'var(--color-error)', fontFamily: 'var(--font-label)' }}
+            >
+              Delete Forever
+            </button>
+          </div>
+        ) : (
+          <>
+            <MarketplaceLink record={record} />
+            {actions.mode === 'active' && (
+              <button
+                type="button"
+                onClick={actions.onDelete}
+                className="hover-underline-grow ml-4 text-xs font-bold uppercase tracking-wide"
+                style={{ color: 'var(--color-error)', fontFamily: 'var(--font-label)' }}
+              >
+                Delete
+              </button>
+            )}
+          </>
+        )}
+      </td>
     </tr>
   );
 }
 
 /** An eBay / Etsy sale on a phone. */
-function MarketplaceSaleCard({ record }: { record: MarketplaceSaleRecord }) {
+function MarketplaceSaleCard({ record, actions }: { record: MarketplaceSaleRecord; actions: MarketplaceRowActions }) {
   const labels = marketplaceLabels(record);
   return (
     <article className="rounded-lg border p-4 shadow-sm" style={{ borderColor: BORDER, background: '#fffdf5' }}>
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+        <MarketplaceSelectBox record={record} actions={actions} className="mt-1 h-5 w-5 shrink-0" />
+        <div className="min-w-0 flex-1">
           <MarketplaceChip record={record} />
           <h2 className="mt-1 text-lg font-bold leading-tight break-all" style={{ color: GOLD }}>
             {record.externalOrderId}
@@ -1209,7 +1491,39 @@ function MarketplaceSaleCard({ record }: { record: MarketplaceSaleRecord }) {
         <MarketplaceStatusBlock label="Fulfillment" value={labels.fulfillment} />
         <MarketplaceStatusBlock label="Status" value={labels.status} />
       </div>
-      <MarketplaceLink record={record} className="outline-button mt-4 w-full justify-center text-sm" />
+      {actions.mode === 'trash' ? (
+        <div className="mt-4 grid gap-2">
+          <button
+            type="button"
+            onClick={actions.onRestore}
+            disabled={actions.busy}
+            className="gold-button w-full justify-center text-sm disabled:opacity-50"
+          >
+            {actions.busy ? 'Working...' : 'Restore Sale'}
+          </button>
+          <button
+            type="button"
+            onClick={actions.onPurge}
+            disabled={actions.busy}
+            className="outline-button social-danger-button w-full justify-center text-sm disabled:opacity-50"
+          >
+            Delete Forever
+          </button>
+        </div>
+      ) : (
+        <>
+          <MarketplaceLink record={record} className="outline-button mt-4 w-full justify-center text-sm" />
+          {actions.mode === 'active' && (
+            <button
+              type="button"
+              onClick={actions.onDelete}
+              className="outline-button social-danger-button mt-2 w-full justify-center text-sm"
+            >
+              Delete Sale
+            </button>
+          )}
+        </>
+      )}
     </article>
   );
 }

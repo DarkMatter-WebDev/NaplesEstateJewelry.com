@@ -21,6 +21,10 @@ export interface MarketplaceSaleEventRow {
   title?: string | null;
   sold_at?: string | null;
   marketplace_status?: string | null;
+  /** In the Orders Recycle Bin (supabase/marketplace-sale-hide-2026-11.sql). */
+  deleted_at?: string | null;
+  /** "Delete Forever": never shown again; the row stays as the sweep's "already seen" marker. */
+  purged_at?: string | null;
   created_at: string;
 }
 
@@ -112,6 +116,64 @@ export function buildMarketplaceSaleRecords(
   }
   return Array.from(byOrder.values())
     .sort((a, b) => Date.parse(b.soldAt) - Date.parse(a.soldAt));
+}
+
+// ---------------------------------------------------------------------------
+// Delete from the site (owner, 2026-11-18: "manually delete orders from eBay /
+// Etsy ... so they just don't exist on the Naples Estate Jewelry site").
+// ⛔ HIDE, never erase: the row is the sales sweep's only "already seen" mark
+// (supabase/marketplace-sale-hide-2026-11.sql). Deleting never touches a
+// product or the marketplace order.
+// ---------------------------------------------------------------------------
+
+/** Rows for the Orders list vs the Recycle Bin; "deleted forever" rows are in neither. */
+export function splitMarketplaceRows<R extends MarketplaceSaleEventRow>(rows: readonly R[]): { active: R[]; trash: R[] } {
+  const active: R[] = [];
+  const trash: R[] = [];
+  for (const row of rows) {
+    if (row.purged_at) continue;
+    (row.deleted_at ? trash : active).push(row);
+  }
+  return { active, trash };
+}
+
+export type MarketplaceHideAction = 'delete' | 'restore' | 'purge';
+export const MARKETPLACE_HIDE_ACTIONS: readonly MarketplaceHideAction[] = ['delete', 'restore', 'purge'];
+/** One request never changes more than this many marketplace orders. */
+export const MAX_MARKETPLACE_HIDE_KEYS = 500;
+
+/** `record.key` ("ebay:12-34567-89012") back to its parts; null for anything else. */
+export function parseMarketplaceRecordKey(key: unknown): { channel: MarketplaceChannel; externalOrderId: string } | null {
+  if (typeof key !== 'string') return null;
+  const colon = key.indexOf(':');
+  if (colon < 0) return null;
+  const channel = key.slice(0, colon);
+  const externalOrderId = key.slice(colon + 1).trim();
+  if (channel !== 'ebay' && channel !== 'etsy') return null;
+  if (!externalOrderId || externalOrderId.length > 100) return null;
+  return { channel, externalOrderId };
+}
+
+/**
+ * What one action writes, and which rows it may touch:
+ * - delete  → into the Recycle Bin (only rows not already in it or gone);
+ * - restore → back to the list (only Recycle Bin rows, never "deleted forever");
+ * - purge   → "Delete Forever" (only Recycle Bin rows — the list's Delete comes first).
+ */
+export function marketplaceHidePlan(action: MarketplaceHideAction, nowIso: string): {
+  patch: { deleted_at?: string | null; purged_at?: string };
+  onlyInTrash: boolean;
+} {
+  if (action === 'delete') return { patch: { deleted_at: nowIso }, onlyInTrash: false };
+  if (action === 'restore') return { patch: { deleted_at: null }, onlyInTrash: true };
+  return { patch: { purged_at: nowIso }, onlyInTrash: true };
+}
+
+/** "eBay sale 12-345" / "3 eBay / Etsy sales" — for confirm boxes and messages. */
+export function marketplaceSalesLabel(records: readonly Pick<MarketplaceSaleRecord, 'channel' | 'externalOrderId'>[]): string {
+  if (records.length === 1) return `${MARKETPLACE_LABEL[records[0].channel]} sale ${records[0].externalOrderId}`;
+  const channels = Array.from(new Set(records.map((r) => MARKETPLACE_LABEL[r.channel])));
+  return `${records.length} ${channels.length === 1 ? channels[0] : 'eBay / Etsy'} sales`;
 }
 
 /** The Orders search box: order id, item titles, or the marketplace's name. */

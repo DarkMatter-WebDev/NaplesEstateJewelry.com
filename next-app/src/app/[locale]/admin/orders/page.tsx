@@ -88,7 +88,7 @@ export default async function AdminOrdersPage({ params, searchParams }: Props) {
     ? ordersQuery.not('deleted_at', 'is', null)
     : ordersQuery.is('deleted_at', null);
 
-  const [ordersResult, { count: unreadMessagesCount }, trashCountResult, marketplaceRecords] = await Promise.all([
+  const [ordersResult, { count: unreadMessagesCount }, trashCountResult, marketplace] = await Promise.all([
     filteredOrdersQuery,
     supabase
       .from('admin_notifications')
@@ -98,8 +98,9 @@ export default async function AdminOrdersPage({ params, searchParams }: Props) {
       .from('orders')
       .select('id', { count: 'exact', head: true })
       .not('deleted_at', 'is', null),
-    // eBay / Etsy sale records, mixed into the list (2026-11-16). Not in the Recycle Bin.
-    isTrash ? Promise.resolve([]) : loadMarketplaceSaleRecords(),
+    // eBay / Etsy sale records, mixed into the list (2026-11-16); deleted ones
+    // sit in the Recycle Bin (2026-11-18), "deleted forever" ones nowhere.
+    loadMarketplaceSaleRecords(),
   ]);
   let orders = ordersResult.data;
   let recycleBinSupported = !ordersResult.error;
@@ -128,7 +129,7 @@ export default async function AdminOrdersPage({ params, searchParams }: Props) {
       }
     }
   }
-  const trashCount = recycleBinSupported ? trashCountResult.count ?? 0 : 0;
+  const trashCount = (recycleBinSupported ? trashCountResult.count ?? 0 : 0) + marketplace.trash.length;
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-background, #fafaf8)' }}>
@@ -147,7 +148,8 @@ export default async function AdminOrdersPage({ params, searchParams }: Props) {
         view={isTrash ? 'trash' : 'active'}
         trashCount={trashCount}
         recycleBinSupported={recycleBinSupported}
-        marketplaceRecords={marketplaceRecords}
+        marketplaceRecords={isTrash ? marketplace.trash : marketplace.active}
+        marketplaceHideSupported={marketplace.hideSupported}
       />
     </div>
   );
