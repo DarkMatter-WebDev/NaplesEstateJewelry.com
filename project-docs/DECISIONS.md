@@ -4,7 +4,14 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-11-18 (6)**. Before that, **2026-11-18 (4)**. Before that, **2026-11-18 (2)**. Before that, **2026-11-16 (5)**. Before that, **2026-11-16 (1)**. Before that, **2026-11-10 (2)**. Before that, **2026-11-09 (3)**. Before that, **2026-11-09 (1)**. Before that, **2026-11-08 (1)**. Before that, **2026-11-05 (5)**. Before that, **2026-11-05 (2)**. Before that, **2026-11-02 (2)**.
+> compaction. Last reconciled: **2026-11-18 (10)**. Before that, **2026-11-18 (6)**. Before that, **2026-11-18 (4)**. Before that, **2026-11-18 (2)**. Before that, **2026-11-16 (5)**. Before that, **2026-11-16 (1)**. Before that, **2026-11-10 (2)**. Before that, **2026-11-09 (3)**. Before that, **2026-11-09 (1)**. Before that, **2026-11-08 (1)**. Before that, **2026-11-05 (5)**. Before that, **2026-11-05 (2)**. Before that, **2026-11-02 (2)**.
+
+## Hero slideshows B/C never mount mid-spin — on Safari they mount at pane A's reveal (2026-11-18)
+
+- **Measured** on the owner's iPhone with the hidden `?heroDebug=1` readout: the iPhone "double stutter" at the first transition was exactly two frames — 53 ms when slideshow B mounted, 59 ms when C mounted — because Safari has no `requestIdleCallback` and the fallback timers (2.5 s / +0.3 s) fired mid-spin. Chrome's idle path mounts them ~1 s in, before the ring shows.
+- **Rule:** a whole-carousel mount costs ~50–100 ms on a phone; it must land where nothing visible is moving. On browsers without `requestIdleCallback`, B mounts the moment pane A is revealed (`HomeHero onReady`) and C `SAFARI_ARM_C_AFTER_B_MS` (150) later — both inside the fade-in's 260 ms invisible delay. ⛔ Never go back to a fixed timer. If the fade-in delay is ever shortened below that, move the mounts before the reveal. Guard `lib/__tests__/hero-pane-arming.test.ts`. (Same lesson as the 2026-08-06 C-mount-during-scroll stutter.)
+- **Method:** Safari can't be traced from the Windows PC — the readout (`src/components/home/HeroDebugReadout.tsx`, `?heroDebug=1` with a capital D, code-split, data stays on the phone) is how an iPhone-only stutter gets measured. Remove it once the fix is confirmed; if needed again, rebuild it from the `CHANGELOG.md` 2026-11-18 (8) description.
+- Record `CHANGELOG.md` 2026-11-18 (8)–(10).
 
 ## Hero ring cards keep `will-change: transform` — it removes the once-per-card hitch (2026-11-18)
 

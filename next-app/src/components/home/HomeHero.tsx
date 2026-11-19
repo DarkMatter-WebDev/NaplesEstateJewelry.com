@@ -40,6 +40,13 @@ type Props = {
    * offscreen panes inside the pinned frame. See the `paused` prop on Carousel.
    */
   paused?: boolean;
+  /**
+   * Called once, the moment this pane is revealed (`.is-ready` added). The
+   * ring is still invisible for the fade-in's 260ms delay after that, so the
+   * stack uses it to mount slideshows B/C where a hitch cannot be seen
+   * (2026-11-18, Safari — see HomeHeroStack).
+   */
+  onReady?: () => void;
 };
 
 // Matches the carousel's mobile breakpoint in the <style> below.
@@ -60,9 +67,23 @@ export default function HomeHero({
   backgroundColor = DEFAULT_BG,
   reverseSpin = false,
   paused = false,
+  onReady,
 }: Props) {
   const sectionRef = useRef<HTMLElement>(null);
   const [heroReady, setHeroReady] = useState(false);
+
+  // Report the reveal outward exactly once (latest-callback ref, so a new
+  // function identity from the parent never re-fires it).
+  const onReadyRef = useRef(onReady);
+  useEffect(() => {
+    onReadyRef.current = onReady;
+  });
+  const reportedReadyRef = useRef(false);
+  useEffect(() => {
+    if (!heroReady || reportedReadyRef.current) return;
+    reportedReadyRef.current = true;
+    onReadyRef.current?.();
+  }, [heroReady]);
 
   // Track the mobile breakpoint so we can use a different ring size on phones.
   const [isMobile, setIsMobile] = useState(false);

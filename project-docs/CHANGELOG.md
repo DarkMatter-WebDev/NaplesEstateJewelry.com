@@ -1,6 +1,22 @@
 
 # Changelog
 
+## 2026-11-18 (10) — iPhone "double stutter" CAUSE CONFIRMED (slideshows B + C mounting mid-spin on Safari's fallback timers) and FIXED — B/C now mount inside pane A's invisible fade-in delay — BUILT + STAGED, not pushed; no SQL, no env vars
+
+- **Owner's iPhone readout (`?heroDebug=1`, iOS 18.7 Safari, 430×775 @3×, portrait):** 1,794 frames, typical 17.0 ms, exactly **2 slow frames** — **3.01 s 53 ms** at "pane B slideshow mounted" (3.02 s) and **3.37 s 59 ms** at "pane C slideshow mounted" (3.33 s). Nothing else slow: the first photo swap at the back (3.60 s), cards turning and coming onto the screen were all at frame rate. → the double stutter = B's and C's mounts, ~0.36 s apart, during the first transition.
+- **Why only Safari:** `HomeHeroStack` arms B with `requestIdleCallback(…, { timeout: 2500 })` and C one idle callback later; Safari has no `requestIdleCallback`, so the fallback `setTimeout(arm, 2500)` / `setTimeout(armC, 300)` fired mid-spin. Chrome mounts both in idle time ~1 s in, before the ring has faded in.
+- **Owner:** *"Yes, build it"* (proposal: Safari only; B at pane A's reveal, C ~0.15 s later; Chrome/desktop unchanged; early scroll still arms B at once).
+- **Change:** `next-app/src/components/home/HomeHero.tsx` — new `onReady` prop, called once when the pane's `heroReady` flips (latest-callback ref). `next-app/src/components/home/HomeHeroStack.tsx` — pane A passes `onReady={markPaneAReady}`; the B arm effect, when `requestIdleCallback` is missing, arms at `paneAReady` (`setTimeout(arm, 0)`) with a 4 s safety net instead of the fixed 2.5 s; C's fallback delay 300 → `SAFARI_ARM_C_AFTER_B_MS = 150` (< the fade-in's 260 ms delay, `home-carousel-fade-in 760ms ease 260ms`). Scroll / wheel / touchstart arming unchanged; `requestIdleCallback` path unchanged. Guard: NEW `src/lib/__tests__/hero-pane-arming.test.ts` (3: no fixed 2500 ms timer, reveal-armed path + Chrome path intact; C delay < fade-in delay read from HomeHero's CSS; onReady fires once).
+- **Checked (throwaway Chrome, iPhone size 430×775 @3×, `requestIdleCallback` deleted before page scripts = Safari path, dev `/?heroDebug=1`):** B and C mounted at the same poll as "pane A revealed"; 1,800 frames, typical 16.7 ms, **0 slow frames**. Limit: on dev the readout started a moment after the reveal, so the mount frames themselves fell before recording — the owner's iPhone run (readout starts before the reveal there) is the real check.
+- **Side effect (Safari only):** B/C photos now load during the reveal instead of at ~2.5 s, so the window `load` event comes later; the next-photo helper (armed 1.5 s after `load`) mounts later — harmless, the ring cards decode swapped photos themselves (11-18 (6)). Chrome/PageSpeed unchanged (idle path).
+- **Gate (from `next-app`):** `npx tsc --noEmit` 0 errors · `npm run lint` 0 errors (the 4 pre-existing `<img>` warnings) · `npx vitest run` **2427/2427** (211 files) · `npm run build` exit 0 (609 pages; dev stopped first, restarted after).
+- **To reverse:** restore `setTimeout(arm, 2500)` / `setTimeout(armC, 300)` in the two arm effects, drop `paneAReady` / `markPaneAReady` / `onReady` and the test.
+
+## 2026-11-18 (9) — Owner: `?heroDebug=1` readout pushed + deployed; "i dont see the badge" = link typed in lower case
+
+- **Owner:** *"i dont see the badge"*. Read-only check (justified by the report): `https://naplesestatejewelry.com/?heroDebug=1` → 200, no redirect; the live homepage script `/_next/static/chunks/3ug7elc05_sfi.js` contains the gate; in a throwaway Chrome at 390×844 / 3× with an iPhone user agent the badge "Recording hero… 25s — don't scroll or tap" showed at the bottom. Claude started moving the badge to the top (suspecting Safari's floating address bar) — then the owner: *"ok, i see it.. i had debug not capitalized"* → edit UNDONE (file hash-identical to the deployed copy again); nothing to push.
+- ⚠️ The parameter is case-sensitive: `?heroDebug=1` (capital D). Open: the owner's iPhone report (`TASKS.md` top block).
+
 ## 2026-11-18 (8) — Hidden hero readout `?heroDebug=1` to measure the iPhone "double stutter" at the first transition — BUILT + STAGED, not pushed; no SQL, no env vars
 
 - **Owner:** *"The stutter is still there on iPhone. It's a double stutter ... when the rightmost image gets completely onto the screen ... and then when the new image comes on the screen ... right as the first transition"*; confirmed *"only the first transition, portrait"*; chose **"Build the readout"** over a speculative warm-up fix.

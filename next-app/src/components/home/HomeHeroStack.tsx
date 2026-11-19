@@ -30,7 +30,7 @@
 // height via CSS — no travel, no pin, panes B and C hidden — restoring the
 // original static hero.
 
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import HomeHero from './HomeHero';
 import HomeHeroOverlay from './HomeHeroOverlay';
@@ -47,6 +47,10 @@ const HeroDebugReadout = dynamic(() => import('./HeroDebugReadout'), { ssr: fals
 const subscribeNever = () => () => {};
 const readHeroDebug = () => new URLSearchParams(window.location.search).get('heroDebug') === '1';
 const readHeroDebugOnServer = () => false;
+
+// Safari slideshow arming (no requestIdleCallback there) — see the arm effects.
+const SAFARI_ARM_C_AFTER_B_MS = 150;
+const SAFARI_ARM_FALLBACK_MS = 4000;
 import { nextHeroSnapPoint, resolveHeroSnapPoints } from '@/lib/home-hero-snap';
 import { onLayoutAffectingResize } from '@/lib/viewport-resize';
 
@@ -421,6 +425,9 @@ export default function HomeHeroStack({
   const [armedC, setArmedC] = useState(false);
   const armedCRef = useRef(false);
   const heroDebug = useSyncExternalStore(subscribeNever, readHeroDebug, readHeroDebugOnServer);
+  // Pane A's reveal (HomeHero onReady). Safari arms B/C on it — see below.
+  const [paneAReady, setPaneAReady] = useState(false);
+  const markPaneAReady = useCallback(() => setPaneAReady(true), []);
 
   // The overlay's text theme follows whichever slideshow currently dominates
   // the frame — each crossing hands over at its midpoint. With one solid color
@@ -469,8 +476,18 @@ export default function HomeHeroStack({
     window.addEventListener('touchstart', arm, options);
     if (typeof window.requestIdleCallback === 'function') {
       idleHandle = window.requestIdleCallback(arm, { timeout: 2500 });
+    } else if (paneAReady) {
+      // ⛔ Safari (no requestIdleCallback) — 2026-11-18, measured on the
+      // owner's iPhone with ?heroDebug=1: the old fixed 2500ms timer mounted B
+      // (53ms frame) and then C (59ms frame) MID-SPIN — the "double stutter"
+      // at the first transition, and the only slow frames in 30 s. Now B mounts
+      // the moment pane A is revealed: its fade-in waits 260ms before the ring
+      // shows at all (`home-carousel-fade-in 760ms ease 260ms`), so both mounts
+      // land while it is still invisible. Do not move this back to a timer.
+      timerHandle = window.setTimeout(arm, 0);
     } else {
-      timerHandle = window.setTimeout(arm, 2500);
+      // Safety net only: pane A always reports ready (its own 1800ms cap).
+      timerHandle = window.setTimeout(arm, SAFARI_ARM_FALLBACK_MS);
     }
     return () => {
       window.removeEventListener('scroll', arm);
@@ -479,7 +496,7 @@ export default function HomeHeroStack({
       if (idleHandle) window.cancelIdleCallback?.(idleHandle);
       if (timerHandle) window.clearTimeout(timerHandle);
     };
-  }, [armed]);
+  }, [armed, paneAReady]);
 
   // Arm slideshow C off the scroll path too, one idle beat after B.
   //
@@ -506,7 +523,9 @@ export default function HomeHeroStack({
     if (typeof window.requestIdleCallback === 'function') {
       idleHandle = window.requestIdleCallback(armC, { timeout: 1500 });
     } else {
-      timerHandle = window.setTimeout(armC, 300);
+      // Safari: right behind B (was 300ms), so C also mounts inside pane A's
+      // 260ms invisible fade-in delay rather than after the ring appears.
+      timerHandle = window.setTimeout(armC, SAFARI_ARM_C_AFTER_B_MS);
     }
     return () => {
       if (idleHandle) window.cancelIdleCallback?.(idleHandle);
@@ -940,6 +959,7 @@ export default function HomeHeroStack({
             initialSettings={initialSettings}
             backgroundColor={paneColors.a}
             paused={!liveA}
+            onReady={markPaneAReady}
         />
         </div>
         <div
