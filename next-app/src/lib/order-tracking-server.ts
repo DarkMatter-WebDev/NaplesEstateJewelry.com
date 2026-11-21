@@ -9,6 +9,7 @@ import {
   type EasyPostTrackingDetail,
 } from '@/lib/easypost';
 import { buildDeliveryUpdateEmailContent, type DeliveryEmailKind } from '@/lib/order-fulfillment-email';
+import { logOrderEmail } from '@/lib/email-copies';
 import {
   compactTrackingNumber,
   deliveredWhere,
@@ -348,7 +349,7 @@ async function sendDeliveryEmail(
     return false;
   }
 
-  const { error: logError } = await service.from('order_emails').insert({
+  const { error: logError } = await logOrderEmail(service, {
     order_id: order.id,
     email_type: 'fulfillment_update',
     recipient,
@@ -356,8 +357,8 @@ async function sendDeliveryEmail(
     status: kind,
     sent_by: null,
     sent_by_email: AUTOMATIC_SENDER_LABEL,
-  });
-  if (logError) console.error('[tracking] order_emails insert failed:', logError.message);
+  }, { html: content.html, text: content.text });
+  if (logError) console.error('[tracking] order_emails insert failed:', logError);
   return true;
 }
 

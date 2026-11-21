@@ -3441,3 +3441,70 @@ main a.underline {
     text-underline-offset: 4px;
   }
 }
+
+/* ---- Pickup signing screen (components/admin/pickup/PickupSignatureScreen.tsx, 2026-11-21) ----
+   Owner's mockup 1: an iPhone held upright is asked to turn sideways; an
+   iPhone on its side drops the logo row + item list, clamps the statement to
+   two lines ("Read all" opens it) and puts the printed name beside the
+   buttons, so the signing box takes the screen and Done needs no scrolling. */
+.pickup-sign-turn,
+.pickup-sign-readall {
+  display: none;
+}
+@media (max-width: 599px) and (orientation: portrait) {
+  .pickup-sign-turn {
+    display: block;
+  }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .pickup-sign-inner {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+  .pickup-sign-head,
+  .pickup-sign-items {
+    display: none;
+  }
+  .pickup-sign-title {
+    margin-top: 0.4rem;
+    font-size: 1.1rem;
+  }
+  .pickup-sign-statement {
+    margin-top: 0.4rem;
+    /* No bottom padding: overflow clips at the padding edge, so padding would
+       show a sliver of the third line. The bottom border keeps the band's look. */
+    padding: 6px 10px 0 !important;
+    border-bottom: 6px solid #fbf5dd;
+    font-size: 12.5px;
+  }
+  .pickup-sign-statement:not(.is-open) {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .pickup-sign-readall {
+    display: block;
+  }
+  .pickup-sign-pad {
+    min-height: 130px;
+  }
+  /* Printed name and the buttons share one row, so Done is on screen without scrolling. */
+  .pickup-sign-bottom {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+  }
+  .pickup-sign-name {
+    flex: 1;
+    margin-top: 0.5rem;
+  }
+  .pickup-sign-name .form-field {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+  .pickup-sign-actions {
+    margin-top: 0;
+  }
+}

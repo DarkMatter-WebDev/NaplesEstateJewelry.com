@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import type { FulfillmentStatus } from '@/types/sales';
 import { buildFulfillmentUpdateEmailContent } from '@/lib/order-fulfillment-email';
 import { isDeliveryTrackingConfigured } from '@/lib/easypost';
+import { logOrderEmail } from '@/lib/email-copies';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -97,7 +98,7 @@ export async function POST(req: Request, { params }: Props) {
 
   // Record the sent email for the order's history (best-effort — see email-invoice).
   const sentAt = new Date().toISOString();
-  const { error: logError } = await supabase.from('order_emails').insert({
+  const { error: logError, id: logId } = await logOrderEmail(supabase, {
     order_id: id,
     email_type: 'fulfillment_update',
     recipient,
@@ -105,12 +106,13 @@ export async function POST(req: Request, { params }: Props) {
     status,
     sent_by: user.id,
     sent_by_email: user.email ?? null,
-  });
-  if (logError) console.error('order_emails insert (update) failed:', logError.message);
+  }, { html: content.html, text: content.text });
+  if (logError) console.error('order_emails insert (update) failed:', logError);
 
   return NextResponse.json({
     success: true,
     email: {
+      id: logId,
       email_type: 'fulfillment_update',
       recipient,
       subject: content.subject,

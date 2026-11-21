@@ -23,6 +23,10 @@ import { heardAboutAdminLabel } from '@/lib/order-heard-about';
 import type { OrderGift } from '@/lib/order-gift';
 import OrderDeliveryTracking from '@/components/admin/OrderDeliveryTracking';
 import type { OrderTrackingRow } from '@/lib/shipment-tracking';
+import OrderPickupPanel from '@/components/admin/pickup/OrderPickupPanel';
+import EmailCopyViewer from '@/components/admin/EmailCopyViewer';
+import { paperDateLine } from '@/lib/order-receipt-paper';
+import { isPickupOrder, type OrderPickupState } from '@/lib/order-pickup';
 
 const GOLD = '#735c00';
 const BORDER = 'var(--color-outline-variant)';
@@ -92,6 +96,8 @@ interface Props {
   deliveryTracking?: OrderTrackingRow | null;
   /** EasyPost connected (EASYPOST_API_KEY set) — the shipped email then promises delivery updates. */
   deliveryTrackingEnabled?: boolean;
+  /** The Local Pickup log (lib/order-pickup.ts, 2026-11-21); `supported: false` until its SQL runs. */
+  pickup?: OrderPickupState;
 }
 
 export default function OrderDetailPanel({
@@ -109,6 +115,7 @@ export default function OrderDetailPanel({
   gift = null,
   deliveryTracking: initialDeliveryTracking = null,
   deliveryTrackingEnabled = false,
+  pickup = { supported: true, row: null },
 }: Props) {
   const router = useRouter();
   const supabase = createClient();
@@ -118,6 +125,8 @@ export default function OrderDetailPanel({
   const [order, setOrder] = useState(initialOrder);
   const [invoices, setInvoices] = useState(initialInvoices);
   const [orderEmails, setOrderEmails] = useState<OrderEmail[]>(initialOrderEmails);
+  /** The Email History row open in the viewer pop-up (2026-11-21). */
+  const [viewingEmail, setViewingEmail] = useState<OrderEmail | null>(null);
   const [internalNotes, setInternalNotes] = useState(order.internal_notes ?? '');
   const [saving, setSaving] = useState<string | null>(null);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
@@ -393,6 +402,7 @@ export default function OrderDetailPanel({
     }
 
     recordSentEmail({
+      id: result?.email?.id ?? null,
       email_type: 'fulfillment_update',
       recipient,
       subject: emailUpdateContent?.subject ?? null,
@@ -517,10 +527,11 @@ export default function OrderDetailPanel({
 
   // Prepend a just-sent email to the on-page history so it shows immediately.
   // (The server also persists it; a reload reflects the stored record.)
-  function recordSentEmail(entry: { email_type: string; recipient: string; subject: string | null; status: string | null }) {
+  function recordSentEmail(entry: { id?: string | null; email_type: string; recipient: string; subject: string | null; status: string | null }) {
     setOrderEmails((prev) => [
       {
-        id: `local-${Date.now()}`,
+        // The server's row id (2026-11-21) lets the viewer open it at once; `local-` = reload first.
+        id: entry.id ?? `local-${Date.now()}`,
         email_type: entry.email_type,
         recipient: entry.recipient,
         subject: entry.subject,
@@ -555,7 +566,7 @@ export default function OrderDetailPanel({
     }
 
     const documentLabel = orderIsPaid ? 'Receipt' : 'Invoice';
-    recordSentEmail({ email_type: orderIsPaid ? 'receipt' : 'invoice', recipient, subject: emailContent.subject, status: null });
+    recordSentEmail({ id: result?.email?.id ?? null, email_type: orderIsPaid ? 'receipt' : 'invoice', recipient, subject: emailContent.subject, status: null });
     setEmailMessage({ text: `${documentLabel} email sent to ${recipient}.`, ok: true });
   }
 
@@ -1164,6 +1175,16 @@ export default function OrderDetailPanel({
               )}
             </section>
 
+            {isPickupOrder(order) && (
+              <OrderPickupPanel
+                order={order}
+                initialPickup={pickup}
+                pickupHours={pickupHours}
+                onPickedUp={() => setOrder((current) => ({ ...current, fulfillment_status: 'picked_up' }))}
+                onEmailSent={(entry) => recordSentEmail(entry)}
+              />
+            )}
+
             <section className="border p-5" style={{ borderColor: BORDER, background: 'white' }}>
               <div className="flex items-center justify-between gap-4 mb-4">
                 <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>Invoices</h2>
@@ -1254,6 +1275,13 @@ export default function OrderDetailPanel({
               <ul className="flex flex-col gap-3">
                 {orderEmails.map((email) => (
                   <li key={email.id} className="border-b pb-3 last:border-b-0 last:pb-0" style={{ borderColor: BORDER }}>
+                    {/* The whole row opens the email as it went out (owner, 2026-11-21, mockup 2). */}
+                    <button
+                      type="button"
+                      onClick={() => setViewingEmail(email)}
+                      className="lift-tile -mx-2 block w-[calc(100%+1rem)] rounded-md border border-transparent px-2 py-1.5 text-left hover:bg-[#fbf6e6]"
+                      aria-label={`View the ${emailTypeLabel(email)} email sent to ${email.recipient}`}
+                    >
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[0.7rem] font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
                         {emailTypeLabel(email)}
@@ -1270,14 +1298,26 @@ export default function OrderDetailPanel({
                         {email.subject}
                       </p>
                     )}
-                    <p className="mt-0.5 text-[0.68rem]" style={{ color: 'var(--color-on-surface-variant)' }}>
-                      From {ORDER_EMAIL_FROM_ADDRESS} &middot; {emailInitiatorLabel(email.sent_by_email)}
+                    <p className="mt-0.5 flex items-end justify-between gap-2 text-[0.68rem]" style={{ color: 'var(--color-on-surface-variant)' }}>
+                      <span>From {ORDER_EMAIL_FROM_ADDRESS} &middot; {emailInitiatorLabel(email.sent_by_email)}</span>
+                      <span className="shrink-0 font-bold uppercase tracking-wider" style={{ color: GOLD }}>View ›</span>
                     </p>
+                    </button>
                   </li>
                 ))}
               </ul>
             ) : (
               <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>No emails sent from this page yet.</p>
+            )}
+            {viewingEmail && (
+              <EmailCopyViewer
+                title={emailTypeLabel(viewingEmail)}
+                url={viewingEmail.id.startsWith('local-') ? null : `/api/admin/orders/${order.id}/emails/${viewingEmail.id}`}
+                to={viewingEmail.recipient}
+                subject={viewingEmail.subject}
+                sentLabel={`${paperDateLine(viewingEmail.created_at)} · ${emailInitiatorLabel(viewingEmail.sent_by_email)}`}
+                onClose={() => setViewingEmail(null)}
+              />
             )}
           </section>
           </div>
@@ -1557,6 +1597,7 @@ function orderItemLineSubtotal(item: { price_snapshot: number; quantity?: number
 function emailTypeLabel(email: { email_type: string; status: string | null }): string {
   if (email.email_type === 'invoice') return 'Invoice';
   if (email.email_type === 'receipt') return 'Receipt';
+  if (email.email_type === 'pickup_receipt') return 'Pickup Receipt';
   if (email.email_type === 'fulfillment_update') {
     return email.status ? `Update — ${orderStatusLabel(email.status)}` : 'Fulfillment Update';
   }

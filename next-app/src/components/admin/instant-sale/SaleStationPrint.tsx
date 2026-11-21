@@ -27,10 +27,20 @@ export default function SaleStationPrint({
   orderId,
   initialRequest = null,
   initialError = null,
+  endpoint,
+  body,
+  label = 'Send to desktop printer',
+  buttonClassName = 'outline-button text-xs',
 }: {
   orderId: string;
   initialRequest?: SalePrintRequestRef | null;
   initialError?: string | null;
+  /** Another route that queues a paper (the pickup sheet, 2026-11-21); defaults to the in-store sale's. */
+  endpoint?: string;
+  /** JSON sent to that route (e.g. which pickup copies). */
+  body?: unknown;
+  label?: string;
+  buttonClassName?: string;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(initialError);
@@ -44,7 +54,10 @@ export default function SaleStationPrint({
     setError(null);
     setPhase(null);
     try {
-      const res = await fetch(`/api/admin/in-store-sales/${orderId}/print-request`, { method: 'POST' });
+      const res = await fetch(endpoint ?? `/api/admin/in-store-sales/${orderId}/print-request`, {
+        method: 'POST',
+        ...(body === undefined ? {} : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.request) {
         setError(data.error ?? 'Could not send it to the desktop printer.');
@@ -57,7 +70,7 @@ export default function SaleStationPrint({
     } finally {
       setBusy(false);
     }
-  }, [orderId]);
+  }, [orderId, endpoint, body]);
 
   // Watch the row until the station marks it printed.
   useEffect(() => {
@@ -90,8 +103,8 @@ export default function SaleStationPrint({
 
   return (
     <div className="grid gap-2">
-      <button type="button" className="outline-button text-xs" disabled={busy || phase === 'waiting'} onClick={() => void send()}>
-        {busy ? 'Sending…' : 'Send to desktop printer'}
+      <button type="button" className={buttonClassName} disabled={busy || phase === 'waiting'} onClick={() => void send()}>
+        {busy ? 'Sending…' : label}
       </button>
       {phase === 'waiting' && (
         <span role="status" className="text-xs text-center" style={{ color: 'var(--color-on-surface-variant)' }}>{SALE_PRINT_MESSAGES.waiting}</span>

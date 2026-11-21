@@ -11,6 +11,7 @@ import { getStoreHours } from '@/lib/store-hours';
 import { loadOrderTaxExemption } from '@/lib/tax-exempt-server';
 import { loadOrderGift } from '@/lib/order-gift-server';
 import { SPLIT_PAYMENTS_COLUMN } from '@/lib/in-store-sale';
+import { logOrderEmail } from '@/lib/email-copies';
 
 const ORDER_INVOICE_COLUMNS = [
   'id',
@@ -49,6 +50,8 @@ function isMissingItemYearColumnError(error: { message?: string | null } | null 
 }
 
 export type SentInvoiceEmail = {
+  /** The Email History row (null if the log write failed). */
+  id: string | null;
   email_type: 'invoice' | 'receipt';
   recipient: string;
   subject: string;
@@ -62,23 +65,18 @@ export type SendInvoiceEmailResult =
   | { ok: false; status: number; error: string };
 
 /**
- * Send an order's invoice/receipt email (paid orders get a "receipt", unpaid get
- * an "invoice") and record it in the order's email history. Shared by the admin
- * "Email Invoice" route and the automatic on-payment send from capture.
+ * The invoice / receipt email for an order, built exactly as `sendOrderInvoiceEmail`
+ * sends it (without sending). Also used by the Email History viewer to rebuild an
+ * email sent before copies were kept (2026-11-21).
  */
-export async function sendOrderInvoiceEmail(opts: {
-  supabase: SupabaseClient;
-  resendKey: string;
-  orderId: string;
-  recipient: string;
-  itemDiscounts?: Record<string, number>;
-  /** null id + a label email records an automatic (system) send. */
-  sentBy?: { id?: string | null; email?: string | null };
-  /** Remote sale invoices only: the Pay online button + other ways to pay. */
-  payment?: InvoicePaymentBlock | null;
-}): Promise<SendInvoiceEmailResult> {
-  const { supabase, resendKey, orderId, recipient } = opts;
-
+export async function buildOrderInvoiceEmail(
+  supabase: SupabaseClient,
+  orderId: string,
+  opts: { itemDiscounts?: Record<string, number>; payment?: InvoicePaymentBlock | null } = {},
+): Promise<
+  | { ok: true; content: ReturnType<typeof buildInvoiceEmailContent>; emailType: 'invoice' | 'receipt' }
+  | { ok: false; status: number; error: string }
+> {
   const [orderResult, { data: invoices }] = await Promise.all([
     supabase.from('orders').select(ORDER_INVOICE_COLUMNS).eq('id', orderId).single(),
     supabase
@@ -120,6 +118,29 @@ export async function sendOrderInvoiceEmail(opts: {
     gift: await loadOrderGift(supabase, orderId),
   });
   const emailType: 'invoice' | 'receipt' = isOrderPaid(emailOrder) ? 'receipt' : 'invoice';
+  return { ok: true, content, emailType };
+}
+
+/**
+ * Send an order's invoice/receipt email (paid orders get a "receipt", unpaid get
+ * an "invoice") and record it in the order's email history. Shared by the admin
+ * "Email Invoice" route and the automatic on-payment send from capture.
+ */
+export async function sendOrderInvoiceEmail(opts: {
+  supabase: SupabaseClient;
+  resendKey: string;
+  orderId: string;
+  recipient: string;
+  itemDiscounts?: Record<string, number>;
+  /** null id + a label email records an automatic (system) send. */
+  sentBy?: { id?: string | null; email?: string | null };
+  /** Remote sale invoices only: the Pay online button + other ways to pay. */
+  payment?: InvoicePaymentBlock | null;
+}): Promise<SendInvoiceEmailResult> {
+  const { supabase, resendKey, orderId, recipient } = opts;
+  const built = await buildOrderInvoiceEmail(supabase, orderId, { itemDiscounts: opts.itemDiscounts, payment: opts.payment });
+  if (!built.ok) return built;
+  const { content, emailType } = built;
 
   try {
     const { Resend } = await import('resend');
@@ -148,19 +169,21 @@ export async function sendOrderInvoiceEmail(opts: {
   }
 
   // Record for the order's email history. Best-effort — the email already sent.
-  const { error: logError } = await supabase.from('order_emails').insert({
+  // With the email's own copy (2026-11-21), for the Email History viewer.
+  const { error: logError, id: logId } = await logOrderEmail(supabase, {
     order_id: orderId,
     email_type: emailType,
     recipient,
     subject: content.subject,
     sent_by: opts.sentBy?.id ?? null,
     sent_by_email: opts.sentBy?.email ?? null,
-  });
-  if (logError) console.error('order_emails insert failed:', logError.message);
+  }, { html: content.html, text: content.text });
+  if (logError) console.error('order_emails insert failed:', logError);
 
   return {
     ok: true,
     email: {
+      id: logId,
       email_type: emailType,
       recipient,
       subject: content.subject,

@@ -390,7 +390,7 @@ and Etsy receipts are trimmed to those fields the moment they arrive
 may ever be stored from an eBay order — doing so needs the subscription back
 first. Notices were still arriving 15 min after the grant (~120/hour), so the
 route stays until they stop (`TASKS.md`), then the route, its tests and
-`EBAY_VERIFICATION_TOKEN` can go. **Done 2026-11-19:** 0 notices in 48 h (11-18 read) → route + tests removed on the owner's yes; the owner deletes the Netlify variable after the push.
+`EBAY_VERIFICATION_TOKEN` can go. **Done 2026-11-19:** 0 notices in 48 h (11-18 read) → route + tests removed on the owner's yes; pushed 11-19 (3); the 11-19 (4) live check got 404 on the route. ◻ The owner deletes the Netlify variable.
 
 **2026-07-16 correction:** the first live implementation stored raw
 account-deletion payloads in `webhook_events.payload`; a read-only audit found

@@ -7,6 +7,8 @@ import { loadCertificateEditorForOrder, loadOrderTaxExemption } from '@/lib/tax-
 import { createServiceClient } from '@/lib/supabase/service';
 import { loadOrderGift } from '@/lib/order-gift-server';
 import { loadOrderTracking } from '@/lib/order-tracking-server';
+import { loadOrderPickup } from '@/lib/order-pickup-server';
+import { isPickupOrder } from '@/lib/order-pickup';
 import { isDeliveryTrackingConfigured } from '@/lib/easypost';
 import { formatPickupHours } from '@/lib/order-invoice-email';
 import { getStoreHours } from '@/lib/store-hours';
@@ -270,6 +272,7 @@ export default async function AdminOrderDetailPage({ params }: Props) {
         gift={await loadOrderGift(supabase, id)}
         deliveryTracking={await loadOrderTracking(supabase, id)}
         deliveryTrackingEnabled={isDeliveryTrackingConfigured()}
+        pickup={isPickupOrder(order as unknown as Order) ? await loadOrderPickup(supabase, id) : undefined}
       />
     </div>
   );

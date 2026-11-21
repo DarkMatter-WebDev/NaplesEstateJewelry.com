@@ -487,10 +487,11 @@ describe('buy receipts: database and storage rules', () => {
 describe('buy receipts: routes', () => {
   const files = routeFiles(join(root, 'src', 'app', 'api', 'admin', 'buy-receipts'));
 
-  it('has the ten routes', () => {
+  it('has the eleven routes', () => {
     // The eighth (2026-10-03) starts and ends customer input mode; the ninth (2026-10-06) keeps the seller's thumbprint;
-    // the tenth (2026-10-09) has the AI read the seller's ID for "Fill form from ID".
-    expect(files).toHaveLength(10);
+    // the tenth (2026-10-09) has the AI read the seller's ID for "Fill form from ID";
+    // the eleventh (2026-11-21) shows the seller's-copy email as it went out ([id]/email-copy).
+    expect(files).toHaveLength(11);
   });
 
   it('gates every handler on requireAdmin and never reaches for the service role', () => {

@@ -106,7 +106,9 @@ describe('wiring (source guards)', () => {
     expect(station).toContain('.from(SALE_PRINT_TABLE)');
     expect(station).toContain(".update({ claimed_at: new Date().toISOString(), claimed_by: stationId() })");
     expect(station).toContain(".is('printed_at', null)");
-    expect(station).toContain('printPaperInFrame(paperReceiptDocument(row.paper))');
+    // Since 2026-11-21 a pickup sheet's private pictures are filled in first (fillPrivatePaper).
+    expect(station).toContain('fillPrivatePaper(row.paper)');
+    expect(station).toContain('printPaperInFrame(paperReceiptDocument(filled.paper))');
     // A missing table (SQL not run) must not stop buy receipts printing.
     expect(station).toContain('!isMissingSalePrintTable(salesError)');
     expect(station).not.toMatch(/fetch\(['`]\/api\/admin\/in-store-sales/);

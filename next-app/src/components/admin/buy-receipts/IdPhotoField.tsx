@@ -26,6 +26,7 @@ export default function IdPhotoField({
   onPick,
   onRemove,
   autoFill,
+  words,
 }: {
   /** What to show: an object URL for a photo not uploaded yet, or a signed link. */
   previewUrl: string | null;
@@ -36,7 +37,11 @@ export default function IdPhotoField({
   onRemove: () => void;
   /** The "Fill form from ID" box, and whether a photo is being read right now. */
   autoFill?: { checked: boolean; onChange: (checked: boolean) => void; reading: boolean };
+  /** Other wording for another use of the strip — the pickup log (2026-11-21). Defaults: the buy receipt's. */
+  words?: { name?: string; hint?: string; fill?: string };
 }) {
+  const name = words?.name ?? 'Seller ID photo';
+  const hint = words?.hint ?? "Kept with this receipt. Not printed on the seller's copy.";
   const fileRef = useRef<HTMLInputElement>(null);
   const [capturing, setCapturing] = useState(false);
   const [viewing, setViewing] = useState(false);
@@ -67,7 +72,7 @@ export default function IdPhotoField({
       {has ? (
         <button type="button" onClick={() => setViewing(true)} aria-label="View the ID photo" className="shrink-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={previewUrl ?? ''} alt="Seller ID" style={{ width: 96, height: 60, objectFit: 'cover', border: '1px solid #d5c697' }} />
+          <img src={previewUrl ?? ''} alt={name} style={{ width: 96, height: 60, objectFit: 'cover', border: '1px solid #d5c697' }} />
         </button>
       ) : (
         <div
@@ -79,10 +84,10 @@ export default function IdPhotoField({
       )}
       <div className="brs-strip-text min-w-[150px] flex-1">
         <div className="text-[13px]" style={{ color: '#1a1c1c' }}>
-          {working ? 'Working on the photo…' : autoFill?.reading ? 'Reading the ID…' : has ? 'Seller ID photo attached' : 'Seller ID photo (optional)'}
+          {working ? 'Working on the photo…' : autoFill?.reading ? 'Reading the ID…' : has ? `${name} attached` : `${name} (optional)`}
         </div>
         <div className="text-[11.5px]" style={{ color: note && !note.ok ? '#a32d2d' : '#746b5b' }}>
-          {note?.text ?? "Kept with this receipt. Not printed on the seller's copy."}
+          {note?.text ?? hint}
         </div>
       </div>
       {autoFill && (
@@ -93,7 +98,7 @@ export default function IdPhotoField({
             onChange={(event) => autoFill.onChange(event.target.checked)}
             style={{ width: 14, height: 14, accentColor: '#735c00' }}
           />
-          Fill form from ID
+          {words?.fill ?? 'Fill form from ID'}
         </label>
       )}
       <button type="button" className={buttonClass} style={buttonStyle} disabled={working} onClick={() => setCapturing(true)}>
@@ -109,11 +114,11 @@ export default function IdPhotoField({
       )}
       <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
 
-      {capturing && <IdPhotoCapture onCapture={onPick} onClose={() => setCapturing(false)} />}
+      {capturing && <IdPhotoCapture title={name} onCapture={onPick} onClose={() => setCapturing(false)} />}
       {viewing && previewUrl && (
-        <AdminModal title="Seller ID photo" onClose={() => setViewing(false)} maxWidth="max-w-3xl">
+        <AdminModal title={name} onClose={() => setViewing(false)} maxWidth="max-w-3xl">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={previewUrl} alt="Seller ID" className="mx-auto max-h-[75vh] w-auto max-w-full" />
+          <img src={previewUrl} alt={name} className="mx-auto max-h-[75vh] w-auto max-w-full" />
         </AdminModal>
       )}
     </div>

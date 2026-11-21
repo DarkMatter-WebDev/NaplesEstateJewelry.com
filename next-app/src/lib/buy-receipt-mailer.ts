@@ -2,6 +2,7 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { buildBuyReceiptEmail } from '@/lib/buy-receipt-email';
 import { BUY_RECEIPT_COLUMNS, type BuyReceiptRow } from '@/lib/buy-receipts';
+import { saveBuyReceiptEmailCopy } from '@/lib/email-copies';
 
 /**
  * Email the seller their copy of a buy receipt through Resend, then stamp
@@ -47,7 +48,9 @@ export async function sendBuyReceiptEmail(opts: {
     return { ok: false, error: 'The receipt could not be emailed. The receipt itself is saved.' };
   }
 
-  // Best effort: the email is already on its way.
+  // Best effort: the email is already on its way. The copy (2026-11-21) is its own
+  // write so a missing column (SQL not run) can never lose the emailed stamp.
+  await saveBuyReceiptEmailCopy(opts.supabase, opts.receipt.id, { html: content.html, text: content.text });
   const { data } = await opts.supabase
     .from('buy_receipts')
     .update({ emailed_at: new Date().toISOString(), emailed_to: to })

@@ -3,7 +3,7 @@
 > Status: **CONNECTED 2026-11-19 (owner: EasyPost funded, production key, 2 Netlify
 > variables, redeploy, Connect — `CHANGELOG.md` 2026-11-19 (5)–(6)).** Untested until the first
 > real shipment. Owner-approved design: mockup 4 (2026-11-05). **Expected-date email (2026-11-19 (7),
-> mockup 1): BUILT + STAGED, not pushed; SQL `supabase/order-tracking-expected-date-2026-11.sql`.**
+> mockup 1): SQL run + pushed by the owner 11-19 (8); untested until the first package.**
 
 ## What the customer gets
 

@@ -25,6 +25,7 @@ import {
 import { formatCurrency } from '@/types/sales';
 import { paperReceiptDocument } from '@/lib/order-receipt-paper';
 import { printPaperInFrame } from '@/lib/print-paper';
+import { fillPrivatePaper } from '@/components/admin/pickup/pickup-client';
 import {
   isMissingSalePrintTable,
   isPaperReceipt,
@@ -208,7 +209,13 @@ export default function PrintStation({ adminBasePath, adminEmail }: { adminBaseP
         if (!isPaperReceipt(row.paper)) {
           setNotice(`Sale ${row.order_number}: the receipt could not be read. Open the order and print it from there.`);
         } else {
-          await printPaperInFrame(paperReceiptDocument(row.paper));
+          // A pickup sheet (2026-11-21) carries its private ID photo / signature as paths: fill them first.
+          const filled = await fillPrivatePaper(row.paper);
+          try {
+            await printPaperInFrame(paperReceiptDocument(filled.paper));
+          } finally {
+            window.setTimeout(filled.release, 60_000);
+          }
         }
         if (!claimed) return;
         // Marked printed even when the paper was unreadable, so one bad row cannot hold the queue.

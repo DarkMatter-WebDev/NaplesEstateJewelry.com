@@ -4,7 +4,24 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-11-19 (7)**. Before that, **2026-11-19 (2)**. Before that, **2026-11-18 (12)**. Before that, **2026-11-18 (10)**. Before that, **2026-11-18 (6)**. Before that, **2026-11-18 (4)**. Before that, **2026-11-18 (2)**. Before that, **2026-11-16 (5)**. Before that, **2026-11-16 (1)**. Before that, **2026-11-10 (2)**. Before that, **2026-11-09 (3)**. Before that, **2026-11-09 (1)**. Before that, **2026-11-08 (1)**. Before that, **2026-11-05 (5)**. Before that, **2026-11-05 (2)**. Before that, **2026-11-02 (2)**.
+> compaction. Last reconciled: **2026-11-21 (3)**. Before that, **2026-11-21 (2)**. Before that, **2026-11-19 (7)**. Before that, **2026-11-19 (2)**. Before that, **2026-11-18 (12)**. Before that, **2026-11-18 (10)**. Before that, **2026-11-18 (6)**. Before that, **2026-11-18 (4)**. Before that, **2026-11-18 (2)**. Before that, **2026-11-16 (5)**. Before that, **2026-11-16 (1)**. Before that, **2026-11-10 (2)**. Before that, **2026-11-09 (3)**. Before that, **2026-11-09 (1)**. Before that, **2026-11-08 (1)**. Before that, **2026-11-05 (5)**. Before that, **2026-11-05 (2)**. Before that, **2026-11-02 (2)**.
+
+## Every logged customer email keeps its own copy; the viewer shows it in a SANDBOXED frame; older emails are rebuilt WITH a warning (2026-11-21)
+
+- **Copies:** every `order_emails` insert goes through `logOrderEmail` (`lib/email-copies.ts`) with the email's HTML + text (`body_html` / `body_text`); a wiring test fails on any direct `from('order_emails').insert(`. Buy receipts keep their latest sent copy (`emailed_html` / `emailed_text`) in a SEPARATE write, so a missing column can never lose the emailed stamp. Before `supabase/email-copies-2026-11.sql` runs, writes fall back to the bare row — the email itself is always sent first.
+- **Viewer:** `EmailCopyViewer` renders the copy in an `<iframe sandbox>` WITHOUT `allow-scripts` (links → new tab via `<base target="_blank">`); never `dangerouslySetInnerHTML` into the admin page (a test checks the sandbox).
+- **Older emails** (no copy): invoice / receipt, manual Fulfillment updates and pickup receipts are rebuilt from the order AS IT IS NOW and always carry "⚠ Rebuilt from the order as it is now…". The automatic delivery emails are NEVER rebuilt (they printed the carrier's scan of that moment) — the pop-up says so. Remote-sale invoices rebuild without their Pay block (the warning covers it).
+- Copies are text (~10–30 KB); pictures stay links. The pickup ID photo / signature are never in an email, so never in a copy.
+
+## Local Pickup: Log Pickup on the order page — the ID photo and signature are PRIVATE, the customer copy and email never carry the ID, the AI only fills empty boxes (2026-11-21)
+
+- **Where:** the Pickup card on a Local Pickup order (`shipping_method = 'pickup'`), never on an in-store sale (`in_store_*` — carried out at the counter). Logging marks the order Picked Up server-side and REPLACES the Fulfillment card's "picked up" email (one email, not two). `picked_up_at` is the first log and never moves.
+- **Signing:** finger on the device the admin holds, full screen, **no lock** (owner: *"admin will be right there"*), Pointer Events + `touch-action: none`; or paper (Save & Print). A finger signature is a lossless WebP; switching to paper removes it.
+- ⛔ **Private:** ID photo + signature only in the private `buy-receipt-ids` bucket under `order-pickups/<order id>/`, WebP checked, PATHS in `order_pickups`, shown by signed link only. The paper carries `data-nej-private` paths and the printing browser fills them (order page or Print Station) — never a stored URL. Delete Forever removes the folder.
+- ⛔ **Customer copy and email:** never the ID photo, ID type or last 4, the signature picture (email) or prices. The email goes to the BUYER's address even when someone else picks up.
+- **AI fill** (owner: *"fill the id info with AI like we do on the buy receipt"*): the buy receipt's own `/api/admin/buy-receipts/id-read` (nothing stored), EMPTY boxes only — ID type, last 4, a blank "Someone else" name. A name that does not match the buyer is a WARNING with a button, never an automatic switch.
+- **Statement** = `PICKUP_STATEMENT` in `lib/order-pickup.ts` (owner's yes to mockup 1); change the words there only.
+- **Copies:** store first, one job; store = ID + Staff line + order/print time beside the ID (no footer row — keeps ~6 items to one sheet); customer = name only + returns/hours footer; a paper pickup's customer copy has no signature row.
 
 ## Delivery emails, 4 of them: the expected-date email goes ONCE, in transit, with the carrier's date printed as given (2026-11-19)
 

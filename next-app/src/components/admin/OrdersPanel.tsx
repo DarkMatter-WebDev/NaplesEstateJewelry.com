@@ -14,6 +14,7 @@ import { buildAddressObject, generateOrderNumber, getProductImages, getProductMe
 import { calculateFlSalesTax, isFloridaState } from '@/lib/checkout-pricing';
 import { adminGetManualOrderProducts, adminUpdateProductsStatus } from '@/app/actions/admin-products';
 import { AppIcon } from '@/components/AppIcon';
+import { removeOrderPickupFiles } from '@/components/admin/pickup/pickup-client';
 import { EMPTY_SELECTION, bulkDeleteConfirmText, bulkDeleteLabel, selectionState, toggleAll, toggleId } from '@/lib/trash-selection';
 import {
   MARKETPLACE_LABEL,
@@ -470,6 +471,7 @@ export default function OrdersPanel({
       setMessage({ text: `Could not permanently delete order: ${error.message}`, ok: false });
       return;
     }
+    void removeOrderPickupFiles([order.id]);
     setOrders((current) => current.filter((existing) => existing.id !== order.id));
     setSelectedTrashIds((current) => (current.has(order.id) ? toggleId(current, order.id) : current));
     setMessage({ text: `Order ${order.order_number} permanently deleted.`, ok: true });
@@ -498,6 +500,7 @@ export default function OrdersPanel({
         setMessage({ text: `Could not permanently delete the selected orders: ${error.message}`, ok: false });
         return;
       }
+      void removeOrderPickupFiles(orderIds);
       const removed = new Set(orderIds);
       setOrders((current) => current.filter((existing) => !removed.has(existing.id)));
     }

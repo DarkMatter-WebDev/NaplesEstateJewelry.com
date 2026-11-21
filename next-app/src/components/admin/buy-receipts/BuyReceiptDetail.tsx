@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import AdminModal from '@/components/admin/AdminModal';
+import EmailCopyViewer from '@/components/admin/EmailCopyViewer';
 import {
   BUY_RECEIPT_VOID_REASON_MAX,
   buyReceiptLanguage,
@@ -42,6 +43,8 @@ const cardStyle = { borderColor: 'var(--color-outline-variant)' } as const;
 
 export default function BuyReceiptDetail({ adminBasePath, initialReceipt }: { adminBasePath: string; initialReceipt: BuyReceiptRow }) {
   const [receipt, setReceipt] = useState(initialReceipt);
+  /** The "Emailed to …" viewer pop-up (2026-11-21). */
+  const [viewingEmail, setViewingEmail] = useState(false);
   const [draft, setDraft] = useState<BuyReceiptDraft | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -272,7 +275,26 @@ export default function BuyReceiptDetail({ adminBasePath, initialReceipt }: { ad
           {receipt.updated_at !== receipt.created_at && (
             <div className="flex justify-between gap-3"><span style={hintStyle}>Last change</span><span className="text-right">{formatReceiptDateTime(receipt.updated_at)}{receipt.updated_by_email ? ` by ${receipt.updated_by_email}` : ''}</span></div>
           )}
-          <div className="flex justify-between gap-3"><span style={hintStyle}>Email</span><span className="text-right">{receipt.emailed_at ? `Emailed to ${receipt.emailed_to} · ${formatReceiptDateTime(receipt.emailed_at)}` : receipt.seller_email ? 'Not emailed' : 'No email address'}</span></div>
+          <div className="flex justify-between gap-3"><span style={hintStyle}>Email</span><span className="text-right">{receipt.emailed_at ? (
+            <button
+              type="button"
+              onClick={() => setViewingEmail(true)}
+              className="text-right underline decoration-dotted underline-offset-4 transition-colors hover:text-[var(--color-primary)] focus-visible:outline focus-visible:outline-2"
+              title="View the email that went out"
+            >
+              Emailed to {receipt.emailed_to} · {formatReceiptDateTime(receipt.emailed_at)} <span className="font-bold" style={{ color: 'var(--color-primary)' }}>View ›</span>
+            </button>
+          ) : receipt.seller_email ? 'Not emailed' : 'No email address'}</span></div>
+          {viewingEmail && receipt.emailed_at && (
+            <EmailCopyViewer
+              title="Seller's copy email"
+              url={`/api/admin/buy-receipts/${receipt.id}/email-copy`}
+              to={receipt.emailed_to ?? receipt.seller_email ?? ''}
+              subject={null}
+              sentLabel={formatReceiptDateTime(receipt.emailed_at)}
+              onClose={() => setViewingEmail(false)}
+            />
+          )}
           <div className="flex justify-between gap-3"><span style={hintStyle}>Seller&rsquo;s copy</span><span className="text-right">{buyReceiptLanguage(receipt) === 'es' ? 'Spanish' : 'English'}</span></div>
           <div className="flex justify-between gap-3"><span style={hintStyle}>Printing</span><span className="text-right">{receiptPrintLabel(receipt)}{receipt.printed_at ? ` · last ${formatReceiptDateTime(receipt.printed_at)}` : ''}</span></div>
           {isVoid && (
