@@ -7,6 +7,7 @@ import SaleStationPrint from '@/components/admin/instant-sale/SaleStationPrint';
 import { useIdPhotoUrl } from '@/components/admin/buy-receipts/buy-receipt-client';
 import { SHOWROOM_TIME_ZONE } from '@/lib/business-location';
 import { paperDateLine } from '@/lib/order-receipt-paper';
+import type { OrderLanguage } from '@/lib/order-language';
 import {
   buildPickupPaper,
   ORDER_PICKUP_SQL_FILE,
@@ -47,12 +48,18 @@ export default function OrderPickupPanel({
   order,
   initialPickup,
   pickupHours,
+  pickupHoursEs,
+  language = 'en',
   onPickedUp,
   onEmailSent,
 }: {
   order: PickupPanelOrder;
   initialPickup: OrderPickupState;
   pickupHours: string;
+  /** The hours in Spanish, for a Spanish customer copy (2026-11-21). */
+  pickupHoursEs?: string;
+  /** The order's customer language: the customer copy and the email follow it; the store copy stays English. */
+  language?: OrderLanguage;
   /** The server marked the order Picked Up. */
   onPickedUp: () => void;
   /** A pickup email went out: add it to the order's email history. */
@@ -76,7 +83,7 @@ export default function OrderPickupPanel({
   async function printHere(which: PickupCopies, row: OrderPickupRow | null) {
     setPrinting(true);
     try {
-      await printPickupHere(buildPickupPaper(order, row, { copies: which, hoursLine: pickupHours, printedAt: new Date().toISOString() }));
+      await printPickupHere(buildPickupPaper(order, row, { copies: which, hoursLine: pickupHours, hoursLineEs: pickupHoursEs, language, printedAt: new Date().toISOString() }));
     } catch {
       setMessage({ text: 'Printing did not start. Try Print Here again.', ok: false });
     } finally {
@@ -237,7 +244,7 @@ export default function OrderPickupPanel({
             <div className="flex flex-wrap gap-2">
               {hasEmail && (
                 <button type="button" className="outline-button text-sm" disabled={emailing} onClick={() => void sendEmail()}>
-                  {emailing ? 'Sending…' : pickup.emailed_at ? 'Email Again' : 'Email Now'}
+                  {emailing ? 'Sending…' : `${pickup.emailed_at ? 'Email Again' : 'Email Now'}${language === 'es' ? ' · Español' : ''}`}
                 </button>
               )}
               <button type="button" className="outline-button text-sm" onClick={() => { setMessage(null); setLogOpen(true); }}>Edit Pickup</button>

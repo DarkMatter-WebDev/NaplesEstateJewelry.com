@@ -34,6 +34,8 @@ import { normalizeUsState } from '@/lib/us-address';
 import SaleItemsEditor, { newSaleItem, saleItemLabel, saleItemPayload, saleItemsProblem, type InStoreProduct, type SaleItemDraft } from './SaleItemsEditor';
 import SaleDeliverySection, { EMPTY_SALE_ADDRESS, type DeliveryMethod, type SaleAddressDraft } from './SaleDeliverySection';
 import RemoteInvoiceCard from './RemoteInvoiceCard';
+import ReceiptLanguageSwitch from '@/components/admin/instant-sale/ReceiptLanguageSwitch';
+import type { OrderLanguage } from '@/lib/order-language';
 
 const label = 'form-label';
 const labelStyle = { color: 'var(--color-primary)' } as const;
@@ -110,6 +112,8 @@ export default function RemoteSaleForm({
   const [payPhone, setPayPhone] = useState(start?.pay.phone ?? false);
   const [linkDays, setLinkDays] = useState<RemoteLinkDays>(start?.linkDays ?? REMOTE_LINK_DAYS_DEFAULT);
   const [message, setMessage] = useState(start?.message ?? '');
+  // "Receipt language" (owner, 2026-11-21): the invoice email, the Pay page it links to and the receipt.
+  const [receiptLanguage, setReceiptLanguage] = useState<OrderLanguage>(start?.receiptLanguage === 'es' ? 'es' : 'en');
   const [draftId, setDraftId] = useState<string | null>(draft?.id ?? null);
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(draft?.updatedAt ?? null);
   const [draftBusy, setDraftBusy] = useState(false);
@@ -160,6 +164,7 @@ export default function RemoteSaleForm({
       pay: { online: payOnline, zelle: payZelle, check: payCheck, phone: payPhone },
       linkDays,
       message,
+      receiptLanguage,
     };
   }
 
@@ -206,7 +211,7 @@ export default function RemoteSaleForm({
     setItems([newSaleItem()]);
     setFirstName(''); setLastName(''); setEmail(''); setPhone('');
     setDelivery('pickup'); setMailingOn(false); setAddress(EMPTY_SALE_ADDRESS); setShipping('insured'); setCustomFee('');
-    setPayOnline(true); setPayZelle(true); setPayCheck(false); setPayPhone(false); setLinkDays(REMOTE_LINK_DAYS_DEFAULT); setMessage('');
+    setPayOnline(true); setPayZelle(true); setPayCheck(false); setPayPhone(false); setLinkDays(REMOTE_LINK_DAYS_DEFAULT); setMessage(''); setReceiptLanguage('en');
     setTaxBox(newTaxExemptBox());
     setError(null); setSent(null);
   }
@@ -241,6 +246,7 @@ export default function RemoteSaleForm({
           pay: { online: payOnline, zelle: payZelle, check: payCheck, phone: payPhone },
           linkDays,
           message,
+          receiptLanguage,
           taxExempt: taxExemptPayload(taxBox),
           draftId,
         }),
@@ -323,6 +329,12 @@ export default function RemoteSaleForm({
               <input className="form-field" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(239) 555-0134" autoComplete="off" />
               <span className="mt-1 block text-xs" style={hintStyle}>Left blank, the customer fills it in when paying.</span>
             </label>
+          </div>
+          <div className="grid gap-1">
+            <ReceiptLanguageSwitch value={receiptLanguage} onChange={setReceiptLanguage} disabled={busy} />
+            {receiptLanguage === 'es' && (
+              <span className="text-xs" style={hintStyle}>The invoice email, its Pay page and the receipt are in Spanish. Your message prints as you type it.</span>
+            )}
           </div>
           <TaxExemptSaleBox box={taxBox} onChange={(next) => { setTaxBox(next); setError(null); }} />
         </section>

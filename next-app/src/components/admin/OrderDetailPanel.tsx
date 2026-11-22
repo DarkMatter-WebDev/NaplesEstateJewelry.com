@@ -13,7 +13,7 @@ import { buildInvoiceEmailContent, invoiceNumberForOrder, isOrderPaid, withInvoi
 import { buildFulfillmentUpdateEmailContent } from '@/lib/order-fulfillment-email';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 import { formatUsdPrice } from '@/lib/pricing';
-import { paymentMethodLabel } from '@/lib/in-store-sale';
+import { paymentMethodLabel, readSaleTradeIn } from '@/lib/in-store-sale';
 import { describeShippingService } from '@/lib/shipping-service';
 import { adminUpdateProductsStatus } from '@/app/actions/admin-products';
 import { AppIcon } from '@/components/AppIcon';
@@ -27,6 +27,8 @@ import OrderPickupPanel from '@/components/admin/pickup/OrderPickupPanel';
 import EmailCopyViewer from '@/components/admin/EmailCopyViewer';
 import { paperDateLine } from '@/lib/order-receipt-paper';
 import { isPickupOrder, type OrderPickupState } from '@/lib/order-pickup';
+import type { OrderLanguage } from '@/lib/order-language';
+import ReceiptLanguageSwitch from '@/components/admin/instant-sale/ReceiptLanguageSwitch';
 
 const GOLD = '#735c00';
 const BORDER = 'var(--color-outline-variant)';
@@ -98,6 +100,15 @@ interface Props {
   deliveryTrackingEnabled?: boolean;
   /** The Local Pickup log (lib/order-pickup.ts, 2026-11-21); `supported: false` until its SQL runs. */
   pickup?: OrderPickupState;
+  /** The pickup hours in Spanish (`formatPickupHours(schedule, 'es')`), for Spanish previews and prints. */
+  pickupHoursEs?: string;
+  /**
+   * The customer's receipt language (lib/order-language.ts, 2026-11-21) and
+   * whether its SQL has run (the switch is hidden until then).
+   */
+  customerLanguage?: { value: OrderLanguage; ready: boolean };
+  /** Listing id → Spanish title, for the Spanish email preview. */
+  spanishTitles?: Record<string, string>;
 }
 
 export default function OrderDetailPanel({
@@ -116,6 +127,9 @@ export default function OrderDetailPanel({
   deliveryTracking: initialDeliveryTracking = null,
   deliveryTrackingEnabled = false,
   pickup = { supported: true, row: null },
+  pickupHoursEs,
+  customerLanguage: initialCustomerLanguage = { value: 'en', ready: false },
+  spanishTitles = {},
 }: Props) {
   const router = useRouter();
   const supabase = createClient();
@@ -125,6 +139,10 @@ export default function OrderDetailPanel({
   const [order, setOrder] = useState(initialOrder);
   const [invoices, setInvoices] = useState(initialInvoices);
   const [orderEmails, setOrderEmails] = useState<OrderEmail[]>(initialOrderEmails);
+  // The Language switch (2026-11-21): the customer's emails and printouts from now on.
+  const [customerLanguage, setCustomerLanguage] = useState<OrderLanguage>(initialCustomerLanguage.value);
+  const [languageSaving, setLanguageSaving] = useState(false);
+  const languageTag = customerLanguage === 'es' ? ' · Español' : '';
   /** The Email History row open in the viewer pop-up (2026-11-21). */
   const [viewingEmail, setViewingEmail] = useState<OrderEmail | null>(null);
   const [internalNotes, setInternalNotes] = useState(order.internal_notes ?? '');
@@ -132,6 +150,10 @@ export default function OrderDetailPanel({
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  // A Trade-in sale (2026-11-21): the buy receipt its credit came from. Moving the sale to the
+  // Recycle Bin ASKS whether that receipt is voided too (owner pick 5) — unticked unless ticked.
+  const tradeIn = readSaleTradeIn(order.trade_in);
+  const [voidTradeReceipt, setVoidTradeReceipt] = useState(false);
   const [showFullRefundConfirm, setShowFullRefundConfirm] = useState(false);
   const [showPartialRefund, setShowPartialRefund] = useState(false);
   const [partialRefundAmount, setPartialRefundAmount] = useState('');
@@ -163,11 +185,39 @@ export default function OrderDetailPanel({
   const invoiceNumber = invoiceNumberForOrder(order, latestInvoice?.invoice_number);
   const numericItemDiscounts = Object.fromEntries(Object.entries(itemDiscounts).map(([id, value]) => [id, Number(value) || 0]));
   const emailOrder = withInvoiceLineDiscounts(order, numericItemDiscounts);
-  const emailContent = buildInvoiceEmailContent(emailOrder, invoiceNumber, { pickupHours });
+  const emailContent = buildInvoiceEmailContent(emailOrder, invoiceNumber, {
+    pickupHours: customerLanguage === 'es' && pickupHoursEs ? pickupHoursEs : pickupHours,
+    language: customerLanguage,
+    spanishTitles: new Map(Object.entries(spanishTitles)),
+  });
   // Same flag the email-update route uses, so the preview matches what is sent.
   const emailUpdateContent = emailUpdateStatus
-    ? buildFulfillmentUpdateEmailContent(order, emailUpdateStatus, { deliveryUpdates: deliveryTrackingEnabled })
+    ? buildFulfillmentUpdateEmailContent(order, emailUpdateStatus, { deliveryUpdates: deliveryTrackingEnabled, language: customerLanguage })
     : null;
+
+  async function changeCustomerLanguage(next: OrderLanguage) {
+    if (next === customerLanguage || languageSaving) return;
+    setLanguageSaving(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/admin/orders/${order.id}/language`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ language: next }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setMessage({ text: data.error ?? 'Could not change the language.', ok: false });
+        return;
+      }
+      setCustomerLanguage(next);
+      setMessage({ text: next === 'es' ? 'Receipts, emails and prints for this order are now in Spanish.' : 'Receipts, emails and prints for this order are now in English.', ok: true });
+    } catch {
+      setMessage({ text: 'Could not reach the server. The language did not change.', ok: false });
+    } finally {
+      setLanguageSaving(false);
+    }
+  }
   const persistedLineDiscount = order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(item.discount ?? 0), orderItemLineSubtotal(item)), 0);
   const editedLineDiscount = order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(itemDiscounts[item.id]) || 0, orderItemLineSubtotal(item)), 0);
   const orderLevelDiscount = Math.max(order.discount - persistedLineDiscount, 0);
@@ -470,6 +520,20 @@ export default function OrderDetailPanel({
       setSaving(null);
       return;
     }
+    if (tradeIn && voidTradeReceipt) {
+      // The sale is already in the Recycle Bin; a receipt that will not void is said, not hidden.
+      const voided = await fetch(`/api/admin/buy-receipts/${tradeIn.buy_receipt_id}/void`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: `Trade-in sale ${order.order_number} moved to the Recycle Bin` }),
+      }).catch(() => null);
+      if (!voided?.ok) {
+        const data = (await voided?.json().catch(() => null)) as { error?: string } | null;
+        setMessage({ text: `The order is in the Recycle Bin, but ${tradeIn.receipt_number} was not voided${data?.error ? ` (${data.error})` : ''} — void it in Buy Receipts.`, ok: false });
+        setSaving(null);
+        return;
+      }
+    }
     startRouteProgress(`${adminBasePath}/orders`);
     router.push(`${adminBasePath}/orders`);
   }
@@ -662,7 +726,7 @@ export default function OrderDetailPanel({
           </div>
           <div className="flex flex-col gap-2">
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => setShowEmailInvoice(true)} className="outline-button text-sm">Email {invoiceDocLabel}</button>
+              <button type="button" onClick={() => setShowEmailInvoice(true)} className="outline-button text-sm">Email {invoiceDocLabel}{languageTag}</button>
               <button type="button" onClick={openOrderPrintPreview} className="outline-button text-sm">Print Order</button>
               <button
                 type="button"
@@ -760,6 +824,15 @@ export default function OrderDetailPanel({
                 <span className="text-sm" style={{ color: 'var(--color-on-surface)' }}>
                   Move this order to the Recycle Bin? You can restore the order later.
                 </span>
+                {tradeIn && (
+                  <label className="flex w-full items-start gap-2 text-sm" style={{ color: 'var(--color-on-surface)' }}>
+                    <input type="checkbox" className="mt-1 h-4 w-4" style={{ accentColor: 'var(--color-primary)' }} checked={voidTradeReceipt} onChange={(event) => setVoidTradeReceipt(event.target.checked)} />
+                    <span>
+                      This sale was paid with trade-in credit from buy receipt <strong>{tradeIn.receipt_number}</strong>. <strong>Also void {tradeIn.receipt_number}.</strong>
+                      <span className="block text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>Left unticked, the buy receipt is not changed. A void cannot be undone.</span>
+                    </span>
+                  </label>
+                )}
                 <button
                   type="button"
                   onClick={() => { setShowDeleteConfirm(false); deleteOrder(); }}
@@ -865,6 +938,16 @@ export default function OrderDetailPanel({
                 <Field label="Email" value={order.customer_email} />
                 <Field label="Phone" value={order.customer_phone} />
               </div>
+              {initialCustomerLanguage.ready && (
+                <div className="mt-4 grid gap-1">
+                  <ReceiptLanguageSwitch label="Language" value={customerLanguage} onChange={(next) => void changeCustomerLanguage(next)} disabled={languageSaving} />
+                  <span className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                    {customerLanguage === 'es'
+                      ? 'The customer’s receipt, emails and printouts are in Spanish. Your copies stay in English. Emails already sent stay as they were.'
+                      : 'The customer’s receipt, emails and printouts are in English.'}
+                  </span>
+                </div>
+              )}
               {(() => {
                 const shipping = formatOrderAddress(order.shipping_address);
                 const billing = formatOrderAddress(order.billing_address);
@@ -1180,6 +1263,8 @@ export default function OrderDetailPanel({
                 order={order}
                 initialPickup={pickup}
                 pickupHours={pickupHours}
+                pickupHoursEs={pickupHoursEs}
+                language={customerLanguage}
                 onPickedUp={() => setOrder((current) => ({ ...current, fulfillment_status: 'picked_up' }))}
                 onEmailSent={(entry) => recordSentEmail(entry)}
               />
@@ -1250,6 +1335,13 @@ export default function OrderDetailPanel({
             </div>
             <div className="border-t mt-4 pt-4 text-sm" style={{ borderColor: BORDER, color: 'var(--color-on-surface-variant)' }}>
               <div>Payment method: {paymentMethodLabel(order.payment_method)}</div>
+              {tradeIn && (
+                <div>
+                  Trade-in: {formatCurrency(tradeIn.value)} of gold on{' '}
+                  <Link href={`${adminBasePath}/buy-receipts/${tradeIn.buy_receipt_id}`} className="font-bold underline-offset-4 hover:underline" style={{ color: 'var(--color-primary)' }}>{tradeIn.receipt_number} ›</Link>
+                  {tradeIn.description ? <span className="block text-xs">{tradeIn.description}</span> : null}
+                </div>
+              )}
               <div>Reference: {order.payment_reference || '-'}</div>
               {(() => {
                 // Which SERVICE was bought (Priority vs Express vs Registered) —
@@ -1339,7 +1431,7 @@ export default function OrderDetailPanel({
 
             <div className="border-b px-5 py-5 pr-16 md:px-7" style={{ borderColor: BORDER }}>
               <p className="text-[0.65rem] font-bold uppercase tracking-[0.28em]" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-                Email {invoiceDocLabel}
+                Email {invoiceDocLabel}{languageTag}
               </p>
               <h2 className="mt-2 text-2xl font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
                 Preview and Recipient
@@ -1461,7 +1553,7 @@ export default function OrderDetailPanel({
                   Close
                 </button>
                 <button type="button" onClick={sendInvoiceEmail} disabled={emailSending} className="gold-button justify-center text-sm disabled:opacity-50">
-                  {emailSending ? 'Sending...' : `Send ${invoiceDocLabel} Email`}
+                  {emailSending ? 'Sending...' : `Send ${invoiceDocLabel} Email${languageTag}`}
                 </button>
               </div>
             </div>
@@ -1484,7 +1576,7 @@ export default function OrderDetailPanel({
 
             <div className="border-b px-5 py-5 pr-16 md:px-7" style={{ borderColor: BORDER }}>
               <p className="text-[0.65rem] font-bold uppercase tracking-[0.28em]" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-                Email Update
+                Email Update{languageTag}
               </p>
               <h2 className="mt-2 text-2xl font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
                 Notify Customer{emailUpdateStatus ? `: ${orderStatusLabel(emailUpdateStatus)}` : ''}

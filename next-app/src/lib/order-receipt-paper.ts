@@ -19,10 +19,11 @@ import type { Order, OrderItem } from '@/types/sales';
 import { formatCurrency, formatPublicPurity } from '@/types/sales';
 import { formatProductItemYear } from '@/types/product';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
-import { cityLine, landmarkPhrase, SHOWROOM_TIME_ZONE, streetLine } from '@/lib/business-location';
+import { cityLine, landmarkPhrase, streetLine } from '@/lib/business-location';
 import { BUSINESS_PHONE, SITE_DOMAIN_LABEL } from '@/lib/order-email-branding';
-import { paidByLines } from '@/lib/in-store-sale';
-import { exemptReceiptLine, type TaxExemptSnapshot } from '@/lib/tax-exempt';
+import { readSaleTradeIn, tradeInReceiptLine } from '@/lib/in-store-sale';
+import { type TaxExemptSnapshot } from '@/lib/tax-exempt';
+import { exemptReceiptLineIn, itemTitleIn, metalIn, orderDateTimeLine, paidByLinesIn, tradeInReceiptLineEs, type OrderLanguage } from '@/lib/order-language';
 
 export type PaperReceiptOrder = Pick<
   Order,
@@ -32,7 +33,9 @@ export type PaperReceiptOrder = Pick<
 > & {
   /** A split payment's parts (`SPLIT_PAYMENTS_COLUMN`, 2026-11-16) — one "Paid by" line each. */
   split_payments?: unknown;
-} & { order_items: Pick<OrderItem, 'inventory_number' | 'title_snapshot' | 'item_year_snapshot' | 'metal_snapshot' | 'purity_snapshot' | 'gram_weight_snapshot' | 'price_snapshot' | 'quantity' | 'discount' | 'image_snapshot'>[] };
+  /** A Trade-in sale's trade (`TRADE_IN_COLUMN`, 2026-11-21) — one line under the totals. */
+  trade_in?: unknown;
+} & { order_items: Pick<OrderItem, 'product_id' | 'inventory_number' | 'title_snapshot' | 'item_year_snapshot' | 'metal_snapshot' | 'purity_snapshot' | 'gram_weight_snapshot' | 'price_snapshot' | 'quantity' | 'discount' | 'image_snapshot'>[] };
 
 export type PaperReceipt = { title: string; css: string; body: string };
 
@@ -50,14 +53,9 @@ function esc(value: string): string {
     .replace(/'/g, '&#039;');
 }
 
-/** "October 21, 2026 · 3:42 PM" in Naples time. */
-export function paperDateLine(iso: string | null | undefined): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const date = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: SHOWROOM_TIME_ZONE }).format(d);
-  const time = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: SHOWROOM_TIME_ZONE }).format(d);
-  return `${date} · ${time}`;
+/** "October 21, 2026 · 3:42 PM" in Naples time ("21 de octubre de 2026 · 3:42 p. m." in Spanish). */
+export function paperDateLine(iso: string | null | undefined, language: OrderLanguage = 'en'): string {
+  return orderDateTimeLine(iso, language);
 }
 
 function addressLines(address: unknown): string[] {
@@ -79,23 +77,36 @@ export function isPaidStatus(status: string | null | undefined): boolean {
 
 /**
  * The paper for one order. `hoursLine` is the showroom's admin-editable hours
- * (`hoursLine(await getStoreHours(), false)`); without it the line is left out
- * rather than printing a stale default.
+ * (`hoursLine(await getStoreHours(), language === 'es')`); without it the line
+ * is left out rather than printing a stale default.
+ *
+ * `language` (2026-11-21): 'es' prints every word the site prints in Spanish;
+ * what was typed (names, unlisted titles, the trade description) prints as
+ * typed, and a listed piece uses its Spanish title from `spanishTitles`.
+ * English prints exactly as before.
  */
 export function buildPaperReceipt(
   order: PaperReceiptOrder,
-  opts: { invoiceNumber?: string | null; hoursLine?: string | null; taxExempt?: TaxExemptSnapshot | null } = {},
+  opts: {
+    invoiceNumber?: string | null;
+    hoursLine?: string | null;
+    taxExempt?: TaxExemptSnapshot | null;
+    language?: OrderLanguage;
+    spanishTitles?: Map<string, string> | null;
+  } = {},
 ): PaperReceipt {
+  const language = opts.language ?? 'en';
+  const es = language === 'es';
   const paid = isPaidStatus(order.payment_status);
   const status = String(order.payment_status ?? '').toLowerCase();
-  const kind = paid ? 'RECEIPT' : 'INVOICE';
+  const kind = paid ? (es ? 'RECIBO' : 'RECEIPT') : (es ? 'FACTURA' : 'INVOICE');
   const badge = status === 'refunded'
-    ? { text: 'REFUNDED', tone: 'grey' }
+    ? { text: es ? 'REEMBOLSADO' : 'REFUNDED', tone: 'grey' }
     : status === 'partially_refunded'
-      ? { text: 'PARTLY REFUNDED', tone: 'grey' }
+      ? { text: es ? 'REEMBOLSO PARCIAL' : 'PARTLY REFUNDED', tone: 'grey' }
       : paid
-        ? { text: 'PAID IN FULL', tone: 'green' }
-        : { text: 'UNPAID', tone: 'amber' };
+        ? { text: es ? 'PAGADO' : 'PAID IN FULL', tone: 'green' }
+        : { text: es ? 'SIN PAGAR' : 'UNPAID', tone: 'amber' };
   const ships = order.shipping_method === 'shipping';
   const shipTo = addressLines(order.shipping_address);
   const fulfilled = String(order.fulfillment_status ?? '').toLowerCase();
@@ -111,51 +122,66 @@ export function buildPaperReceipt(
     const detail = [
       item.inventory_number ? `#${item.inventory_number}` : null,
       year ? `Ca. ${year}` : null,
-      item.metal_snapshot,
+      metalIn(item.metal_snapshot, language),
       item.purity_snapshot ? formatPublicPurity(item.purity_snapshot) : null,
       item.gram_weight_snapshot ? `${item.gram_weight_snapshot} g` : null,
-      qty > 1 ? `Qty ${qty} × ${formatCurrency(Number(item.price_snapshot))}` : null,
+      qty > 1 ? `${es ? 'Cant.' : 'Qty'} ${qty} × ${formatCurrency(Number(item.price_snapshot))}` : null,
     ].filter(Boolean).join(' · ');
     const image = normalizeLegacyLocalImageUrl(item.image_snapshot);
     return `<tr>
 <td class="n">${index + 1}</td>
 ${anyPhoto ? `<td class="ph">${image ? `<img src="${esc(image)}" alt="">` : ''}</td>` : ''}
-<td><strong>${esc(item.title_snapshot)}</strong>${detail ? `<span>${esc(detail)}</span>` : ''}</td>
+<td><strong>${esc(itemTitleIn(item, language, opts.spanishTitles))}</strong>${detail ? `<span>${esc(detail)}</span>` : ''}</td>
 <td class="m">${discount > 0 ? `<s>${esc(formatCurrency(lineSubtotal))}</s>` : ''}${esc(formatCurrency(lineSubtotal - discount))}</td>
 </tr>`;
   }).join('');
 
   const count = items.reduce((sum, item) => sum + qtyOf(item), 0);
-  const paidBy = paid ? paidByLines(order) : ['Not paid yet'];
+  const paidBy = paid ? paidByLinesIn(order, language) : [es ? 'Aún sin pagar' : 'Not paid yet'];
+  const tradeIn = readSaleTradeIn(order.trade_in);
+  const pickedUp = fulfilled === 'picked_up' || fulfilled === 'delivered';
   const delivery = ships
-    ? `<div class="lab">Ship to</div>${shipTo.length > 0 ? shipTo.map(esc).join('<br>') : 'Address to come'}`
-    : `<div class="lab">Delivery</div>${fulfilled === 'picked_up' || fulfilled === 'delivered' ? 'Picked up in store' : 'Pickup at the showroom'}`;
+    ? `<div class="lab">${es ? 'Enviar a' : 'Ship to'}</div>${shipTo.length > 0 ? shipTo.map(esc).join('<br>') : es ? 'Dirección pendiente' : 'Address to come'}`
+    : es
+      ? `<div class="lab">Entrega</div>${pickedUp ? 'Recogido en la tienda' : 'Recoger en el salón'}`
+      : `<div class="lab">Delivery</div>${pickedUp ? 'Picked up in store' : 'Pickup at the showroom'}`;
   const contact = [order.customer_email, order.customer_phone].filter(Boolean).map((v) => esc(String(v))).join(' · ');
 
+  const taxLabel = es
+    ? (opts.taxExempt ? 'Impuesto de ventas de FL · exento' : Number(order.tax) > 0 ? 'Impuesto de ventas de FL · 6%' : 'Impuesto de ventas')
+    : (opts.taxExempt ? 'FL sales tax · exempt' : Number(order.tax) > 0 ? 'FL sales tax · 6%' : 'Sales tax');
   const totals = [
-    `<div><span>Subtotal · ${count} item${count === 1 ? '' : 's'}</span><span>${esc(formatCurrency(order.subtotal))}</span></div>`,
-    Number(order.discount) > 0 ? `<div><span>Discount</span><span>−${esc(formatCurrency(order.discount))}</span></div>` : '',
-    ships ? `<div><span>Shipping${Number(order.shipping_fee) > 0 ? '' : ' · no charge'}</span><span>${esc(formatCurrency(order.shipping_fee))}</span></div>` : '',
-    `<div><span>${opts.taxExempt ? 'FL sales tax · exempt' : Number(order.tax) > 0 ? 'FL sales tax · 6%' : 'Sales tax'}</span><span>${esc(formatCurrency(order.tax))}</span></div>`,
-    `<div class="big"><span>${paid ? 'Total paid' : 'Total due'}</span><span>${esc(formatCurrency(order.total))}</span></div>`,
+    es
+      ? `<div><span>Subtotal · ${count} artículo${count === 1 ? '' : 's'}</span><span>${esc(formatCurrency(order.subtotal))}</span></div>`
+      : `<div><span>Subtotal · ${count} item${count === 1 ? '' : 's'}</span><span>${esc(formatCurrency(order.subtotal))}</span></div>`,
+    Number(order.discount) > 0 ? `<div><span>${es ? 'Descuento' : 'Discount'}</span><span>−${esc(formatCurrency(order.discount))}</span></div>` : '',
+    ships ? `<div><span>${es ? 'Envío' : 'Shipping'}${Number(order.shipping_fee) > 0 ? '' : es ? ' · sin cargo' : ' · no charge'}</span><span>${esc(formatCurrency(order.shipping_fee))}</span></div>` : '',
+    `<div><span>${taxLabel}</span><span>${esc(formatCurrency(order.tax))}</span></div>`,
+    `<div class="big"><span>${paid ? (es ? 'Total pagado' : 'Total paid') : (es ? 'Total a pagar' : 'Total due')}</span><span>${esc(formatCurrency(order.total))}</span></div>`,
   ].join('');
 
-  const title = `${kind === 'RECEIPT' ? 'Receipt' : 'Invoice'} ${order.order_number}`;
+  const title = es
+    ? `${paid ? 'Recibo' : 'Factura'} ${order.order_number}`
+    : `${kind === 'RECEIPT' ? 'Receipt' : 'Invoice'} ${order.order_number}`;
+  const footer = es
+    ? `<strong>¡Gracias!</strong> ¿Preguntas? Llame o envíe un texto al ${esc(BUSINESS_PHONE)} · Vea este pedido cuando quiera en ${esc(SITE_DOMAIN_LABEL)}/es/order-lookup${opts.hoursLine ? `<br>Salón: ${esc(opts.hoursLine)} · ${esc(landmarkPhrase(true))}` : ''}`
+    : `<strong>Thank you!</strong> Questions? Call or text ${esc(BUSINESS_PHONE)} · View this order anytime at ${esc(SITE_DOMAIN_LABEL)}/order-lookup${opts.hoursLine ? `<br>Showroom: ${esc(opts.hoursLine)} · ${esc(landmarkPhrase(false))}` : ''}`;
   const body = `<div class="nej-paper">
 <div class="top">
   <div class="brand"><img src="${LOGO_PATH}" alt=""><div><div class="name">Naples Estate Jewelry</div><div class="addr">${esc(streetLine())}, ${esc(cityLine())} · ${esc(BUSINESS_PHONE)}<br>${esc(SITE_DOMAIN_LABEL)}</div></div></div>
-  <div class="doc"><div class="kind">${kind}</div><div class="meta">Order ${esc(order.order_number)}${!paid && opts.invoiceNumber ? `<br>${esc(opts.invoiceNumber)}` : ''}<br>${esc(paperDateLine(order.created_at))}</div><span class="badge ${badge.tone}">${badge.text}</span></div>
+  <div class="doc"><div class="kind">${kind}</div><div class="meta">${es ? 'Pedido' : 'Order'} ${esc(order.order_number)}${!paid && opts.invoiceNumber ? `<br>${esc(opts.invoiceNumber)}` : ''}<br>${esc(paperDateLine(order.created_at, language))}</div><span class="badge ${badge.tone}">${badge.text}</span></div>
 </div>
 <div class="info">
-  <div><div class="lab">${paid ? 'Sold to' : 'Bill to'}</div>${esc(order.customer_name || '—')}${contact ? `<br>${contact}` : ''}</div>
-  <div><div class="lab">Paid by</div>${paidBy.map(esc).join('<br>')}</div>
+  <div><div class="lab">${paid ? (es ? 'Vendido a' : 'Sold to') : (es ? 'Facturar a' : 'Bill to')}</div>${esc(order.customer_name || '—')}${contact ? `<br>${contact}` : ''}</div>
+  <div><div class="lab">${es ? 'Forma de pago' : 'Paid by'}</div>${paidBy.map(esc).join('<br>')}</div>
   <div>${delivery}</div>
 </div>
-<table><thead><tr><th></th>${anyPhoto ? '<th></th>' : ''}<th>Item</th><th class="m">Price</th></tr></thead><tbody>${rows}</tbody></table>
+<table><thead><tr><th></th>${anyPhoto ? '<th></th>' : ''}<th>${es ? 'Artículo' : 'Item'}</th><th class="m">${es ? 'Precio' : 'Price'}</th></tr></thead><tbody>${rows}</tbody></table>
 <div class="totals">${totals}</div>${opts.taxExempt ? `
-<div class="exempt">${esc(exemptReceiptLine(opts.taxExempt))}</div>` : ''}
+<div class="exempt">${esc(exemptReceiptLineIn(opts.taxExempt, language))}</div>` : ''}${tradeIn ? `
+<div class="exempt">${esc(es ? tradeInReceiptLineEs(tradeIn) : tradeInReceiptLine(tradeIn))}</div>` : ''}
 <div class="foot">
-  <strong>Thank you!</strong> Questions? Call or text ${esc(BUSINESS_PHONE)} · View this order anytime at ${esc(SITE_DOMAIN_LABEL)}/order-lookup${opts.hoursLine ? `<br>Showroom: ${esc(opts.hoursLine)} · ${esc(landmarkPhrase(false))}` : ''}
+  ${footer}
 </div>
 </div>`;
 

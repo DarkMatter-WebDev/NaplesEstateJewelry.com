@@ -7,7 +7,9 @@ import { buildPaperReceipt, isPaidStatus } from '@/lib/order-receipt-paper';
 import { hoursLine } from '@/lib/business-location';
 import { getStoreHours } from '@/lib/store-hours';
 import { loadOrderTaxExemption } from '@/lib/tax-exempt-server';
-import { SPLIT_PAYMENTS_COLUMN } from '@/lib/in-store-sale';
+import { SPLIT_PAYMENTS_COLUMN, TRADE_IN_COLUMN } from '@/lib/in-store-sale';
+import { loadOrderLanguage, loadSpanishItemTitles } from '@/lib/order-language-server';
+import { printLanguage } from '@/lib/order-language';
 import type { Order, OrderItem } from '@/types/sales';
 import CustomerModeTabGuard from '@/components/admin/buy-receipts/CustomerModeTabGuard';
 import PrintInvoiceClient from './PrintInvoiceClient';
@@ -28,12 +30,13 @@ const INVOICE_COLUMNS = [
   'payment_status',
   'payment_method',
   SPLIT_PAYMENTS_COLUMN,
+  TRADE_IN_COLUMN,
   'fulfillment_status',
   'order_status',
   'shipping_method',
   'shipping_address',
   'created_at',
-  'order_items(id, order_id, inventory_number, title_snapshot, item_year_snapshot, metal_snapshot, purity_snapshot, gram_weight_snapshot, price_snapshot, quantity, discount, image_snapshot)',
+  'order_items(id, order_id, product_id, inventory_number, title_snapshot, item_year_snapshot, metal_snapshot, purity_snapshot, gram_weight_snapshot, price_snapshot, quantity, discount, image_snapshot)',
 ].join(', ');
 
 const INVOICE_COLUMNS_WITHOUT_ITEM_YEAR = INVOICE_COLUMNS
@@ -47,10 +50,12 @@ function isMissingItemYearColumnError(error: { message?: string | null } | null 
 
 interface Props {
   params: Promise<{ locale: string; id: string }>;
+  searchParams: Promise<{ lang?: string | string[] }>;
 }
 
-export default async function AdminOrderInvoicePrintPage({ params }: Props) {
+export default async function AdminOrderInvoicePrintPage({ params, searchParams }: Props) {
   const { locale, id } = await params;
+  const { lang } = await searchParams;
   const isEs = locale === 'es';
   const adminBasePath = isEs ? '/es/admin' : '/admin';
 
@@ -95,11 +100,17 @@ export default async function AdminOrderInvoicePrintPage({ params }: Props) {
 
   const typedOrder = order as unknown as Order & { order_items: OrderItem[] };
   const latestInvoiceNumber = invoices?.[0]?.invoice_number ?? null;
+  // The customer's language (2026-11-21): the order's, unless "Print in" picked the other.
+  const orderLanguage = await loadOrderLanguage(supabase, id);
+  const language = printLanguage(lang, orderLanguage);
+  const es = language === 'es';
   // The one-page paper (2026-10-21), not the email's HTML.
   const paper = buildPaperReceipt(typedOrder, {
     invoiceNumber: invoiceNumberForOrder(typedOrder, latestInvoiceNumber),
-    hoursLine: hoursLine(await getStoreHours(), false),
+    hoursLine: hoursLine(await getStoreHours(), es),
     taxExempt: await loadOrderTaxExemption(supabase, id),
+    language,
+    spanishTitles: es ? await loadSpanishItemTitles(supabase, typedOrder.order_items.map((item) => item.product_id)) : null,
   });
 
   return (
@@ -109,6 +120,9 @@ export default async function AdminOrderInvoicePrintPage({ params }: Props) {
         label={isPaidStatus(typedOrder.payment_status) ? `Receipt · ${typedOrder.order_number}` : `Invoice · ${invoiceNumberForOrder(typedOrder, latestInvoiceNumber)}`}
         orderNumber={typedOrder.order_number}
         backHref={`${adminBasePath}/orders/${id}`}
+        language={language}
+        orderLanguage={orderLanguage}
+        basePath={`${adminBasePath}/orders/${id}/invoice`}
       />
       {/* No admin menu on this page, so the guard the menu carries is added here. Draws nothing. */}
       <CustomerModeTabGuard />

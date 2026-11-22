@@ -4,7 +4,7 @@ import { revalidatePath, revalidateTag } from 'next/cache';
 import { finalizePaidOrder } from '@/lib/order-finalize';
 import { scheduleProductStatusHooks } from '@/lib/product-status-hooks';
 import { getProductImages, getProductMetal, getProductWeight } from '@/lib/sales';
-import type { InStoreItem, SalePaidBy, SalePaymentPart } from '@/lib/in-store-sale';
+import type { InStoreItem, SalePaidBy, SalePaymentPart, SaleTradeIn } from '@/lib/in-store-sale';
 import { isProductPurchasable, type Product } from '@/types/product';
 
 // Instant Sale (owner, 2026-10-21): the server steps the In-store sale and the
@@ -104,6 +104,8 @@ export async function recordOfflinePayment(
     note: string | null;
     recordedBy: string | null;
     sendCustomerReceipt: boolean;
+    /** A Trade-in sale (2026-11-21): the buy receipt the credit came from, for the customer's receipt. */
+    trade?: SaleTradeIn | null;
   },
 ): Promise<{ ok: true; receiptEmailed: boolean } | { ok: false; error: string; status: number }> {
   const { data: captured, error: captureError } = await service.rpc('capture_paypal_order', {
@@ -115,7 +117,9 @@ export async function recordOfflinePayment(
     p_payment_response: {
       source: input.captureIdPrefix === 'remote' ? 'remote_sale' : 'in_store',
       paid_by: input.paidBy,
-      ...(input.paidBy === 'split' ? { payments: input.payments } : {}),
+      // A trade-in keeps its parts even when the credit is the only one: it carries the BUY number.
+      ...(input.paidBy === 'split' || input.trade ? { payments: input.payments } : {}),
+      ...(input.trade ? { trade: input.trade } : {}),
       note: input.note,
       recorded_by: input.recordedBy,
     },

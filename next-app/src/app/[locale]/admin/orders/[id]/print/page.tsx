@@ -5,6 +5,8 @@ import { getVerifiedUser } from '@/lib/auth-claims';
 import { invoiceNumberForOrder } from '@/lib/order-invoice-email';
 import type { Order, OrderItem } from '@/types/sales';
 import CustomerModeTabGuard from '@/components/admin/buy-receipts/CustomerModeTabGuard';
+import { loadOrderLanguage, loadSpanishItemTitles } from '@/lib/order-language-server';
+import { printLanguage } from '@/lib/order-language';
 import PrintOrderClient from './PrintOrderClient';
 
 export const metadata: Metadata = { title: 'Print Order' };
@@ -65,10 +67,12 @@ function isMissingDeletedAtColumnError(error: { message?: string | null } | null
 
 interface Props {
   params: Promise<{ locale: string; id: string }>;
+  searchParams: Promise<{ lang?: string | string[] }>;
 }
 
-export default async function AdminOrderPrintPage({ params }: Props) {
+export default async function AdminOrderPrintPage({ params, searchParams }: Props) {
   const { locale, id } = await params;
+  const { lang } = await searchParams;
   const isEs = locale === 'es';
   const adminBasePath = isEs ? '/es/admin' : '/admin';
 
@@ -142,6 +146,12 @@ export default async function AdminOrderPrintPage({ params }: Props) {
 
   const typedOrder = order as unknown as Order & { order_items: OrderItem[] };
   const invoiceNumber = invoiceNumberForOrder(typedOrder, invoices?.[0]?.invoice_number ?? null);
+  // The order's language unless "Print in" picked the other (2026-11-21).
+  const orderLanguage = await loadOrderLanguage(supabase, id);
+  const language = printLanguage(lang, orderLanguage);
+  const spanishTitles = language === 'es'
+    ? Object.fromEntries(await loadSpanishItemTitles(supabase, typedOrder.order_items.map((item) => item.product_id)))
+    : null;
 
   return (
     <>
@@ -151,6 +161,10 @@ export default async function AdminOrderPrintPage({ params }: Props) {
         invoiceNumber={invoiceNumber}
         order={typedOrder}
         printedAt={new Date().toISOString()}
+        language={language}
+        orderLanguage={orderLanguage}
+        spanishTitles={spanishTitles}
+        basePath={`${adminBasePath}/orders/${id}/print`}
       />
       {/* No admin menu on this page, so the guard the menu carries is added here. Draws nothing. */}
       <CustomerModeTabGuard />

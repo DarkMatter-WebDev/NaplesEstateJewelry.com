@@ -4,6 +4,7 @@ import type { FulfillmentStatus } from '@/types/sales';
 import { buildFulfillmentUpdateEmailContent } from '@/lib/order-fulfillment-email';
 import { isDeliveryTrackingConfigured } from '@/lib/easypost';
 import { logOrderEmail } from '@/lib/email-copies';
+import { loadOrderLanguage } from '@/lib/order-language-server';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -73,7 +74,11 @@ export async function POST(req: Request, { params }: Props) {
     ...order,
     shipping_carrier: 'shipping_carrier' in order ? order.shipping_carrier : null,
     tracking_number: 'tracking_number' in order ? order.tracking_number : null,
-  }, status, { deliveryUpdates: isDeliveryTrackingConfigured() });
+  }, status, {
+    deliveryUpdates: isDeliveryTrackingConfigured(),
+    // The customer's language (2026-11-21): Spanish when the order is set to Español.
+    language: await loadOrderLanguage(supabase, id),
+  });
 
   try {
     const { Resend } = await import('resend');

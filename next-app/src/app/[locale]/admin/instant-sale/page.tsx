@@ -33,14 +33,14 @@ export default async function AdminInstantSalePage({ params }: Props) {
     <div style={{ minHeight: '100vh', background: 'var(--color-background, #fafaf8)' }}>
       <AdminHeader adminBasePath={page.adminBasePath} active="instant-sale" unreadMessagesCount={page.unreadMessagesCount} userEmail={page.userEmail} />
       <main className="px-4 md:px-8 py-8">
-        <div className="mx-auto max-w-[900px]">
+        <div className="mx-auto max-w-[1100px]">
           <div className="mb-6">
             <p className="text-[0.65rem] font-bold uppercase tracking-[0.35em] mb-3" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>Sales</p>
             <h1 className="text-3xl md:text-4xl font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>Instant Sale</h1>
             <p className="mt-2 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>Pick how this sale happens.</p>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-3">
             <div className={card} style={{ borderColor: 'var(--color-primary)' }}>
               <h2 className="text-xl font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>In-store sale</h2>
               <ul className={bullets} style={{ color: 'var(--color-on-surface-variant)' }}>
@@ -58,6 +58,16 @@ export default async function AdminInstantSalePage({ params }: Props) {
                 <li>They pay through a private link (PayPal or card), or by Zelle / check</li>
               </ul>
               <Link href={`${page.adminBasePath}/instant-sale/remote`} className="outline-button mt-2 justify-center text-xs">Start remote sale</Link>
+            </div>
+            {/* Trade-in sale (owner, 2026-11-21, option C): the buy receipt and the sale on one screen. */}
+            <div className={card} style={{ borderColor: 'var(--color-outline-variant)' }}>
+              <h2 className="text-xl font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>Trade-in sale</h2>
+              <ul className={bullets} style={{ color: 'var(--color-on-surface-variant)' }}>
+                <li>They trade gold toward a piece, here in the store</li>
+                <li>The buy receipt and the sale on one screen, one save</li>
+                <li>The difference is worked out — they pay the rest, or you pay them</li>
+              </ul>
+              <Link href={`${page.adminBasePath}/instant-sale/trade`} className="outline-button mt-2 justify-center text-xs">Start trade-in sale</Link>
             </div>
           </div>
 

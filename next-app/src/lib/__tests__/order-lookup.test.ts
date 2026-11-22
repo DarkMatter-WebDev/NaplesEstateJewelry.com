@@ -99,13 +99,14 @@ describe('order emails point guests at the lookup, with the brand-cased domain',
     expect(buyReceipt).not.toContain('</a> &middot; ${escapeHtml(addressOneLine())}');
   });
   it('both order emails pass the order number through', () => {
-    expect(read('src', 'lib', 'order-invoice-email.ts')).toContain('buildOrderEmailFooterHtml(orderNumber)');
-    expect(read('src', 'lib', 'order-invoice-email.ts')).toContain('buildOrderEmailFooterTextLines(order.order_number)');
+    // Since 2026-11-21 with the customer's language too (Spanish receipts).
+    expect(read('src', 'lib', 'order-invoice-email.ts')).toContain('buildOrderEmailFooterHtml(orderNumber, language)');
+    expect(read('src', 'lib', 'order-invoice-email.ts')).toContain('buildOrderEmailFooterTextLines(order.order_number, language)');
     // Since 2026-11-05 every fulfillment email goes through one shell, which
     // takes the order number from each builder (5 since 2026-11-19: + the
     // expected-delivery-date email).
     const fulfillment = read('src', 'lib', 'order-fulfillment-email.ts');
-    expect(fulfillment).toContain('buildOrderEmailFooterHtml(orderNumber)');
+    expect(fulfillment).toContain('buildOrderEmailFooterHtml(orderNumber, language)');
     expect(fulfillment).toContain('buildOrderEmailFooterTextLines(order.order_number)');
     expect(fulfillment.match(/emailShell\(\{\s*title:[^}]*?orderNumber: order\.order_number/g)?.length).toBe(5);
   });

@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { saveOrderLanguage } from '@/lib/order-language-server';
+import { normalizeOrderLanguage } from '@/lib/order-language';
 import { requireAdmin } from '@/lib/admin-auth';
 import { createServiceClient } from '@/lib/supabase/service';
 import { buildAddressObject, generateOrderNumber } from '@/lib/sales';
@@ -102,6 +104,9 @@ export async function POST(req: Request) {
   const createdRow = Array.isArray(created) ? created[0] : created;
   const orderId = createdRow?.order_id as string | undefined;
   if (!orderId) return NextResponse.json({ error: 'Could not create the order.' }, { status: 500 });
+
+  // "Receipt language" (2026-11-21): the invoice email, its Pay link and the receipt.
+  await saveOrderLanguage(service, orderId, normalizeOrderLanguage((body as Record<string, unknown> | null)?.receiptLanguage));
 
   // Noted before the invoice email, so the email and the pay page drop the tax.
   if (certificate) {

@@ -218,6 +218,7 @@ export const BUY_RECEIPT_PAYMENT_LABELS_ES: Record<BuyReceiptPaymentMethod, stri
   paypal: 'PayPal',
   bank_transfer: 'Transferencia bancaria',
   store_credit: 'Crédito en tienda / intercambio',
+  trade_credit: 'Crédito por intercambio',
 };
 
 /** The ID type as stored ('Driver license') → Spanish for the seller's copy. An unknown value prints as stored. */

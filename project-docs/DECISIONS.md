@@ -4,7 +4,24 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-11-21 (3)**. Before that, **2026-11-21 (2)**. Before that, **2026-11-19 (7)**. Before that, **2026-11-19 (2)**. Before that, **2026-11-18 (12)**. Before that, **2026-11-18 (10)**. Before that, **2026-11-18 (6)**. Before that, **2026-11-18 (4)**. Before that, **2026-11-18 (2)**. Before that, **2026-11-16 (5)**. Before that, **2026-11-16 (1)**. Before that, **2026-11-10 (2)**. Before that, **2026-11-09 (3)**. Before that, **2026-11-09 (1)**. Before that, **2026-11-08 (1)**. Before that, **2026-11-05 (5)**. Before that, **2026-11-05 (2)**. Before that, **2026-11-02 (2)**.
+> compaction. Last reconciled: **2026-11-21 (6)**. Before that **2026-11-21 (5)**. Before that, **2026-11-21 (3)**. Before that, **2026-11-21 (2)**. Before that, **2026-11-19 (7)**. Before that, **2026-11-19 (2)**. Before that, **2026-11-18 (12)**. Before that, **2026-11-18 (10)**. Before that, **2026-11-18 (6)**. Before that, **2026-11-18 (4)**. Before that, **2026-11-18 (2)**. Before that, **2026-11-16 (5)**. Before that, **2026-11-16 (1)**. Before that, **2026-11-10 (2)**. Before that, **2026-11-09 (3)**. Before that, **2026-11-09 (1)**. Before that, **2026-11-08 (1)**. Before that, **2026-11-05 (5)**. Before that, **2026-11-05 (2)**. Before that, **2026-11-02 (2)**.
+
+## Spanish receipts: ONE language per order (`orders.customer_language`); the customer's emails and printouts follow it, the shop's copies stay English (2026-11-21)
+
+- **Set by where they bought or by the owner:** /es checkout, an /es offer, the /es pay page set it automatically; In-store / Remote "Receipt language" (starts English), the Trade-in's "Both receipts" switch, and the order page's Language switch set it by hand. Older orders and anything unset = English (owner pick 4).
+- **What follows it:** receipt/invoice email, Fulfillment updates, the 3 delivery emails, the pickup email, the one-page paper, Print Order, gift slip, pickup customer copy. Print pages also take `?lang=` ("Print in"), which does NOT change the order.
+- **What never follows it:** shop/store copies, owner notification emails, admin screens (pick 6). A Spanish order's pickup STORE copy prints the English statement AND the Spanish one under it (the customer reads what they sign — same rule as buy receipts).
+- ⛔ **Read the column only through `lib/order-language-server.ts`**, on its own query — never add `customer_language` to a shared select (a missing column would blank every receipt). New customer-facing email or paper → take an `OrderLanguage`, keep the English literal byte-identical, add a case to `spanish-receipts.test.ts`.
+- **Words:** formal "usted"; built by hand, not `Intl` in Spanish (server and browser must agree); typed text prints as typed; a listed piece uses `title_es` when present (pick 2). ⚠️ The pickup statement and the tax-exempt line are Claude's Spanish — owner's translator/attorney to confirm (pick 5).
+
+## Trade-in sale: ONE screen, ONE save, TWO records that name each other; the link lives in the payment lists (no SQL) (2026-11-21)
+
+- **Why two records, not one:** the buy receipt is the Florida secondhand-dealer record of the gold (seller, ID, thumbprint, signed statement) and must exist on its own; the sale is an order like any In-store sale. The screen joins them; it never merges them.
+- **Same form, not a copy:** the left half IS `BuyReceiptForm` (`trade` prop) — customer input mode, ID photo, thumbprint and print sets cannot drift from Buy Receipts.
+- **The link:** buy receipt `payments[0]` = `trade_credit` (order number in `reference`, `order_id`); order `payment_response.payments[0]` = `trade_credit` (BUY number in `reference`) + `payment_response.trade`. Read with `buyReceiptTrade` / `TRADE_IN_COLUMN` (never the whole response). ⛔ `trade_credit` is written ONLY by `/api/admin/trade-in-sales` — never offered on the plain forms, never accepted by `normalizeSalePayments` or a plain `normalizeBuyReceiptInput`.
+- **Money (owner picks 2026-11-21):** credit = min(gold, sale total); the customer pays the rest; gold worth more → the rest is paid to the seller ON THE BUY RECEIPT. Tax 6% on the full price, as every pickup — ⛔ change only on the accountant's word, in `tradeInSaleTotals` alone. Pickup only; no drafts; no store-credit balance.
+- **Pairs:** a trade receipt is never edited alone (void both, redo) and cannot be deleted until void. Void / Recycle Bin each ASK (an unticked box) whether the other goes too — never silently; the order side is record-only (the item stays sold).
+- **Save order:** receipt → sale → link → emails. If the sale fails, the route deletes the receipt so nothing is half-recorded.
 
 ## Every logged customer email keeps its own copy; the viewer shows it in a SANDBOXED frame; older emails are rebuilt WITH a warning (2026-11-21)
 

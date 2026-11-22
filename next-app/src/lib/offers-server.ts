@@ -2,6 +2,7 @@ import 'server-only';
 import { createHash, randomBytes } from 'node:crypto';
 import { revalidatePath, revalidateTag } from 'next/cache';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { saveOrderLanguage } from '@/lib/order-language-server';
 import {
   CHECKOUT_PRODUCT_COLUMNS,
   buildOrderDraft,
@@ -1071,6 +1072,8 @@ export async function acceptOffer(
     return fail(500, rpcError?.message ?? 'Could not create the order. Nothing was charged.');
   }
   await service.from('orders').update({ paypal_order_id: offer.paypal_order_id, offer_id: offer.id }).eq('id', orderId);
+  // The offer was made on /es → Spanish receipt and emails (2026-11-21).
+  await saveOrderLanguage(service, orderId, offer.locale === 'es' ? 'es' : 'en');
 
   // 2. Charge the hold.
   let capture;

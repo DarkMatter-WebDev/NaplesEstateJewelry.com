@@ -114,6 +114,7 @@ export default function SaleItemsEditor({
   spotData,
   priceLabel,
   listedNote,
+  tradeInPrices,
 }: {
   items: SaleItemDraft[];
   setItems: Dispatch<SetStateAction<SaleItemDraft[]>>;
@@ -123,6 +124,13 @@ export default function SaleItemsEditor({
   priceLabel: string;
   /** The line under a picked listed item. */
   listedNote: string;
+  /**
+   * The Trade-in sale (owner pick 7, 2026-11-21): each listed item's advertised
+   * trade-in price ("put your gold toward it and pay as little as ___"), by
+   * product id. When an item has one, picking it fills that price; it can be
+   * typed over. Left out everywhere else.
+   */
+  tradeInPrices?: Record<string, number>;
 }) {
   const chosenIds = useMemo(() => new Set(items.flatMap((item) => (item.selected ? [item.selected.id] : []))), [items]);
 
@@ -185,7 +193,7 @@ export default function SaleItemsEditor({
                       <li key={p.id}>
                         <button
                           type="button"
-                          onClick={() => update(item.key, { selected: p, query: '', price: String(getSnapshotPrice(p as Product, spotData) || '') })}
+                          onClick={() => update(item.key, { selected: p, query: '', price: String(tradeInPrices?.[p.id] ?? (getSnapshotPrice(p as Product, spotData) || '')) })}
                           className="w-full text-left rounded-lg border px-3 py-2 text-sm hover:bg-[var(--color-surface-container-low)]"
                           style={cardStyle}
                         >
@@ -210,7 +218,11 @@ export default function SaleItemsEditor({
                     <div className="min-w-0 grid gap-0.5">
                       <span className="text-[0.65rem] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>#{item.selected.inventory_number ?? '—'} · {item.selected.category} · In stock</span>
                       <span className="text-sm font-semibold leading-snug" style={{ color: 'var(--color-on-surface)' }}>{item.selected.title}</span>
-                      <span className="text-xs" style={hintStyle}>Listed at {formatCurrency(getSnapshotPrice(item.selected as Product, spotData))} · {listedNote}</span>
+                      <span className="text-xs" style={hintStyle}>
+                        Listed at {formatCurrency(getSnapshotPrice(item.selected as Product, spotData))}
+                        {tradeInPrices?.[item.selected.id] != null ? <> · <strong style={{ color: 'var(--color-primary)' }}>trade-in price {formatCurrency(tradeInPrices[item.selected.id])}</strong></> : null}
+                        {' · '}{listedNote}
+                      </span>
                     </div>
                     <button type="button" className="ml-auto text-xs underline flex-shrink-0" style={hintStyle} onClick={() => update(item.key, { selected: null, price: '' })}>Change</button>
                   </div>

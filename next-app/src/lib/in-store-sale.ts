@@ -39,8 +39,17 @@ import { normalizeTaxExemptSaleInput, type TaxExemptSaleChoice } from '@/lib/tax
 // recorded as paid like the rest: the credit was issued earlier, outside the site.
 export const IN_STORE_PAYMENT_METHODS = ['zettle', 'cash', 'zelle', 'check', 'cashapp', 'venmo', 'store_credit'] as const;
 export type InStorePaymentMethod = (typeof IN_STORE_PAYMENT_METHODS)[number];
+/**
+ * Every method a recorded sale can carry: the form's list above, plus the
+ * Trade-in sale's `trade_credit` (owner, 2026-11-21) — gold bought on a buy
+ * receipt at the same counter, put toward this sale. Never offered on the
+ * In-store or Remote forms (they list `IN_STORE_PAYMENT_METHODS`, and
+ * `normalizeSalePayments` accepts only those); only `lib/trade-in-sale.ts` writes it.
+ */
+export type SalePaymentMethod = InStorePaymentMethod | 'trade_credit';
+export const SALE_TRADE_CREDIT = 'trade_credit' as const;
 
-export const IN_STORE_PAYMENT_LABELS: Record<InStorePaymentMethod, string> = {
+export const IN_STORE_PAYMENT_LABELS: Record<SalePaymentMethod, string> = {
   zettle: 'Card · Zettle',
   cash: 'Cash',
   zelle: 'Zelle',
@@ -48,6 +57,7 @@ export const IN_STORE_PAYMENT_LABELS: Record<InStorePaymentMethod, string> = {
   cashapp: 'Cash App',
   venmo: 'Venmo',
   store_credit: 'Store credit',
+  trade_credit: 'Trade-in credit',
 };
 
 /**
@@ -57,7 +67,7 @@ export const IN_STORE_PAYMENT_LABELS: Record<InStorePaymentMethod, string> = {
  * (or `remote_split`) with the parts in `orders.payment_response.payments`
  * and a readable `payment_reference`. No new column.
  */
-export type SalePaidBy = InStorePaymentMethod | 'split';
+export type SalePaidBy = SalePaymentMethod | 'split';
 
 /** orders.payment_method value for an in-store sale, e.g. `in_store_zettle` / `in_store_split`. */
 export function inStorePaymentMethodValue(method: SalePaidBy): string {
@@ -74,7 +84,7 @@ export function paymentMethodLabel(value: string | null | undefined): string {
   const inStore = value.match(/^(in_store|remote)_(\w+)$/);
   if (inStore) {
     const method = inStore[2];
-    const name = method === 'split' ? 'Split' : IN_STORE_PAYMENT_LABELS[method as InStorePaymentMethod] ?? method;
+    const name = method === 'split' ? 'Split' : IN_STORE_PAYMENT_LABELS[method as SalePaymentMethod] ?? method;
     return `${inStore[1] === 'remote' ? 'Invoice' : 'In store'} · ${name}`;
   }
   return value;
@@ -89,8 +99,17 @@ export function remotePaymentMethodValue(method: SalePaidBy): string {
 
 /** Payments on one sale (owner pick 2026-11-16). */
 export const SALE_PAYMENTS_MAX = 4;
-/** One payment of a split. The same method may appear twice (two cards on Zettle). */
-export type SalePaymentPart = { method: InStorePaymentMethod; amount: number };
+/**
+ * One payment of a split. The same method may appear twice (two cards on Zettle).
+ * `reference`: only on a trade-in credit — the buy receipt's number (BUY-00142).
+ */
+export type SalePaymentPart = { method: SalePaymentMethod; amount: number; reference?: string | null };
+
+/** "Card · Zettle", or for a trade-in credit "Trade-in credit · BUY-00142". */
+export function salePaymentPartLabel(part: Pick<SalePaymentPart, 'method' | 'reference'>): string {
+  const label = IN_STORE_PAYMENT_LABELS[part.method] ?? part.method;
+  return part.method === SALE_TRADE_CREDIT && part.reference ? `${label} · ${part.reference}` : label;
+}
 
 const PAYMENT_AMOUNT_MAX = 10_000_000;
 const cents = (value: number) => Math.round(value * 100);
@@ -150,15 +169,16 @@ export function normalizeSalePayments(
 
 /** "Cash $500.00 + Card · Zettle $1,302.00". */
 export function formatSalePayments(parts: SalePaymentPart[]): string {
-  return parts.map((part) => `${IN_STORE_PAYMENT_LABELS[part.method]} ${money(part.amount)}`).join(' + ');
+  return parts.map((part) => `${salePaymentPartLabel(part)} ${money(part.amount)}`).join(' + ');
 }
 
 /** orders.payment_reference: "In store · Cash" or "In store · Cash $500.00 + Card · Zettle $1,302.00". */
 export function salePaymentReference(prefix: 'In store' | 'Invoice', paidBy: SalePaidBy, parts: SalePaymentPart[]): string {
-  return paidBy === 'split' ? `${prefix} · ${formatSalePayments(parts)}` : `${prefix} · ${IN_STORE_PAYMENT_LABELS[paidBy]}`;
+  if (paidBy === 'split') return `${prefix} · ${formatSalePayments(parts)}`;
+  return `${prefix} · ${parts[0] ? salePaymentPartLabel(parts[0]) : IN_STORE_PAYMENT_LABELS[paidBy]}`;
 }
 
-const COLLECT_PHRASE: Record<InStorePaymentMethod, string> = {
+const COLLECT_PHRASE: Record<SalePaymentMethod, string> = {
   zettle: 'on Zettle',
   cash: 'in cash',
   zelle: 'by Zelle',
@@ -166,6 +186,7 @@ const COLLECT_PHRASE: Record<InStorePaymentMethod, string> = {
   cashapp: 'by Cash App',
   venmo: 'by Venmo',
   store_credit: 'in store credit',
+  trade_credit: 'in trade-in credit',
 };
 
 /** "$1,302.00 on Zettle and $500.00 in cash" — the card first, as it is the one still to run. */
@@ -175,16 +196,24 @@ export function salePaymentsCollectPhrase(parts: SalePaymentPart[]): string {
   return phrases.length > 1 ? `${phrases.slice(0, -1).join(', ')} and ${phrases[phrases.length - 1]}` : phrases[0] ?? '';
 }
 
-/** The parts saved on a split order (`payment_response.payments`), or null when it is not a readable split. */
-export function readSalePaymentParts(value: unknown): SalePaymentPart[] | null {
-  if (!Array.isArray(value) || value.length < 2) return null;
+/**
+ * The parts saved on an order (`payment_response.payments`), or null when they
+ * are not readable. A split has two or more; a sale paid wholly by trade-in
+ * credit keeps its one part (`minParts: 1`) for the receipt number it carries.
+ */
+export function readSalePaymentParts(value: unknown, minParts = 2): SalePaymentPart[] | null {
+  if (!Array.isArray(value) || value.length === 0 || value.length < minParts) return null;
   const parts: SalePaymentPart[] = [];
   for (const row of value) {
     const source = (row ?? {}) as Record<string, unknown>;
-    const method = String(source.method ?? '') as InStorePaymentMethod;
+    const method = String(source.method ?? '') as SalePaymentMethod;
     const amount = Number(source.amount);
-    if (!IN_STORE_PAYMENT_METHODS.includes(method) || !Number.isFinite(amount) || amount <= 0) return null;
-    parts.push({ method, amount: round2(amount) });
+    const known = (IN_STORE_PAYMENT_METHODS as readonly string[]).includes(method) || method === SALE_TRADE_CREDIT;
+    if (!known || !Number.isFinite(amount) || amount <= 0) return null;
+    const reference = method === SALE_TRADE_CREDIT && typeof source.reference === 'string' && source.reference.trim()
+      ? source.reference.trim().slice(0, 30)
+      : null;
+    parts.push(reference ? { method, amount: round2(amount), reference } : { method, amount: round2(amount) });
   }
   return parts;
 }
@@ -201,11 +230,39 @@ export const SPLIT_PAYMENTS_COLUMN = 'split_payments:payment_response->payments'
  * the single label. `split_payments` is `SPLIT_PAYMENTS_COLUMN`'s value.
  */
 export function paidByLines(order: { payment_method?: string | null; split_payments?: unknown }): string[] {
-  const split = /^(in_store|remote)_split$/.exec(String(order.payment_method ?? ''));
-  const parts = split ? readSalePaymentParts(order.split_payments) : null;
-  if (!split || !parts) return [paymentMethodLabel(order.payment_method)];
-  const prefix = split[1] === 'remote' ? 'Invoice' : 'In store';
-  return parts.map((part) => `${prefix} · ${IN_STORE_PAYMENT_LABELS[part.method]} ${money(part.amount)}`);
+  const match = /^(in_store|remote)_(split|trade_credit)$/.exec(String(order.payment_method ?? ''));
+  const parts = match ? readSalePaymentParts(order.split_payments, match[2] === 'split' ? 2 : 1) : null;
+  if (!match || !parts) return [paymentMethodLabel(order.payment_method)];
+  const prefix = match[1] === 'remote' ? 'Invoice' : 'In store';
+  // Paid wholly by a trade-in: one line naming the buy receipt, no amount (it is the total).
+  if (match[2] === 'trade_credit') return [`${prefix} · ${salePaymentPartLabel(parts[0])}`];
+  return parts.map((part) => `${prefix} · ${salePaymentPartLabel(part)} ${money(part.amount)}`);
+}
+
+// ---- Trade-in sale (owner, 2026-11-21) ------------------------------------
+
+/**
+ * What the customer traded in, kept on the sale as `payment_response.trade`
+ * so its receipt can say it. Select it with `TRADE_IN_COLUMN` (never the whole
+ * response, like `SPLIT_PAYMENTS_COLUMN`).
+ */
+export type SaleTradeIn = { buy_receipt_id: string; receipt_number: string; description: string; value: number };
+export const TRADE_IN_COLUMN = 'trade_in:payment_response->trade';
+
+export function readSaleTradeIn(value: unknown): SaleTradeIn | null {
+  if (!value || typeof value !== 'object') return null;
+  const source = value as Record<string, unknown>;
+  const receiptNumber = typeof source.receipt_number === 'string' ? source.receipt_number : '';
+  const id = typeof source.buy_receipt_id === 'string' ? source.buy_receipt_id : '';
+  const amount = Number(source.value);
+  if (!receiptNumber || !id || !Number.isFinite(amount)) return null;
+  return { buy_receipt_id: id, receipt_number: receiptNumber, description: String(source.description ?? ''), value: round2(amount) };
+}
+
+/** "Your trade-in: 14K yellow gold scrap · 18.2 g (receipt BUY-00142, $900.00)." — on the paper and the emailed receipt. */
+export function tradeInReceiptLine(trade: SaleTradeIn): string {
+  const what = trade.description.trim();
+  return `Your trade-in: ${what ? `${what} ` : ''}(receipt ${trade.receipt_number}, ${money(trade.value)}).`;
 }
 
 export const IN_STORE_METALS = ['Gold', 'Silver', 'Other'] as const;

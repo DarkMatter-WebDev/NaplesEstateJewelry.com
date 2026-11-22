@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { loadOrderLanguage } from '@/lib/order-language-server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { createServiceClient } from '@/lib/supabase/service';
 import { queueSalePrint } from '@/lib/sale-print-requests-server';
@@ -51,7 +52,10 @@ export async function POST(req: Request, context: Context) {
   const paper = buildPickupPaper(order, pickup, {
     copies,
     hoursLine: formatPickupHours(schedule),
+    hoursLineEs: formatPickupHours(schedule, 'es'),
     printedAt: new Date().toISOString(),
+    // The customer copy in the order's language (2026-11-21).
+    language: await loadOrderLanguage(admin.supabase, id),
   });
   const queued = await queueSalePrint(admin.supabase, createServiceClient(), {
     orderId: id,

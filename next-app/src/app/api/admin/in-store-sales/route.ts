@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { saveOrderLanguage } from '@/lib/order-language-server';
+import { normalizeOrderLanguage } from '@/lib/order-language';
 import { requireAdmin } from '@/lib/admin-auth';
 import { createServiceClient } from '@/lib/supabase/service';
 import { buildAddressObject, generateOrderNumber } from '@/lib/sales';
@@ -127,6 +129,9 @@ export async function POST(req: Request) {
   const createdRow = Array.isArray(created) ? created[0] : created;
   const orderId = createdRow?.order_id as string | undefined;
   if (!orderId) return NextResponse.json({ error: 'Could not create the order.' }, { status: 500 });
+
+  // "Receipt language" (2026-11-21): before the payment step emails the receipt.
+  await saveOrderLanguage(service, orderId, normalizeOrderLanguage((body as Record<string, unknown> | null)?.receiptLanguage));
 
   // Noted on the order BEFORE the payment step emails the receipt, so the
   // receipt carries the certificate line.

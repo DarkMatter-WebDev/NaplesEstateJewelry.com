@@ -43,8 +43,8 @@ export function getAccountUrl(): string {
  * create an account (owner, 2026-09-17), so order emails point here — the
  * customer enters the email or phone on the order and sees it, no sign-in.
  */
-export function getOrderLookupUrl(orderNumber?: string | null): string {
-  const base = `${getSiteUrl()}/order-lookup`;
+export function getOrderLookupUrl(orderNumber?: string | null, language: 'en' | 'es' = 'en'): string {
+  const base = `${getSiteUrl()}${language === 'es' ? '/es' : ''}/order-lookup`;
   return orderNumber ? `${base}?order=${encodeURIComponent(orderNumber)}` : base;
 }
 
@@ -63,15 +63,21 @@ export function getOrderLookupUrl(orderNumber?: string | null): string {
  * across lines ("(239)" / "404-8505"), which is unreadable and unclickable as a
  * number. Keep the wrapper if you edit this line.
  */
-export function buildOrderEmailFooterHtml(orderNumber?: string | null) {
+export function buildOrderEmailFooterHtml(orderNumber?: string | null, language: 'en' | 'es' = 'en') {
   const siteUrl = getSiteUrl();
-  const lookupUrl = getOrderLookupUrl(orderNumber);
+  const lookupUrl = getOrderLookupUrl(orderNumber, language);
+  // Spanish (2026-11-21): the same footer for a customer whose receipts are in Spanish.
+  const lookup = language === 'es'
+    ? `Vea este pedido cuando quiera en
+        <a href="${escapeHtml(lookupUrl)}" style="color:#735c00;font-weight:700;text-decoration:underline;">${escapeHtml(SITE_DOMAIN_LABEL)}/es/order-lookup</a>
+        &mdash; ingrese su número de pedido y el correo o teléfono del pedido. No necesita una cuenta.`
+    : `View this order anytime at
+        <a href="${escapeHtml(lookupUrl)}" style="color:#735c00;font-weight:700;text-decoration:underline;">${escapeHtml(SITE_DOMAIN_LABEL)}/order-lookup</a>
+        &mdash; enter your order number and the email or phone on the order. No account needed.`;
   return `
     <div style="margin:22px 0 0;padding-top:16px;border-top:1px solid #eadfbd;">
       <p style="margin:0 0 8px;font-size:13px;line-height:1.55;color:#746b5b;">
-        View this order anytime at
-        <a href="${escapeHtml(lookupUrl)}" style="color:#735c00;font-weight:700;text-decoration:underline;">${escapeHtml(SITE_DOMAIN_LABEL)}/order-lookup</a>
-        &mdash; enter your order number and the email or phone on the order. No account needed.
+        ${lookup}
       </p>
       <!-- One line each, centred (owner, 2026-10-15): the website, the address,
            the phone. Run together as "site · address · phone" the address wrapped
@@ -85,9 +91,11 @@ export function buildOrderEmailFooterHtml(orderNumber?: string | null) {
   `;
 }
 
-export function buildOrderEmailFooterTextLines(orderNumber?: string | null): string[] {
+export function buildOrderEmailFooterTextLines(orderNumber?: string | null, language: 'en' | 'es' = 'en'): string[] {
   return [
-    `View this order anytime at ${getOrderLookupUrl(orderNumber)} — enter your order number and the email or phone on the order. No account needed.`,
+    language === 'es'
+      ? `Vea este pedido cuando quiera en ${getOrderLookupUrl(orderNumber, 'es')} — ingrese su número de pedido y el correo o teléfono del pedido. No necesita una cuenta.`
+      : `View this order anytime at ${getOrderLookupUrl(orderNumber)} — enter your order number and the email or phone on the order. No account needed.`,
     SITE_DOMAIN_LABEL,
     addressOneLine(),
     BUSINESS_PHONE,

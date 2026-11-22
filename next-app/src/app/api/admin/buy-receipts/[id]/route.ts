@@ -8,6 +8,7 @@ import {
   BUY_RECEIPT_ID_BUCKET,
   buyReceiptContentColumns,
   buyReceiptLanguage,
+  buyReceiptTrade,
   buyReceiptIdPhotoFolder,
   isReceiptId,
   normalizeBuyReceiptInput,
@@ -58,10 +59,18 @@ export async function PUT(req: Request, context: Context) {
 
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
 
-  const { data: current } = await admin.supabase.from('buy_receipts').select('id, status').eq('id', id).maybeSingle();
+  const { data: current } = await admin.supabase.from('buy_receipts').select('id, status, payments').eq('id', id).maybeSingle();
   if (!current) return notFound();
   if (current.status === 'void') {
     return NextResponse.json({ error: 'A void receipt cannot be edited. Duplicate it instead.' }, { status: 409 });
+  }
+  // A Trade-in receipt (2026-11-21) is tied to its sale by amount: changing it alone would break the pair.
+  const trade = buyReceiptTrade(current as Pick<BuyReceiptRow, 'payments'>);
+  if (trade) {
+    return NextResponse.json(
+      { error: `This receipt is part of trade-in sale ${trade.orderNumber ?? ''}. To change it, void it (and the sale) and record the trade again.` },
+      { status: 409 },
+    );
   }
 
   // "Save draft" again: only the name is checked, and the form as typed replaces the stored one.
@@ -144,10 +153,18 @@ export async function DELETE(_req: Request, context: Context) {
 
   const { data: current } = await admin.supabase
     .from('buy_receipts')
-    .select('id, receipt_number, seller_id_photo_path, seller_thumbprint_path')
+    .select('id, receipt_number, status, payments, seller_id_photo_path, seller_thumbprint_path')
     .eq('id', id)
     .maybeSingle();
   if (!current) return notFound();
+  // A Trade-in receipt (2026-11-21) is named on its sale's receipt: void it first, so the pair is closed on purpose.
+  const trade = buyReceiptTrade(current as Pick<BuyReceiptRow, 'payments'>);
+  if (trade && current.status !== 'void') {
+    return NextResponse.json(
+      { error: `This receipt paid toward sale ${trade.orderNumber ?? ''}. Void it first (you can send the sale to the Recycle Bin from the same dialog).` },
+      { status: 409 },
+    );
+  }
 
   // The ID photo goes FIRST. This bucket is private and has no garbage
   // collector (the Storage GC only knows `product-images`), so a photo whose

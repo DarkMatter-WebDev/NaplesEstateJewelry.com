@@ -153,8 +153,9 @@ export function markPrinted(id: string, copies: number): Promise<ReceiptResult> 
   return call(`/api/admin/buy-receipts/${id}/printed`, json('POST', { copies }), 'Printed, but the log could not be updated.');
 }
 
-export function voidReceipt(id: string, reason: string): Promise<ReceiptResult> {
-  return call(`/api/admin/buy-receipts/${id}/void`, json('POST', { reason }), 'Could not void the receipt.');
+/** `alsoOrder`: a Trade-in receipt's sale goes to the Orders Recycle Bin with it (owner pick 5, 2026-11-21). */
+export function voidReceipt(id: string, reason: string, alsoOrder = false): Promise<ReceiptResult> {
+  return call(`/api/admin/buy-receipts/${id}/void`, json('POST', { reason, alsoOrder }), 'Could not void the receipt.');
 }
 
 export type DeleteReceiptResult = { deleted: true } | { error: string };

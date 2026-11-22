@@ -181,6 +181,8 @@ export type RemoteDraftForm = {
   pay: RemotePayOptions;
   linkDays: RemoteLinkDays;
   message: string;
+  /** "Receipt language" (2026-11-21); a draft saved before it reopens on English. */
+  receiptLanguage?: 'en' | 'es';
 };
 
 export type RemoteDraftCardData = { id: string; customer: string | null; itemCount: number; updatedAt: string };
@@ -240,6 +242,7 @@ export function sanitizeRemoteDraft(raw: unknown): RemoteDraftForm {
       : { online: true, zelle: true, check: false, phone: false },
     linkDays: REMOTE_LINK_DAYS.includes(days) ? days : REMOTE_LINK_DAYS_DEFAULT,
     message: draftText(source.message, REMOTE_MESSAGE_MAX),
+    receiptLanguage: source.receiptLanguage === 'es' ? 'es' : 'en',
   };
 }
 
@@ -304,16 +307,24 @@ export function remoteInvoiceState(
 }
 
 /** The "Other ways to pay" lines, the same in the email and on the pay page. */
-export function remoteOtherWays(pay: RemotePayOptions, orderNumber: string): string[] {
+export function remoteOtherWays(pay: RemotePayOptions, orderNumber: string, isEs = false): string[] {
   const lines: string[] = [];
+  if (isEs) {
+    // A Spanish invoice (2026-11-21).
+    if (pay.zelle) lines.push(`Zelle a ${ZELLE_PAY_TO}: escriba ${orderNumber} en la nota.`);
+    if (pay.check) lines.push(`Cheque a nombre de ${CHECK_PAYABLE_TO}, enviado por correo a ${streetLine()}, ${cityLine()}, o entregado en el salón.`);
+    if (pay.phone) lines.push(`Llame al ${PAY_BY_PHONE} para pagar con tarjeta.`);
+    return lines;
+  }
   if (pay.zelle) lines.push(`Zelle to ${ZELLE_PAY_TO} — put ${orderNumber} in the memo.`);
   if (pay.check) lines.push(`Check payable to ${CHECK_PAYABLE_TO}, mailed to ${streetLine()}, ${cityLine()}, or brought to the showroom.`);
   if (pay.phone) lines.push(`Call ${PAY_BY_PHONE} to pay by card.`);
   return lines;
 }
 
-export function remotePayUrl(siteUrl: string, token: string): string {
-  return `${siteUrl.replace(/\/$/, '')}/pay/${encodeURIComponent(token)}`;
+/** The private pay page; a Spanish invoice links straight to its Spanish page (2026-11-21). */
+export function remotePayUrl(siteUrl: string, token: string, isEs = false): string {
+  return `${siteUrl.replace(/\/$/, '')}${isEs ? '/es' : ''}/pay/${encodeURIComponent(token)}`;
 }
 
 export type PayPageAddress = { line1: string; line2: string | null; city: string; state: string; postalCode: string };

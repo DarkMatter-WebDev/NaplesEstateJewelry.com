@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useEffect } from 'react';
 import type { OrderGift } from '@/lib/order-gift';
 import { CONTACT_PHONE_DISPLAY } from '@/lib/contact-links';
+import type { OrderLanguage } from '@/lib/order-language';
+import PrintLanguageSwitch from '@/components/admin/PrintLanguageSwitch';
 
 function closePreview(backHref: string) {
   if (window.opener) {
@@ -17,13 +19,18 @@ function closePreview(backHref: string) {
  * Printed and put in the box. ⛔ No prices, no buyer email / phone / address —
  * the recipient sees this. The order number stays so an exchange can be found.
  */
-export default function GiftSlipClient({ backHref, orderNumber, from, gift, items }: {
+export default function GiftSlipClient({ backHref, orderNumber, from, gift, items, language, orderLanguage, basePath }: {
   backHref: string;
   orderNumber: string;
   from: string | null;
   gift: OrderGift;
   items: string[];
+  /** Printed in Spanish for a Spanish order, or on "Print in: Español" (2026-11-21). */
+  language: OrderLanguage;
+  orderLanguage: OrderLanguage;
+  basePath: string;
 }) {
+  const es = language === 'es';
   useEffect(() => {
     document.body.classList.add('order-print-preview-active');
     return () => document.body.classList.remove('order-print-preview-active');
@@ -35,23 +42,30 @@ export default function GiftSlipClient({ backHref, orderNumber, from, gift, item
         <button type="button" onClick={() => closePreview(backHref)}>Close Preview</button>
         <Link href={backHref}>Back to Order</Link>
         <strong>Gift Slip - {orderNumber}</strong>
+        <span className="lang"><PrintLanguageSwitch current={language} orderLanguage={orderLanguage} basePath={basePath} /></span>
         <button type="button" className="primary" onClick={() => window.print()}>Print</button>
       </div>
 
-      <main className="slip">
+      <main className="slip" lang={language}>
         <p className="mark">Naples Estate Jewelry</p>
         <p className="sub">Naples, Florida</p>
-        <p className="for">{gift.recipientName ? <>A gift for <b>{gift.recipientName}</b></> : 'A gift for you'}</p>
+        <p className="for">
+          {gift.recipientName
+            ? <>{es ? 'Un regalo para' : 'A gift for'} <b>{gift.recipientName}</b></>
+            : es ? 'Un regalo para usted' : 'A gift for you'}
+        </p>
         {gift.message && <p className="msg">“{gift.message}”</p>}
-        {from && <p className="from">— from {from}</p>}
+        {from && <p className="from">— {es ? 'de parte de' : 'from'} {from}</p>}
         {items.length > 0 && (
           <div className="items">
-            <p className="label">In this package</p>
+            <p className="label">{es ? 'En este paquete' : 'In this package'}</p>
             {items.map((title, i) => <p key={`${i}-${title}`}>{title}</p>)}
           </div>
         )}
         <p className="foot">
-          Gift receipt · Order {orderNumber} · Questions or an exchange? Call{' '}
+          {es
+            ? <>Recibo de regalo · Pedido {orderNumber} · ¿Preguntas o un cambio? Llame al{' '}</>
+            : <>Gift receipt · Order {orderNumber} · Questions or an exchange? Call{' '}</>}
           <span style={{ whiteSpace: 'nowrap' }}>{CONTACT_PHONE_DISPLAY}</span> · naplesestatejewelry.com
         </p>
       </main>
@@ -61,7 +75,9 @@ export default function GiftSlipClient({ backHref, orderNumber, from, gift, item
         .gift-slip-root { min-height: 100vh; padding: 0 0 40px; color: #1a1c1c; font-family: var(--font-body, system-ui, sans-serif); }
         .print-toolbar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: #fff; border-bottom: 1px solid #ddd5c2; font-size: 14px; }
         .print-toolbar button, .print-toolbar a { border: 1px solid #c9bd9d; background: #fff; color: #735c00; border-radius: 999px; padding: 6px 14px; font-size: 13px; cursor: pointer; text-decoration: none; }
-        .print-toolbar .primary { margin-left: auto; background: linear-gradient(135deg, #dcb336, #b5890c); color: #fff; border: none; font-weight: 700; }
+        .print-toolbar .lang { margin-left: auto; }
+        .print-toolbar .lang a { border: none; border-radius: 0; padding: 0.3rem 0.7rem; }
+        .print-toolbar .primary { background: linear-gradient(135deg, #dcb336, #b5890c); color: #fff; border: none; font-weight: 700; }
         .slip { width: min(5.5in, calc(100% - 32px)); margin: 28px auto 0; background: #fff; border: 1px solid #cfc8b8; padding: 0.45in 0.5in 0.32in; text-align: center; box-shadow: 0 16px 40px rgba(0,0,0,0.1); }
         .mark { margin: 0; font-family: var(--font-headline, Georgia, serif); font-weight: 700; font-size: 20px; letter-spacing: 0.14em; text-transform: uppercase; color: #735c00; }
         .sub { margin: 4px 0 22px; font-size: 10.5px; letter-spacing: 0.2em; text-transform: uppercase; color: #4d4635; }

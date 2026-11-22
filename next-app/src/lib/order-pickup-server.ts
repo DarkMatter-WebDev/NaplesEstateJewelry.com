@@ -1,5 +1,6 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { loadOrderLanguage } from '@/lib/order-language-server';
 import {
   isMissingPickupTable,
   ORDER_PICKUP_COLUMNS,
@@ -78,7 +79,8 @@ export async function sendPickupEmail(opts: {
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) return { ok: false, error: 'Email sending is not configured on the server.' };
 
-  const content = buildPickupEmail(opts.order, opts.pickup);
+  // In the order's customer language (2026-11-21).
+  const content = buildPickupEmail(opts.order, opts.pickup, await loadOrderLanguage(opts.supabase, opts.order.id));
   try {
     const { Resend } = await import('resend');
     const resend = new Resend(resendKey);

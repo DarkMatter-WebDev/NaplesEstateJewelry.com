@@ -14,10 +14,11 @@ import {
   type StoreHoursSchedule,
 } from '@/lib/business-location';
 import { describeOrderShippingService } from '@/lib/checkout-shipping';
-import { IN_STORE_PAYMENT_LABELS, formatSalePayments, readSalePaymentParts, type InStorePaymentMethod } from '@/lib/in-store-sale';
+import { IN_STORE_PAYMENT_LABELS, formatSalePayments, readSalePaymentParts, readSaleTradeIn, salePaymentPartLabel, tradeInReceiptLine, type SalePaymentMethod } from '@/lib/in-store-sale';
 import { paperDateLine } from '@/lib/order-receipt-paper';
-import { exemptReceiptLine, type TaxExemptSnapshot } from '@/lib/tax-exempt';
-import { giftReceiptNote, type OrderGift } from '@/lib/order-gift';
+import { type TaxExemptSnapshot } from '@/lib/tax-exempt';
+import { type OrderGift } from '@/lib/order-gift';
+import { exemptReceiptLineIn, giftReceiptNoteIn, inStorePaidByTextEs, itemTitleIn, metalIn, orderDateLine, orderStatusLabelEs, tradeInReceiptLineEs, type OrderLanguage } from '@/lib/order-language';
 
 export type InvoiceEmailOrder = Order & { order_items: OrderItem[] };
 
@@ -144,11 +145,12 @@ export function isOrderPaid(order: Pick<Order, 'payment_status'>): boolean {
  * when every day is closed (the block's own byAppointment footnote would
  * otherwise be the only content).
  */
-export function formatPickupHours(schedule: StoreHoursSchedule): string {
-  const summary = hoursSummary(schedule, false);
+export function formatPickupHours(schedule: StoreHoursSchedule, language: OrderLanguage = 'en'): string {
+  const es = language === 'es';
+  const summary = hoursSummary(schedule, es);
   if (summary) return `${summary.days}, ${summary.times}`;
-  const segments = hoursSegmentsFull(schedule, false);
-  return segments.length > 0 ? segments.join('; ') : 'By appointment';
+  const segments = hoursSegmentsFull(schedule, es);
+  return segments.length > 0 ? segments.join('; ') : es ? 'Con cita' : 'By appointment';
 }
 
 // This module is sync and imported by a client component (OrderDetailPanel's
@@ -161,14 +163,30 @@ function inStorePaidByText(method: string, splitPayments: unknown): string {
     const parts = readSalePaymentParts(splitPayments);
     return parts ? formatSalePayments(parts).replace(/ \+ (?=[^+]*$)/, ' and ').replace(/ \+ /g, ', ') : 'several payments';
   }
-  return IN_STORE_PAYMENT_LABELS[method as InStorePaymentMethod] ?? 'in store';
+  if (method === 'trade_credit') {
+    // Paid wholly by a trade-in (2026-11-21): name the buy receipt.
+    const parts = readSalePaymentParts(splitPayments, 1);
+    return parts ? salePaymentPartLabel(parts[0]) : IN_STORE_PAYMENT_LABELS.trade_credit;
+  }
+  return IN_STORE_PAYMENT_LABELS[method as SalePaymentMethod] ?? 'in store';
 }
 
 export function buildInvoiceEmailContent(
   order: InvoiceEmailOrder,
   fallbackInvoiceNumber?: string | null,
-  opts?: { pickupHours?: string; payment?: InvoicePaymentBlock | null; taxExempt?: TaxExemptSnapshot | null; gift?: OrderGift | null },
+  opts?: {
+    pickupHours?: string;
+    payment?: InvoicePaymentBlock | null;
+    taxExempt?: TaxExemptSnapshot | null;
+    gift?: OrderGift | null;
+    /** The customer's language (2026-11-21); English when absent, exactly as before. */
+    language?: OrderLanguage;
+    /** Listing id → Spanish title, for a Spanish receipt. */
+    spanishTitles?: Map<string, string> | null;
+  },
 ): InvoiceEmailContent {
+  const language = opts?.language ?? 'en';
+  const es = language === 'es';
   const invoiceNumber = invoiceNumberForOrder(order, fallbackInvoiceNumber);
   const paid = isOrderPaid(order);
   const payment = paid ? null : opts?.payment ?? null;
@@ -176,7 +194,7 @@ export function buildInvoiceEmailContent(
   // the receipt says how and when it was paid, and leaves out what does not
   // apply to a piece they carried out — the $0.00 shipping row, the "Shipping
   // method: Local Pickup" box and the pickup address + hours.
-  const inStoreMethod = /^in_store_(\w+)$/.exec(String(order.payment_method ?? ''))?.[1] as InStorePaymentMethod | undefined;
+  const inStoreMethod = /^in_store_(\w+)$/.exec(String(order.payment_method ?? ''))?.[1] as SalePaymentMethod | undefined;
   const inStore = Boolean(inStoreMethod);
   const carriedOut = inStore && order.shipping_method === 'pickup';
   // Local pickup orders can still have an address on file (the checkout address
@@ -184,9 +202,13 @@ export function buildInvoiceEmailContent(
   // rather than "Ship to" since nothing is actually being shipped.
   const isPickup = order.shipping_method === 'pickup';
   // A paid order gets a "receipt"; an unpaid order gets an "invoice".
-  const subject = paid
-    ? `Receipt for order ${order.order_number} from Naples Estate Jewelry`
-    : `Invoice ${invoiceNumber} from Naples Estate Jewelry`;
+  const subject = es
+    ? paid
+      ? `Recibo del pedido ${order.order_number} de Naples Estate Jewelry`
+      : `Factura ${invoiceNumber} de Naples Estate Jewelry`
+    : paid
+      ? `Receipt for order ${order.order_number} from Naples Estate Jewelry`
+      : `Invoice ${invoiceNumber} from Naples Estate Jewelry`;
   const customerName = order.customer_name || 'there';
   const items = order.order_items.map((item) => {
     const qty = orderItemQuantity(item);
@@ -195,18 +217,18 @@ export function buildInvoiceEmailContent(
     const lineTotal = Math.max(lineSubtotal - discount, 0);
     const circa = formatProductItemYear(item.item_year_snapshot);
     const details = [
-      qty > 1 ? `Qty ${qty} × ${formatCurrency(item.price_snapshot)}` : null,
+      qty > 1 ? `${es ? 'Cant.' : 'Qty'} ${qty} × ${formatCurrency(item.price_snapshot)}` : null,
       circa ? `Ca. ${circa}` : null,
-      item.metal_snapshot,
-      item.purity_snapshot ? `${formatPublicPurity(item.purity_snapshot)} purity` : null,
+      metalIn(item.metal_snapshot, language),
+      item.purity_snapshot ? (es ? `pureza ${formatPublicPurity(item.purity_snapshot)}` : `${formatPublicPurity(item.purity_snapshot)} purity`) : null,
       item.gram_weight_snapshot ? `${item.gram_weight_snapshot}g` : null,
     ].filter(Boolean).join(' - ');
 
     return {
-      title: item.title_snapshot,
+      title: itemTitleIn(item, language, opts?.spanishTitles),
       // An unlisted piece (in-store / remote sale) has no number: say nothing rather than "No inventory #".
       inventory: item.inventory_number || '',
-      details: details || 'Estate jewelry item',
+      details: details || (es ? 'Joya de patrimonio' : 'Estate jewelry item'),
       price: formatCurrency(lineTotal),
       originalPrice: formatCurrency(lineSubtotal),
       discount: discount > 0 ? `-${formatCurrency(discount)}` : null,
@@ -217,17 +239,23 @@ export function buildInvoiceEmailContent(
     subtotal: formatCurrency(order.subtotal),
     discount: order.discount > 0 ? `-${formatCurrency(order.discount)}` : null,
     tax: formatCurrency(order.tax),
-    taxLabel: opts?.taxExempt ? 'Tax · exempt' : 'Tax',
-    exemptLine: opts?.taxExempt ? exemptReceiptLine(opts.taxExempt) : null,
+    taxLabel: es ? (opts?.taxExempt ? 'Impuesto · exento' : 'Impuesto') : (opts?.taxExempt ? 'Tax · exempt' : 'Tax'),
+    exemptLine: opts?.taxExempt ? exemptReceiptLineIn(opts.taxExempt, language) : null,
     shipping: formatCurrency(order.shipping_fee),
     total: formatCurrency(order.total),
   };
-  const greeting = `Hi ${customerName},`;
-  const intro = paid
-    ? `Thank you for your order with Naples Estate Jewelry. Your payment has been received — here is your receipt for order ${order.order_number}.`
-    : payment
-      ? `Here is your invoice from Naples Estate Jewelry for order ${order.order_number}.`
-      : `Thank you for your order with Naples Estate Jewelry. Invoice ${invoiceNumber} for ${order.order_number} is ready for review.`;
+  const greeting = es ? (order.customer_name ? `Hola, ${order.customer_name}:` : 'Hola:') : `Hi ${customerName},`;
+  const intro = es
+    ? paid
+      ? `Gracias por su compra en Naples Estate Jewelry. Recibimos su pago; este es su recibo del pedido ${order.order_number}.`
+      : payment
+        ? `Esta es su factura de Naples Estate Jewelry del pedido ${order.order_number}.`
+        : `Gracias por su pedido en Naples Estate Jewelry. La factura ${invoiceNumber} del pedido ${order.order_number} está lista para su revisión.`
+    : paid
+      ? `Thank you for your order with Naples Estate Jewelry. Your payment has been received — here is your receipt for order ${order.order_number}.`
+      : payment
+        ? `Here is your invoice from Naples Estate Jewelry for order ${order.order_number}.`
+        : `Thank you for your order with Naples Estate Jewelry. Invoice ${invoiceNumber} for ${order.order_number} is ready for review.`;
   // A pickup buyer is TOLD WHERE TO GO. Until 2026-08-17 this email said only
   // "call or text with any questions about pickup" — someone who had just paid
   // several thousand dollars had to phone up to learn the address. The showroom
@@ -238,32 +266,48 @@ export function buildInvoiceEmailContent(
   // from that same business, so it only pushed the street address down.
   const pickup: InvoicePickupBlock | null = isPickup && !carriedOut
     ? {
-      label: 'Pickup Location',
+      label: es ? 'Lugar de recogida' : 'Pickup Location',
       addressLines: [streetLine(), cityLine()],
-      landmark: landmarkPhrase(false),
-      hoursLabel: 'Hours',
-      hours: opts?.pickupHours ?? formatPickupHours(DEFAULT_STORE_HOURS),
-      byAppointment: byAppointmentLabel(false),
+      landmark: landmarkPhrase(es),
+      hoursLabel: es ? 'Horario' : 'Hours',
+      hours: opts?.pickupHours ?? formatPickupHours(DEFAULT_STORE_HOURS, language),
+      byAppointment: byAppointmentLabel(es),
     }
     : null;
 
   // Sent from a no-reply address, so don't invite replies — direct to phone/text.
-  const paidNote = paid
-    ? inStoreMethod
-      ? `Paid in full by ${inStorePaidByText(inStoreMethod, order.split_payments)} on ${paperDateLine(order.created_at).split(' · ')[0] || 'the day of the sale'} — thank you.`
-      : 'Your payment has been received in full — thank you.'
-    : '';
+  const paidNote = !paid
+    ? ''
+    : es
+      ? inStoreMethod
+        ? `Pagado en su totalidad con ${inStorePaidByTextEs(inStoreMethod, order.split_payments)} el ${orderDateLine(order.created_at, 'es') || 'día de la venta'}. ¡Gracias!`
+        : 'Recibimos su pago completo. ¡Gracias!'
+      : inStoreMethod
+        ? `Paid in full by ${inStorePaidByText(inStoreMethod, order.split_payments)} on ${paperDateLine(order.created_at).split(' · ')[0] || 'the day of the sale'} — thank you.`
+        : 'Your payment has been received in full — thank you.';
   // A checkout gift (2026-10-29): the buyer's record of who it goes to and
   // what the slip says. The priced receipt stays with the buyer.
-  const note = [paidNote, opts?.gift ? giftReceiptNote(opts.gift) : ''].filter(Boolean).join(' ');
-  const contactNote = carriedOut
-    ? `Call or text us at ${BUSINESS_PHONE} with any questions.`
-    : paid
-      ? `Call or text us at ${BUSINESS_PHONE} with any questions about pickup, delivery, or shipping.`
-      : `Call or text us at ${BUSINESS_PHONE} with any questions about payment, pickup, delivery, or shipping.`;
-  const closing = 'Thank you, NaplesEstateJewelry.com';
+  // A Trade-in sale (2026-11-21): what they traded, and the buy receipt it is on.
+  const tradeIn = paid ? readSaleTradeIn(order.trade_in) : null;
+  const note = [
+    paidNote,
+    tradeIn ? (es ? tradeInReceiptLineEs(tradeIn) : tradeInReceiptLine(tradeIn)) : '',
+    opts?.gift ? giftReceiptNoteIn(opts.gift, language) : '',
+  ].filter(Boolean).join(' ');
+  const contactNote = es
+    ? carriedOut
+      ? `Llame o envíe un texto al ${BUSINESS_PHONE} si tiene alguna pregunta.`
+      : paid
+        ? `Llame o envíe un texto al ${BUSINESS_PHONE} si tiene preguntas sobre la recogida, la entrega o el envío.`
+        : `Llame o envíe un texto al ${BUSINESS_PHONE} si tiene preguntas sobre el pago, la recogida, la entrega o el envío.`
+    : carriedOut
+      ? `Call or text us at ${BUSINESS_PHONE} with any questions.`
+      : paid
+        ? `Call or text us at ${BUSINESS_PHONE} with any questions about pickup, delivery, or shipping.`
+        : `Call or text us at ${BUSINESS_PHONE} with any questions about payment, pickup, delivery, or shipping.`;
+  const closing = es ? 'Gracias, NaplesEstateJewelry.com' : 'Thank you, NaplesEstateJewelry.com';
   const shipToLines = formatAddressLines(order.shipping_address);
-  const shipToLabel = isPickup ? 'Address' : 'Ship to';
+  const shipToLabel = es ? (isPickup ? 'Dirección' : 'Enviar a') : (isPickup ? 'Address' : 'Ship to');
 
   return {
     subject,
@@ -288,40 +332,44 @@ export function buildInvoiceEmailContent(
       contactNote,
       closing,
       paid,
-      paymentStatus: orderStatusLabel(order.payment_status),
-      fulfillmentStatus: orderStatusLabel(order.fulfillment_status),
+      paymentStatus: es ? orderStatusLabelEs(order.payment_status) : orderStatusLabel(order.payment_status),
+      fulfillmentStatus: es ? orderStatusLabelEs(order.fulfillment_status) : orderStatusLabel(order.fulfillment_status),
       // NOT `orderStatusLabel(order.shipping_method)` — that column is the
       // narrowed DB value, so it printed "Shipping method: Shipping".
       shippingMethod: describeOrderShippingService(
         order.shipping_method,
         order.subtotal,
         order.shipping_fee,
+        es,
       ),
       shipTo: shipToLines,
       shipToLabel,
       payment,
       hideShipping: carriedOut,
+      language,
     }),
     text: [
       greeting,
       intro,
       ...(payment?.message ? ['', payment.message, '— Chris'] : []),
-      ...(paid ? ['', 'PAYMENT RECEIVED — PAID IN FULL'] : []),
+      ...(paid ? ['', es ? 'PAGO RECIBIDO — PAGADO EN SU TOTALIDAD' : 'PAYMENT RECEIVED — PAID IN FULL'] : []),
       '',
-      'Items:',
-      ...(items.length > 0 ? items.map((item) => `- ${item.title}${item.inventory ? ` (${item.inventory})` : ''} - ${item.discount ? `${item.originalPrice}, line discount ${item.discount}, total ${item.price}` : item.price}`) : ['- No item details were attached.']),
+      es ? 'Artículos:' : 'Items:',
+      ...(items.length > 0
+        ? items.map((item) => `- ${item.title}${item.inventory ? ` (${item.inventory})` : ''} - ${item.discount ? (es ? `${item.originalPrice}, descuento ${item.discount}, total ${item.price}` : `${item.originalPrice}, line discount ${item.discount}, total ${item.price}`) : item.price}`)
+        : [es ? '- No se adjuntaron detalles de los artículos.' : '- No item details were attached.']),
       '',
       `Subtotal: ${totals.subtotal}`,
-      ...(totals.discount ? [`Discount: ${totals.discount}`] : []),
+      ...(totals.discount ? [`${es ? 'Descuento' : 'Discount'}: ${totals.discount}`] : []),
       `${totals.taxLabel}: ${totals.tax}`,
-      ...(carriedOut ? [] : [`Shipping: ${totals.shipping}`]),
+      ...(carriedOut ? [] : [`${es ? 'Envío' : 'Shipping'}: ${totals.shipping}`]),
       `Total: ${totals.total}`,
       ...(totals.exemptLine ? [totals.exemptLine] : []),
       ...(payment?.payUrl
         ? ['', `${payment.payLabel.toUpperCase()}:`, payment.payUrl, payment.payHint, ...(payment.taxHint ? [payment.taxHint] : [])]
         : []),
       ...(payment && payment.otherWays.length > 0
-        ? ['', payment.payUrl ? 'OTHER WAYS TO PAY' : 'HOW TO PAY', ...payment.otherWays]
+        ? ['', payment.payUrl ? (es ? 'OTRAS FORMAS DE PAGAR' : 'OTHER WAYS TO PAY') : (es ? 'CÓMO PAGAR' : 'HOW TO PAY'), ...payment.otherWays]
         : []),
       ...(shipToLines.length > 0 ? ['', `${shipToLabel}:`, ...shipToLines] : []),
       '',
@@ -343,7 +391,7 @@ export function buildInvoiceEmailContent(
       contactNote,
       closing,
       '',
-      ...buildOrderEmailFooterTextLines(order.order_number),
+      ...buildOrderEmailFooterTextLines(order.order_number, language),
     ].join('\n'),
   };
 }
@@ -380,6 +428,7 @@ function buildInvoiceEmailHtml({
   shipToLabel,
   payment,
   hideShipping,
+  language,
 }: Omit<InvoiceEmailContent, 'html' | 'text' | 'invoiceNumber'> & {
   orderNumber: string;
   paid: boolean;
@@ -391,7 +440,9 @@ function buildInvoiceEmailHtml({
   payment: InvoicePaymentBlock | null;
   /** An in-store sale carried out of the showroom: no shipping row, no shipping box. */
   hideShipping: boolean;
+  language: OrderLanguage;
 }) {
+  const es = language === 'es';
   // No photo, no box — but the row keeps the photo's space while any item has
   // one, so every title lines up (owner, 2026-10-21: a flush-left row read as
   // confusing on a phone). With no photo on any item the column goes.
@@ -413,12 +464,12 @@ function buildInvoiceEmailHtml({
           </table>
         </td>
         <td align="right" style="padding:14px 0;border-bottom:1px solid #eadfbd;color:#735c00;font-weight:700;white-space:nowrap;">
-          ${item.discount ? `<span style="display:block;color:#746b5b;font-size:12px;font-weight:400;text-decoration:line-through;">${escapeHtml(item.originalPrice)}</span><span style="display:block;color:#735c00;font-size:12px;">Discount ${escapeHtml(item.discount)}</span>` : ''}
+          ${item.discount ? `<span style="display:block;color:#746b5b;font-size:12px;font-weight:400;text-decoration:line-through;">${escapeHtml(item.originalPrice)}</span><span style="display:block;color:#735c00;font-size:12px;">${es ? 'Descuento' : 'Discount'} ${escapeHtml(item.discount)}</span>` : ''}
           ${escapeHtml(item.price)}
         </td>
       </tr>
     `).join('')
-    : '<tr><td colspan="2" style="padding:14px 0;color:#746b5b;">No item details were attached.</td></tr>';
+    : `<tr><td colspan="2" style="padding:14px 0;color:#746b5b;">${es ? 'No se adjuntaron detalles de los artículos.' : 'No item details were attached.'}</td></tr>`;
 
   return `
     <div style="margin:0;padding:0;background:#f8f6ef;">
@@ -430,8 +481,8 @@ function buildInvoiceEmailHtml({
                 <td style="padding:28px 30px 18px;border-bottom:1px solid #d5c697;">
                   <div style="color:#735c00;font-size:11px;font-weight:700;letter-spacing:4px;text-transform:uppercase;">NaplesEstateJewelry.com</div>
                   <h1 style="margin:10px 0 0;color:#1d1a14;font-family:Georgia,'Times New Roman',serif;font-size:${SUBJECT_HEADING_PX}px;line-height:1.3;">${escapeHtml(subject)}</h1>
-                  ${paid ? '<div style="display:inline-block;margin:12px 0 0;padding:5px 12px;background:#0f7a4f;color:#ffffff;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;border-radius:3px;">Paid in full</div>' : ''}
-                  <p style="margin:8px 0 0;color:#746b5b;font-size:13px;">Order ${escapeHtml(orderNumber)} - ${escapeHtml(paymentStatus)} - ${escapeHtml(fulfillmentStatus)}</p>
+                  ${paid ? '<div style="display:inline-block;margin:12px 0 0;padding:5px 12px;background:#0f7a4f;color:#ffffff;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;border-radius:3px;">' + (es ? 'Pagado en su totalidad' : 'Paid in full') + '</div>' : ''}
+                  <p style="margin:8px 0 0;color:#746b5b;font-size:13px;">${es ? 'Pedido' : 'Order'} ${escapeHtml(orderNumber)} - ${escapeHtml(paymentStatus)} - ${escapeHtml(fulfillmentStatus)}</p>
                 </td>
               </tr>
               <tr>
@@ -446,16 +497,16 @@ function buildInvoiceEmailHtml({
 
                   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 22px;">
                     ${totalRow('Subtotal', totals.subtotal)}
-                    ${totals.discount ? totalRow('Discount', totals.discount) : ''}
+                    ${totals.discount ? totalRow(es ? 'Descuento' : 'Discount', totals.discount) : ''}
                     ${totalRow(totals.taxLabel, totals.tax)}
-                    ${hideShipping ? '' : totalRow('Shipping', totals.shipping)}
-                    ${totalRow(paid ? 'Total Paid' : 'Total', totals.total, true)}
+                    ${hideShipping ? '' : totalRow(es ? 'Envío' : 'Shipping', totals.shipping)}
+                    ${totalRow(paid ? (es ? 'Total pagado' : 'Total Paid') : 'Total', totals.total, true)}
                   </table>
                   ${totals.exemptLine ? `<p style="margin:-10px 0 22px;padding:8px 12px;background:#fbf5dd;border-left:3px solid #d4af37;font-size:13px;line-height:1.5;color:#1d1a14;">${escapeHtml(totals.exemptLine)}</p>` : ''}
-                  ${payment ? paymentBlockHtml(payment) : ''}
+                  ${payment ? paymentBlockHtml(payment, es) : ''}
 
                   ${hideShipping ? '' : `<div style="margin:0 0 22px;padding:14px 16px;background:#fbfaf5;border:1px solid #eadfbd;color:#746b5b;font-size:13px;line-height:1.5;">
-                    Shipping method: ${escapeHtml(shippingMethod)}
+                    ${es ? 'Método de envío' : 'Shipping method'}: ${escapeHtml(shippingMethod)}
                     ${shipTo.length > 0 ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid #eadfbd;"><strong style="display:block;color:#1d1a14;font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">${escapeHtml(shipToLabel)}</strong>${shipTo.map(escapeHtml).join('<br/>')}</div>` : ''}
                   </div>`}
 
@@ -463,7 +514,7 @@ function buildInvoiceEmailHtml({
                   ${pickup ? pickupBlockHtml(pickup) : ''}
                   <p style="margin:0 0 18px;font-size:15px;line-height:1.55;">${pinPhoneToOneLine(escapeHtml(contactNote))}</p>
                   <p style="margin:0;font-size:15px;line-height:1.55;">${escapeHtml(closing)}</p>
-                  ${buildOrderEmailFooterHtml(orderNumber)}
+                  ${buildOrderEmailFooterHtml(orderNumber, language)}
                 </td>
               </tr>
             </table>
@@ -528,7 +579,7 @@ function paymentMessageHtml(message: string) {
  * The Pay online button and the other ways to pay. A TABLE-cell button (the
  * bulletproof-button pattern) so Outlook keeps its background and padding.
  */
-function paymentBlockHtml(payment: InvoicePaymentBlock) {
+function paymentBlockHtml(payment: InvoicePaymentBlock, es = false) {
   const button = payment.payUrl
     ? `
                   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 8px;">
@@ -546,7 +597,7 @@ function paymentBlockHtml(payment: InvoicePaymentBlock) {
                   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 22px;border:1px solid #eadfbd;">
                     <tr>
                       <td style="padding:12px 14px;color:#1d1a14;font-size:14px;line-height:1.6;">
-                        <strong style="display:block;margin-bottom:4px;">${payment.payUrl ? 'Other ways to pay' : 'How to pay'}</strong>
+                        <strong style="display:block;margin-bottom:4px;">${payment.payUrl ? (es ? 'Otras formas de pagar' : 'Other ways to pay') : (es ? 'Cómo pagar' : 'How to pay')}</strong>
                         ${payment.otherWays.map((line) => `<span style="display:block;">${escapeHtml(line).replace(/\(\d{3}\) \d{3}-\d{4}/g, (phone) => `<span style="white-space:nowrap;">${phone}</span>`)}</span>`).join('')}
                       </td>
                     </tr>

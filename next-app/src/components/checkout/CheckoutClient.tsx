@@ -314,6 +314,9 @@ export default function CheckoutClient({ locale, paypalClientId, pickupHoursLine
       // server re-checks both before it drops any tax.
       taxExempt: exemption,
       orderId: orderIdRef.current,
+      // The page's language becomes the order's: Spanish receipts and emails
+      // for a buyer on /es (2026-11-21).
+      locale: isEs ? 'es' : 'en',
     };
   }
 

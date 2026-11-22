@@ -71,6 +71,7 @@ export default function ReceiptPrintControls({
   onChanged,
   initialSet,
   autoAction = null,
+  onAutoDone,
 }: {
   receipt: BuyReceiptRow;
   onChanged: (receipt: BuyReceiptRow) => void;
@@ -78,6 +79,8 @@ export default function ReceiptPrintControls({
   initialSet?: BuyReceiptPrintSetKey;
   /** Do this once as soon as the panel appears (the form's "Save and send" / "Print here"). */
   autoAction?: 'send' | 'print' | null;
+  /** The automatic action above has finished, whatever its outcome (the Trade-in sale prints the sale's paper next). */
+  onAutoDone?: () => void;
 }) {
   const hasIdPhoto = Boolean(receipt.seller_id_photo_path);
   const [chosen, setChosen] = useState<BuyReceiptPrintSetKey | null>(initialSet ?? null);
@@ -157,8 +160,8 @@ export default function ReceiptPrintControls({
     // twice, and the first pass's cleanup cancels its timer.
     const timer = window.setTimeout(() => {
       autoRan.current = true;
-      if (autoAction === 'send') void send();
-      else void printHere();
+      const done = autoAction === 'send' ? send() : printHere();
+      void done.finally(() => onAutoDone?.());
     }, 0);
     return () => window.clearTimeout(timer);
     // Run once for the receipt this panel was opened with.

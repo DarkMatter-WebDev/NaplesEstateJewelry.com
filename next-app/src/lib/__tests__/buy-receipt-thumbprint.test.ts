@@ -73,7 +73,7 @@ describe('thumbprint: stored privately, with the receipt', () => {
     expect(sampleBuyReceipt('2026-10-06T15:00:00Z').seller_thumbprint_path).toBeNull();
 
     const route = read('src', 'app', 'api', 'admin', 'buy-receipts', '[id]', 'route.ts');
-    expect(route).toContain(".select('id, receipt_number, seller_id_photo_path, seller_thumbprint_path')");
+    expect(route).toContain(".select('id, receipt_number, status, payments, seller_id_photo_path, seller_thumbprint_path')");
     expect(route).toContain('if (current.seller_thumbprint_path) paths.add(current.seller_thumbprint_path);');
     // Still pictures first, the row second.
     expect(route.indexOf('bucket.remove([...paths])')).toBeLessThan(route.indexOf(".from('buy_receipts').delete().eq('id', id)"));

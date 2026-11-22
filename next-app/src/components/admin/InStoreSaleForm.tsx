@@ -39,6 +39,8 @@ import TaxExemptSaleBox, {
   taxExemptProblem,
 } from '@/components/admin/instant-sale/TaxExemptSaleBox';
 import { exemptShortTag } from '@/lib/tax-exempt';
+import ReceiptLanguageSwitch from '@/components/admin/instant-sale/ReceiptLanguageSwitch';
+import type { OrderLanguage } from '@/lib/order-language';
 import SalePaymentsEditor, {
   newSalePayments,
   salePaymentParts,
@@ -99,6 +101,8 @@ export default function InStoreSaleForm({
   // "Email copy" (owner, 2026-10-21): ticks itself when an email is typed in;
   // unticking it keeps the email on the order but sends no receipt now.
   const [emailCopy, setEmailCopy] = useState(false);
+  // "Receipt language" (owner, 2026-11-21): starts on English every sale.
+  const [receiptLanguage, setReceiptLanguage] = useState<OrderLanguage>('en');
   const [delivery, setDelivery] = useState<DeliveryMethod>('pickup');
   const [mailingOn, setMailingOn] = useState(false);
   const [line1, setLine1] = useState('');
@@ -149,7 +153,7 @@ export default function InStoreSaleForm({
 
   function clearAll() {
     setItems([newSaleItem()]);
-    setFirstName(''); setLastName(''); setPhone(''); setEmail(''); setEmailCopy(false); setPayments(newSalePayments('zettle')); setNote('');
+    setFirstName(''); setLastName(''); setPhone(''); setEmail(''); setEmailCopy(false); setReceiptLanguage('en'); setPayments(newSalePayments('zettle')); setNote('');
     setDelivery('pickup'); setMailingOn(false); setLine1(''); setLine2(''); setCity(''); setShipState(''); setZip('');
     setShipping('insured'); setCustomFee('');
     setTaxBox(newTaxExemptBox());
@@ -196,6 +200,7 @@ export default function InStoreSaleForm({
           items: items.map(saleItemPayload),
           customer: { firstName, lastName, phone, email },
           emailCopy: emailCopy && Boolean(email.trim()),
+          receiptLanguage,
           delivery: {
             method: delivery,
             address: showAddress ? { line1, line2, city, state: shipState, postalCode: zip } : null,
@@ -362,6 +367,12 @@ export default function InStoreSaleForm({
                     : (shipped ? 'No receipt now — you can send it from the order. The tracking email still goes here.' : 'No receipt is emailed. You can send it later from the order.')}
               </span>
             </div>
+          </div>
+          <div className="grid gap-1">
+            <ReceiptLanguageSwitch value={receiptLanguage} onChange={setReceiptLanguage} disabled={Boolean(busy)} />
+            {receiptLanguage === 'es' && (
+              <span className="text-xs" style={hintStyle}>The receipt you print and the emails the customer gets are in Spanish. Your copy of the order stays in English.</span>
+            )}
           </div>
           <TaxExemptSaleBox box={taxBox} onChange={(next) => { setTaxBox(next); setError(null); }} />
         </section>

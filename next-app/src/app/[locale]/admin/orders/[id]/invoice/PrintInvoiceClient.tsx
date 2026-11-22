@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { PAPER_PAGE_CSS, paperReceiptDocument, type PaperReceipt } from '@/lib/order-receipt-paper';
 import { printPaperInFrame } from '@/lib/print-paper';
+import type { OrderLanguage } from '@/lib/order-language';
+import PrintLanguageSwitch from '@/components/admin/PrintLanguageSwitch';
 
 /**
  * Order → Print Invoice. Since 2026-10-21 this prints the ONE-PAGE paper
@@ -17,8 +19,15 @@ export default function PrintInvoiceClient({
   label,
   orderNumber,
   backHref,
+  language,
+  orderLanguage,
+  basePath,
 }: {
   paper: PaperReceipt;
+  /** The language this paper is printed in, and the order's own (2026-11-21). */
+  language: OrderLanguage;
+  orderLanguage: OrderLanguage;
+  basePath: string;
   /** "Receipt NEJ-…" / "Invoice NEJ-…". */
   label: string;
   orderNumber: string;
@@ -62,12 +71,14 @@ export default function PrintInvoiceClient({
         <span style={{ color: '#d5c697' }}>|</span>
         <span style={{ fontSize: '0.82rem', color: '#1d1a14', fontWeight: 700 }}>{label}</span>
         {error && <span role="alert" style={{ fontSize: '0.78rem', color: '#a32d2d' }}>{error}</span>}
+        <span style={{ marginLeft: 'auto' }}>
+          <PrintLanguageSwitch current={language} orderLanguage={orderLanguage} basePath={basePath} />
+        </span>
         <button
           type="button"
           onClick={() => void print()}
           disabled={printing}
           style={{
-            marginLeft: 'auto',
             padding: '0.5rem 1.25rem',
             background: 'linear-gradient(135deg, #dcb336, #b5890c)',
             color: '#ffffff',

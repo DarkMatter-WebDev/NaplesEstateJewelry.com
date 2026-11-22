@@ -2,11 +2,13 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { formatCurrency } from '@/types/sales';
 import AdminModal from '@/components/admin/AdminModal';
 import EmailCopyViewer from '@/components/admin/EmailCopyViewer';
 import {
   BUY_RECEIPT_VOID_REASON_MAX,
   buyReceiptLanguage,
+  buyReceiptTrade,
   draftFromReceipt,
   formatReceiptDateTime,
   normalizeBuyReceiptInput,
@@ -56,6 +58,9 @@ export default function BuyReceiptDetail({ adminBasePath, initialReceipt }: { ad
   const [voidReason, setVoidReason] = useState('');
   const [voidError, setVoidError] = useState<string | null>(null);
   const [voidBusy, setVoidBusy] = useState(false);
+  /** A Trade-in receipt's void dialog asks about its sale (owner pick 5, 2026-11-21); unticked unless the owner ticks it. */
+  const [voidSaleToo, setVoidSaleToo] = useState(false);
+  const [voidNote, setVoidNote] = useState<string | null>(null);
   const [emailing, setEmailing] = useState(false);
   const [emailNote, setEmailNote] = useState<{ text: string; ok: boolean } | null>(null);
 
@@ -63,6 +68,7 @@ export default function BuyReceiptDetail({ adminBasePath, initialReceipt }: { ad
   // Same private bucket, same ten-minute signed link.
   const thumbprintUrl = useIdPhotoUrl(receipt.seller_thumbprint_path);
   const isVoid = receipt.status === 'void';
+  const trade = buyReceiptTrade(receipt);
   const editing = draft !== null;
 
   async function saveEdit() {
@@ -156,12 +162,14 @@ export default function BuyReceiptDetail({ adminBasePath, initialReceipt }: { ad
     }
     setVoidBusy(true);
     setVoidError(null);
-    const result = await voidReceipt(receipt.id, voidReason);
+    const result = await voidReceipt(receipt.id, voidReason, voidSaleToo);
     setVoidBusy(false);
     if ('error' in result) {
       setVoidError(result.error);
       return;
     }
+    const extra = result as { orderMoved?: boolean; orderError?: string | null };
+    setVoidNote(extra.orderError ?? (extra.orderMoved && trade ? `Sale ${trade.orderNumber ?? ''} moved to the Orders Recycle Bin.` : null));
     setReceipt(result.receipt);
     setDraft(null);
     setVoiding(false);
@@ -258,9 +266,12 @@ export default function BuyReceiptDetail({ adminBasePath, initialReceipt }: { ad
               <Link href={`${adminBasePath}/buy-receipts?from=${receipt.id}`} className="outline-button text-xs">Duplicate</Link>
               {!isVoid && (
                 <>
-                  <button type="button" className="outline-button text-xs" onClick={() => { setDraft(draftFromReceipt(receipt)); setError(null); }}>
-                    Edit
-                  </button>
+                  {/* A Trade-in receipt is tied to its sale by amount: it is voided and redone, never edited alone. */}
+                  {!trade && (
+                    <button type="button" className="outline-button text-xs" onClick={() => { setDraft(draftFromReceipt(receipt)); setError(null); }}>
+                      Edit
+                    </button>
+                  )}
                   <button type="button" className="outline-button text-xs" style={{ color: 'var(--color-error)', borderColor: 'var(--color-error)' }} onClick={() => setVoiding(true)}>
                     Void
                   </button>
@@ -270,7 +281,20 @@ export default function BuyReceiptDetail({ adminBasePath, initialReceipt }: { ad
           </>
         )}
 
+        {voidNote && <p role="status" className="text-right text-sm" style={{ color: 'var(--color-primary)' }}>{voidNote}</p>}
         <div className="grid gap-1 border bg-white p-4 text-sm" style={cardStyle}>
+          {trade && (
+            <div className="flex justify-between gap-3">
+              <span style={hintStyle}>Trade-in sale</span>
+              <span className="text-right">
+                {formatCurrency(trade.amount)} toward{' '}
+                {trade.orderId ? (
+                  <Link href={`${adminBasePath}/orders/${trade.orderId}`} className="font-bold underline-offset-4 hover:underline" style={{ color: 'var(--color-primary)' }}>{trade.orderNumber ?? 'the sale'} ›</Link>
+                ) : (trade.orderNumber ?? 'a sale')}
+                {!isVoid && <span className="block text-xs" style={hintStyle}>Tied to the sale — to change it, void both and record the trade again.</span>}
+              </span>
+            </div>
+          )}
           <div className="flex justify-between gap-3"><span style={hintStyle}>Recorded</span><span className="text-right">{formatReceiptDateTime(receipt.created_at)}{receipt.created_by_email ? ` by ${receipt.created_by_email}` : ''}</span></div>
           {receipt.updated_at !== receipt.created_at && (
             <div className="flex justify-between gap-3"><span style={hintStyle}>Last change</span><span className="text-right">{formatReceiptDateTime(receipt.updated_at)}{receipt.updated_by_email ? ` by ${receipt.updated_by_email}` : ''}</span></div>
@@ -313,6 +337,15 @@ export default function BuyReceiptDetail({ adminBasePath, initialReceipt }: { ad
               <span className="form-label" style={{ color: 'var(--color-primary)' }}>Reason</span>
               <textarea className="form-field" rows={3} maxLength={BUY_RECEIPT_VOID_REASON_MAX} value={voidReason} onChange={(event) => setVoidReason(event.target.value)} />
             </label>
+            {trade?.orderId && (
+              <label className="flex items-start gap-2 rounded-lg border p-3 text-sm" style={{ borderColor: '#e9d7a0', background: '#fbf5dd' }}>
+                <input type="checkbox" className="mt-1 h-4 w-4" style={{ accentColor: 'var(--color-primary)' }} checked={voidSaleToo} onChange={(event) => setVoidSaleToo(event.target.checked)} />
+                <span>
+                  This receipt paid {formatCurrency(trade.amount)} toward sale <strong>{trade.orderNumber}</strong>. <strong>Also move that sale to the Recycle Bin.</strong>
+                  <span className="block text-xs" style={hintStyle}>The item stays marked sold — open the order to return it to inventory. Left unticked, the sale is not changed.</span>
+                </span>
+              </label>
+            )}
             {voidError && <p role="alert" className="text-sm" style={{ color: 'var(--color-error)' }}>{voidError}</p>}
             <div className="flex justify-end gap-2">
               <button type="button" className="outline-button text-xs" disabled={voidBusy} onClick={() => setVoiding(false)}>Keep it</button>

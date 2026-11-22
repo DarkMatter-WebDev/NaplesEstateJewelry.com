@@ -42,6 +42,15 @@ Admin → **Buy Receipts** has three tabs:
 A saved receipt has its own page, `/admin/buy-receipts/<id>`: print it again,
 edit it, duplicate it, void it, add or replace the ID photo.
 
+## Trade-in toward a purchase (2026-11-21)
+
+Gold traded toward a piece from the case is recorded on **Instant Sale → Trade-in
+sale** (also linked as **Trade-in sale →** on these tabs): this same receipt form
+on the left, the sale on the right, one save. Its Paid by reads *Trade-in credit
+toward purchase NEJ-…*. Such a receipt has no Edit and cannot be deleted until
+void; its Void dialog can also send the sale to the Recycle Bin. Runbook:
+`features/instant-sale.md` → *Trade-in sale*.
+
 ## What is on the receipt
 
 - Header: the logo mark, **Naples Estate Jewelry**, the showroom address,

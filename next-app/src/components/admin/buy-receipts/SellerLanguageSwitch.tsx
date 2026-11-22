@@ -16,15 +16,18 @@ export default function SellerLanguageSwitch({
   value,
   onChange,
   disabled,
+  label = 'Seller’s copy',
 }: {
   value: BuyReceiptLanguage;
   onChange: (language: BuyReceiptLanguage) => void;
   disabled?: boolean;
+  /** The Trade-in sale says "Both receipts": this switch sets the sale receipt too (2026-11-21). */
+  label?: string;
 }) {
   return (
-    <div className="brs-act-lang flex items-center gap-2" role="radiogroup" aria-label="Seller's copy language">
+    <div className="brs-act-lang flex items-center gap-2" role="radiogroup" aria-label={`${label} language`}>
       <span className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-        Seller&rsquo;s copy
+        {label}
       </span>
       <span className="brs-lang-buttons flex gap-1">
         {BUY_RECEIPT_LANGUAGES.map((language) => {

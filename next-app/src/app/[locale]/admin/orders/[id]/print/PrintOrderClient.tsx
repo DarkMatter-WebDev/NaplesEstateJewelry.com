@@ -6,8 +6,10 @@ import type { ReactNode } from 'react';
 import type { Order, OrderItem } from '@/types/sales';
 import { formatCurrency, formatOrderDate, formatPublicPurity, orderStatusLabel } from '@/types/sales';
 import { formatProductItemYear } from '@/types/product';
-import { paymentMethodLabel } from '@/lib/in-store-sale';
 import { describeShippingService } from '@/lib/shipping-service';
+import { describeOrderShippingService } from '@/lib/checkout-shipping';
+import { itemTitleIn, metalIn, orderDateTimeLine, orderStatusLabelEs, paymentMethodLabelIn, type OrderLanguage } from '@/lib/order-language';
+import PrintLanguageSwitch from '@/components/admin/PrintLanguageSwitch';
 
 type PrintableOrder = Order & { order_items: OrderItem[] };
 
@@ -41,15 +43,31 @@ export default function PrintOrderClient({
   invoiceNumber,
   order,
   printedAt,
+  language,
+  orderLanguage,
+  spanishTitles,
+  basePath,
 }: {
   adminEmail: string | null;
   backHref: string;
   invoiceNumber: string;
   order: PrintableOrder;
   printedAt: string;
+  /** Spanish for a Spanish order, or on "Print in: Español" (2026-11-21). */
+  language: OrderLanguage;
+  orderLanguage: OrderLanguage;
+  spanishTitles: Record<string, string> | null;
+  basePath: string;
 }) {
+  const es = language === 'es';
   const shippingAddress = formatOrderAddress(order.shipping_address);
   const billingAddress = formatOrderAddress(order.billing_address);
+  const service = describeShippingService(order);
+  // Spanish: the customer's shipping name only; the packing notes are the shop's, in English.
+  const shippingLabel = es
+    ? describeOrderShippingService(String(order.shipping_method ?? ''), Number(order.subtotal), Number(order.shipping_fee), true)
+    : service.label;
+  const dateLine = (iso: string) => (es ? orderDateTimeLine(iso, 'es') : formatOrderDate(iso));
 
   useEffect(() => {
     document.body.classList.add('order-print-preview-active');
@@ -64,53 +82,55 @@ export default function PrintOrderClient({
         </button>
         <Link href={backHref}>Back to Order</Link>
         <strong>Print Preview - {order.order_number}</strong>
+        <span className="lang"><PrintLanguageSwitch current={language} orderLanguage={orderLanguage} basePath={basePath} /></span>
         <button type="button" className="primary" onClick={() => window.print()}>
           Print
         </button>
       </div>
 
-      <main className="paper">
+      <main className="paper" lang={language}>
         <header className="print-document-header">
           <div>
             <div className="brand">Naples Estate Jewelry</div>
-            <h1>Order Invoice</h1>
+            <h1>{es ? 'Factura del pedido' : 'Order Invoice'}</h1>
             <p className="meta">{order.order_number} - {invoiceNumber}</p>
           </div>
           <div className="meta right">
-            Created {formatOrderDate(order.created_at)}<br />
-            Printed {formatOrderDate(printedAt)}
+            {es ? 'Creado' : 'Created'} {dateLine(order.created_at)}<br />
+            {es ? 'Impreso' : 'Printed'} {dateLine(printedAt)}
           </div>
         </header>
 
         <section className="status-grid">
-          <StatusBox label="Payment" value={order.payment_status} />
-          <StatusBox label="Fulfillment" value={order.fulfillment_status} />
-          <StatusBox label="Order" value={order.order_status} />
+          <StatusBox label={es ? 'Pago' : 'Payment'} value={order.payment_status} es={es} />
+          <StatusBox label={es ? 'Entrega' : 'Fulfillment'} value={order.fulfillment_status} es={es} />
+          <StatusBox label={es ? 'Pedido' : 'Order'} value={order.order_status} es={es} />
         </section>
 
         <section className="info-grid">
-          <InfoBlock label="Customer">
+          <InfoBlock label={es ? 'Cliente' : 'Customer'}>
             <p>
               {order.customer_name || '-'}<br />
               {order.customer_email || '-'}<br />
               {order.customer_phone || '-'}
             </p>
           </InfoBlock>
-          <InfoBlock label="Payment / Shipping">
+          <InfoBlock label={es ? 'Pago / Envío' : 'Payment / Shipping'}>
             <p>
-              Method: {paymentMethodLabel(order.payment_method)}<br />
-              Reference: {order.payment_reference || '-'}<br />
-              Shipping: {describeShippingService(order).label}
-              {describeShippingService(order).detail ? <><br /><span style={{ fontSize: '0.85em' }}>{describeShippingService(order).detail}</span></> : null}
+              {es ? 'Forma de pago' : 'Method'}: {paymentMethodLabelIn(order.payment_method, language)}<br />
+              {/* Spanish: the stored reference is the shop's English note ("In store · Check"); Forma de pago above already says it. */}
+              {!(es && /^(In store|Invoice) · /.test(order.payment_reference ?? '')) && <>{es ? 'Referencia' : 'Reference'}: {order.payment_reference || '-'}<br /></>}
+              {es ? 'Envío' : 'Shipping'}: {shippingLabel}
+              {!es && service.detail ? <><br /><span style={{ fontSize: '0.85em' }}>{service.detail}</span></> : null}
             </p>
           </InfoBlock>
           {shippingAddress.length > 0 && (
-            <InfoBlock label="Shipping Address">
+            <InfoBlock label={es ? 'Dirección de envío' : 'Shipping Address'}>
               <AddressLines lines={shippingAddress} />
             </InfoBlock>
           )}
           {billingAddress.length > 0 && (
-            <InfoBlock label="Billing Address">
+            <InfoBlock label={es ? 'Dirección de facturación' : 'Billing Address'}>
               <AddressLines lines={billingAddress} />
             </InfoBlock>
           )}
@@ -119,12 +139,12 @@ export default function PrintOrderClient({
         <table>
           <thead>
             <tr>
-              <th>Item</th>
-              <th>Inventory</th>
-              <th className="money">Unit Price</th>
-              <th className="money">Qty</th>
-              <th className="money">Discount</th>
-              <th className="money">Line Total</th>
+              <th>{es ? 'Artículo' : 'Item'}</th>
+              <th>{es ? 'Inventario' : 'Inventory'}</th>
+              <th className="money">{es ? 'Precio unitario' : 'Unit Price'}</th>
+              <th className="money">{es ? 'Cant.' : 'Qty'}</th>
+              <th className="money">{es ? 'Descuento' : 'Discount'}</th>
+              <th className="money">{es ? 'Total' : 'Line Total'}</th>
             </tr>
           </thead>
           <tbody>
@@ -136,16 +156,16 @@ export default function PrintOrderClient({
               const year = formatProductItemYear(item.item_year_snapshot);
               const specs = [
                 year ? `Ca. ${year}` : null,
-                item.metal_snapshot,
-                item.purity_snapshot ? `${formatPublicPurity(item.purity_snapshot)} purity` : null,
+                metalIn(item.metal_snapshot, language),
+                item.purity_snapshot ? (es ? `pureza ${formatPublicPurity(item.purity_snapshot)}` : `${formatPublicPurity(item.purity_snapshot)} purity`) : null,
                 item.gram_weight_snapshot ? `${item.gram_weight_snapshot}g` : null,
               ].filter(Boolean).join(' - ');
 
               return (
                 <tr key={item.id}>
                   <td>
-                    <strong>{item.title_snapshot}</strong>
-                    <span>{specs || 'Estate jewelry item'}</span>
+                    <strong>{itemTitleIn(item, language, spanishTitles)}</strong>
+                    <span>{specs || (es ? 'Joya de patrimonio' : 'Estate jewelry item')}</span>
                   </td>
                   <td>{item.inventory_number || '-'}</td>
                   <td className="money">{formatCurrency(item.price_snapshot)}</td>
@@ -155,31 +175,31 @@ export default function PrintOrderClient({
                 </tr>
               );
             }) : (
-              <tr><td colSpan={6}>No item details were attached.</td></tr>
+              <tr><td colSpan={6}>{es ? 'No se adjuntaron detalles de los artículos.' : 'No item details were attached.'}</td></tr>
             )}
           </tbody>
         </table>
 
         <section className="summary">
           <SummaryRow label="Subtotal" value={formatCurrency(order.subtotal)} />
-          {order.discount > 0 && <SummaryRow label="Discount" value={`-${formatCurrency(order.discount)}`} />}
-          <SummaryRow label="Tax" value={formatCurrency(order.tax)} />
-          <SummaryRow label="Shipping" value={formatCurrency(order.shipping_fee)} />
+          {order.discount > 0 && <SummaryRow label={es ? 'Descuento' : 'Discount'} value={`-${formatCurrency(order.discount)}`} />}
+          <SummaryRow label={es ? 'Impuesto' : 'Tax'} value={formatCurrency(order.tax)} />
+          <SummaryRow label={es ? 'Envío' : 'Shipping'} value={formatCurrency(order.shipping_fee)} />
           <SummaryRow label="Total" value={formatCurrency(order.total)} strong />
           {order.refund_amount != null && order.refund_amount > 0 && (
-            <SummaryRow label="Refunded" value={`-${formatCurrency(order.refund_amount)}`} />
+            <SummaryRow label={es ? 'Reembolsado' : 'Refunded'} value={`-${formatCurrency(order.refund_amount)}`} />
           )}
         </section>
 
         {(order.customer_notes || order.internal_notes) && (
           <section className="notes">
             {order.customer_notes && (
-              <InfoBlock label="Customer Notes">
+              <InfoBlock label={es ? 'Notas del cliente' : 'Customer Notes'}>
                 <p className="preline">{order.customer_notes}</p>
               </InfoBlock>
             )}
             {order.internal_notes && (
-              <InfoBlock label="Internal Notes">
+              <InfoBlock label={es ? 'Notas internas' : 'Internal Notes'}>
                 <p className="preline">{order.internal_notes}</p>
               </InfoBlock>
             )}
@@ -187,7 +207,9 @@ export default function PrintOrderClient({
         )}
 
         <footer>
-          Printed from the admin order detail page{adminEmail ? ` by ${adminEmail}` : ''}.
+          {es
+            ? <>Impreso desde la página del pedido{adminEmail ? ` por ${adminEmail}` : ''}.</>
+            : <>Printed from the admin order detail page{adminEmail ? ` by ${adminEmail}` : ''}.</>}
         </footer>
       </main>
 
@@ -235,8 +257,9 @@ export default function PrintOrderClient({
           color: #f3e6a9;
           font-size: 0.88rem;
         }
+        .print-toolbar .lang { margin-left: auto; }
+        .print-toolbar .lang a { border: none; padding: 0.3rem 0.7rem; font-size: 0.78rem; }
         .print-toolbar .primary {
-          margin-left: auto;
           border-color: #b5890c;
           background: #b5890c;
           color: #ffffff;
@@ -410,11 +433,11 @@ export default function PrintOrderClient({
   );
 }
 
-function StatusBox({ label, value }: { label: string; value: string }) {
+function StatusBox({ label, value, es = false }: { label: string; value: string; es?: boolean }) {
   return (
     <div className="status">
       <span>{label}</span>
-      <strong>{orderStatusLabel(value)}</strong>
+      <strong>{es ? orderStatusLabelEs(value) : orderStatusLabel(value)}</strong>
     </div>
   );
 }

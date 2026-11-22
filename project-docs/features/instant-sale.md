@@ -1,4 +1,4 @@
-# Instant Sale (Admin) — In-store sale + Remote sale
+# Instant Sale (Admin) — In-store sale + Remote sale + Trade-in sale
 
 > Built 2026-10-21 from owner mockups v1 + v2. Was "In-Store Sale" (2026-09-16).
 > Rules: `DECISIONS.md` → *"Instant Sale"*. Payment flow detail:
@@ -7,9 +7,9 @@
 
 ## Where
 
-- Admin menu → **Instant Sale** (`/admin/instant-sale`). Two cards — **In-store
-  sale** and **Remote sale** — and the list of **Open invoices** (unpaid remote
-  sales, expired links included).
+- Admin menu → **Instant Sale** (`/admin/instant-sale`). Three cards — **In-store
+  sale**, **Remote sale** and (2026-11-21) **Trade-in sale** — and the list of
+  **Open invoices** (unpaid remote sales, expired links included).
 - `/admin/in-store-sale` (old bookmarks, the desktop shortcut) forwards to Instant Sale.
 
 ## In-store sale — the customer is here and pays now
@@ -141,6 +141,62 @@
   the payment page says so and takes no money.
 - A remote **pickup** stays "Fulfillment: Pending" until you mark it picked up.
 - The payment page (`/pay/<link>`) is private: never indexed, no referrer.
+
+## Receipt language — English | Español (2026-11-21)
+
+In-store sale and Remote sale have **Receipt language: English | Español** under
+the customer's boxes (starts on English). Español = the receipt you print, the
+emails the customer gets (receipt / invoice and its Pay page, later updates,
+tracking, pickup) in Spanish; your copy of the order stays English. On a
+**Trade-in sale** the buy receipt's switch, labelled **Both receipts**, sets both.
+Change it later on the order page (Customer card → Language). Rules:
+`DECISIONS.md` → *"Spanish receipts"*.
+
+## Trade-in sale — gold traded toward a purchase (2026-11-21)
+
+Owner option C, mockup 1 → *"Yes, build it"*. Rules: `DECISIONS.md` → *"Trade-in sale"*.
+Record: `CHANGELOG.md` 2026-11-21 (5). No SQL.
+
+**Where:** Instant Sale → third card **Trade-in sale** (`/admin/instant-sale/trade`),
+or **Trade-in sale →** at the end of the Buy Receipts tabs.
+
+**At the counter:**
+
+1. **Left — the buy receipt**, exactly as on Buy Receipts: seller boxes (or
+   **Customer input mode**), ID photo + Fill from ID, thumbprint, the gold and
+   what you pay for it. **Paid by** starts with a locked line, *Trade-in credit
+   toward this sale* — it fills in from the right side.
+2. **Right — what they buy** (starts on *Listed item*). A listing that shows a
+   trade-in price ("pay as little as ___") fills that price; type over it if
+   needed. The customer's name / phone / email come from the receipt — the
+   **phone is required** for the sale.
+3. **The difference** works itself out (6% tax on the full price, as on every pickup):
+   - gold worth less → **Customer pays $X** → collect it (Zettle, cash, split…, as In-store);
+   - gold worth more → **You pay <name> $X** → choose how under the receipt's
+     Paid by (cash, check #, Zelle… — split with +);
+   - equal → *Even trade*.
+4. **Email copy** on the receipt emails BOTH receipts. **Save trade** ·
+   **Save & print both** (buy receipt print set first, then the sale's
+   one-page receipt) · **Save & send both to desktop printer**.
+
+**What each paper says:** buy receipt — *Trade-in credit toward purchase
+NEJ-…* (+ the payout line); sale receipt — *In store · Trade-in credit ·
+BUY-00142 $900.00*, *Card · Zettle $1,750.00*, and *Your trade-in: … (receipt
+BUY-00142, $900.00).* The order page shows **Trade-in: $900 of gold on BUY-00142 ›**.
+
+**Mistakes:** a trade receipt cannot be edited or deleted on its own. Void it
+(its dialog offers an unticked *Also move sale NEJ-… to the Recycle Bin*), or
+move the order to the Recycle Bin (its confirm offers an unticked *Also void
+BUY-…*), then record the trade again. Moving the sale to the Recycle Bin keeps
+the item sold — use *Move to Recycle Bin and return to inventory* on the order
+when the piece is back in the case.
+
+**Good to know:** pickup only (ship it? do two receipts); no drafts; no
+store-credit balance — leftover value is paid out the same day. A refresh while
+the tablet is locked in Customer input mode lands on Buy Receipts (the seller's
+boxes come back; re-enter the sale half). Code: `lib/trade-in-sale.ts`,
+`app/api/admin/trade-in-sales/route.ts`, `components/admin/instant-sale/TradeInSaleForm.tsx`
+(+ `BuyReceiptForm`'s `trade` prop).
 
 ## Tax-exempt sale (2026-10-27)
 

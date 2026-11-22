@@ -5,6 +5,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { sendOrderInvoiceEmail } from '@/lib/order-invoice-mailer';
 import type { InvoicePaymentBlock } from '@/lib/order-invoice-email';
 import { getSiteUrl } from '@/lib/order-email-branding';
+import { loadOrderLanguage } from '@/lib/order-language-server';
+import type { OrderLanguage } from '@/lib/order-language';
 import {
   formatRemoteDue,
   remoteInvoiceState,
@@ -91,19 +93,32 @@ export function payOptionsOf(row: Pick<RemoteInvoiceRow, 'pay_online' | 'pay_zel
   return { online: row.pay_online, zelle: row.pay_zelle, check: row.pay_check, phone: row.pay_phone };
 }
 
-export function payUrlOf(row: Pick<RemoteInvoiceRow, 'pay_token'>): string {
-  return remotePayUrl(getSiteUrl(), row.pay_token);
+export function payUrlOf(row: Pick<RemoteInvoiceRow, 'pay_token'>, language: OrderLanguage = 'en'): string {
+  return remotePayUrl(getSiteUrl(), row.pay_token, language === 'es');
 }
 
 /** The email's payment block for this invoice (see `InvoicePaymentBlock`). */
 export function invoicePaymentBlock(
   row: RemoteInvoiceRow,
   order: Pick<RemoteOrderRow, 'order_number' | 'total' | 'shipping_method' | 'shipping_address'>,
-  options: { taxExempt?: boolean } = {},
+  options: { taxExempt?: boolean; language?: OrderLanguage } = {},
 ): InvoicePaymentBlock {
   const pay = payOptionsOf(row);
+  const es = options.language === 'es';
   // A tax-exempt invoice has no tax to come off, so it never says it will.
   const shipsWithoutAddress = !options.taxExempt && order.shipping_method === 'shipping' && !order.shipping_address;
+  if (es) {
+    return {
+      payUrl: pay.online ? payUrlOf(row, 'es') : null,
+      payLabel: `Pagar ${formatCurrency(order.total)} de forma segura`,
+      payHint: `PayPal o cualquier tarjeta de débito o crédito · enlace válido hasta el ${formatRemoteDue(row.expires_at, true)}`,
+      taxHint: pay.online && shipsWithoutAddress
+        ? '¿Envío fuera de Florida? El impuesto de Florida se descuenta al ingresar su dirección.'
+        : null,
+      otherWays: remoteOtherWays(pay, order.order_number, true),
+      message: row.message,
+    };
+  }
   return {
     payUrl: pay.online ? payUrlOf(row) : null,
     payLabel: `Pay ${formatCurrency(order.total)} securely`,
@@ -131,7 +146,10 @@ export async function sendRemoteInvoiceEmail(
     orderId: order.id,
     recipient: order.customer_email,
     sentBy,
-    payment: invoicePaymentBlock(row, order, { taxExempt: Boolean(await loadOrderTaxExemption(service, order.id)) }),
+    payment: invoicePaymentBlock(row, order, {
+      taxExempt: Boolean(await loadOrderTaxExemption(service, order.id)),
+      language: await loadOrderLanguage(service, order.id),
+    }),
   });
   return result.ok ? { ok: true } : { ok: false, error: result.error };
 }

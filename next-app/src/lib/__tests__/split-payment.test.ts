@@ -153,7 +153,7 @@ describe('split payment values, labels and receipt lines', () => {
       expect(read(file), file).toContain('SPLIT_PAYMENTS_COLUMN');
     }
     // The recorder saves the parts where SPLIT_PAYMENTS_COLUMN reads them.
-    expect(read('src/lib/instant-sale-server.ts')).toContain("...(input.paidBy === 'split' ? { payments: input.payments } : {})");
+    expect(read('src/lib/instant-sale-server.ts')).toContain("...(input.paidBy === 'split' || input.trade ? { payments: input.payments } : {})");
   });
 });
 

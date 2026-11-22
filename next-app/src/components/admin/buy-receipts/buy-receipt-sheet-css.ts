@@ -219,6 +219,10 @@ export const BUY_RECEIPT_SHEET_CSS = `
   margin-top: 6px;
 }
 .buy-receipt-sheet .brs-hint { margin: 6px 0 0; font-size: 11.5px; }
+/* The Trade-in sale's locked first "Paid by" line (2026-11-21): worked out from the sale, never typed. */
+.buy-receipt-sheet .sheet-input.brs-locked { background: #fbf5dd; border-bottom-color: #d4af37; font-weight: 600; color: #1a1c1c; opacity: 1; -webkit-text-fill-color: #1a1c1c; }
+.buy-receipt-sheet .brs-trade-note { align-self: center; font-size: 11.5px; }
+.buy-receipt-sheet .brs-lock { display: inline-flex; align-items: center; justify-content: center; color: #735c00; }
 .buy-receipt-sheet .brs-hint.is-ok { color: #3b6d11; }
 .buy-receipt-sheet .brs-hint.is-off { color: #a32d2d; }
 

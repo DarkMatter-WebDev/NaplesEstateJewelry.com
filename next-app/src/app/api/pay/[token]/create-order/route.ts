@@ -4,6 +4,7 @@ import { createPayPalOrder, paypalConfigured } from '@/lib/paypal';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { buildAddressObject } from '@/lib/sales';
 import { upsertOrderInvoice } from '@/lib/order-invoices';
+import { saveOrderLanguage } from '@/lib/order-language-server';
 import { normalizePayPageCustomer, payPageTotals } from '@/lib/remote-sale';
 import { loadOrderTaxExemption } from '@/lib/tax-exempt-server';
 import { findRemoteInvoiceByToken } from '@/lib/remote-sale-server';
@@ -111,6 +112,8 @@ export async function POST(req: Request, { params }: Props) {
     console.error('pay-invoice order update error:', updateError);
     return NextResponse.json({ error: isEs ? 'No se pudo iniciar el pago.' : 'Could not start payment.' }, { status: 500 });
   }
+  // The language of the page they pay on is the language of their receipt (2026-11-21).
+  await saveOrderLanguage(service, order.id, isEs ? 'es' : 'en');
   await upsertOrderInvoice(service, order.id);
 
   // After a declined payment the retry must get a NEW PayPal order, not the

@@ -50,6 +50,14 @@ export default function BuyReceiptTabs({
           </Link>
         );
       })}
+      {/* Gold traded toward a purchase (owner, 2026-11-21): the buy receipt and the sale on one screen. */}
+      <Link
+        href={`${adminBasePath}/instant-sale/trade`}
+        className="px-2 py-2 text-sm font-semibold underline-offset-4 hover:underline"
+        style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
+      >
+        Trade-in sale →
+      </Link>
       {end ? <span className="ml-auto flex items-center">{end}</span> : null}
     </nav>
   );

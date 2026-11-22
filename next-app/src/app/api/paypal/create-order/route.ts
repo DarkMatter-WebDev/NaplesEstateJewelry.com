@@ -31,6 +31,8 @@ import { normalizePhoneNumber } from '@/lib/phone';
 import { normalizePersonName } from '@/lib/person-name';
 import { normalizeGift } from '@/lib/order-gift';
 import { saveOrderGift } from '@/lib/order-gift-server';
+import { saveOrderLanguage } from '@/lib/order-language-server';
+import { normalizeOrderLanguage } from '@/lib/order-language';
 import { findCounterByToken } from '@/lib/offers-server';
 import {
   applyOrderExemption,
@@ -402,6 +404,8 @@ export async function POST(req: Request) {
         }
         if (reuseDraft) await noteExemption(order.id, reuseDraft);
         await saveOrderGift(service, order.id, gift);
+        // Bought on /es → Spanish receipts and emails (2026-11-21).
+        await saveOrderLanguage(service, order.id, normalizeOrderLanguage(body.locale));
         return NextResponse.json({ paypalOrderId: paypalOrder.id, orderId: order.id });
       } catch (err) {
         console.error('PayPal create-order (reuse) error:', err);
@@ -514,6 +518,8 @@ export async function POST(req: Request) {
       await applyOrderExemption(service, orderId, checkoutExemptionSnapshot(exemption, draft.taxExempted));
     }
     await saveOrderGift(service, orderId, gift);
+    // Bought on /es → Spanish receipts and emails (2026-11-21). Before the receipt email.
+    await saveOrderLanguage(service, orderId, normalizeOrderLanguage(body.locale));
     await upsertOrderInvoice(service, orderId);
 
     return NextResponse.json({ paypalOrderId: paypalOrder.id, orderId });

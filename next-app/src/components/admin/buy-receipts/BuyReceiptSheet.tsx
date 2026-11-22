@@ -98,6 +98,13 @@ type EditProps = {
   onMailingListChange?: (checked: boolean) => void;
   /** Draw the seller's view (customer input mode). Leave out everywhere else. */
   customer?: BuyReceiptCustomerView;
+  /**
+   * The Trade-in sale screen (owner, 2026-11-21): "Paid by" starts with a
+   * locked line — the credit put toward the sale, worked out from both halves
+   * (null until the purchase is priced). The form's own payment rows then only
+   * pay the seller the rest (`payout`), and are hidden when nothing is left.
+   */
+  trade?: { credit: number | null; payout: number | null };
 };
 
 type PrintProps = {
@@ -273,6 +280,7 @@ function EditSheet({
   mailingList = false,
   onMailingListChange,
   customer,
+  trade,
 }: EditProps) {
   // Set when the owner picks "Check", so the check-number field takes focus as it appears.
   const focusCheckRow = useRef<number | null>(null);
@@ -332,6 +340,12 @@ function EditSheet({
   const total = draftTotal(draft);
   const balance = paymentsBalance(draft);
   const split = draft.payments.length > 1;
+  // On a trade, the form's rows pay out only what the credit does not cover.
+  const payout = trade ? (trade.payout ?? 0) : null;
+  const showRows = payout == null || payout > 0;
+  const maxRows = trade ? BUY_RECEIPT_MAX_PAYMENTS - 1 : BUY_RECEIPT_MAX_PAYMENTS;
+  const payoutPaid = draft.payments.reduce((sum, payment) => sum + (Number(String(payment.amount).replace(/[$,\s]/g, '')) || 0), 0);
+  const payoutMatches = payout != null && Math.round(payoutPaid * 100) === Math.round(payout * 100);
 
   // Everything under the seller's boxes — the ID photo and thumbprint strips, the items, the money,
   // the notes, the signatures. One piece, so the seller's view can switch the whole of it off at once.
@@ -381,7 +395,19 @@ function EditSheet({
       </div>
 
       <div className="brs-pay">
-        {draft.payments.map((payment, index) => (
+        {trade && (
+          <div className="brs-pay-row">
+            <select className="sheet-input brs-locked" disabled value="trade" aria-label="Payment method">
+              <option value="trade">Trade-in credit toward this sale</option>
+            </select>
+            <span className="brs-muted brs-trade-note">{trade.credit == null ? 'price the purchase →' : 'from the sale →'}</span>
+            <input className="sheet-input brs-right brs-locked" readOnly tabIndex={-1} value={trade.credit == null ? '' : trade.credit.toFixed(2)} placeholder="—" aria-label="Trade-in credit" />
+            <span className="brs-lock" aria-hidden="true" title="Worked out from the sale">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
+            </span>
+          </div>
+        )}
+        {showRows && draft.payments.map((payment, index) => (
           <div className="brs-pay-row" key={index}>
             <select
               className="sheet-input"
@@ -421,7 +447,7 @@ function EditSheet({
               <span />
             )}
             {index === 0 ? (
-              <button type="button" className="brs-icon-button" aria-label="Add another payment method" title="Add another payment method" disabled={draft.payments.length >= BUY_RECEIPT_MAX_PAYMENTS} onClick={addPayment}>
+              <button type="button" className="brs-icon-button" aria-label="Add another payment method" title="Add another payment method" disabled={draft.payments.length >= maxRows} onClick={addPayment}>
                 +
               </button>
             ) : (
@@ -432,7 +458,16 @@ function EditSheet({
           </div>
         ))}
         <span className="brs-label">Paid by</span>
-        {split && (
+        {trade ? (
+          trade.credit == null ? null : payout != null && payout > 0 ? (
+            <p className={`brs-hint ${!split || payoutMatches ? 'is-ok' : 'is-off'}`} role="status">
+              {formatCurrency(trade.credit)} goes toward the purchase; the other {formatCurrency(payout)} is paid to the seller
+              {split && !payoutMatches ? ` — these add up to ${formatCurrency(payoutPaid)}` : ''}.
+            </p>
+          ) : (
+            <p className="brs-hint is-ok" role="status">The whole {formatCurrency(trade.credit)} goes toward the purchase.</p>
+          )
+        ) : split && (
           <p className={`brs-hint ${balance.matches ? 'is-ok' : 'is-off'}`} role="status">
             {balance.message}
           </p>

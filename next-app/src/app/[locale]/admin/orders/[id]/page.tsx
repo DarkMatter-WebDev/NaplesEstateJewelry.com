@@ -1,4 +1,5 @@
 import { notFound, redirect } from 'next/navigation';
+import { loadOrderLanguage, loadSpanishItemTitles, orderLanguageReady } from '@/lib/order-language-server';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { getVerifiedUser } from '@/lib/auth-claims';
@@ -12,7 +13,7 @@ import { isPickupOrder } from '@/lib/order-pickup';
 import { isDeliveryTrackingConfigured } from '@/lib/easypost';
 import { formatPickupHours } from '@/lib/order-invoice-email';
 import { getStoreHours } from '@/lib/store-hours';
-import { SPLIT_PAYMENTS_COLUMN } from '@/lib/in-store-sale';
+import { SPLIT_PAYMENTS_COLUMN, TRADE_IN_COLUMN } from '@/lib/in-store-sale';
 import AdminHeader from '@/components/admin/AdminHeader';
 import type { Order, OrderItem } from '@/types/sales';
 import type { Product } from '@/types/product';
@@ -38,6 +39,7 @@ const ORDER_DETAIL_COLUMNS = [
   'order_status',
   'payment_method',
   SPLIT_PAYMENTS_COLUMN,
+  TRADE_IN_COLUMN,
   'payment_reference',
   'shipping_method',
   'shipping_carrier',
@@ -247,6 +249,13 @@ export default async function AdminOrderDetailPage({ params }: Props) {
   }
 
   const taxExemption = await loadOrderTaxExemption(supabase, id);
+  // The customer's receipt language (2026-11-21). `ready` = its SQL has run.
+  const [customerLanguage, languageReady] = await Promise.all([
+    loadOrderLanguage(supabase, id),
+    orderLanguageReady(supabase),
+  ]);
+  const spanishTitles = Object.fromEntries(await loadSpanishItemTitles(supabase, orderItems.map((item) => item.product_id)));
+  const storeHours = await getStoreHours();
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-background, #fafaf8)' }}>
@@ -258,7 +267,10 @@ export default async function AdminOrderDetailPage({ params }: Props) {
       />
 
       <OrderDetailPanel
-        pickupHours={formatPickupHours(await getStoreHours())}
+        pickupHours={formatPickupHours(storeHours)}
+        pickupHoursEs={formatPickupHours(storeHours, 'es')}
+        customerLanguage={{ value: customerLanguage, ready: languageReady }}
+        spanishTitles={spanishTitles}
         initialOrder={order as unknown as Order & { order_items: OrderItem[] }}
         itemMeltValues={itemMeltValues}
         initialInvoices={(invoices ?? []) as Invoice[]}

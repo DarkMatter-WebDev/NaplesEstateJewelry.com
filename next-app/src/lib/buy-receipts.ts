@@ -78,7 +78,15 @@ export type BuyReceiptIdType = (typeof BUY_RECEIPT_ID_TYPES)[number];
  * method here needs no SQL.
  */
 export const BUY_RECEIPT_PAYMENT_METHODS = ['cash', 'check', 'zelle', 'venmo', 'cashapp', 'paypal', 'bank_transfer', 'store_credit'] as const;
-export type BuyReceiptPaymentMethod = (typeof BUY_RECEIPT_PAYMENT_METHODS)[number];
+/**
+ * "Trade-in credit toward a purchase" (owner, 2026-11-21, Trade-in sale): the
+ * gold was paid for with credit on a sale recorded at the same counter. It is
+ * NOT in the form's list above — only the Trade-in sale screen writes it, as
+ * the FIRST payment, carrying the sale's order number (`reference`) and order
+ * id (`order_id`). See `lib/trade-in-sale.ts`.
+ */
+export const BUY_RECEIPT_TRADE_CREDIT = 'trade_credit' as const;
+export type BuyReceiptPaymentMethod = (typeof BUY_RECEIPT_PAYMENT_METHODS)[number] | typeof BUY_RECEIPT_TRADE_CREDIT;
 
 export const BUY_RECEIPT_PAYMENT_LABELS: Record<BuyReceiptPaymentMethod, string> = {
   cash: 'Cash',
@@ -89,6 +97,7 @@ export const BUY_RECEIPT_PAYMENT_LABELS: Record<BuyReceiptPaymentMethod, string>
   paypal: 'PayPal',
   bank_transfer: 'Bank transfer',
   store_credit: 'Store credit / trade',
+  trade_credit: 'Trade-in credit',
 };
 
 /**
@@ -190,7 +199,8 @@ export function resolvePrintCopies(input: unknown, hasIdPhoto: boolean): BuyRece
 }
 
 export type BuyReceiptItem = { qty: number; description: string; amount: number };
-export type BuyReceiptPayment = { method: BuyReceiptPaymentMethod; reference: string | null; amount: number };
+/** `order_id`: only on a `trade_credit` payment — the sale the credit went toward (its number is the `reference`). */
+export type BuyReceiptPayment = { method: BuyReceiptPaymentMethod; reference: string | null; amount: number; order_id?: string | null };
 /** `draft` (2026-10-09): saved to be finished later, on any device — see `buy-receipt-drafts.ts`. */
 export type BuyReceiptStatus = 'draft' | 'recorded' | 'void';
 
@@ -364,7 +374,8 @@ export function draftFromReceipt(row: BuyReceiptRow): BuyReceiptDraft {
   }));
   while (items.length < BUY_RECEIPT_FORM_ROWS) items.push({ qty: '', description: '', amount: '' });
 
-  const saved = row.payments ?? [];
+  // A trade-in credit belongs to the sale it paid toward: a copy of the receipt is a plain one.
+  const saved = (row.payments ?? []).filter((payment) => payment.method !== BUY_RECEIPT_TRADE_CREDIT);
   const payments: BuyReceiptDraftPayment[] = saved.map((payment) => ({
     method: payment.method,
     reference: payment.reference ?? '',
@@ -446,6 +457,8 @@ function isRealDate(text: string): boolean {
 export function normalizeBuyReceiptInput(
   body: unknown,
   now: Date = new Date(),
+  /** `tradeCredit`: the Trade-in sale route — the FIRST payment may be `trade_credit`. Nowhere else. */
+  options: { tradeCredit?: boolean } = {},
 ): { value: BuyReceiptInput } | { error: string } {
   const source = (body ?? {}) as Record<string, unknown>;
 
@@ -515,10 +528,11 @@ export function normalizeBuyReceiptInput(
   }
   const split = rawPayments.length > 1;
   const payments: BuyReceiptPayment[] = [];
-  for (const raw of rawPayments) {
-    const row = (raw ?? {}) as Record<string, unknown>;
+  for (let index = 0; index < rawPayments.length; index += 1) {
+    const row = (rawPayments[index] ?? {}) as Record<string, unknown>;
     const method = collapse(row.method) as BuyReceiptPaymentMethod;
-    if (!BUY_RECEIPT_PAYMENT_METHODS.includes(method)) return { error: 'Choose how the seller was paid.' };
+    const tradeRow = method === BUY_RECEIPT_TRADE_CREDIT && options.tradeCredit === true && index === 0;
+    if (!tradeRow && !(BUY_RECEIPT_PAYMENT_METHODS as readonly string[]).includes(method)) return { error: 'Choose how the seller was paid.' };
     let reference: string | null = null;
     if (method === 'check') {
       reference = optionalText(row.reference, BUY_RECEIPT_REFERENCE_MAX);
@@ -583,11 +597,29 @@ export function buyReceiptContentColumns(input: BuyReceiptInput) {
   };
 }
 
-/** "Cash" / "Check #2041" — or, for a Spanish seller's copy, "Efectivo" / "Cheque #2041". */
+/**
+ * "Cash" / "Check #2041" — or, for a Spanish seller's copy, "Efectivo" / "Cheque #2041".
+ * A trade-in credit names the sale: "Trade-in credit toward purchase NEJ-20261121-7KQ2M".
+ */
 export function paymentLabel(method: string, reference: string | null | undefined, language: BuyReceiptLanguage = 'en'): string {
   const labels = language === 'es' ? BUY_RECEIPT_PAYMENT_LABELS_ES : BUY_RECEIPT_PAYMENT_LABELS;
   const label = labels[method as BuyReceiptPaymentMethod] ?? method;
+  if (method === BUY_RECEIPT_TRADE_CREDIT && reference) {
+    return language === 'es' ? `${label} para la compra ${reference}` : `${label} toward purchase ${reference}`;
+  }
   return method === 'check' && reference ? `${label} #${reference}` : label;
+}
+
+/**
+ * The sale a Trade-in receipt's credit went toward (owner, 2026-11-21), or null
+ * for an ordinary receipt. Read from the first payment — no column of its own.
+ */
+export function buyReceiptTrade(
+  row: Pick<BuyReceiptRow, 'payments'>,
+): { orderId: string | null; orderNumber: string | null; amount: number } | null {
+  const first = (row.payments ?? [])[0];
+  if (!first || first.method !== BUY_RECEIPT_TRADE_CREDIT) return null;
+  return { orderId: first.order_id ?? null, orderNumber: first.reference ?? null, amount: Number(first.amount ?? 0) };
 }
 
 /** The "Paid by" line on the paper: one method alone, or each with its amount. */

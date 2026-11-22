@@ -1,7 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ComponentType } from 'react';
 import Link from 'next/link';
+import type { PaperReceipt } from '@/lib/order-receipt-paper';
+import type { SalePrintRequestRef } from '@/lib/sale-print-requests';
+import { normalizeTradeInSaleInput, tradeInBalance } from '@/lib/trade-in-sale';
 import { draftContinuePath, normalizeBuyReceiptDraftSave, type BuyReceiptDraftForm } from '@/lib/buy-receipt-drafts';
 import { applyIdReadToDraft } from '@/lib/buy-receipt-id-read';
 import {
@@ -10,6 +13,7 @@ import {
   buyReceiptLanguage,
   defaultPrintSet,
   draftPaperLines,
+  draftTotal,
   formatReceiptDateTime,
   normalizeBuyReceiptInput,
   paymentsLine,
@@ -81,7 +85,56 @@ import { CUSTOMER_MODE_PAGE_CSS } from './buy-receipt-customer-css';
  */
 
 type Action = 'save' | 'send' | 'print';
-type Saved = { receipt: BuyReceiptRow; action: 'send' | 'print' | null; setKey: BuyReceiptPrintSetKey };
+type Saved = { receipt: BuyReceiptRow; action: 'send' | 'print' | null; setKey: BuyReceiptPrintSetKey; trade?: TradeSaved };
+
+/** What the trade-in route answered about the SALE half (the receipt half is `Saved.receipt`). */
+export type TradeSaved = {
+  orderId: string;
+  orderNumber: string;
+  saleReceiptEmailed: boolean;
+  paper: PaperReceipt | null;
+  stationRequest: SalePrintRequestRef | null;
+  stationError: string | null;
+  linkError: string | null;
+  /** The button that saved it: 'print' prints the sale's paper once the buy receipt's print is done. */
+  action: Action;
+};
+
+/** What the right-hand column of the Trade-in sale screen is given to draw. */
+export type TradeSideContext = {
+  /** The receipt's total — what the gold is worth. */
+  tradeValue: number;
+  seller: { name: string; phone: string; email: string };
+  /** The paper's "Email copy" box: both receipts go to the seller's email. */
+  emailCopy: boolean;
+  busy: Action | null;
+  error: string | null;
+  save: (action: Action) => void;
+  clear: () => void;
+};
+
+/**
+ * The Trade-in sale screen (owner, 2026-11-21, option C): THIS form, the same
+ * paper, with the sale beside it. The screen (`TradeInSaleForm`) owns the
+ * sale's state and hands the form what it needs; the form owns the receipt,
+ * its pictures, customer input mode — and the one save of both.
+ */
+export type BuyReceiptTradeMode = {
+  /** The sale's total, or null while it is not priced yet. */
+  saleTotal: number | null;
+  /** The sale half of the request body, or why it cannot be saved yet. `tradeValue`: the receipt's total. */
+  salePart: (tradeValue: number) => { value: Record<string, unknown> } | { error: string };
+  /** The right-hand column (a component defined once by the screen, so it is never remounted while typing). */
+  Side: ComponentType<{ context: TradeSideContext }>;
+  /**
+   * The sale's half of the after-save panel. `buyPrintDone`: the buy receipt's
+   * automatic print (or send) has finished — "Save & print both" prints the
+   * sale's paper then, so the two print windows never open on top of each other.
+   */
+  Saved: ComponentType<{ saved: TradeSaved; receipt: BuyReceiptRow; buyPrintDone: boolean }>;
+  /** "New trade-in sale": empty the sale too. */
+  onClear: () => void;
+};
 type EmailState = { status: 'sent'; to: string } | { status: 'failed'; error: string } | null;
 /** The tablet is with the seller: on their boxes, or on the locked Thank-you screen. */
 type CustomerMode = { phase: 'form' | 'thanks'; tried: boolean };
@@ -97,7 +150,10 @@ export default function BuyReceiptForm({
   startInCustomerMode = false,
   draftReceipt = null,
   draftForm = null,
+  trade,
 }: {
+  /** The Trade-in sale screen (2026-11-21): the sale beside the paper, one save for both. */
+  trade?: BuyReceiptTradeMode;
   adminBasePath: string;
   /** The server's clock at render, so the date on the blank paper matches on both sides of hydration. */
   nowIso: string;
@@ -152,8 +208,13 @@ export default function BuyReceiptForm({
   const [listState, setListState] = useState<'added' | 'failed' | null>(null);
   /** How the tablet last came back; the line it may leave on the form is worked out from this, live. */
   const [handBackReason, setHandBackReason] = useState<CustomerHandBackReason | null>(null);
+  /** The after-save panel's automatic print (or send) of the buy receipt has finished. */
+  const [buyPrintDone, setBuyPrintDone] = useState(false);
 
   const hasPhoto = linked ? Boolean(linked.seller_id_photo_path) : photo !== null;
+  // A trade: what the gold is worth against what they buy (null until the purchase is priced).
+  const tradeValue = draftTotal(draft);
+  const tradeSplit = trade && trade.saleTotal != null && tradeValue > 0 ? tradeInBalance(tradeValue, trade.saleTotal) : null;
   // Nobody picked (or the pick needs a photo that is gone): the default — with the ID photo as soon as there is one.
   const setKey = chosenSet && printSetAllowed(chosenSet, hasPhoto) ? chosenSet : defaultPrintSet(hasPhoto);
 
@@ -377,6 +438,102 @@ export default function BuyReceiptForm({
     setListState(null);
     setHandBackReason(null);
     setModeError(null);
+    setBuyPrintDone(false);
+  }
+
+  /** "New trade-in sale" / "Clear" on the trade screen: both halves start over. */
+  function startOverTrade() {
+    startOver();
+    trade?.onClear();
+  }
+
+  /**
+   * The trade screen's save (owner, 2026-11-21): the receipt AND the sale in one
+   * request (`/api/admin/trade-in-sales`), then — as on Buy Receipts — the ID
+   * photo and the thumbprint to the saved receipt. `print` prints the buy
+   * receipt here, then the sale's paper; `send` sends both to the desktop printer.
+   */
+  async function submitTrade(action: Action) {
+    if (!trade || busy) return;
+    const salePart = trade.salePart(tradeValue);
+    if ('error' in salePart) {
+      setError(salePart.error);
+      return;
+    }
+    const wantsEmail = emailCopy && Boolean(draft.sellerEmail.trim());
+    const wantsList = mailingList && Boolean(draft.sellerEmail.trim());
+    const body = {
+      receipt: draft,
+      sale: salePart.value,
+      emailCopy: wantsEmail,
+      mailingList: wantsList,
+      print: action === 'print',
+      sendToStation: action === 'send',
+    };
+    // The route's own check, run here first so the message comes without a round trip.
+    const check = normalizeTradeInSaleInput(body);
+    if ('error' in check) {
+      setError(check.error);
+      return;
+    }
+    setBusy(action);
+    setError(null);
+    let data: Record<string, unknown> | null = null;
+    try {
+      const response = await fetch('/api/admin/trade-in-sales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      data = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+      if (!response.ok || !data?.receipt) {
+        setError(String(data?.error ?? 'Could not save the trade. Nothing was recorded.'));
+        setBusy(null);
+        return;
+      }
+    } catch {
+      setError('Could not reach the server. Nothing was recorded — try again.');
+      setBusy(null);
+      return;
+    }
+
+    let receipt = data.receipt as BuyReceiptRow;
+    if (wantsEmail) {
+      setEmailState(
+        data.emailed
+          ? { status: 'sent', to: receipt.emailed_to ?? draft.sellerEmail.trim() }
+          : { status: 'failed', error: String(data.emailError ?? 'The buy receipt could not be emailed.') },
+      );
+    }
+    setListState(wantsList ? ((data.mailingList as 'added' | 'failed' | null) ?? 'failed') : null);
+    if (photo) {
+      const uploaded = await uploadIdPhoto(receipt.id, photo.blob);
+      if ('error' in uploaded) setPhotoFailed(uploaded.error);
+      else receipt = uploaded.receipt;
+    }
+    if (thumbprint) {
+      const uploaded = await uploadThumbprint(receipt.id, thumbprint.blob);
+      if ('error' in uploaded) setThumbprintFailed(uploaded.error);
+      else receipt = uploaded.receipt;
+    }
+    const savedWithPhoto = Boolean(receipt.seller_id_photo_path);
+    const usableSet = printSetAllowed(setKey, savedWithPhoto) ? setKey : defaultPrintSet(savedWithPhoto);
+    setSaved({
+      receipt,
+      action: action === 'save' ? null : action,
+      setKey: usableSet,
+      trade: {
+        orderId: String(data.orderId),
+        orderNumber: String(data.orderNumber),
+        saleReceiptEmailed: Boolean(data.saleReceiptEmailed),
+        paper: (data.paper as PaperReceipt | null) ?? null,
+        stationRequest: (data.stationRequest as SalePrintRequestRef | null) ?? null,
+        stationError: (data.stationError as string | null) ?? null,
+        linkError: (data.linkError as string | null) ?? null,
+        action,
+      },
+    });
+    setBusy(null);
   }
 
   /** Lock this browser on the server FIRST; only then is the tablet safe to hand over. */
@@ -557,19 +714,15 @@ export default function BuyReceiptForm({
       mailingList={mailingList}
       onMailingListChange={setMailingList}
       customer={customer}
+      trade={trade ? { credit: tradeSplit?.credit ?? null, payout: tradeSplit?.payout ?? null } : undefined}
     />
   );
 
   // The tabs are drawn here, not by the page shell, because the one new button
   // sits at the right end of their row and needs this form's state. Small on
   // purpose: the form is the main thing, the hand-over is optional.
-  const tabs = (
-    <BuyReceiptTabs
-      adminBasePath={adminBasePath}
-      active="new"
-      end={
-        // Offered on a receipt that has not been saved yet — not after a save, and not on a saved draft (see enterCustomerMode).
-        saved || linked ? null : (
+  // Offered on a receipt that has not been saved yet — not after a save, and not on a saved draft (see enterCustomerMode).
+  const modeButton = saved || linked ? null : (
           <button
             type="button"
             className="outline-button"
@@ -585,22 +738,24 @@ export default function BuyReceiptForm({
             </svg>
             {modeBusy ? 'Locking…' : 'Customer input mode'}
           </button>
-        )
-      }
-    />
+  );
+  // The trade screen has its own heading: the Buy Receipts tabs do not belong there, only the hand-over button.
+  const tabs = trade ? (
+    modeButton && <div className="mb-3 flex justify-end">{modeButton}</div>
+  ) : (
+    <BuyReceiptTabs adminBasePath={adminBasePath} active="new" end={modeButton} />
   );
 
   if (saved) {
     const { receipt } = saved;
-    return (
-      <>
-      {tabs}
-      <div className="mx-auto grid max-w-xl gap-4" role="status">
+    const savedTrade = trade && saved.trade ? saved.trade : null;
+    const receiptPanel = (
+      <div className={savedTrade ? 'grid gap-4' : 'mx-auto grid max-w-xl gap-4'} role="status">
         <div className="grid justify-items-center gap-2 pt-2 text-center">
           <span className="flex h-14 w-14 items-center justify-center rounded-full border" style={{ borderColor: 'var(--color-primary)', background: '#fbf5dd' }}>
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7" /></svg>
           </span>
-          <h2 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>Receipt saved</h2>
+          <h2 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>{savedTrade ? 'Buy receipt saved' : 'Receipt saved'}</h2>
           <span className="text-xs" style={hintStyle}>Receipt <strong>{receipt.receipt_number}</strong></span>
         </div>
 
@@ -666,15 +821,29 @@ export default function BuyReceiptForm({
             receipt={receipt}
             initialSet={saved.setKey}
             autoAction={saved.action}
+            onAutoDone={() => setBuyPrintDone(true)}
             onChanged={(next) => setSaved((current) => (current ? { ...current, receipt: next } : current))}
           />
         </div>
 
         <div className="grid gap-2 pt-1 sm:grid-cols-2">
-          <button type="button" className="gold-button text-xs" onClick={startOver}>New receipt</button>
+          <button type="button" className="gold-button text-xs" onClick={savedTrade ? startOverTrade : startOver}>{savedTrade ? 'New trade-in sale' : 'New receipt'}</button>
           <Link href={`${adminBasePath}/buy-receipts/${receipt.id}`} className="outline-button text-xs">Open {receipt.receipt_number}</Link>
         </div>
       </div>
+    );
+    return (
+      <>
+      {tabs}
+      {savedTrade && trade ? (
+        // The two records side by side: the sale (what the customer bought) and the buy receipt (the gold).
+        <div className="grid items-start gap-6 lg:grid-cols-2">
+          <trade.Saved saved={savedTrade} receipt={receipt} buyPrintDone={buyPrintDone} />
+          {receiptPanel}
+        </div>
+      ) : (
+        receiptPanel
+      )}
       </>
     );
   }
@@ -724,6 +893,33 @@ export default function BuyReceiptForm({
         paper={sheet}
       />
     )}
+    {trade ? (
+      // The Trade-in sale screen: the paper on the left, the sale and the one save on the right.
+      <form onSubmit={(event) => event.preventDefault()} className="grid items-start gap-6 xl:grid-cols-[minmax(0,8.5in)_minmax(340px,1fr)]">
+        <div className="grid gap-3">
+          {sheet()}
+          <div className="brs-actions-row flex flex-wrap items-center justify-end gap-2" style={{ width: 'min(8.5in, 100%)' }}>
+            {longReceipt && <span className="mr-auto text-xs" style={hintStyle}>This receipt is long and may run onto a second page.</span>}
+            <PrintSetSelect value={setKey} hasIdPhoto={hasPhoto} onChange={setChosenSet} disabled={working} />
+            {/* On a trade it sets BOTH receipts' language: the seller's copy and the sale receipt + email (2026-11-21). */}
+            <SellerLanguageSwitch label="Both receipts" value={draft.sellerLanguage} onChange={(sellerLanguage) => setDraft((current) => ({ ...current, sellerLanguage }))} disabled={working} />
+          </div>
+        </div>
+        <div className="xl:sticky xl:top-4">
+          <trade.Side
+            context={{
+              tradeValue,
+              seller: { name: draft.sellerName, phone: draft.sellerPhone, email: draft.sellerEmail },
+              emailCopy: emailCopy && Boolean(draft.sellerEmail.trim()),
+              busy,
+              error,
+              save: (action) => void submitTrade(action),
+              clear: startOverTrade,
+            }}
+          />
+        </div>
+      </form>
+    ) : (
     <form
       // Enter in a field must never save a half-filled receipt: every action is a button.
       onSubmit={(event) => event.preventDefault()}
@@ -786,6 +982,7 @@ export default function BuyReceiptForm({
         </p>
       </div>
     </form>
+    )}
     </>
   );
 }

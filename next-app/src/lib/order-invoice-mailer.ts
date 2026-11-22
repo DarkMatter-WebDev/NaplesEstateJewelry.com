@@ -10,8 +10,10 @@ import {
 import { getStoreHours } from '@/lib/store-hours';
 import { loadOrderTaxExemption } from '@/lib/tax-exempt-server';
 import { loadOrderGift } from '@/lib/order-gift-server';
-import { SPLIT_PAYMENTS_COLUMN } from '@/lib/in-store-sale';
+import { SPLIT_PAYMENTS_COLUMN, TRADE_IN_COLUMN } from '@/lib/in-store-sale';
 import { logOrderEmail } from '@/lib/email-copies';
+import { loadOrderLanguage, loadSpanishItemTitles } from '@/lib/order-language-server';
+import type { OrderLanguage } from '@/lib/order-language';
 
 const ORDER_INVOICE_COLUMNS = [
   'id',
@@ -30,6 +32,7 @@ const ORDER_INVOICE_COLUMNS = [
   'order_status',
   'payment_method',
   SPLIT_PAYMENTS_COLUMN,
+  TRADE_IN_COLUMN,
   'payment_reference',
   'shipping_method',
   'shipping_address',
@@ -74,7 +77,7 @@ export async function buildOrderInvoiceEmail(
   orderId: string,
   opts: { itemDiscounts?: Record<string, number>; payment?: InvoicePaymentBlock | null } = {},
 ): Promise<
-  | { ok: true; content: ReturnType<typeof buildInvoiceEmailContent>; emailType: 'invoice' | 'receipt' }
+  | { ok: true; content: ReturnType<typeof buildInvoiceEmailContent>; emailType: 'invoice' | 'receipt'; language: OrderLanguage }
   | { ok: false; status: number; error: string }
 > {
   const [orderResult, { data: invoices }] = await Promise.all([
@@ -108,17 +111,25 @@ export async function buildOrderInvoiceEmail(
     order as unknown as InvoiceEmailOrder,
     opts.itemDiscounts ?? {},
   );
+  // The customer's language (2026-11-21): set at checkout on /es, on the
+  // Instant Sale forms, or on the order page. English until set.
+  const language = await loadOrderLanguage(supabase, orderId);
+  const spanishTitles = language === 'es'
+    ? await loadSpanishItemTitles(supabase, emailOrder.order_items.map((item) => item.product_id))
+    : null;
   // Admin-editable hours, resolved at SEND time so the pickup block always
   // prints the current schedule (defaults to Tue–Sat if unconfigured).
   const content = buildInvoiceEmailContent(emailOrder, invoiceNumber, {
-    pickupHours: formatPickupHours(await getStoreHours()),
+    language,
+    spanishTitles,
+    pickupHours: formatPickupHours(await getStoreHours(), language),
     payment: opts.payment ?? null,
     // Tax-exempt sales (owner, 2026-10-27) print the certificate line.
     taxExempt: await loadOrderTaxExemption(supabase, orderId),
     gift: await loadOrderGift(supabase, orderId),
   });
   const emailType: 'invoice' | 'receipt' = isOrderPaid(emailOrder) ? 'receipt' : 'invoice';
-  return { ok: true, content, emailType };
+  return { ok: true, content, emailType, language };
 }
 
 /**

@@ -53,6 +53,8 @@ export interface Order {
   payment_reference: string | null;
   /** Split payment parts — only when selected via `SPLIT_PAYMENTS_COLUMN` (lib/in-store-sale.ts). */
   split_payments?: unknown;
+  /** A Trade-in sale's trade (`payment_response.trade`) — only when selected via `TRADE_IN_COLUMN` (2026-11-21). */
+  trade_in?: unknown;
   shipping_method: ShippingMethod;
   shipping_carrier?: string | null;
   tracking_number?: string | null;

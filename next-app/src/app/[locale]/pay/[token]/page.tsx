@@ -86,7 +86,7 @@ export default async function PayInvoicePage({ params }: Props) {
       shippingFee: Number(order.shipping_fee),
       ships: order.shipping_method === 'shipping',
       shippingLabel: Number(order.shipping_fee) > 0 ? (isEs ? 'Envío' : 'Shipping') : (isEs ? 'Envío · sin cargo' : 'Shipping · no charge'),
-      otherWays: remoteOtherWays({ ...payOptionsOf(invoice), online: false }, order.order_number),
+      otherWays: remoteOtherWays({ ...payOptionsOf(invoice), online: false }, order.order_number, isEs),
       message: invoice.message,
       // A tax-exempt invoice (owner, 2026-10-27): no Florida tax at any address.
       taxExempt: exemption

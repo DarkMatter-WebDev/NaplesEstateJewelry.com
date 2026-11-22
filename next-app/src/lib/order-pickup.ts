@@ -15,6 +15,7 @@
 //
 // Pure: no React, no Supabase client.
 import { BUY_RECEIPT_ID_TYPES, type BuyReceiptIdType } from '@/lib/buy-receipts';
+import { metalIn, orderDateLine, type OrderLanguage } from '@/lib/order-language';
 import { escapeHtml as esc } from '@/lib/marketing-email-html';
 import { cityLine, landmarkPhrase, SHOWROOM_TIME_ZONE, streetLine } from '@/lib/business-location';
 import { BUSINESS_PHONE, SITE_DOMAIN_LABEL } from '@/lib/order-email-branding';
@@ -60,6 +61,15 @@ export type OrderPickupState = { supported: boolean; row: OrderPickupRow | null 
  */
 export const PICKUP_STATEMENT =
   "I confirm I am the buyer named on this order, or a person the buyer authorized to collect it, and the ID shown is mine. I received the item(s) listed above, have inspected them, and accept them in the condition described. Returns follow Naples Estate Jewelry's posted policy: call or text within 5 days of pickup.";
+
+/**
+ * The same statement in Spanish (2026-11-21), on the Spanish customer copy and
+ * the Spanish pickup email, and under the English one on the store copy of a
+ * Spanish order, so the customer can read what they sign.
+ * ⚠️ Claude's translation — for the owner's translator or attorney (TASKS).
+ */
+export const PICKUP_STATEMENT_ES =
+  'Confirmo que soy el comprador indicado en este pedido, o una persona autorizada por el comprador para recogerlo, y que la identificación presentada es mía. Recibí los artículos indicados arriba, los revisé y los acepto en el estado descrito. Las devoluciones siguen la política publicada de Naples Estate Jewelry: llame o envíe un texto dentro de los 5 días posteriores a la recogida.';
 
 export const PICKUP_ID_TYPES = BUY_RECEIPT_ID_TYPES;
 
@@ -235,8 +245,9 @@ export type PickupPaperOrder = {
   order_items: PickupPaperItem[];
 };
 
-/** "November 21, 2026" in Naples time. */
-export function pickupDateOnly(iso: string | null | undefined): string {
+/** "November 21, 2026" in Naples time ("21 de noviembre de 2026" in Spanish). */
+export function pickupDateOnly(iso: string | null | undefined, language: OrderLanguage = 'en'): string {
+  if (language === 'es') return orderDateLine(iso, 'es');
   if (!iso) return '';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
@@ -249,12 +260,12 @@ function qtyOf(item: { quantity?: number | null }): number {
 }
 
 /** "#1043 · Ca. 1950 · 14K · 4.2 g" — the same detail line as the receipt, never a price. */
-export function pickupItemDetail(item: PickupPaperItem): string {
+export function pickupItemDetail(item: PickupPaperItem, language: OrderLanguage = 'en'): string {
   const year = formatProductItemYear(item.item_year_snapshot ?? null);
   return [
     item.inventory_number ? `#${item.inventory_number}` : null,
     year ? `Ca. ${year}` : null,
-    item.metal_snapshot,
+    metalIn(item.metal_snapshot, language),
     item.purity_snapshot ? formatPublicPurity(item.purity_snapshot) : null,
     item.gram_weight_snapshot ? `${item.gram_weight_snapshot} g` : null,
   ].filter(Boolean).join(' · ');
@@ -270,13 +281,22 @@ export function pickupIdLine(pickup: Pick<OrderPickupRow, 'id_type' | 'id_last4'
   return [pickup.id_type, pickup.id_last4 ? `····${pickup.id_last4}` : null].filter(Boolean).join(' ');
 }
 
-function copyBody(order: PickupPaperOrder, pickup: OrderPickupRow | null, copy: 'store' | 'customer', opts: { hoursLine?: string | null; printedAt?: string }): string {
+function copyBody(
+  order: PickupPaperOrder,
+  pickup: OrderPickupRow | null,
+  copy: 'store' | 'customer',
+  opts: { hoursLine?: string | null; hoursLineEs?: string | null; printedAt?: string; language?: OrderLanguage },
+): string {
   const store = copy === 'store';
+  // The customer copy is in the order's language; the store copy stays English (2026-11-21).
+  const orderEs = opts.language === 'es';
+  const es = orderEs && !store;
+  const language: OrderLanguage = es ? 'es' : 'en';
   const items = order.order_items;
   const anyPhoto = items.some((item) => Boolean(normalizeLegacyLocalImageUrl(item.image_snapshot)));
   const rows = items.map((item, index) => {
     const image = normalizeLegacyLocalImageUrl(item.image_snapshot);
-    const detail = pickupItemDetail(item);
+    const detail = pickupItemDetail(item, language);
     return `<tr>
 <td class="n">${index + 1}</td>
 ${anyPhoto ? `<td class="ph">${image ? `<img src="${esc(image)}" alt="">` : ''}</td>` : ''}
@@ -287,7 +307,7 @@ ${anyPhoto ? `<td class="ph">${image ? `<img src="${esc(image)}" alt="">` : ''}<
 
   const contact = [order.customer_email, order.customer_phone].filter(Boolean).map((v) => esc(String(v))).join(' · ');
   const pickedUp = pickup
-    ? `${esc(paperDateLine(pickup.picked_up_at))}<br>at the showroom`
+    ? `${esc(paperDateLine(pickup.picked_up_at, language))}<br>${es ? 'en el salón' : 'at the showroom'}`
     : '<span class="blank"></span>';
   const idLine = pickupIdLine(pickup);
   const pickedUpBy = pickup
@@ -296,17 +316,17 @@ ${anyPhoto ? `<td class="ph">${image ? `<img src="${esc(image)}" alt="">` : ''}<
 
   const digital = Boolean(pickup && pickup.sign_method === 'digital' && pickup.signature_path);
   const signedName = pickup?.signed_name || pickup?.picked_up_by || '';
-  const signedDate = pickupDateOnly(pickup?.signed_at ?? pickup?.picked_up_at);
+  const signedDate = pickupDateOnly(pickup?.signed_at ?? pickup?.picked_up_at, language);
   // A paper pickup: the store copy has blank lines to sign by hand; the customer copy has no signature row.
   const showSigs = store || digital;
   const sigs = !showSigs ? '' : `
 <div class="sigs${store ? '' : ' three'}">
-  <div><div class="sig">${digital && pickup?.signature_path ? privateImg(pickup.signature_path, 'sigimg') : ''}</div><div class="siglab">Customer signature</div></div>
-  <div><div class="sig typed">${digital ? esc(signedName) : ''}</div><div class="siglab">Printed name</div></div>
-  <div><div class="sig typed">${digital ? esc(signedDate) : ''}</div><div class="siglab">Date picked up</div></div>
+  <div><div class="sig">${digital && pickup?.signature_path ? privateImg(pickup.signature_path, 'sigimg') : ''}</div><div class="siglab">${es ? 'Firma del cliente' : 'Customer signature'}</div></div>
+  <div><div class="sig typed">${digital ? esc(signedName) : ''}</div><div class="siglab">${es ? 'Nombre' : 'Printed name'}</div></div>
+  <div><div class="sig typed">${digital ? esc(signedDate) : ''}</div><div class="siglab">${es ? 'Fecha de recogida' : 'Date picked up'}</div></div>
   ${store ? '<div><div class="sig"></div><div class="siglab">Staff</div></div>' : ''}
 </div>${digital && pickup?.signed_at ? `
-<div class="esig">Signed electronically at the showroom · ${esc(paperDateLine(pickup.signed_at))}</div>` : ''}`;
+<div class="esig">${es ? 'Firmado electrónicamente en el salón' : 'Signed electronically at the showroom'} · ${esc(paperDateLine(pickup.signed_at, language))}</div>` : ''}`;
 
   const idRow = !store ? '' : `
 <div class="idrow">
@@ -315,22 +335,33 @@ ${anyPhoto ? `<td class="ph">${image ? `<img src="${esc(image)}" alt="">` : ''}<
 </div>`;
 
   // The store copy's order + print time sit beside the ID (no footer row), so six items still fit one sheet.
+  const hoursEs = opts.hoursLineEs ?? null;
   const foot = store
     ? ''
-    : `<div class="foot"><strong>Thank you!</strong> Questions? Call or text ${esc(BUSINESS_PHONE)} · Returns: call or text within 5 days of pickup · ${esc(SITE_DOMAIN_LABEL)}/returns-refunds${opts.hoursLine ? `<br>Showroom: ${esc(opts.hoursLine)} · ${esc(landmarkPhrase(false))}` : ''}</div>`;
+    : es
+      ? `<div class="foot"><strong>¡Gracias!</strong> ¿Preguntas? Llame o envíe un texto al ${esc(BUSINESS_PHONE)} · Devoluciones: llame o envíe un texto dentro de los 5 días posteriores a la recogida · ${esc(SITE_DOMAIN_LABEL)}/es/returns-refunds${hoursEs ? `<br>Salón: ${esc(hoursEs)} · ${esc(landmarkPhrase(true))}` : ''}</div>`
+      : `<div class="foot"><strong>Thank you!</strong> Questions? Call or text ${esc(BUSINESS_PHONE)} · Returns: call or text within 5 days of pickup · ${esc(SITE_DOMAIN_LABEL)}/returns-refunds${opts.hoursLine ? `<br>Showroom: ${esc(opts.hoursLine)} · ${esc(landmarkPhrase(false))}` : ''}</div>`;
+  // A Spanish order's store copy: the statement in Spanish too, under the English one.
+  const statement = es
+    ? esc(PICKUP_STATEMENT_ES)
+    : orderEs
+      ? `${esc(PICKUP_STATEMENT)}<br><br><span lang="es">${esc(PICKUP_STATEMENT_ES)}</span>`
+      : esc(PICKUP_STATEMENT);
 
   return `<div class="nej-paper nej-pickup">
 <div class="top">
   <div class="brand"><img src="/assets/images/branding/email-logo.png" alt=""><div><div class="name">Naples Estate Jewelry</div><div class="addr">${esc(streetLine())}, ${esc(cityLine())} · ${esc(BUSINESS_PHONE)}<br>${esc(SITE_DOMAIN_LABEL)}</div></div></div>
-  <div class="doc"><div class="kind">PICKUP</div><div class="meta">Order ${esc(order.order_number)}<br>Ordered ${esc(paperDateLine(order.created_at))}</div><span class="badge ${store ? 'gold' : 'green'}">${store ? 'STORE COPY' : 'CUSTOMER COPY'}</span></div>
+  <div class="doc">${es
+    ? `<div class="kind">RECOGIDA</div><div class="meta">Pedido ${esc(order.order_number)}<br>Pedido el ${esc(paperDateLine(order.created_at, 'es'))}</div><span class="badge green">COPIA DEL CLIENTE</span>`
+    : `<div class="kind">PICKUP</div><div class="meta">Order ${esc(order.order_number)}<br>Ordered ${esc(paperDateLine(order.created_at))}</div><span class="badge ${store ? 'gold' : 'green'}">${store ? 'STORE COPY' : 'CUSTOMER COPY'}</span>`}</div>
 </div>
 <div class="info">
-  <div><div class="lab">Buyer</div>${esc(order.customer_name || '—')}${contact ? `<br>${contact}` : ''}</div>
-  <div><div class="lab">Picked up</div>${pickedUp}</div>
-  <div><div class="lab">Picked up by</div>${pickedUpBy}</div>
+  <div><div class="lab">${es ? 'Comprador' : 'Buyer'}</div>${esc(order.customer_name || '—')}${contact ? `<br>${contact}` : ''}</div>
+  <div><div class="lab">${es ? 'Recogido' : 'Picked up'}</div>${pickedUp}</div>
+  <div><div class="lab">${es ? 'Recogido por' : 'Picked up by'}</div>${pickedUpBy}</div>
 </div>
-<table><thead><tr><th></th>${anyPhoto ? '<th></th>' : ''}<th>Item</th><th class="m">Qty</th></tr></thead><tbody>${rows}</tbody></table>
-<div class="statement">${esc(PICKUP_STATEMENT)}</div>${sigs}${idRow}
+<table><thead><tr><th></th>${anyPhoto ? '<th></th>' : ''}<th>${es ? 'Artículo' : 'Item'}</th><th class="m">${es ? 'Cant.' : 'Qty'}</th></tr></thead><tbody>${rows}</tbody></table>
+<div class="statement">${statement}</div>${sigs}${idRow}
 ${foot}
 </div>`;
 }
@@ -389,7 +420,15 @@ export const PICKUP_PAPER_CSS = `.nej-paper{font-family:Arial,Helvetica,sans-ser
 export function buildPickupPaper(
   order: PickupPaperOrder,
   pickup: OrderPickupRow | null,
-  opts: { copies?: PickupCopies; hoursLine?: string | null; printedAt?: string } = {},
+  opts: {
+    copies?: PickupCopies;
+    hoursLine?: string | null;
+    /** The hours in Spanish, for a Spanish customer copy. */
+    hoursLineEs?: string | null;
+    printedAt?: string;
+    /** The order's customer language (2026-11-21): the customer copy follows it. */
+    language?: OrderLanguage;
+  } = {},
 ): PaperReceipt {
   const copies: PickupCopies = pickup ? opts.copies ?? 'both' : 'store';
   const list: ('store' | 'customer')[] = copies === 'both' ? ['store', 'customer'] : [copies];

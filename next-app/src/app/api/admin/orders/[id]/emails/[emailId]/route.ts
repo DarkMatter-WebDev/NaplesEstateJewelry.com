@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { loadOrderLanguage } from '@/lib/order-language-server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { isMissingCopyColumn, rebuildPlan, type EmailCopyResponse } from '@/lib/email-copies';
 import { buildOrderInvoiceEmail } from '@/lib/order-invoice-mailer';
@@ -58,7 +59,7 @@ export async function GET(_req: Request, context: Context) {
       rebuilt = buildFulfillmentUpdateEmailContent(
         { ...order, shipping_carrier: order.shipping_carrier ?? null, tracking_number: order.tracking_number ?? null },
         plan.status,
-        { deliveryUpdates: isDeliveryTrackingConfigured() },
+        { deliveryUpdates: isDeliveryTrackingConfigured(), language: await loadOrderLanguage(admin.supabase, id) },
       );
     }
   } else if (plan.kind === 'pickup') {
@@ -66,7 +67,7 @@ export async function GET(_req: Request, context: Context) {
       loadPickupOrder(admin.supabase, id),
       admin.supabase.from(ORDER_PICKUP_TABLE).select(ORDER_PICKUP_COLUMNS).eq('order_id', id).maybeSingle(),
     ]);
-    if (order && pickup) rebuilt = buildPickupEmail(order, pickup as unknown as OrderPickupRow);
+    if (order && pickup) rebuilt = buildPickupEmail(order, pickup as unknown as OrderPickupRow, await loadOrderLanguage(admin.supabase, id));
   } else {
     const body: EmailCopyResponse = { missing: true, reason: plan.reason };
     return NextResponse.json(body);

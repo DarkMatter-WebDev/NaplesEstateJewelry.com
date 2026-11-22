@@ -1,6 +1,7 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { loadOrderLanguage } from '@/lib/order-language-server';
 import {
   createTracker,
   easyPostApiKey,
@@ -324,7 +325,8 @@ async function sendDeliveryEmail(
   if (!claimed || claimed.length === 0) return false;
 
   const recipient = order.customer_email!.trim();
-  const content = buildDeliveryUpdateEmailContent(order, kind, scan);
+  // In the customer's language (2026-11-21).
+  const content = buildDeliveryUpdateEmailContent(order, kind, scan, await loadOrderLanguage(service, order.id));
   try {
     const { Resend } = await import('resend');
     const resend = new Resend(resendKey);
