@@ -4,6 +4,7 @@ import { loadOrderLanguage } from '@/lib/order-language-server';
 import {
   isMissingPickupTable,
   ORDER_PICKUP_COLUMNS,
+  pickupEmailRecipients,
   ORDER_PICKUP_TABLE,
   type OrderPickupRow,
   type OrderPickupState,
@@ -62,18 +63,25 @@ export type PickupEmailEntry = {
 };
 
 export type SendPickupEmailResult =
-  | { ok: true; pickup: OrderPickupRow; email: PickupEmailEntry }
+  | { ok: true; pickup: OrderPickupRow; emails: PickupEmailEntry[]; failed: string[] }
   | { ok: false; error: string };
 
-/** Email the BUYER their pickup copy. Never the ID photo, ID details or the signature picture. */
+/**
+ * Email the pickup copy. Default: the BUYER (the order's email). `recipients`
+ * (Log Pickup, owner 2026-11-22): the order's email, a different address the
+ * customer asked for, or both — each gets its OWN email (neither sees the
+ * other's address) and its own Email History row. Never the ID photo, ID
+ * details or the signature picture.
+ */
 export async function sendPickupEmail(opts: {
   supabase: SupabaseClient;
   order: PickupOrder;
   pickup: OrderPickupRow;
   sentBy: { id: string; email: string | null };
+  recipients?: string[];
 }): Promise<SendPickupEmailResult> {
-  const to = String(opts.order.customer_email ?? '').trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+  const recipients = opts.recipients ?? pickupEmailRecipients(opts.order.customer_email, true, null);
+  if (recipients.length === 0) {
     return { ok: false, error: 'This order has no email address to send the pickup copy to.' };
   }
   const resendKey = process.env.RESEND_API_KEY;
@@ -81,35 +89,44 @@ export async function sendPickupEmail(opts: {
 
   // In the order's customer language (2026-11-21).
   const content = buildPickupEmail(opts.order, opts.pickup, await loadOrderLanguage(opts.supabase, opts.order.id));
-  try {
-    const { Resend } = await import('resend');
-    const resend = new Resend(resendKey);
-    const result = await resend.emails.send({
-      from: 'Naples Estate Jewelry <noreply@naplesestatejewelry.com>',
-      replyTo: 'info@naplesestatejewelry.com',
-      to,
-      subject: content.subject,
-      html: content.html,
-      text: content.text,
-    });
-    if (result.error || !result.data?.id) {
-      throw new Error(result.error?.message ?? 'Resend did not return an accepted email ID.');
+  const { Resend } = await import('resend');
+  const resend = new Resend(resendKey);
+  const sent: string[] = [];
+  const failed: string[] = [];
+  for (const to of recipients) {
+    try {
+      const result = await resend.emails.send({
+        from: 'Naples Estate Jewelry <noreply@naplesestatejewelry.com>',
+        replyTo: 'info@naplesestatejewelry.com',
+        to,
+        subject: content.subject,
+        html: content.html,
+        text: content.text,
+      });
+      if (result.error || !result.data?.id) {
+        throw new Error(result.error?.message ?? 'Resend did not return an accepted email ID.');
+      }
+      sent.push(to);
+    } catch (error) {
+      console.error('[order-pickup] email failed', error instanceof Error ? error.message : error);
+      failed.push(to);
     }
-  } catch (error) {
-    console.error('[order-pickup] email failed', error instanceof Error ? error.message : error);
+  }
+  if (sent.length === 0) {
     return { ok: false, error: 'The pickup copy could not be emailed. The pickup itself is saved.' };
   }
 
   const sentAt = new Date().toISOString();
-  // Best effort from here: the email is already on its way.
-  const [{ data: stamped }, { error: logError, id: logId }] = await Promise.all([
+  const emailedTo = sent.join(', ');
+  // Best effort from here: the emails are already on their way.
+  const [{ data: stamped }, ...logs] = await Promise.all([
     opts.supabase
       .from(ORDER_PICKUP_TABLE)
-      .update({ emailed_at: sentAt, emailed_to: to })
+      .update({ emailed_at: sentAt, emailed_to: emailedTo })
       .eq('order_id', opts.order.id)
       .select(ORDER_PICKUP_COLUMNS)
       .maybeSingle(),
-    logOrderEmail(opts.supabase, {
+    ...sent.map((to) => logOrderEmail(opts.supabase, {
       order_id: opts.order.id,
       email_type: PICKUP_EMAIL_TYPE,
       recipient: to,
@@ -117,21 +134,22 @@ export async function sendPickupEmail(opts: {
       status: 'picked_up',
       sent_by: opts.sentBy.id,
       sent_by_email: opts.sentBy.email,
-    }, { html: content.html, text: content.text }),
+    }, { html: content.html, text: content.text })),
   ]);
-  if (logError) console.error('[order-pickup] order_emails insert failed', logError);
+  for (const log of logs) if (log.error) console.error('[order-pickup] order_emails insert failed', log.error);
 
   return {
     ok: true,
-    pickup: (stamped as unknown as OrderPickupRow | null) ?? { ...opts.pickup, emailed_at: sentAt, emailed_to: to },
-    email: {
-      id: logId,
+    pickup: (stamped as unknown as OrderPickupRow | null) ?? { ...opts.pickup, emailed_at: sentAt, emailed_to: emailedTo },
+    emails: sent.map((to, index) => ({
+      id: logs[index]?.id ?? null,
       email_type: PICKUP_EMAIL_TYPE,
       recipient: to,
       subject: content.subject,
       status: 'picked_up',
       sent_by_email: opts.sentBy.email,
       created_at: sentAt,
-    },
+    })),
+    failed,
   };
 }

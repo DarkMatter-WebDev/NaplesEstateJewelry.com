@@ -15,6 +15,9 @@ export async function POST(req: Request) {
   const subject = typeof body?.subject === 'string' ? body.subject.trim() : '';
   const html = typeof body?.html === 'string' ? body.html.trim() : '';
   const senderProfile = normalizeSenderProfile(body?.senderProfile);
+  // The Spanish version (2026-11-22): when filled in, the test sends it too, as a second email.
+  const subjectEs = typeof body?.subjectEs === 'string' ? body.subjectEs.trim() : '';
+  const htmlEs = typeof body?.htmlEs === 'string' ? body.htmlEs.trim() : '';
   const to = user.email;
 
   if (!to) return NextResponse.json({ error: 'Admin email is unavailable.' }, { status: 400 });
@@ -45,7 +48,24 @@ export async function POST(req: Request) {
       senderProfile,
       settings,
     });
-    return NextResponse.json({ success: result.sent === 1, sent: result.sent, failed: result.failed });
+    let sent = result.sent;
+    let failed = result.failed;
+    let spanishSent = false;
+    if (subjectEs && htmlEs) {
+      const spanishResult = await sendDirectMarketingCampaign({
+        campaignId: 'test',
+        subject: `[Test] ${subject}`,
+        html,
+        recipients: [{ ...recipient, language: 'es' }],
+        senderProfile,
+        settings,
+        spanish: { subject: `[Prueba] ${subjectEs}`, html: htmlEs },
+      });
+      sent += spanishResult.sent;
+      failed += spanishResult.failed;
+      spanishSent = spanishResult.sent === 1;
+    }
+    return NextResponse.json({ success: failed === 0 && sent > 0, sent, failed, spanishSent });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Could not send test email.' },

@@ -175,6 +175,122 @@ export function dealLine(deal: DealWords): string {
   return [head, dealSizeLabel(deal)].filter(Boolean).join(' · ');
 }
 
+/* ── Spanish (2026-11-22) ────────────────────────────────────────────────────
+ * Spanish subscribers get the deal in Spanish: the fixed words come from here
+ * (never the machine), and the words the owner typed come from the Spanish
+ * boxes (`title_es`, `size_text_es`, `description_es`, `message_es` —
+ * translated on Preview, editable). An empty Spanish box falls back to the
+ * English one, so a deal can never go out with a hole in it. */
+
+/** The Spanish closing message a new deal starts with. */
+export const DEFAULT_DEAL_MESSAGE_ES = 'No está en el sitio web. La primera respuesta se la lleva. Se recoge en nuestra tienda de Naples.';
+
+/** The metals in Spanish, as printed (lower-case after the first word: "Oro amarillo"). */
+export const DEAL_METALS_ES: Record<(typeof DEAL_METALS)[number], string> = {
+  'Yellow Gold': 'Oro amarillo',
+  'White Gold': 'Oro blanco',
+  'Rose Gold': 'Oro rosa',
+  'Two-Tone Gold': 'Oro bicolor',
+  'Tricolor Gold': 'Oro tricolor',
+  'Sterling Silver': 'Plata de ley',
+  Silver: 'Plata',
+  Platinum: 'Platino',
+  Palladium: 'Paladio',
+};
+
+/** The Spanish boxes of a deal. Absent on a row read before `spanish-subscribers-2026-11.sql` ran. */
+export type DealWordsEs = DealWords & {
+  title_es?: string | null;
+  size_text_es?: string | null;
+};
+
+/** Metal + Purity in Spanish order — "Oro amarillo 14K", "Plata de ley 925"; '' when both are left off. */
+export function dealMetalLabelEs(deal: DealWords): string {
+  const metal = shown(deal.metal);
+  const metalEs = metal ? DEAL_METALS_ES[metal as (typeof DEAL_METALS)[number]] ?? metal : '';
+  return [metalEs, shown(deal.purity)].filter(Boolean).join(' ');
+}
+
+/** The Spanish "What it is", or the English one when the Spanish box is empty. */
+export function dealTitleEs(deal: DealWordsEs): string {
+  return oneLine(deal.title_es) || oneLine(deal.title);
+}
+
+/**
+ * The Spanish closing message: the Spanish box, else the built-in Spanish one
+ * when the English is still the standard closing, else the English words.
+ */
+export function dealMessageEs(deal: { message?: string | null; message_es?: string | null }): string {
+  const spanish = oneLine(deal.message_es);
+  if (spanish) return spanish;
+  const english = oneLine(deal.message);
+  return !english || english === DEFAULT_DEAL_MESSAGE ? DEFAULT_DEAL_MESSAGE_ES : english;
+}
+
+/** The Spanish size, or the English one when the Spanish box is empty. */
+export function dealSizeLabelEs(deal: DealWordsEs): string {
+  return shown(deal.size_text_es) || dealSizeLabel(deal);
+}
+
+/**
+ * The one line on the Spanish pictures and in the Spanish "¡Es suya!" text:
+ * What it is, then metal, then size — "Cadena tipo cuerda · 18.4 g · Oro
+ * amarillo 14K · 22 pulg." (Spanish puts the noun first.)
+ */
+export function dealLineEs(deal: DealWordsEs): string {
+  return [dealTitleEs(deal), dealMetalLabelEs(deal), dealSizeLabelEs(deal)].filter(Boolean).join(' · ');
+}
+
+export const DEAL_SPANISH_COLUMNS = ['title_es', 'size_text_es', 'description_es', 'message_es'] as const;
+export type DealSpanishInput = Record<(typeof DEAL_SPANISH_COLUMNS)[number], string>;
+
+/**
+ * The Spanish boxes as the owner typed them (null = not sent, leave as is).
+ * Same limits as the English boxes.
+ */
+export function normalizeDealSpanish(body: unknown): { value: DealSpanishInput | null } | { error: string } {
+  const source = (body ?? {}) as Record<string, unknown>;
+  if (!DEAL_SPANISH_COLUMNS.some((key) => typeof source[key] === 'string')) return { value: null };
+  const value: DealSpanishInput = {
+    title_es: oneLine(source.title_es),
+    size_text_es: oneLine(source.size_text_es),
+    description_es: cleanDealDescription(source.description_es),
+    message_es: oneLine(source.message_es),
+  };
+  if (value.title_es.length > DEAL_TITLE_MAX) return { error: `Keep the Spanish "Artículo" under ${DEAL_TITLE_MAX} characters.` };
+  if (value.size_text_es.length > DEAL_SIZE_MAX) return { error: `Keep the Spanish size under ${DEAL_SIZE_MAX} characters.` };
+  if (value.description_es.length > DEAL_DESCRIPTION_MAX) return { error: `Keep the Spanish description under ${DEAL_DESCRIPTION_MAX} characters.` };
+  if (value.message_es.length > DEAL_MESSAGE_MAX) return { error: `Keep the Spanish message under ${DEAL_MESSAGE_MAX} characters.` };
+  return { value };
+}
+
+/**
+ * Whether Preview / Send should (re)translate the Spanish boxes:
+ *   translate  the boxes are empty, the owner pressed "Translate again", or
+ *              the English changed and the Spanish is still the machine's;
+ *   stale      the English changed but the owner corrected the Spanish — kept
+ *              (never overwritten), and the form says to check it;
+ *   keep       nothing changed.
+ */
+export function spanishTranslationPlan(input: {
+  hasSpanish: boolean;
+  sourceHash: string;
+  storedSourceHash: string | null;
+  spanishHash: string;
+  machineHash: string | null;
+  force: boolean;
+}): 'translate' | 'stale' | 'keep' {
+  if (input.force || !input.hasSpanish) return 'translate';
+  if (input.storedSourceHash === input.sourceHash) return 'keep';
+  return input.machineHash && input.spanishHash === input.machineHash ? 'translate' : 'stale';
+}
+
+/** The Spanish columns for an update — only when the row has them (the SQL has run). */
+export function dealSpanishColumns(value: DealSpanishInput | null, row?: Record<string, unknown> | null): Record<string, string> {
+  if (!value || !row || !('title_es' in row)) return {};
+  return { ...value };
+}
+
 /**
  * The new detail columns for an insert or update: a box with something in it,
  * or any box the row already has (so it can be cleared). A blank box on a row

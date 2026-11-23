@@ -3,6 +3,7 @@ import { requireAdmin } from '@/lib/admin-auth';
 import { createServiceClient } from '@/lib/supabase/service';
 import {
   buildMarketingAudience,
+  countByLanguage,
   getMarketingSettings,
   normalizeSenderProfile,
   senderForProfile,
@@ -23,10 +24,18 @@ export async function POST(req: Request) {
   const html = typeof body?.html === 'string' ? body.html.trim() : '';
   const scope = normalizeScope(body?.scope);
   const senderProfile = normalizeSenderProfile(body?.senderProfile);
+  // The Spanish version (2026-11-22). Both parts or neither: an empty one = Spanish subscribers get the English email (owner "3A").
+  const subjectEs = typeof body?.subjectEs === 'string' ? body.subjectEs.trim() : '';
+  const htmlEs = typeof body?.htmlEs === 'string' ? body.htmlEs.trim() : '';
+  const spanish = subjectEs && htmlEs ? { subject: subjectEs, html: htmlEs } : null;
 
   if (!subject) return NextResponse.json({ error: 'Subject is required.' }, { status: 400 });
   if (!html) return NextResponse.json({ error: 'Email HTML/body is required.' }, { status: 400 });
   if (html.length > 100000) return NextResponse.json({ error: 'Email body is too long.' }, { status: 400 });
+  if (htmlEs.length > 100000) return NextResponse.json({ error: 'The Spanish email body is too long.' }, { status: 400 });
+  if (Boolean(subjectEs) !== Boolean(htmlEs)) {
+    return NextResponse.json({ error: 'The Spanish version needs both a subject and a body — or leave both empty to send everyone the English email.' }, { status: 400 });
+  }
 
   try {
     const settings = await getMarketingSettings();
@@ -54,11 +63,20 @@ export async function POST(req: Request) {
         total_count: recipients.length,
         created_by: user.id,
       };
+    // The Spanish version is stored with the campaign once its columns exist
+    // (supabase/spanish-subscribers-2026-11.sql); before that it still SENDS,
+    // it just is not kept on the record.
     let { data: campaign, error: campaignError } = await supabase
       .from('email_campaigns')
-      .insert(campaignInsert)
+      .insert(spanish ? ({ ...campaignInsert, subject_es: spanish.subject, html_es: spanish.html } as Record<string, unknown>) : campaignInsert)
       .select('id')
       .single();
+
+    if (spanish && (campaignError?.code === '42703' || campaignError?.code === 'PGRST204')) {
+      const retry = await supabase.from('email_campaigns').insert(campaignInsert).select('id').single();
+      campaign = retry.data;
+      campaignError = retry.error;
+    }
 
     if (campaignError?.code === '42703') {
       const fallback = await supabase
@@ -95,6 +113,7 @@ export async function POST(req: Request) {
       recipients,
       senderProfile,
       settings,
+      spanish,
     });
 
     await Promise.all(result.perRecipient.map((item) => (
@@ -119,7 +138,16 @@ export async function POST(req: Request) {
       })
       .eq('id', campaign.id);
 
-    return NextResponse.json({ success: true, campaignId: campaign.id, sent: result.sent, failed: result.failed, total: recipients.length });
+    const split = countByLanguage(recipients);
+    return NextResponse.json({
+      success: true,
+      campaignId: campaign.id,
+      sent: result.sent,
+      failed: result.failed,
+      total: recipients.length,
+      // How many got the Spanish version (0 when there was none).
+      spanish: spanish ? split.es : 0,
+    });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Could not send marketing campaign.' },

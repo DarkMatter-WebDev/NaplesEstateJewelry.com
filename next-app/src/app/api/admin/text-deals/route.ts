@@ -14,13 +14,23 @@ export async function GET() {
   const { error } = await requireAdmin();
   if (error) return error;
   const service = createServiceClient();
-  const [{ data: deals, error: dealsError }, { count: confirmed }, { count: pending }] = await Promise.all([
+  const [{ data: deals, error: dealsError }, { count: confirmed }, { count: pending }, { count: confirmedEs }, spanishProbe] = await Promise.all([
     service.from('text_deals').select('*').order('created_at', { ascending: false }).limit(100),
     service.from('homepage_subscribers').select('id', { count: 'exact', head: true }).eq('sms_status', 'confirmed'),
     service.from('homepage_subscribers').select('id', { count: 'exact', head: true }).eq('sms_status', 'pending'),
+    // How many of the confirmed get the Spanish version (2026-11-22).
+    service.from('homepage_subscribers').select('id', { count: 'exact', head: true }).eq('sms_status', 'confirmed').eq('locale', 'es'),
+    // Has `spanish-subscribers-2026-11.sql` run? The form shows the Spanish box only then.
+    service.from('text_deals').select('title_es').limit(1),
   ]);
   if (dealsError) return NextResponse.json({ error: dealsError.message }, { status: 500 });
-  return NextResponse.json({ deals: deals ?? [], confirmed: confirmed ?? 0, pending: pending ?? 0 });
+  return NextResponse.json({
+    deals: deals ?? [],
+    confirmed: confirmed ?? 0,
+    pending: pending ?? 0,
+    confirmedEs: confirmedEs ?? 0,
+    spanishReady: !spanishProbe.error,
+  });
 }
 
 export async function POST(req: Request) {

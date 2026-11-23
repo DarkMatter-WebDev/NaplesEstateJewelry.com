@@ -32,6 +32,35 @@ export async function orderLanguageReady(client: SupabaseClient): Promise<boolea
   return !error;
 }
 
+/**
+ * Customer email → the language of their LATEST order (2026-11-22, marketing
+ * email "4A": accounts and past buyers have no saved language of their own).
+ * Its own query, as this file requires. Empty on any error (column missing,
+ * no access) — every recipient then reads as English, as before.
+ */
+export async function loadLatestOrderLanguageByEmail(client: SupabaseClient): Promise<Map<string, OrderLanguage>> {
+  const latest = new Map<string, OrderLanguage>();
+  let rows: unknown[] | null = null;
+  try {
+    const { data, error } = await client
+      .from('orders')
+      .select('customer_email, customer_language, created_at')
+      .not('customer_email', 'is', null)
+      .order('created_at', { ascending: true })
+      .limit(10000);
+    if (!error) rows = data;
+  } catch {
+    rows = null;
+  }
+  if (!rows) return latest;
+  const data = rows;
+  for (const row of data as Array<{ customer_email: string | null; customer_language?: unknown }>) {
+    const email = String(row.customer_email ?? '').trim().toLowerCase();
+    if (email) latest.set(email, normalizeOrderLanguage(row.customer_language));
+  }
+  return latest;
+}
+
 /** Listing id → Spanish title, for the listed pieces on a Spanish receipt (pick 2). Empty on any error. */
 export async function loadSpanishItemTitles(
   client: SupabaseClient,

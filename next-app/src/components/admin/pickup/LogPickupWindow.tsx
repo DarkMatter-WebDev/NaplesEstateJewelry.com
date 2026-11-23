@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import IdPhotoField from '@/components/admin/buy-receipts/IdPhotoField';
 import { readIdPhoto, useIdPhotoUrl } from '@/components/admin/buy-receipts/buy-receipt-client';
 import {
   cleanIdLast4,
+  cleanPickupEmail,
   idNameMatchesBuyer,
   PICKUP_COPIES_OPTIONS,
   PICKUP_ID_TYPES,
@@ -20,6 +21,12 @@ import { savePickup, type SavePickupResult } from './pickup-client';
  * the ID photo (webcam or file — the buy receipt's own strip and camera
  * window), ID type + last 4, how they will sign, and "Email the customer their
  * pickup copy".
+ *
+ * Email the pickup copy (owner, 2026-11-22, mockup 1): two boxes — "To the
+ * email on the order" (ticked, as before) and "To a different email" (opens a
+ * box to type the address the customer asks for). One, the other, or both; a
+ * line under them says where it will go. The typed address is used for this
+ * email only — never saved onto the order.
  *
  * "Fill from ID" (owner: "fill the id info with AI like we do on the buy
  * receipt"): ticked, a new photo is read by the AI through the buy receipt's
@@ -70,6 +77,9 @@ export default function LogPickupWindow({
   const [idName, setIdName] = useState<string | null>(null);
   const [signMethod, setSignMethod] = useState<PickupSignMethod>(existing?.sign_method ?? 'digital');
   const [email, setEmail] = useState(hasEmail);
+  const [otherOn, setOtherOn] = useState(false);
+  const [otherEmail, setOtherEmail] = useState('');
+  const [otherError, setOtherError] = useState<string | null>(null);
   const [copies, setCopies] = useState<PickupCopies>('both');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -130,6 +140,16 @@ export default function LogPickupWindow({
       setError('ID last 4 must be four letters or digits.');
       return null;
     }
+    const sendOther = !existing && otherOn;
+    const other = sendOther ? cleanPickupEmail(otherEmail) : null;
+    if (sendOther && !other) {
+      const text = otherEmail.trim()
+        ? 'That email address does not look right.'
+        : 'Type the other email address, or untick "To a different email".';
+      // Shown under the address box only (not twice).
+      setOtherError(text);
+      return null;
+    }
     return {
       buyer,
       name,
@@ -138,6 +158,7 @@ export default function LogPickupWindow({
       signMethod,
       signedName: existing?.signed_name ?? name,
       email: !existing && hasEmail && email,
+      emailOther: other ?? '',
       removePhoto: removePhoto && !photo,
     };
   }
@@ -165,6 +186,18 @@ export default function LogPickupWindow({
 
   // Digital with no signature yet → the customer signs first; anything else saves.
   const needsSignature = signMethod === 'digital' && !existing?.signature_path;
+  // Where the pickup copy will go — the line under the two email boxes.
+  const orderEmail = (order.customer_email ?? '').trim();
+  const toOrder = hasEmail && email;
+  const typed = otherEmail.trim();
+  const sameAsOrder = Boolean(typed) && typed.toLowerCase() === orderEmail.toLowerCase();
+  const sendsTo: ReactNode = toOrder && otherOn && !sameAsOrder
+    ? <>Sends to <strong>both</strong>: {orderEmail} and <strong>{typed || 'the address you type'}</strong>.</>
+    : toOrder
+      ? <>Sends to <strong>{orderEmail}</strong></>
+      : otherOn
+        ? <>Sends to <strong>{typed || 'the address you type'}</strong>{hasEmail ? <> only — not to {orderEmail}.</> : '.'}</>
+        : 'No email will be sent.';
   const choice = (selected: boolean) => ({
     borderColor: selected ? 'var(--color-primary)' : 'var(--color-outline-variant)',
     background: selected ? '#fbf6e6' : '#fff',
@@ -270,15 +303,63 @@ export default function LogPickupWindow({
           )}
 
           {!existing && (
-            <label className={`flex items-start gap-3 text-sm ${hasEmail ? 'cursor-pointer' : 'opacity-50'}`}>
-              <input type="checkbox" className="mt-0.5" checked={hasEmail && email} disabled={!hasEmail} onChange={(event) => setEmail(event.target.checked)} style={{ width: 18, height: 18, accentColor: '#735c00' }} />
-              <span>
-                <strong>Email the customer their pickup copy</strong>
-                <span className="block text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-                  {hasEmail ? `to ${order.customer_email} — the buyer, even when someone else picks up.` : 'This order has no email address.'}
+            <div className="grid gap-2.5">
+              <span className="form-label" style={{ marginBottom: 0 }}>Email the pickup copy</span>
+              <label className={`flex items-start gap-3 text-sm ${hasEmail ? 'cursor-pointer' : 'opacity-50'}`}>
+                <input type="checkbox" className="mt-0.5" checked={hasEmail && email} disabled={!hasEmail} onChange={(event) => setEmail(event.target.checked)} style={{ width: 18, height: 18, flex: 'none', accentColor: '#735c00' }} />
+                <span>
+                  <strong>To the email on the order</strong>
+                  <span className="block text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                    {hasEmail ? `${order.customer_email} — the buyer, even when someone else picks up.` : 'This order has no email address.'}
+                  </span>
                 </span>
-              </span>
-            </label>
+              </label>
+              <div>
+                <label className="flex cursor-pointer items-start gap-3 text-sm">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={otherOn}
+                    onChange={(event) => {
+                      setOtherOn(event.target.checked);
+                      setOtherError(null);
+                    }}
+                    style={{ width: 18, height: 18, flex: 'none', accentColor: '#735c00' }}
+                  />
+                  <span>
+                    <strong>To a different email</strong>
+                    <span className="block text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                      When they ask — the person picking up, or another address. Used for this email only; the order keeps its email.
+                    </span>
+                  </span>
+                </label>
+                {otherOn && (
+                  <div className="mt-2" style={{ marginLeft: 30 }}>
+                    <input
+                      className="form-field"
+                      type="email"
+                      inputMode="email"
+                      autoCapitalize="none"
+                      autoComplete="off"
+                      spellCheck={false}
+                      autoFocus
+                      maxLength={254}
+                      placeholder="name@example.com"
+                      aria-label="Different email address"
+                      aria-invalid={Boolean(otherError)}
+                      value={otherEmail}
+                      onChange={(event) => {
+                        setOtherEmail(event.target.value);
+                        setOtherError(null);
+                      }}
+                      style={otherError ? { borderColor: 'var(--color-error)' } : undefined}
+                    />
+                    {otherError && <p className="mt-1.5 text-xs font-semibold" style={{ color: 'var(--color-error)' }}>{otherError}</p>}
+                  </div>
+                )}
+              </div>
+              <p className="rounded-md px-2.5 py-2 text-[0.8rem]" style={{ background: '#f6f2e4', color: 'var(--color-on-surface-variant)' }}>{sendsTo}</p>
+            </div>
           )}
 
           {error && <p role="alert" className="text-sm font-semibold" style={{ color: 'var(--color-error)' }}>{error}</p>}

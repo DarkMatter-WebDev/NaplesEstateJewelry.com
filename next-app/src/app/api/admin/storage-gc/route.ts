@@ -168,11 +168,15 @@ export async function POST(req: Request) {
   const { data: textDeals } = await supabase
     .from('text_deals')
     .select('*');
-  for (const row of (textDeals as Array<{ photo_path: string | null; card_path: string | null; detail_photo_paths?: unknown; detail_media_paths?: unknown }> | null) ?? []) {
+  // Since 2026-11-22 a deal also has its Spanish pictures (`card_path_es`,
+  // `detail_media_paths_es`), sent to Spanish subscribers.
+  for (const row of (textDeals as Array<{ photo_path: string | null; card_path: string | null; detail_photo_paths?: unknown; detail_media_paths?: unknown; card_path_es?: unknown; detail_media_paths_es?: unknown }> | null) ?? []) {
     if (row.photo_path) referencedPaths.add(row.photo_path);
     if (row.card_path) referencedPaths.add(row.card_path);
     for (const path of asStringArray(row.detail_photo_paths)) referencedPaths.add(path);
     for (const path of asStringArray(row.detail_media_paths)) referencedPaths.add(path);
+    if (typeof row.card_path_es === 'string' && row.card_path_es) referencedPaths.add(row.card_path_es);
+    for (const path of asStringArray(row.detail_media_paths_es)) referencedPaths.add(path);
   }
 
   const storage = supabase.storage.from(PRODUCT_IMAGES_BUCKET);

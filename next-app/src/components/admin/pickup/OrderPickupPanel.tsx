@@ -12,6 +12,7 @@ import {
   buildPickupPaper,
   ORDER_PICKUP_SQL_FILE,
   PICKUP_COPIES_OPTIONS,
+  pickupCardStatus,
   pickupIdLine,
   type OrderPickupRow,
   type OrderPickupState,
@@ -50,10 +51,13 @@ export default function OrderPickupPanel({
   pickupHours,
   pickupHoursEs,
   language = 'en',
+  fulfillmentStatus,
   onPickedUp,
   onEmailSent,
 }: {
   order: PickupPanelOrder;
+  /** The order's Fulfillment status, so this card agrees with the Fulfillment card (2026-11-22). */
+  fulfillmentStatus: string | null | undefined;
   initialPickup: OrderPickupState;
   pickupHours: string;
   /** The hours in Spanish, for a Spanish customer copy (2026-11-21). */
@@ -94,11 +98,14 @@ export default function OrderPickupPanel({
   function applySaved(result: Extract<SavePickupResult, { pickup: OrderPickupRow }>, first: boolean) {
     setPickup(result.pickup);
     if (result.fulfillmentStatus === 'picked_up') onPickedUp();
-    if (result.email) onEmailSent(result.email);
-    const emailed = result.email ? ` Emailed to ${result.email.recipient}.` : '';
+    for (const entry of result.emails) onEmailSent(entry);
+    const emailed = result.emails.length ? ` Emailed to ${result.emails.map((entry) => entry.recipient).join(' and ')}.` : '';
     setMessage(
       result.emailError
-        ? { text: `Pickup ${first ? 'logged' : 'saved'}, but the email did not go: ${result.emailError}`, ok: false }
+        ? result.emails.length
+          // Both addresses chosen, only one went (2026-11-22).
+          ? { text: `Pickup ${first ? 'logged' : 'saved'}.${emailed} ${result.emailError}`, ok: false }
+          : { text: `Pickup ${first ? 'logged' : 'saved'}, but the email did not go: ${result.emailError}`, ok: false }
         : { text: `Pickup ${first ? 'logged — the order is marked Picked Up' : 'saved'}.${emailed}`, ok: true },
     );
   }
@@ -144,6 +151,7 @@ export default function OrderPickupPanel({
         signMethod: 'digital',
         signedName: pickup.signed_name ?? pickup.picked_up_by,
         email: false,
+        emailOther: '',
         removePhoto: false,
       },
       photo: null,
@@ -152,12 +160,14 @@ export default function OrderPickupPanel({
 
   const label = 'form-label';
   const value = 'text-sm';
+  const status = pickupCardStatus(Boolean(pickup), fulfillmentStatus);
+  const pickedUp = status === 'logged' || status === 'marked-no-log';
 
   return (
-    <section className="border p-5" style={{ borderColor: pickup ? GOLD : BORDER, background: 'white' }}>
+    <section className="border p-5" style={{ borderColor: pickedUp ? GOLD : BORDER, background: 'white' }}>
       <div className="mb-4 flex items-center gap-3">
         <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>Pickup</h2>
-        {pickup && <span className="rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white" style={{ background: '#0f7a4f' }}>Picked up</span>}
+        {pickedUp && <span className="rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white" style={{ background: '#0f7a4f' }}>Picked up</span>}
       </div>
 
       {!initialPickup.supported ? (
@@ -166,10 +176,17 @@ export default function OrderPickupPanel({
         </p>
       ) : !pickup ? (
         <>
-          <p className="text-sm"><strong>Local Pickup</strong> · not picked up yet</p>
+          <p className="text-sm">
+            <strong>Local Pickup</strong> · {status === 'marked-no-log' ? 'marked picked up in Fulfillment' : 'not picked up yet'}
+          </p>
           <p className="mt-1 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
             {order.customer_name || 'No buyer name'} · {itemCount} item{itemCount === 1 ? '' : 's'}
           </p>
+          {status === 'marked-no-log' && (
+            <p className="mt-2 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+              No pickup log yet — no ID or signature on file. Log Pickup adds them.
+            </p>
+          )}
           <div className="mt-4 flex flex-wrap gap-2">
             <button type="button" className="gold-button text-sm" onClick={() => { setMessage(null); setLogOpen(true); }}>Log Pickup</button>
             <button type="button" className="outline-button text-sm" disabled={printing} onClick={() => void printHere('store', null)}>
@@ -182,6 +199,11 @@ export default function OrderPickupPanel({
         </>
       ) : (
         <>
+          {status === 'log-unmarked' && (
+            <p className="mb-3 text-sm font-semibold" style={{ color: 'var(--color-error)' }}>
+              Unmarked in Fulfillment — the order is not marked Picked Up. This pickup log stays on file; Mark Picked Up or Edit Pickup marks it again.
+            </p>
+          )}
           <dl className="grid gap-x-4 gap-y-3 sm:grid-cols-[130px_1fr]">
             <dt className={label}>Picked up</dt>
             <dd className={value}>{paperDateLine(pickup.picked_up_at)}</dd>

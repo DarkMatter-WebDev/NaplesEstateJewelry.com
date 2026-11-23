@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { createServiceClient } from '@/lib/supabase/service';
 import { normalizeUsPhone } from '@/lib/subscriber-phone';
-import { dealMediaUrls, dealPhotos, deleteDeal, loadDeal, markDealAvailable, markDealSold, notifyDealSold } from '@/lib/text-alerts/deals';
-import { dealDetailColumns, normalizeDealDraft } from '@/lib/text-alerts/deal-input';
+import { dealMediaUrls, dealMediaUrlsFor, dealPhotos, deleteDeal, loadDeal, markDealAvailable, markDealSold, notifyDealSold } from '@/lib/text-alerts/deals';
+import { dealMediaPathsEs } from '@/lib/text-alerts/deal-photos';
+import { dealDetailColumns, dealSpanishColumns, normalizeDealDraft, normalizeDealSpanish } from '@/lib/text-alerts/deal-input';
 
 /**
  * GET: one deal with its send tally and the replies in clock order (the first
@@ -52,7 +53,9 @@ export async function GET(_req: Request, context: Context) {
   const card = deal.card_path ? service.storage.from('product-images').getPublicUrl(deal.card_path).data.publicUrl : null;
   // Every picture that went (or will go) out, the main one first; just the card until Preview has run.
   const media = dealMediaUrls(service, deal) ?? (card ? [card] : []);
-  return NextResponse.json({ deal: { ...deal, card_url: card, photos: dealPhotos(service, deal), media_urls: media }, tally, replies: withNames });
+  // The Spanish pictures, when rendered (2026-11-22).
+  const mediaEs = dealMediaPathsEs(deal) ? dealMediaUrlsFor(service, deal, 'es') ?? [] : [];
+  return NextResponse.json({ deal: { ...deal, card_url: card, photos: dealPhotos(service, deal), media_urls: media, media_urls_es: mediaEs }, tally, replies: withNames });
 }
 
 export async function DELETE(_req: Request, context: Context) {
@@ -78,7 +81,11 @@ export async function PATCH(req: Request, context: Context) {
   try {
     if (body.action === 'sold') {
       const soldTo = body.soldToPhone ? normalizeUsPhone(body.soldToPhone) : null;
-      const deal = await markDealSold(id, { soldToPhone: soldTo, replyText: typeof body.replyText === 'string' ? body.replyText : null });
+      const deal = await markDealSold(id, {
+        soldToPhone: soldTo,
+        replyText: typeof body.replyText === 'string' ? body.replyText : null,
+        replyTextEs: typeof body.replyTextEs === 'string' ? body.replyTextEs : null,
+      });
       // Buyer confirmation + "spoken for" notices — best-effort, never fails the click.
       const notified = await notifyDealSold(id);
       return NextResponse.json({ deal, notified });
@@ -93,7 +100,10 @@ export async function PATCH(req: Request, context: Context) {
     // A draft as typed so far; Preview checks what the deal needs (2026-10-24).
     const input = normalizeDealDraft(body);
     if ('error' in input) return NextResponse.json({ error: input.error }, { status: 400 });
-    // New words need a new picture (the price and line are drawn on it).
+    // The Spanish boxes as the owner corrected them (2026-11-22); absent = leave as is.
+    const spanish = normalizeDealSpanish(body);
+    if ('error' in spanish) return NextResponse.json({ error: spanish.error }, { status: 400 });
+    // New words need a new picture (the price and line are drawn on it) — in both languages.
     const { data, error: updateError } = await service
       .from('text_deals')
       .update({
@@ -101,7 +111,9 @@ export async function PATCH(req: Request, context: Context) {
         price_text: input.value.price_text,
         message: input.value.message,
         ...dealDetailColumns(input.value, current),
+        ...dealSpanishColumns(spanish.value, current),
         card_path: null,
+        ...('card_path_es' in current ? { card_path_es: null } : {}),
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)

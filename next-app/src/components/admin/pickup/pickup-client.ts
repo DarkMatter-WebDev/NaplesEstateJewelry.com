@@ -25,7 +25,7 @@ export type PickupEmailEntry = {
 };
 
 export type SavePickupResult =
-  | { pickup: OrderPickupRow; fulfillmentStatus: string | null; email: PickupEmailEntry | null; emailError: string | null }
+  | { pickup: OrderPickupRow; fulfillmentStatus: string | null; emails: PickupEmailEntry[]; emailError: string | null }
   | { error: string };
 
 export async function savePickup(
@@ -41,7 +41,7 @@ export async function savePickup(
     const res = await fetch(`/api/admin/orders/${orderId}/pickup`, { method: 'POST', body: form });
     const data = (await res.json().catch(() => ({}))) as Partial<Extract<SavePickupResult, { pickup: OrderPickupRow }>> & { error?: string };
     if (!res.ok || !data.pickup) return { error: data.error ?? 'The pickup could not be saved. Try again.' };
-    return { pickup: data.pickup, fulfillmentStatus: data.fulfillmentStatus ?? null, email: data.email ?? null, emailError: data.emailError ?? null };
+    return { pickup: data.pickup, fulfillmentStatus: data.fulfillmentStatus ?? null, emails: data.emails ?? [], emailError: data.emailError ?? null };
   } catch {
     return { error: OFFLINE };
   }

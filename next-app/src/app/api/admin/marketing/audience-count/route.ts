@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
-import { buildMarketingAudience, type AudienceScope } from '@/lib/marketing';
+import { buildMarketingAudience, countByLanguage, type AudienceScope } from '@/lib/marketing';
 
 function normalizeScope(value: unknown): AudienceScope {
   return value === 'subscribers' || value === 'accounts' || value === 'buyers' || value === 'all' ? value : 'all';
@@ -15,7 +15,9 @@ export async function POST(req: Request) {
 
   try {
     const recipients = await buildMarketingAudience(scope, supabase);
-    return NextResponse.json({ count: recipients.length, scope });
+    // "38 English · 3 Español" (2026-11-22).
+    const split = countByLanguage(recipients);
+    return NextResponse.json({ count: recipients.length, scope, english: split.en, spanish: split.es });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Could not build marketing audience.' },

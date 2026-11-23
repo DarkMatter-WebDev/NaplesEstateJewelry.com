@@ -33,26 +33,42 @@ type CampaignSuccess = {
   sent: number;
   subject: string;
   total: number;
+  /** How many got the Spanish version (2026-11-22). */
+  spanish: number;
 };
 
+type ScopeCount = { count: number; spanish: number };
+const SCOPES: AudienceScope[] = ['all', 'subscribers', 'accounts', 'buyers'];
+
+/*
+ * Spanish version (2026-11-22, owner mockup 1: "3A, 4A"): "Translate to
+ * Spanish" fills a Spanish subject + body the owner can correct. Recipients
+ * whose language is Spanish (Spanish newsletter row, or a Spanish latest
+ * order) get it, with the footer in Spanish. Left empty, they get the English
+ * email.
+ */
 export default function MarketingComposer() {
   const [scope, setScope] = useState<AudienceScope>('all');
   const [senderProfile, setSenderProfile] = useState<MarketingSenderProfile>('chris');
   const [subject, setSubject] = useState('');
   const [html, setHtml] = useState('');
+  const [subjectEs, setSubjectEs] = useState('');
+  const [htmlEs, setHtmlEs] = useState('');
   const [audienceCounts, setAudienceCounts] = useState<AudienceCounts>({
     all: null,
     subscribers: null,
     accounts: null,
     buyers: null,
   });
+  const [spanishCounts, setSpanishCounts] = useState<AudienceCounts>({ all: null, subscribers: null, accounts: null, buyers: null });
   const [settings, setSettings] = useState<SettingsState | null>(null);
-  const [busy, setBusy] = useState<'count' | 'test' | 'send' | null>(null);
+  const [busy, setBusy] = useState<'count' | 'test' | 'send' | 'translate' | null>(null);
   const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null);
   const [campaignSuccess, setCampaignSuccess] = useState<CampaignSuccess | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewLanguage, setPreviewLanguage] = useState<'en' | 'es'>('en');
 
-  const fetchAudienceCount = useCallback(async (nextScope: AudienceScope) => {
+  const fetchAudienceCount = useCallback(async (nextScope: AudienceScope): Promise<ScopeCount> => {
     const res = await fetch('/api/admin/marketing/audience-count', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -60,55 +76,79 @@ export default function MarketingComposer() {
     });
     const data = await res.json().catch(() => null);
     if (!res.ok) throw new Error(data?.error || `Could not count ${AUDIENCE_LABELS[nextScope].toLowerCase()}.`);
-    return Number(data.count ?? 0);
+    return { count: Number(data.count ?? 0), spanish: Number(data.spanish ?? 0) };
+  }, []);
+
+  const applyCounts = useCallback((counts: ScopeCount[]) => {
+    const total = {} as AudienceCounts;
+    const spanish = {} as AudienceCounts;
+    SCOPES.forEach((item, index) => {
+      total[item] = counts[index].count;
+      spanish[item] = counts[index].spanish;
+    });
+    setAudienceCounts(total);
+    setSpanishCounts(spanish);
   }, []);
 
   const refreshCounts = useCallback(async () => {
     setBusy('count');
     setNotice(null);
     try {
-      const [all, subscribers, accounts, buyers] = await Promise.all([
-        fetchAudienceCount('all'),
-        fetchAudienceCount('subscribers'),
-        fetchAudienceCount('accounts'),
-        fetchAudienceCount('buyers'),
-      ]);
-      setAudienceCounts({ all, subscribers, accounts, buyers });
+      applyCounts(await Promise.all(SCOPES.map((item) => fetchAudienceCount(item))));
     } catch (err) {
       setNotice({ text: err instanceof Error ? err.message : 'Could not count recipients.', ok: false });
     } finally {
       setBusy(null);
     }
-  }, [fetchAudienceCount]);
+  }, [fetchAudienceCount, applyCounts]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [settingsRes, allCount, subscribersCount, accountsCount, buyersCount] = await Promise.all([
+        const [settingsRes, ...counts] = await Promise.all([
           fetch('/api/admin/marketing/settings'),
-          fetchAudienceCount('all'),
-          fetchAudienceCount('subscribers'),
-          fetchAudienceCount('accounts'),
-          fetchAudienceCount('buyers'),
+          ...SCOPES.map((item) => fetchAudienceCount(item)),
         ]);
         const settingsData = await settingsRes.json().catch(() => null);
         if (!settingsRes.ok) throw new Error(settingsData?.error || 'Could not load marketing settings.');
         if (!cancelled) {
           setSettings(settingsData as SettingsState);
-          setAudienceCounts({
-            all: allCount,
-            subscribers: subscribersCount,
-            accounts: accountsCount,
-            buyers: buyersCount,
-          });
+          applyCounts(counts);
         }
       } catch (err) {
         if (!cancelled) setNotice({ text: err instanceof Error ? err.message : 'Could not load marketing settings.', ok: false });
       }
     })();
     return () => { cancelled = true; };
-  }, [fetchAudienceCount]);
+  }, [fetchAudienceCount, applyCounts]);
+
+  async function translateToSpanish() {
+    if (busy !== null) return;
+    if (!subject.trim() || !html.trim()) {
+      setNotice({ text: 'Write the English subject and body first, then translate.', ok: false });
+      return;
+    }
+    if ((subjectEs.trim() || htmlEs.trim()) && !window.confirm('Replace the Spanish version (and any corrections in it) with a new translation?')) return;
+    setBusy('translate');
+    setNotice(null);
+    try {
+      const res = await fetch('/api/admin/marketing/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject, html }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || 'Could not translate the email.');
+      setSubjectEs(String(data.subjectEs ?? ''));
+      setHtmlEs(String(data.htmlEs ?? ''));
+      setNotice({ text: 'Translated. Read it over and correct anything before you send — Preview Español shows it as it will arrive.', ok: true });
+    } catch (err) {
+      setNotice({ text: err instanceof Error ? err.message : 'Could not translate the email.', ok: false });
+    } finally {
+      setBusy(null);
+    }
+  }
 
   useEffect(() => {
     if (!previewOpen) return;
@@ -137,6 +177,15 @@ export default function MarketingComposer() {
       setNotice({ text: 'There are no eligible recipients for the selected audience.', ok: false });
       return;
     }
+    if (Boolean(subjectEs.trim()) !== Boolean(htmlEs.trim())) {
+      setNotice({ text: 'The Spanish version needs both a subject and a body — or leave both empty to send everyone the English email.', ok: false });
+      return;
+    }
+    const spanishFilled = Boolean(subjectEs.trim() && htmlEs.trim());
+    if (endpoint === 'send' && !spanishFilled && (spanishCount ?? 0) > 0
+      && !window.confirm(`No Spanish version: the ${spanishCount} Spanish ${spanishCount === 1 ? 'recipient gets' : 'recipients get'} the English email. Send anyway?`)) {
+      return;
+    }
 
     setBusy(endpoint);
     setNotice(null);
@@ -145,13 +194,13 @@ export default function MarketingComposer() {
       const res = await fetch(`/api/admin/marketing/${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subject, html, scope, senderProfile }),
+        body: JSON.stringify({ subject, html, scope, senderProfile, ...(spanishFilled ? { subjectEs, htmlEs } : {}) }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error || 'Could not send email.');
       setNotice({
         text: endpoint === 'test'
-          ? 'Test email sent to your admin email.'
+          ? (data?.spanishSent ? 'Two test emails sent to your admin email: English and Español.' : 'Test email sent to your admin email.')
           : 'Campaign sent successfully.',
         ok: true,
       });
@@ -163,9 +212,12 @@ export default function MarketingComposer() {
           sent: Number(data.sent ?? 0),
           subject,
           total: Number(data.total ?? 0),
+          spanish: Number(data.spanish ?? 0),
         });
         setSubject('');
         setHtml('');
+        setSubjectEs('');
+        setHtmlEs('');
         void refreshCounts();
       }
     } catch (err) {
@@ -175,28 +227,31 @@ export default function MarketingComposer() {
     }
   }
 
-  function openPreview() {
-    if (!html.trim()) {
-      setNotice({ text: 'Add an email body before previewing.', ok: false });
+  function openPreview(language: 'en' | 'es' = 'en') {
+    if (!(language === 'es' ? htmlEs : html).trim()) {
+      setNotice({ text: language === 'es' ? 'Add or translate the Spanish body before previewing it.' : 'Add an email body before previewing.', ok: false });
       return;
     }
     setNotice(null);
+    setPreviewLanguage(language);
     setPreviewOpen(true);
   }
 
   const recipientCount = audienceCounts[scope];
+  const spanishCount = spanishCounts[scope];
   const canAttemptAction = busy === null;
   const countLabel = (nextScope: AudienceScope) => {
     const count = audienceCounts[nextScope];
     return count === null ? 'Counting...' : `${count} ${count === 1 ? 'recipient' : 'recipients'}`;
   };
-  const previewUnsubscribeUrl = `${settings?.siteUrl ?? 'https://naplesestatejewelry.com'}/unsubscribe?email=preview%40naplesestatejewelry.co`;
+  const previewIsEs = previewLanguage === 'es';
+  const previewUnsubscribeUrl = `${settings?.siteUrl ?? 'https://naplesestatejewelry.com'}${previewIsEs ? '/es' : ''}/unsubscribe?email=preview%40naplesestatejewelry.co`;
   // Falls back to the showroom address for the same reason the server does:
   // marketing email must carry a physical address. Before 2026-08-17 this
   // rendered a "add the live address before sending" placeholder, which is now
   // unreachable — getMarketingSettings() never returns a null mailingAddress.
   const previewMailingAddress = settings?.mailingAddress || addressOneLine();
-  const previewSubject = subject.trim() || 'Untitled Campaign';
+  const previewSubject = (previewIsEs ? subjectEs : subject).trim() || 'Untitled Campaign';
   const selectedSender = settings?.senderProfiles?.[senderProfile];
   const selectedFromAddress = selectedSender?.fromAddress
     ?? (senderProfile === 'chris'
@@ -224,7 +279,7 @@ export default function MarketingComposer() {
   <body>
     <div class="email-shell">
       <div class="email-paper">
-        ${withMarketingFooter(html, previewUnsubscribeUrl, previewMailingAddress)}
+        ${withMarketingFooter(previewIsEs ? htmlEs : html, previewUnsubscribeUrl, previewMailingAddress, previewLanguage)}
       </div>
     </div>
   </body>
@@ -241,8 +296,15 @@ export default function MarketingComposer() {
             Sends only to the centralized eligible audience and appends unsubscribe/address footer automatically.
           </p>
         </div>
-        <div className="rounded-full px-3 py-1 text-xs font-bold" style={{ background: 'rgba(115, 92, 0, 0.1)', color: 'var(--color-primary)' }}>
-          {recipientCount === null ? 'Counting...' : `${recipientCount} recipients`}
+        <div className="flex flex-wrap gap-1.5">
+          <div className="rounded-full px-3 py-1 text-xs font-bold" style={{ background: 'rgba(115, 92, 0, 0.1)', color: 'var(--color-primary)' }}>
+            {recipientCount === null ? 'Counting...' : `${recipientCount} recipients`}
+          </div>
+          {recipientCount !== null && (spanishCount ?? 0) > 0 && (
+            <div className="rounded-full px-3 py-1 text-xs font-bold" style={{ background: 'rgba(115, 92, 0, 0.1)', color: 'var(--color-primary)' }} title="Spanish = joined in Spanish, switched to Spanish in Subscribers, or their latest order was Spanish">
+              {recipientCount - (spanishCount ?? 0)} English · {spanishCount} Español
+            </div>
+          )}
         </div>
       </div>
 
@@ -281,6 +343,7 @@ export default function MarketingComposer() {
               <strong className="mt-1 block text-base">{campaignSuccess.subject}</strong>
               <p className="mt-1 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
                 Sent to {AUDIENCE_LABELS[campaignSuccess.scope].toLowerCase()}.
+                {campaignSuccess.spanish > 0 ? ` ${campaignSuccess.spanish} got the Spanish version.` : ''}
               </p>
             </div>
             <div className="grid grid-cols-3 gap-2 text-center">
@@ -374,15 +437,54 @@ export default function MarketingComposer() {
             placeholder="<h1>New arrivals</h1><p>Write the campaign body here.</p>"
           />
         </label>
+        <div
+          className="rounded-2xl border p-4"
+          style={{ borderColor: 'color-mix(in srgb, var(--color-primary) 30%, transparent)', background: 'color-mix(in srgb, var(--color-primary) 3%, white)' }}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="form-label" style={{ marginBottom: 0 }}>
+              Spanish version{spanishCount !== null ? ` · for ${spanishCount} ${spanishCount === 1 ? 'person' : 'people'}` : ''}
+            </span>
+            <button type="button" className="gold-button" disabled={busy !== null} onClick={() => void translateToSpanish()}>
+              {busy === 'translate' ? 'Translating...' : 'Translate to Spanish'}
+            </button>
+          </div>
+          <label className="mt-3 block">
+            <span className="form-label">Subject (Español)</span>
+            <input className="form-field mt-2 w-full" value={subjectEs} onChange={(event) => setSubjectEs(event.target.value)} maxLength={180} lang="es" />
+          </label>
+          <label className="mt-3 block">
+            <span className="form-label">Email HTML (Español)</span>
+            <textarea
+              className="form-field mt-2 min-h-[12rem] w-full font-mono text-sm"
+              value={htmlEs}
+              onChange={(event) => setHtmlEs(event.target.value)}
+              lang="es"
+              placeholder="Press Translate to Spanish, or paste the Spanish HTML here."
+            />
+          </label>
+          <span className="mt-2 block text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+            Left empty, Spanish subscribers get the English email. Spanish = joined in Spanish, switched to Spanish in Subscribers, or their latest order was Spanish. Their footer and unsubscribe page are in Spanish.
+          </span>
+        </div>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
             className="outline-button"
             disabled={busy !== null}
-            onClick={openPreview}
+            onClick={() => openPreview('en')}
             title="Opens a rendered preview of the email HTML with the automatic footer."
           >
             Preview Email
+          </button>
+          <button
+            type="button"
+            className="outline-button"
+            disabled={busy !== null || !htmlEs.trim()}
+            onClick={() => openPreview('es')}
+            title="The Spanish version as it will arrive, with the Spanish footer."
+          >
+            Preview Español
           </button>
           <button
             type="button"
@@ -428,7 +530,7 @@ export default function MarketingComposer() {
             <div className="flex flex-col gap-3 border-b px-4 py-3 md:flex-row md:items-center md:justify-between" style={{ borderColor: 'var(--color-outline-variant)' }}>
               <div>
                 <p className="text-[0.6rem] font-bold uppercase tracking-[0.18em]" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
-                  Email Preview
+                  {previewIsEs ? 'Email Preview · Español' : 'Email Preview'}
                 </p>
                 <h3 id="marketing-preview-title" className="mt-1 text-lg font-bold" style={{ color: 'var(--color-on-surface)' }}>
                   {previewSubject}

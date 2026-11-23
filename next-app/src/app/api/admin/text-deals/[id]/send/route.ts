@@ -17,14 +17,16 @@ export async function POST(req: Request, context: Context) {
   const { error } = await requireAdmin();
   if (error) return error;
   const { id } = await context.params;
-  const body = (await req.json().catch(() => ({}))) as { test?: boolean; to?: string };
+  const body = (await req.json().catch(() => ({}))) as { test?: boolean; to?: string; language?: string };
   try {
     if (body.test) {
       const config = twilioConfig();
       const to = normalizeUsPhone(body.to) ?? config?.forwardTo;
       if (!to) return NextResponse.json({ error: 'Twilio is not configured yet.' }, { status: 503 });
-      const sent = await sendDealTest(id, to);
-      return NextResponse.json({ test: true, to, sid: sent.sid });
+      // "Test in Español" (2026-11-22): the Spanish version to the owner's cell.
+      const language = body.language === 'es' ? 'es' : 'en';
+      const sent = await sendDealTest(id, to, language);
+      return NextResponse.json({ test: true, to, sid: sent.sid, language });
     }
     const result = await startDealSend(id);
     if (result.notConfigured) {

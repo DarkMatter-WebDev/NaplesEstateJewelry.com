@@ -84,20 +84,37 @@ export function withDealPhotoAsMain(list: string[], path: string): string[] {
  * rendered ones are cleared. The detail columns are named only when the deal
  * has, or had, detail shots — a one-photo deal writes what it always wrote.
  */
-export function dealPhotoUpdate(list: string[], rowHasDetailColumns: boolean): Record<string, unknown> {
+export function dealPhotoUpdate(list: string[], rowHasDetailColumns: boolean, rowHasSpanishColumns = false): Record<string, unknown> {
   const { photo_path, detail_photo_paths } = splitDealPhotos(list);
   const update: Record<string, unknown> = { photo_path, card_path: null };
   if (detail_photo_paths.length > 0 || rowHasDetailColumns) {
     update.detail_photo_paths = detail_photo_paths;
     update.detail_media_paths = [];
   }
+  // The Spanish pictures (2026-11-22) are cleared with the English ones.
+  if (rowHasSpanishColumns) Object.assign(update, { card_path_es: null, detail_media_paths_es: [] });
   return update;
 }
 
 export type DealMediaColumns = DealPhotoColumns & {
   card_path: string | null;
   detail_media_paths?: string[] | null;
+  /** The Spanish pictures (2026-11-22); absent before `spanish-subscribers-2026-11.sql` ran. */
+  card_path_es?: string | null;
+  detail_media_paths_es?: string[] | null;
 };
+
+/**
+ * The Spanish pictures in sending order, or null when they are not rendered
+ * (yet) — a Spanish subscriber then gets the English pictures, never none.
+ */
+export function dealMediaPathsEs(deal: DealMediaColumns): string[] | null {
+  if (!deal.card_path_es) return null;
+  const details = dealPhotoList(deal).slice(1);
+  const rendered = pathList(deal.detail_media_paths_es);
+  if (rendered.length !== details.length) return null;
+  return [deal.card_path_es, ...rendered];
+}
 
 /**
  * The pictures to send, in sending order — the main picture FIRST (owner:
@@ -120,10 +137,13 @@ export function dealMediaPaths(deal: DealMediaColumns): string[] | null {
  * counter tells the customer there are more. The main picture is always 1.
  * A one-photo deal gets none.
  */
-export function dealPhotoCounter(index: number, total: number): string | null {
+export function dealPhotoCounter(index: number, total: number, language: 'en' | 'es' = 'en'): string | null {
   if (total <= 1) return null;
-  return `Photo ${index + 1} of ${total}`;
+  return language === 'es' ? `Foto ${index + 1} de ${total}` : `Photo ${index + 1} of ${total}`;
 }
+
+/** The gold badge on the main picture, per language. */
+export const DEAL_BADGE = { en: 'First reply wins', es: 'Primera respuesta gana' } as const;
 
 /** Capitals in the line's face average about this wide (measured: 62 characters fill the row at 26 px). */
 const DEAL_LINE_GLYPH_EM = 0.56;

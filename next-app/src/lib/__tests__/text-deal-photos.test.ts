@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  DEAL_BADGE,
   DEAL_CARD_SHARED_TARGET_BYTES,
   DEAL_CARD_SOLO_TARGET_BYTES,
   DEAL_DETAIL_TARGET_BYTES,
@@ -93,9 +94,13 @@ describe('text-deal photos: what is sent', () => {
     expect(dealPhotoCounter(1, 2)).toBe('Photo 2 of 2');
     expect(dealPhotoCounter(0, 1)).toBeNull();
     expect(dealPhotoCounter(0, 0)).toBeNull();
+    // The Spanish set (2026-11-22, owner "1B"): the same tag, in Spanish.
+    expect(dealPhotoCounter(1, 3, 'es')).toBe('Foto 2 de 3');
+    expect(dealPhotoCounter(0, 1, 'es')).toBeNull();
+    expect(DEAL_BADGE).toEqual({ en: 'First reply wins', es: 'Primera respuesta gana' });
     const deals = read('lib/text-alerts/deals.ts');
     expect(deals).toContain('const total = details.length + 1;');
-    expect(deals).toContain("badge: 'First reply wins', counter: dealPhotoCounter(0, total) }");
+    expect(deals).toContain('badge: DEAL_BADGE[language], counter: dealPhotoCounter(0, total, language) }');
     // One gold tag, drawn the same way on the main picture and on the detail strip.
     const card = read('lib/text-alerts/card.ts');
     expect(card.match(/counterNode\(content\.counter,/g)).toHaveLength(2);
@@ -136,7 +141,8 @@ describe('text-deal photos: source guards', () => {
     const deals = read('lib/text-alerts/deals.ts');
     // The deal send and the test send both go through the ordered list.
     expect(deals.match(/sendTwilioMessage\(\{ to(: row\.phone_e164)?, body, mediaUrls \}\)/g)).toHaveLength(2);
-    expect(deals).toContain('if (!dealMediaPaths(deal)) await buildDealMedia(service, deal);');
+    // A send with no pictures yet renders them first (and the Spanish set when a Spanish subscriber is on the list).
+    expect(deals).toContain('if (!dealMediaPaths(deal) || (anySpanish && dealHasSpanishColumns(deal) && !dealMediaPathsEs(deal))) {');
   });
 
   it('EVERY picture carries the price: the full card on the main photo, a small strip (price + line, no brand mark, no badge) on each detail shot', () => {
@@ -145,10 +151,11 @@ describe('text-deal photos: source guards', () => {
     // "option a, price and the one line").
     const deals = read('lib/text-alerts/deals.ts');
     expect(deals.match(/renderDealCard\(/g)).toHaveLength(1);
-    // The line is the built one (Purity + Metal + What it is + Size, 2026-10-24) on every picture.
-    expect(deals).toContain('const line = dealLine(deal);');
-    expect(deals).toContain('renderDealDetail(await readStoredPhoto(service, source), { price: deal.price_text, line, counter: dealPhotoCounter(index + 1, total) }, budget.detail)');
-    expect(deals).toContain("{ price: deal.price_text, line, badge: 'First reply wins', counter: dealPhotoCounter(0, total) }");
+    // The line is the built one (Purity + Metal + What it is + Size, 2026-10-24) on every picture —
+    // the Spanish set (2026-11-22) uses the Spanish line.
+    expect(deals).toContain("const line = language === 'es' ? dealLineEs(deal) : dealLine(deal);");
+    expect(deals).toContain('renderDealDetail(source, { price: deal.price_text, line, counter: dealPhotoCounter(index + 1, total, language) }, budget.detail)');
+    expect(deals).toContain('{ price: deal.price_text, line, badge: DEAL_BADGE[language], counter: dealPhotoCounter(0, total, language) }');
     const card = read('lib/text-alerts/card.ts');
     const detail = card.slice(card.indexOf('export async function renderDealDetail('));
     expect(detail).toContain('renderStripLayer(');
@@ -163,7 +170,8 @@ describe('text-deal photos: source guards', () => {
     expect(strip).toContain("flexDirection: 'column'");
     // New words need new pictures on every photo: a word change clears the card, and the send renders all again.
     const route = read('app/api/admin/text-deals/[id]/route.ts');
-    expect(route).toMatch(/\.update\(\{[^}]*\.\.\.dealDetailColumns\(input\.value, current\),\s*card_path: null,/);
+    // (and since 2026-11-22 the Spanish card too, once its column exists).
+    expect(route).toMatch(/\.update\(\{[^}]*\.\.\.dealDetailColumns\(input\.value, current\),\s*\.\.\.dealSpanishColumns\(spanish\.value, current\),\s*card_path: null,\s*\.\.\.\('card_path_es' in current \? \{ card_path_es: null \} : \{\}\),/);
   });
 
   it('photos change only on a draft, through requireAdmin, and a shared photo is never deleted', () => {

@@ -34,9 +34,15 @@ import {
  * confirmation text will come BEFORE any deal — true today (nothing is sent
  * until the texting batch exists) and true after it (that batch sends it at
  * once).
+ *
+ * "¿Prefiere español?" (2026-11-22, owner: a Spanish-only customer joined from
+ * the English site): one line at the top switches the window's language in
+ * place ("Prefer English?" on the Spanish site). The person is saved in the
+ * language they joined in, and every text and email then reaches them in it.
  */
 export default function HomeSubscribeModal({ locale, onClose }: { locale: string; onClose: () => void }) {
-  const isEs = locale === 'es';
+  const [language, setLanguage] = useState<'en' | 'es'>(locale === 'es' ? 'es' : 'en');
+  const isEs = language === 'es';
   const prefix = isEs ? '/es' : '';
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -116,7 +122,8 @@ export default function HomeSubscribeModal({ locale, onClose }: { locale: string
         email: wantsEmail ? email : undefined,
         phone: wantsText ? phone : undefined,
         smsConsent: wantsText ? consent : undefined,
-        locale,
+        // The language the window is showing — what the person read and agreed to.
+        locale: language,
       }),
     });
     const data = await res.json().catch(() => null);
@@ -137,7 +144,7 @@ export default function HomeSubscribeModal({ locale, onClose }: { locale: string
     { value: 'both', label: isEs ? 'Ambos' : 'Both', hint: null },
   ];
 
-  const consentStatement = smsConsentText(locale);
+  const consentStatement = smsConsentText(language);
   // The statement ends with the two link labels; render those as links and the
   // rest as text, so what is stored and what was shown are the same words.
   const privacyLabel = SMS_CONSENT_LINKS.privacy.label[isEs ? 'es' : 'en'];
@@ -159,6 +166,7 @@ export default function HomeSubscribeModal({ locale, onClose }: { locale: string
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        lang={language}
         onKeyDown={trapTab}
         className="home-subscribe-modal w-full max-w-[480px] border bg-white outline-none md:max-w-[580px]"
         style={{ borderColor: 'var(--color-outline-variant)', boxShadow: '0 24px 60px rgba(0,0,0,0.35)', color: 'var(--color-on-surface)' }}
@@ -199,7 +207,7 @@ export default function HomeSubscribeModal({ locale, onClose }: { locale: string
                   {smsStatus === 'confirmed'
                     ? (isEs ? 'Las ofertas por texto le llegarán a este número.' : 'Text deals will reach you at this number.')
                     : (isEs
-                        ? 'Antes de que salga cualquier oferta, recibirá un solo texto pidiéndole que responda YES. No se envía nada hasta que lo haga.'
+                        ? 'Antes de que salga cualquier oferta, recibirá un solo texto pidiéndole que responda SÍ. No se envía nada hasta que lo haga.'
                         : "Before any deal goes out, you'll get one text asking you to reply YES. Nothing is sent until you do.")}
                 </p>
               </div>
@@ -214,6 +222,24 @@ export default function HomeSubscribeModal({ locale, onClose }: { locale: string
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="grid gap-3.5 px-5 pt-2 pb-5 md:gap-5 md:px-8 md:pt-3 md:pb-8" noValidate>
+            {/* Switch the window's language in place; the person is saved in the language they join in. */}
+            <button
+              type="button"
+              onClick={() => { setLanguage(isEs ? 'en' : 'es'); setMessage(''); if (status === 'error') setStatus('idle'); }}
+              lang={isEs ? 'en' : 'es'}
+              className="lift-tile flex w-full items-center justify-between gap-2 rounded-full border py-1.5 pl-4 pr-1.5 text-left"
+              style={{ borderColor: 'color-mix(in srgb, var(--color-primary) 35%, transparent)', background: 'color-mix(in srgb, var(--color-primary) 5%, white)' }}
+            >
+              <span className="text-[0.95rem] md:text-base" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
+                {isEs ? 'Prefer English?' : '¿Prefiere español?'}
+              </span>
+              <span
+                className="whitespace-nowrap rounded-full px-3 py-1.5 text-[0.6rem] font-extrabold uppercase tracking-[0.14em] md:text-[0.66rem]"
+                style={{ background: 'var(--color-on-surface)', color: '#e9c349', fontFamily: 'var(--font-label)' }}
+              >
+                {isEs ? 'English →' : 'Español →'}
+              </span>
+            </button>
             <p className="text-sm md:text-[0.95rem]" style={{ color: 'var(--color-on-surface-variant)' }}>
               {isEs ? 'Las buenas piezas no duran. Elija cómo quiere enterarse.' : "Good pieces don't last. Choose how you want to hear about them."}
             </p>
@@ -332,7 +358,7 @@ export default function HomeSubscribeModal({ locale, onClose }: { locale: string
               </>
             )}
 
-            {!wantsText && <FormPrivacyNotice locale={locale} />}
+            {!wantsText && <FormPrivacyNotice locale={language} />}
 
             {message && (
               <p className="text-xs" role="alert" style={{ color: status === 'error' ? 'var(--color-error)' : 'var(--color-on-surface)' }}>

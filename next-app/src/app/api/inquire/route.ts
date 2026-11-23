@@ -8,6 +8,7 @@ import { encodeLeadPhoto } from '@/lib/lead-photo-encode';
 import { LEAD_PHOTO_MAX } from '@/lib/lead-photo-limits';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { checkSubmissionForSpam } from '@/lib/spam-heuristics';
+import { inquiryConfirmationEmail, inquiryLanguage, type InquiryLanguage } from '@/lib/inquiry-confirmation';
 import { normalizePhoneNumber, phoneErrorMessage } from '@/lib/phone';
 import {
   formatLocation,
@@ -132,9 +133,11 @@ interface EmailPayload {
   imageUrls: string[];
   prefs: InquiryPreferences;
   adClick: AdClickIds;
+  /** The customer's confirmation only — the owner's copy is always English. */
+  language: InquiryLanguage;
 }
 
-async function sendEmails({ itemTitle, name, phone, email, message, imageUrls, prefs, adClick }: EmailPayload) {
+async function sendEmails({ itemTitle, name, phone, email, message, imageUrls, prefs, adClick, language }: EmailPayload) {
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) return;
 
@@ -173,16 +176,14 @@ async function sendEmails({ itemTitle, name, phone, email, message, imageUrls, p
              ${sourceHtml}`,
     });
 
-    // Confirm to customer
+    // Confirm to customer — in the language of the page they sent from.
     if (email) {
+      const confirmation = inquiryConfirmationEmail(itemTitle, name, language);
       await resend.emails.send({
         from: FROM,
         to: email,
-        subject: `We received your inquiry about: ${itemTitle}`,
-        html: `<p>Hi ${esc(name)},</p>
-               <p>Thank you for your interest in <strong>${esc(itemTitle)}</strong>. We will be in touch with you shortly.</p>
-               <p>For urgent questions, call us at <a href="tel:2394048505">(239) 404-8505</a>.</p>
-               <p>— Naples Estate Jewelry</p>`,
+        subject: confirmation.subject,
+        html: confirmation.html,
       });
     }
   } catch (emailErr) {
@@ -276,7 +277,7 @@ async function handleJsonInquiry(req: Request) {
   }
 
   await notifyAdminOfInquiry({ kind: 'product-inquiry', itemTitle: item, name, phone: normalizedPhone, email: email || null, message, imageUrls: [], prefs, adClick });
-  await sendEmails({ itemTitle: item, name, phone: normalizedPhone, email: email || null, message, imageUrls: [], prefs, adClick });
+  await sendEmails({ itemTitle: item, name, phone: normalizedPhone, email: email || null, message, imageUrls: [], prefs, adClick, language: inquiryLanguage(raw.locale) });
 
   return NextResponse.json({ success: true });
 }
@@ -471,7 +472,7 @@ async function handleLeadForm(req: Request) {
     kind: source === 'free-evaluation' ? 'free-evaluation' : source === 'sell-by-mail' ? 'sell-by-mail' : 'submit-item',
     itemTitle, name, phone: normalizedPhone, email: email || null, message, imageUrls, prefs, adClick,
   });
-  await sendEmails({ itemTitle, name, phone: normalizedPhone, email: email || null, message, imageUrls, prefs, adClick });
+  await sendEmails({ itemTitle, name, phone: normalizedPhone, email: email || null, message, imageUrls, prefs, adClick, language: inquiryLanguage(form.get('locale')) });
 
   return NextResponse.json({ success: true });
 }

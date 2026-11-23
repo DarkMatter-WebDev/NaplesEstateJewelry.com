@@ -33,5 +33,5 @@ export async function POST(_req: Request, context: Context) {
     sentBy: { id: admin.user.id, email: admin.user.email ?? null },
   });
   if (!sent.ok) return NextResponse.json({ error: sent.error }, { status: 502 });
-  return NextResponse.json({ pickup: sent.pickup, email: sent.email });
+  return NextResponse.json({ pickup: sent.pickup, email: sent.emails[0] });
 }

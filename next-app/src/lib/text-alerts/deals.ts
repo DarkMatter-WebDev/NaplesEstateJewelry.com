@@ -7,7 +7,9 @@ import { encodeProductImageToWebp } from '@/lib/product-image-encode';
 import { brandMediaUrl, twilioConfigured } from './config';
 import { renderDealCard, renderDealDetail } from './card';
 import {
+  DEAL_BADGE,
   dealMediaPaths,
+  dealMediaPathsEs,
   dealPhotoCounter,
   dealPhotoLimitMessage,
   dealPhotoList,
@@ -18,9 +20,30 @@ import {
   withDealPhotoAsMain,
   withDealPhotoRemoved,
 } from './deal-photos';
-import { dealLine, dealMetalLabel, dealReadyProblem, dealSizeLabel } from './deal-input';
-import { dealText, DEFAULT_SOLD_REPLY, soldNoticeText, winnerText, type DealCopy } from './messages';
+import {
+  dealLine,
+  dealLineEs,
+  dealMessageEs,
+  dealMetalLabel,
+  dealMetalLabelEs,
+  dealReadyProblem,
+  dealSizeLabel,
+  dealSizeLabelEs,
+  dealTitleEs,
+  spanishTranslationPlan,
+} from './deal-input';
+import {
+  dealText,
+  DEFAULT_SOLD_REPLY,
+  soldNoticeText,
+  soldReplyFor,
+  textLanguage,
+  winnerText,
+  type DealCopy,
+  type TextLanguage,
+} from './messages';
 import { sendTwilioMessage, TwilioError } from './twilio';
+import { translateDealWordsToSpanish } from '@/lib/ai-translate';
 
 /**
  * Text deals — pieces that never reach the website (owner, 2026-09-15):
@@ -66,7 +89,22 @@ export type DealRow = {
   sold_reply_text: string | null;
   created_at: string;
   updated_at: string;
+  /** Spanish (2026-11-22); absent on a row read before `spanish-subscribers-2026-11.sql` ran. */
+  title_es?: string | null;
+  size_text_es?: string | null;
+  description_es?: string | null;
+  message_es?: string | null;
+  sold_reply_text_es?: string | null;
+  card_path_es?: string | null;
+  detail_media_paths_es?: string[] | null;
+  es_source_hash?: string | null;
+  es_machine_hash?: string | null;
 };
+
+/** Has the Spanish SQL run for this row? Every Spanish write checks it first. */
+export function dealHasSpanishColumns(deal: Partial<DealRow> | null | undefined): boolean {
+  return Boolean(deal && 'title_es' in deal);
+}
 
 export type SendPassResult = {
   attempted: number;
@@ -118,7 +156,19 @@ export function dealMediaUrls(service: SupabaseClient, deal: DealRow): string[] 
   return dealMediaPaths(deal)?.map((path) => publicUrl(service, path)) ?? null;
 }
 
-async function storeDealJpeg(service: SupabaseClient, dealId: string, kind: 'card' | 'detail', jpeg: Buffer): Promise<string> {
+/**
+ * The pictures a subscriber in this language gets: the Spanish set when it is
+ * rendered, otherwise the English one (never none).
+ */
+export function dealMediaUrlsFor(service: SupabaseClient, deal: DealRow, language: TextLanguage): string[] | null {
+  if (language === 'es') {
+    const spanish = dealMediaPathsEs(deal);
+    if (spanish) return spanish.map((path) => publicUrl(service, path));
+  }
+  return dealMediaUrls(service, deal);
+}
+
+async function storeDealJpeg(service: SupabaseClient, dealId: string, kind: 'card' | 'detail' | 'card-es' | 'detail-es', jpeg: Buffer): Promise<string> {
   const hash = createHash('sha256').update(jpeg).digest('hex').slice(0, 12);
   const path = `${TEXT_DEALS_PREFIX}/${safeId(dealId)}/${kind}-${hash}.jpg`;
   const { error } = await service.storage
@@ -133,35 +183,122 @@ async function storeDealJpeg(service: SupabaseClient, dealId: string, kind: 'car
  * price card, then each detail shot with the small price strip. What Preview
  * shows is exactly what goes out (a phone may show them in another order).
  */
-export async function buildDealMedia(service: SupabaseClient, deal: DealRow): Promise<{ pictures: DealPicture[]; totalBytes: number }> {
+export async function buildDealMedia(
+  service: SupabaseClient,
+  deal: DealRow,
+): Promise<{ pictures: DealPicture[]; totalBytes: number; picturesEs: DealPicture[] | null; totalBytesEs: number }> {
   const [main, ...details] = dealPhotoList(deal);
   if (!main) throw new Error('Add a photo before sending.');
   // Photos may come first (2026-10-24); the boxes are checked here, before any picture is drawn.
   const problem = dealReadyProblem(deal);
   if (problem) throw new Error(problem);
-  const line = dealLine(deal);
   const budget = dealPictureBudget(details.length);
   // "Photo 2 of 5" on every picture of a deal with more than one — the main picture is 1.
   const total = details.length + 1;
+  const sources = await Promise.all([main, ...details].map((path) => readStoredPhoto(service, path)));
 
-  const card = await renderDealCard(await readStoredPhoto(service, main), { price: deal.price_text, line, badge: 'First reply wins', counter: dealPhotoCounter(0, total) }, budget.card);
-  const cardPath = await storeDealJpeg(service, deal.id, 'card', card.jpeg);
-  const pictures: DealPicture[] = [{ path: cardPath, url: publicUrl(service, cardPath), bytes: card.bytes, main: true }];
-
-  for (const [index, source] of details.entries()) {
-    const detail = await renderDealDetail(await readStoredPhoto(service, source), { price: deal.price_text, line, counter: dealPhotoCounter(index + 1, total) }, budget.detail);
-    const path = await storeDealJpeg(service, deal.id, 'detail', detail.jpeg);
-    pictures.push({ path, url: publicUrl(service, path), bytes: detail.bytes, main: false });
+  /** One set of pictures in one language — the same photos, the words on them translated (owner, 2026-11-22: "1B"). */
+  async function renderSet(language: TextLanguage): Promise<DealPicture[]> {
+    const line = language === 'es' ? dealLineEs(deal) : dealLine(deal);
+    const suffix = language === 'es' ? '-es' : '';
+    const card = await renderDealCard(sources[0], { price: deal.price_text, line, badge: DEAL_BADGE[language], counter: dealPhotoCounter(0, total, language) }, budget.card);
+    const cardPath = await storeDealJpeg(service, deal.id, `card${suffix}` as 'card' | 'card-es', card.jpeg);
+    const set: DealPicture[] = [{ path: cardPath, url: publicUrl(service, cardPath), bytes: card.bytes, main: true }];
+    for (const [index, source] of sources.slice(1).entries()) {
+      const detail = await renderDealDetail(source, { price: deal.price_text, line, counter: dealPhotoCounter(index + 1, total, language) }, budget.detail);
+      const path = await storeDealJpeg(service, deal.id, `detail${suffix}` as 'detail' | 'detail-es', detail.jpeg);
+      set.push({ path, url: publicUrl(service, path), bytes: detail.bytes, main: false });
+    }
+    return set;
   }
 
-  const update: Record<string, unknown> = { card_path: cardPath, updated_at: new Date().toISOString() };
+  const pictures = await renderSet('en');
+  // The Spanish set only once its columns exist (the SQL has run).
+  const picturesEs = dealHasSpanishColumns(deal) ? await renderSet('es') : null;
+
+  const update: Record<string, unknown> = { card_path: pictures[0].path, updated_at: new Date().toISOString() };
   // Named only when the row has the column or needs it — see `dealPhotoUpdate`.
   if (details.length > 0 || Array.isArray(deal.detail_media_paths)) {
     update.detail_media_paths = pictures.slice(1).map((picture) => picture.path);
   }
+  if (picturesEs) {
+    update.card_path_es = picturesEs[0].path;
+    update.detail_media_paths_es = picturesEs.slice(1).map((picture) => picture.path);
+  }
   const { error: updateError } = await service.from('text_deals').update(update).eq('id', deal.id);
   if (updateError) throw new Error(`Could not save the deal pictures: ${updateError.message}`);
-  return { pictures, totalBytes: pictures.reduce((sum, picture) => sum + picture.bytes, 0) };
+  const sum = (set: DealPicture[]) => set.reduce((total, picture) => total + picture.bytes, 0);
+  return { pictures, totalBytes: sum(pictures), picturesEs, totalBytesEs: picturesEs ? sum(picturesEs) : 0 };
+}
+
+/* ── Spanish words (2026-11-22) ──────────────────────────────────────────── */
+
+const hashWords = (parts: Array<string | null | undefined>) =>
+  createHash('sha256').update(JSON.stringify(parts.map((part) => (part ?? '').trim()))).digest('hex').slice(0, 16);
+
+/** What the Spanish was (or would be) translated from: the English boxes the owner types. */
+export function dealSourceHash(deal: Partial<DealRow>): string {
+  return hashWords([deal.title, deal.size_text, deal.description, deal.message]);
+}
+
+/** The Spanish boxes as they are now. */
+export function dealSpanishHash(deal: Partial<DealRow>): string {
+  return hashWords([deal.title_es, deal.size_text_es, deal.description_es, deal.message_es]);
+}
+
+export type SpanishWordsResult = {
+  deal: DealRow;
+  /** The machine translated just now. */
+  translated: boolean;
+  /** The English changed after the owner corrected the Spanish — kept, but worth a look. */
+  stale: boolean;
+  /** Why the translation did not run (not set up, timed out…); the deal still works, Spanish falls back to English words. */
+  error: string | null;
+};
+
+/**
+ * Fill the Spanish boxes from the English ones when they are empty, or when
+ * the English changed and the owner had not corrected the Spanish (owner,
+ * 2026-11-22, "2A": a deal goes out with the automatic Spanish even unread).
+ * The owner's corrections are never overwritten unless `force` ("Translate
+ * again"). Never throws: a failed translation is reported in `error`.
+ */
+export async function ensureDealSpanishWords(service: SupabaseClient, deal: DealRow, options: { force?: boolean } = {}): Promise<SpanishWordsResult> {
+  if (!dealHasSpanishColumns(deal)) return { deal, translated: false, stale: false, error: null };
+  const plan = spanishTranslationPlan({
+    hasSpanish: Boolean(deal.title_es?.trim() || deal.message_es?.trim()),
+    sourceHash: dealSourceHash(deal),
+    storedSourceHash: deal.es_source_hash ?? null,
+    spanishHash: dealSpanishHash(deal),
+    machineHash: deal.es_machine_hash ?? null,
+    force: options.force === true,
+  });
+  if (plan !== 'translate') return { deal, translated: false, stale: plan === 'stale', error: null };
+
+  try {
+    const words = await translateDealWordsToSpanish({
+      title: deal.title ?? '',
+      size_text: deal.size_text ?? '',
+      description: deal.description ?? '',
+      message: deal.message ?? '',
+    });
+    const update = {
+      ...words,
+      es_source_hash: dealSourceHash(deal),
+      es_machine_hash: dealSpanishHash(words),
+      // New words need new Spanish pictures.
+      card_path_es: null,
+      detail_media_paths_es: [],
+      updated_at: new Date().toISOString(),
+    };
+    const { data, error } = await service.from('text_deals').update(update).eq('id', deal.id).select('*').single<DealRow>();
+    if (error || !data) throw new Error(error?.message ?? 'Could not save the Spanish.');
+    return { deal: data, translated: true, stale: false, error: null };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Translation failed.';
+    console.error('[text-alerts] Spanish translation failed', message);
+    return { deal, translated: false, stale: false, error: message };
+  }
 }
 
 /** Thrown for a photo change the owner can fix (limit reached, not a draft, not on the deal). */
@@ -175,7 +312,7 @@ export class DealPhotoError extends Error {
 async function saveDealPhotos(service: SupabaseClient, deal: DealRow, list: string[]): Promise<DealRow> {
   const { data, error } = await service
     .from('text_deals')
-    .update({ ...dealPhotoUpdate(list, Array.isArray(deal.detail_photo_paths)), updated_at: new Date().toISOString() })
+    .update({ ...dealPhotoUpdate(list, Array.isArray(deal.detail_photo_paths), dealHasSpanishColumns(deal)), updated_at: new Date().toISOString() })
     .eq('id', deal.id)
     .eq('status', 'draft')
     .select('*')
@@ -222,11 +359,17 @@ export async function makeDealPhotoMain(service: SupabaseClient, deal: DealRow, 
   return saveDealPhotos(service, deal, withDealPhotoAsMain(current, path));
 }
 
-/** Every stored object a deal row points at: its photos and its rendered pictures. */
+/** Every stored object a deal row points at: its photos and its rendered pictures (English and Spanish). */
 function dealObjectPaths(row: Partial<DealRow>): string[] {
   const detailMedia = Array.isArray(row.detail_media_paths) ? row.detail_media_paths : [];
-  return [...dealPhotoList({ photo_path: row.photo_path ?? null, detail_photo_paths: row.detail_photo_paths }), row.card_path, ...detailMedia]
-    .filter((path): path is string => typeof path === 'string' && path.length > 0);
+  const detailMediaEs = Array.isArray(row.detail_media_paths_es) ? row.detail_media_paths_es : [];
+  return [
+    ...dealPhotoList({ photo_path: row.photo_path ?? null, detail_photo_paths: row.detail_photo_paths }),
+    row.card_path,
+    ...detailMedia,
+    row.card_path_es,
+    ...detailMediaEs,
+  ].filter((path): path is string => typeof path === 'string' && path.length > 0);
 }
 
 /**
@@ -262,15 +405,45 @@ export async function loadDeal(service: SupabaseClient, dealId: string): Promise
   return data ?? null;
 }
 
-/** Confirmed numbers only — nothing else is ever texted a deal. */
-export async function listConfirmedRecipients(service: SupabaseClient): Promise<Array<{ id: string; phone_e164: string }>> {
+/** Confirmed numbers only — nothing else is ever texted a deal. Each with its language. */
+export async function listConfirmedRecipients(service: SupabaseClient): Promise<Array<{ id: string; phone_e164: string; language: TextLanguage }>> {
   const { data, error } = await service
     .from('homepage_subscribers')
-    .select('id, phone_e164')
+    .select('id, phone_e164, locale')
     .eq('sms_status', 'confirmed')
     .not('phone_e164', 'is', null);
   if (error) throw new Error(`Could not load confirmed numbers: ${error.message}`);
-  return (data ?? []).filter((row): row is { id: string; phone_e164: string } => typeof row.phone_e164 === 'string');
+  return (data ?? [])
+    .filter((row) => typeof row.phone_e164 === 'string')
+    .map((row) => ({ id: row.id as string, phone_e164: row.phone_e164 as string, language: textLanguage(row.locale) }));
+}
+
+/** Subscriber id → language, for the rows of one send pass. English on any error. */
+async function languagesById(service: SupabaseClient, ids: string[]): Promise<Map<string, TextLanguage>> {
+  const out = new Map<string, TextLanguage>();
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (unique.length === 0) return out;
+  const { data, error } = await service.from('homepage_subscribers').select('id, locale').in('id', unique);
+  if (error) {
+    console.error('[text-alerts] subscriber languages unreadable; sending English', error.message);
+    return out;
+  }
+  for (const row of data ?? []) out.set(row.id as string, textLanguage(row.locale));
+  return out;
+}
+
+/** Phone → language, for the sold notices. English on any error. */
+export async function languagesByPhone(service: SupabaseClient, phones: string[]): Promise<Map<string, TextLanguage>> {
+  const out = new Map<string, TextLanguage>();
+  const unique = [...new Set(phones.filter(Boolean))];
+  if (unique.length === 0) return out;
+  const { data, error } = await service.from('homepage_subscribers').select('phone_e164, locale').in('phone_e164', unique);
+  if (error) {
+    console.error('[text-alerts] subscriber languages unreadable; sending English', error.message);
+    return out;
+  }
+  for (const row of data ?? []) if (row.phone_e164) out.set(row.phone_e164 as string, textLanguage(row.locale));
+  return out;
 }
 
 /**
@@ -280,13 +453,21 @@ export async function listConfirmedRecipients(service: SupabaseClient): Promise<
  */
 export async function startDealSend(dealId: string): Promise<SendPassResult> {
   const service = createServiceClient();
-  const deal = await loadDeal(service, dealId);
+  let deal = await loadDeal(service, dealId);
   if (!deal) throw new Error('Deal not found.');
   if (deal.status === 'sold') throw new Error('This deal is marked sold.');
-  if (!dealMediaPaths(deal)) await buildDealMedia(service, deal);
 
   const recipients = await listConfirmedRecipients(service);
   if (recipients.length === 0) throw new Error('Nobody has confirmed text alerts yet.');
+
+  // Spanish subscribers get the Spanish words + pictures (2026-11-22). Filled
+  // here too in case Preview did not (owner "2A": goes out unread); a failed
+  // translation never stops the send — the Spanish falls back to English words.
+  const anySpanish = recipients.some((r) => r.language === 'es');
+  if (anySpanish) deal = (await ensureDealSpanishWords(service, deal)).deal;
+  if (!dealMediaPaths(deal) || (anySpanish && dealHasSpanishColumns(deal) && !dealMediaPathsEs(deal))) {
+    await buildDealMedia(service, deal);
+  }
 
   const rows = recipients.map((r) => ({ deal_id: dealId, subscriber_id: r.id, phone_e164: r.phone_e164, status: 'queued' }));
   const { error: queueError } = await service
@@ -314,10 +495,12 @@ export async function runDealSendPass(dealId: string, limit = SEND_PASS_LIMIT): 
     result.notConfigured = true;
     return result;
   }
-  // One message, every picture, the main one first.
-  const mediaUrls = dealMediaUrls(service, deal);
-  if (!mediaUrls) throw new Error('The deal has no picture yet.');
-  const body = dealText(dealCopy(deal));
+  // One message, every picture, the main one first — in the subscriber's language.
+  if (!dealMediaUrls(service, deal)) throw new Error('The deal has no picture yet.');
+  const versions: Record<TextLanguage, { body: string; mediaUrls: string[] }> = {
+    en: { body: dealText(dealCopy(deal)), mediaUrls: dealMediaUrlsFor(service, deal, 'en') ?? [] },
+    es: { body: dealText(dealCopyEs(deal), 'es'), mediaUrls: dealMediaUrlsFor(service, deal, 'es') ?? [] },
+  };
 
   const { data: queued, error } = await service
     .from('text_deal_sends')
@@ -327,8 +510,11 @@ export async function runDealSendPass(dealId: string, limit = SEND_PASS_LIMIT): 
     .order('id', { ascending: true })
     .limit(limit);
   if (error) throw new Error(`Could not read the queue: ${error.message}`);
+  const languages = await languagesById(service, (queued ?? []).map((row) => row.subscriber_id as string));
 
   for (const row of queued ?? []) {
+    const language: TextLanguage = (typeof row.subscriber_id === 'string' && languages.get(row.subscriber_id)) || 'en';
+    const { body, mediaUrls } = versions[language];
     result.attempted += 1;
     // Claim the row first; a second pass running at the same time skips it.
     const { data: claimed } = await service
@@ -389,21 +575,45 @@ export function dealCopy(deal: DealRow): DealCopy {
   };
 }
 
-/** A test to one number (the owner's cell); logged, never counted as a deal send. */
-export async function sendDealTest(dealId: string, to: string): Promise<{ sid: string }> {
+/**
+ * The Spanish words of a deal's text: the fixed labels are Spanish
+ * (`dealText(…, 'es')`), the owner's words come from the Spanish boxes, and
+ * an empty Spanish box falls back to the English one.
+ */
+export function dealCopyEs(deal: DealRow): DealCopy {
+  return {
+    item: dealTitleEs(deal),
+    metal: dealMetalLabelEs(deal),
+    size: dealSizeLabelEs(deal),
+    price: deal.price_text,
+    comparable: deal.comparable_price_text ?? null,
+    description: deal.description_es?.trim() || deal.description || null,
+    message: dealMessageEs(deal),
+  };
+}
+
+/** A test to one number (the owner's cell); logged, never counted as a deal send. `language: 'es'` = the Spanish version. */
+export async function sendDealTest(dealId: string, to: string, language: TextLanguage = 'en'): Promise<{ sid: string }> {
   const service = createServiceClient();
-  const deal = await loadDeal(service, dealId);
+  let deal = await loadDeal(service, dealId);
   if (!deal) throw new Error('Deal not found.');
   if (!twilioConfigured()) throw new Error('Twilio is not configured yet.');
-  const mediaUrls = dealMediaUrls(service, deal) ?? (await buildDealMedia(service, deal)).pictures.map((picture) => picture.url);
-  const body = dealText(dealCopy(deal));
+  if (language === 'es') deal = (await ensureDealSpanishWords(service, deal)).deal;
+  const needsPictures = !dealMediaPaths(deal) || (language === 'es' && dealHasSpanishColumns(deal) && !dealMediaPathsEs(deal));
+  if (needsPictures) {
+    await buildDealMedia(service, deal);
+    deal = (await loadDeal(service, dealId)) ?? deal;
+  }
+  const mediaUrls = dealMediaUrlsFor(service, deal, language) ?? [];
+  const body = language === 'es' ? dealText(dealCopyEs(deal), 'es') : dealText(dealCopy(deal));
   const sent = await sendTwilioMessage({ to, body, mediaUrls });
   await service.from('text_system_messages').insert({ kind: 'deal_test', to_phone: to, deal_id: dealId, message_sid: sent.sid, status: sent.status });
   return { sid: sent.sid };
 }
 
-export async function markDealSold(dealId: string, input: { soldToPhone?: string | null; replyText?: string | null }): Promise<DealRow> {
+export async function markDealSold(dealId: string, input: { soldToPhone?: string | null; replyText?: string | null; replyTextEs?: string | null }): Promise<DealRow> {
   const service = createServiceClient();
+  const current = await loadDeal(service, dealId);
   const { data, error } = await service
     .from('text_deals')
     .update({
@@ -411,6 +621,8 @@ export async function markDealSold(dealId: string, input: { soldToPhone?: string
       sold_at: new Date().toISOString(),
       sold_to_phone: input.soldToPhone ?? null,
       sold_reply_text: input.replyText?.trim() || DEFAULT_SOLD_REPLY,
+      // The Spanish "spoken for" line, once its column exists.
+      ...(dealHasSpanishColumns(current) && typeof input.replyTextEs === 'string' ? { sold_reply_text_es: input.replyTextEs.trim() || null } : {}),
       updated_at: new Date().toISOString(),
     })
     .eq('id', dealId)
@@ -464,21 +676,33 @@ export async function notifyDealSold(dealId: string): Promise<SoldNotifyOutcome>
     }
   }
 
-  const winner = deal.sold_to_phone;
-  if (winner) {
-    outcome.winner = await sendOne('deal_winner', winner, winnerText({ title: dealLine(deal), price: deal.price_text }));
-  }
-
   // Everyone the deal actually reached (accepted by Twilio or delivered), minus the buyer.
+  const winner = deal.sold_to_phone;
   const { data: sends } = await service
     .from('text_deal_sends')
     .select('phone_e164, status')
     .eq('deal_id', dealId)
     .in('status', ['sent', 'delivered']);
   const others = Array.from(new Set((sends ?? []).map((row) => row.phone_e164 as string).filter((phone) => phone && phone !== winner)));
-  const notice = soldNoticeText(deal.sold_reply_text);
+  // Each person in their own language (2026-11-22).
+  const languages = await languagesByPhone(service, [...others, ...(winner ? [winner] : [])]);
+  const languageOf = (phone: string): TextLanguage => languages.get(phone) ?? 'en';
+
+  if (winner) {
+    const spanish = languageOf(winner) === 'es';
+    outcome.winner = await sendOne(
+      'deal_winner',
+      winner,
+      winnerText({ title: spanish ? dealLineEs(deal) : dealLine(deal), price: deal.price_text }, spanish ? 'es' : 'en'),
+    );
+  }
+
+  const notices: Record<TextLanguage, string> = {
+    en: soldNoticeText(deal.sold_reply_text),
+    es: soldNoticeText(soldReplyFor('es', deal.sold_reply_text, deal.sold_reply_text_es), 'es'),
+  };
   for (let i = 0; i < others.length; i += 10) {
-    const results = await Promise.all(others.slice(i, i + 10).map((phone) => sendOne('deal_sold', phone, notice)));
+    const results = await Promise.all(others.slice(i, i + 10).map((phone) => sendOne('deal_sold', phone, notices[languageOf(phone)])));
     for (const result of results) outcome.others[result] += 1;
   }
   return outcome;
@@ -523,6 +747,9 @@ export async function reopenDealAsDraft(dealId: string): Promise<DealRow> {
       ...(details.length > 0 ? { detail_photo_paths: details } : {}),
       status: 'draft',
       sold_reply_text: source.sold_reply_text,
+      // The Spanish words are translated again on Preview (the message is new);
+      // only the owner's Spanish "spoken for" line comes along.
+      ...(dealHasSpanishColumns(source) ? { sold_reply_text_es: source.sold_reply_text_es ?? null } : {}),
     })
     .select('*')
     .single<DealRow>();

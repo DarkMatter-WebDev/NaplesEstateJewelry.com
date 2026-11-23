@@ -50,7 +50,10 @@ describe('the window', () => {
   });
 
   it('shows the stored consent statement and links its two labels', () => {
-    expect(modal).toContain('smsConsentText(locale)');
+    // In the language the window is showing — "¿Prefiere español?" switches it (2026-11-22).
+    expect(modal).toContain('smsConsentText(language)');
+    expect(modal).toContain('locale: language,');
+    expect(modal).toContain("{isEs ? 'Prefer English?' : '¿Prefiere español?'}");
     expect(modal).toContain('SMS_CONSENT_LINKS.privacy.path');
     expect(modal).toContain('SMS_CONSENT_LINKS.terms.path');
   });

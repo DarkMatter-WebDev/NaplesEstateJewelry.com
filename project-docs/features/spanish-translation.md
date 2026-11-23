@@ -1,6 +1,6 @@
 # Feature: Spanish Localization
 
-> Current EN/ES localization model. Last updated: **2026-08-03**.
+> Current EN/ES localization model. Last updated: **2026-11-22** (Spanish subscribers section).
 
 ## Status
 
@@ -18,6 +18,32 @@ Examples:
 /contact     <-> /es/contact
 /account     <-> /es/account
 ```
+
+## Spanish subscribers — texts and emails (2026-11-22)
+
+Each subscriber has a language (`homepage_subscribers.locale`). Spanish
+subscribers get the text deals, every text-deal system text and the marketing
+emails in Spanish. Rules: `DECISIONS.md` → "Spanish subscribers"; files:
+`STRUCTURE.md` → "Spanish subscribers" row; history: `CHANGELOG.md` 2026-11-22 (2).
+
+- **How someone becomes Spanish:** joins on the /es site, or taps
+  "¿Prefiere español?" in the Join window; a Spanish buy receipt's mailing-list
+  add; or the owner's Language switch in Admin → Subscribers. Email recipients
+  with no newsletter row follow their latest order's language.
+- **Texts:** fixed Spanish wording in `lib/text-alerts/messages.ts`; STOP / HELP
+  stay the words to type. Spanish stop words (ALTO, PARAR…) are handled by the
+  site, not Twilio.
+- **Deals:** Preview machine-translates the owner's words into the Español box
+  (corrections kept; "Translate again" redoes it) and renders a Spanish set of
+  pictures. "Test in Español" sends the Spanish version to the owner's cell.
+- **Email:** "Translate to Spanish" on Compose Campaign; empty = English for
+  everyone. Spanish footer + `/es/unsubscribe`.
+- **Lead forms (2026-11-22 (3)):** the Free Evaluation / Sell by Mail / shop
+  inquiry forms send `locale`; the customer's confirmation email comes back in
+  that language (`lib/inquiry-confirmation.ts`).
+- **Still English:** Supabase account emails (sign-up confirmation, password
+  reset) — dashboard templates; open in `TASKS.md`.
+- ⚠️ The Spanish wording is Claude's draft — the owner's translator confirms it.
 
 ## Key Files
 

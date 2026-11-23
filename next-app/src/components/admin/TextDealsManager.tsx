@@ -12,12 +12,14 @@ import {
   DEAL_TITLE_MAX,
   DEFAULT_DEAL_MESSAGE,
   dealLine,
+  dealMessageEs,
   dealMetalLabel,
+  dealMetalLabelEs,
   dealSizeLabel,
   formatDealPrice,
 } from '@/lib/text-alerts/deal-input';
 import { DEAL_PHOTO_MAX, formatPictureBytes } from '@/lib/text-alerts/deal-photos';
-import { DEFAULT_SOLD_REPLY, dealText } from '@/lib/text-alerts/messages';
+import { DEFAULT_SOLD_REPLY, DEFAULT_SOLD_REPLY_ES, dealText } from '@/lib/text-alerts/messages';
 
 /**
  * Admin → Text Deals (owner mockup v2 sections 3b + 3c, 2026-09-15).
@@ -41,6 +43,11 @@ import { DEFAULT_SOLD_REPLY, dealText } from '@/lib/text-alerts/messages';
  * with nothing typed; Preview checks the boxes), plus Comparable price, Metal
  * + Purity (must-pick), Size / length and a longer Description. The line on
  * the pictures is built from Purity + Metal + What it is + Size (`dealLine`).
+ * Since 2026-11-22 (owner, mockup 1: "1B, 2A, 3A, 4A"): Spanish subscribers
+ * get the deal in Spanish. Preview also fills the Spanish box (translated
+ * automatically, editable; "Translate again" redoes it) and renders a Spanish
+ * set of pictures ("Foto 2 de 5"). Send gives each person their own language;
+ * an unread Spanish box still goes out (2A). Shown once the SQL has run.
  */
 type Deal = {
   id: string;
@@ -61,7 +68,15 @@ type Deal = {
   sold_to_phone: string | null;
   sold_reply_text: string | null;
   created_at: string;
+  /** Spanish (2026-11-22); absent before the SQL ran. */
+  title_es?: string | null;
+  size_text_es?: string | null;
+  description_es?: string | null;
+  message_es?: string | null;
+  sold_reply_text_es?: string | null;
 };
+
+type SpanishPreview = { title_es: string; size_text_es: string; description_es: string; message_es: string; translated: boolean; stale: boolean; error: string | null };
 
 type Reply = {
   id: number;
@@ -79,7 +94,7 @@ type Reply = {
 type Photo = { path: string; url: string };
 type Picture = { url: string; bytes: number; main: boolean };
 
-type Detail = { deal: Deal & { card_url: string | null; photos: Photo[]; media_urls: string[] }; tally: Record<string, number>; replies: Reply[] };
+type Detail = { deal: Deal & { card_url: string | null; photos: Photo[]; media_urls: string[]; media_urls_es?: string[] }; tally: Record<string, number>; replies: Reply[] };
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', {
   month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York',
@@ -119,11 +134,24 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
   const [soldReply, setSoldReply] = useState(DEFAULT_SOLD_REPLY);
   const [reopenedFrom, setReopenedFrom] = useState<string | null>(null);
 
+  // Spanish (2026-11-22): the box appears once the SQL has run.
+  const [spanishReady, setSpanishReady] = useState(false);
+  const [confirmedEs, setConfirmedEs] = useState(0);
+  const [titleEs, setTitleEs] = useState('');
+  const [sizeEs, setSizeEs] = useState('');
+  const [descriptionEs, setDescriptionEs] = useState('');
+  const [messageEs, setMessageEs] = useState('');
+  const [spanishNote, setSpanishNote] = useState<{ text: string; ok: boolean } | null>(null);
+  const [picturesEs, setPicturesEs] = useState<Picture[] | null>(null);
+  const [soldReplyEs, setSoldReplyEs] = useState(DEFAULT_SOLD_REPLY_ES);
+
   const loadList = useCallback(async () => {
     const data = await readJson(await fetch('/api/admin/text-deals'));
     setDeals(data.deals ?? []);
     setConfirmed(data.confirmed ?? 0);
     setPending(data.pending ?? 0);
+    setConfirmedEs(data.confirmedEs ?? 0);
+    setSpanishReady(data.spanishReady === true);
   }, []);
 
   const loadDetail = useCallback(async (id: string) => {
@@ -131,6 +159,7 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
     const data = (await readJson(await fetch(`/api/admin/text-deals/${id}`))) as Detail;
     setDetail(data);
     setSoldReply(data.deal.sold_reply_text || DEFAULT_SOLD_REPLY);
+    setSoldReplyEs(data.deal.sold_reply_text_es || DEFAULT_SOLD_REPLY_ES);
   }, []);
 
   // Loads run from a queued callback, not the effect body (react-hooks/set-state-in-effect).
@@ -159,19 +188,39 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
     description,
     message,
   }), [words, title, price, message, comparable, description]);
+  // The Spanish text as it will read: Spanish labels, the Spanish boxes, an empty box falls back to the English one.
+  const previewTextEs = useMemo(() => dealText({
+    item: titleEs.trim() || title || '…',
+    metal: dealMetalLabelEs(words),
+    size: sizeEs.trim() || dealSizeLabel(words),
+    price: formatDealPrice(price) ?? '$…',
+    comparable: formatDealPrice(comparable),
+    description: descriptionEs.trim() || description,
+    message: dealMessageEs({ message, message_es: messageEs }),
+  }, 'es'), [words, titleEs, title, sizeEs, price, comparable, descriptionEs, description, messageEs, message]);
+  const confirmedEn = Math.max(confirmed - confirmedEs, 0);
+
+  function setSpanishBoxes(source: { title_es?: string | null; size_text_es?: string | null; description_es?: string | null; message_es?: string | null }) {
+    setTitleEs(source.title_es ?? ''); setSizeEs(source.size_text_es ?? '');
+    setDescriptionEs(source.description_es ?? ''); setMessageEs(source.message_es ?? '');
+  }
 
   function resetComposer() {
     setDraftId(null); setTitle(''); setPrice(''); setMessage(DEFAULT_DEAL_MESSAGE);
     setComparable(''); setMetal(''); setPurity(''); setSize(''); setDescription('');
     setPhotos([]); setPictures(null); setReopenedFrom(null);
+    setSpanishBoxes({}); setSpanishNote(null); setPicturesEs(null);
   }
 
   async function saveDraft(): Promise<string> {
     // Every box may still be empty — photos can go first; Preview checks what the deal needs.
-    const payload = { title, price, message, comparable, metal, purity, size, description };
+    // The Spanish boxes ride along once the SQL has run (the owner's corrections are kept).
+    const spanish = spanishReady ? { title_es: titleEs, size_text_es: sizeEs, description_es: descriptionEs, message_es: messageEs } : {};
+    const payload = { title, price, message, comparable, metal, purity, size, description, ...spanish };
     if (draftId) {
       const data = await readJson(await fetch(`/api/admin/text-deals/${draftId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }));
       setPictures(null);
+      setPicturesEs(null);
       setDeals((current) => current.map((d) => (d.id === draftId ? data.deal : d)));
       return draftId;
     }
@@ -229,15 +278,32 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
     }
   }
 
-  async function onPreview(event?: FormEvent) {
+  async function onPreview(event?: FormEvent, options: { retranslate?: boolean } = {}) {
     event?.preventDefault();
-    setBusy('preview');
+    setBusy(options.retranslate ? 'translate' : 'preview');
     setNotice(null);
     try {
       const id = await saveDraft();
       if (photos.length === 0) throw new Error('Add a photo first.');
-      const data = (await readJson(await fetch('/api/admin/text-deals/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dealId: id }) }))) as { pictures: Picture[]; totalBytes: number };
+      const data = (await readJson(await fetch('/api/admin/text-deals/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dealId: id, retranslate: options.retranslate === true }),
+      }))) as { pictures: Picture[]; totalBytes: number; picturesEs: Picture[] | null; spanish: SpanishPreview | null };
       setPictures(data.pictures);
+      setPicturesEs(data.picturesEs ?? null);
+      if (data.spanish) {
+        setSpanishBoxes(data.spanish);
+        setSpanishNote(
+          data.spanish.error
+            ? { text: `The Spanish could not be translated (${data.spanish.error}). Spanish subscribers get the Spanish labels with the English words until you fill the boxes or press Translate again.`, ok: false }
+            : data.spanish.stale
+              ? { text: 'You changed the English after correcting the Spanish. Your Spanish is kept — check it, or press Translate again.', ok: false }
+              : data.spanish.translated
+                ? { text: 'Translated just now. Correct anything you like, then Preview again.', ok: true }
+                : null,
+        );
+      }
       setNotice({ text: `${data.pictures.length === 1 ? 'Picture' : `${data.pictures.length} pictures`} ready (${formatPictureBytes(data.totalBytes)}).`, ok: true });
     } catch (err) {
       setNotice({ text: err instanceof Error ? err.message : 'Could not render the pictures.', ok: false });
@@ -246,13 +312,13 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
     }
   }
 
-  async function onTest() {
+  async function onTest(language: 'en' | 'es' = 'en') {
     if (!draftId) { setNotice({ text: 'Preview first.', ok: false }); return; }
-    setBusy('test');
+    setBusy(language === 'es' ? 'test-es' : 'test');
     setNotice(null);
     try {
-      const data = await readJson(await fetch(`/api/admin/text-deals/${draftId}/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ test: true }) }));
-      setNotice({ text: `Test sent to ${formatUsPhone(data.to)}.`, ok: true });
+      const data = await readJson(await fetch(`/api/admin/text-deals/${draftId}/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ test: true, language }) }));
+      setNotice({ text: `${language === 'es' ? 'Spanish test' : 'Test'} sent to ${formatUsPhone(data.to)}.`, ok: true });
     } catch (err) {
       setNotice({ text: err instanceof Error ? err.message : 'Could not send the test.', ok: false });
     } finally {
@@ -262,7 +328,8 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
 
   async function onSend() {
     if (!draftId || !pictures) { setNotice({ text: 'Preview first, then send.', ok: false }); return; }
-    if (!window.confirm(`Send this deal to ${confirmed} confirmed number${confirmed === 1 ? '' : 's'}?`)) return;
+    const split = spanishReady && confirmedEs > 0 ? ` (${confirmedEn} in English, ${confirmedEs} in Spanish)` : '';
+    if (!window.confirm(`Send this deal to ${confirmed} confirmed number${confirmed === 1 ? '' : 's'}${split}?`)) return;
     setBusy('send');
     setNotice(null);
     try {
@@ -284,7 +351,8 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
     setBusy(action);
     setNotice(null);
     try {
-      const result = await readJson(await fetch(`/api/admin/text-deals/${detail.deal.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, soldToPhone, replyText: soldReply }) })) as { notified?: { winner: string; others: { sent: number; failed: number; already: number } } };
+      const spanishReply = 'sold_reply_text_es' in detail.deal ? { replyTextEs: soldReplyEs } : {};
+      const result = await readJson(await fetch(`/api/admin/text-deals/${detail.deal.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, soldToPhone, replyText: soldReply, ...spanishReply }) })) as { notified?: { winner: string; others: { sent: number; failed: number; already: number } } };
       await Promise.all([loadList(), loadDetail(detail.deal.id)]);
       if (action === 'sold') {
         const n = result.notified;
@@ -318,6 +386,8 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
       setDraftId(d.id); setTitle(d.title); setPrice(d.price_text); setMessage(d.message);
       setComparable(d.comparable_price_text ?? ''); setMetal(d.metal ?? ''); setPurity(d.purity ?? ''); setSize(d.size_text ?? ''); setDescription(d.description ?? '');
       setPhotos(d.photos ?? []); setPictures(null);
+      // Empty Spanish boxes: Preview translates the new message.
+      setSpanishBoxes(d); setSpanishNote(null); setPicturesEs(null);
       setReopenedFrom(detail.deal.id);
       await loadList();
       setSelectedId(null); setDetail(null);
@@ -452,9 +522,51 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
             <span className="mt-1 block text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>&quot;Reply STOP to opt out&quot; is added automatically.</span>
           </label>
 
-          <div className="rounded-lg border px-3 py-2 text-xs whitespace-pre-line" style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-low)', color: 'var(--color-on-surface)' }}>
-            <span className="block font-bold">Text as it will read:</span>{previewText}
-          </div>
+          {spanishReady ? (
+            <div className="grid gap-4 md:grid-cols-2 md:items-start">
+              <div>
+                <span className={label} style={labelStyle}>English · {confirmedEn} {confirmedEn === 1 ? 'person' : 'people'}</span>
+                <div className="rounded-lg border px-3 py-2 text-xs whitespace-pre-line" style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-low)', color: 'var(--color-on-surface)' }}>
+                  <span className="block font-bold">Text as it will read:</span>{previewText}
+                </div>
+              </div>
+              <div className="grid gap-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className={label} style={{ ...labelStyle, marginBottom: 0 }}>Español · {confirmedEs} {confirmedEs === 1 ? 'person' : 'people'}</span>
+                  <button type="button" className="outline-button text-xs" onClick={() => void onPreview(undefined, { retranslate: true })} disabled={busy !== null || photos.length === 0} title="Translate the Spanish again from the English (replaces your corrections)">
+                    {busy === 'translate' ? 'Translating…' : 'Translate again'}
+                  </button>
+                </div>
+                {spanishNote && (
+                  <p className="rounded-lg px-3 py-2 text-xs" style={{ background: spanishNote.ok ? 'color-mix(in srgb, var(--color-primary) 8%, transparent)' : '#fff4e5', color: spanishNote.ok ? 'var(--color-primary)' : '#8a5a00' }}>{spanishNote.text}</p>
+                )}
+                <label className="block">
+                  <span className={label} style={labelStyle}>Artículo</span>
+                  <input className="form-field w-full" value={titleEs} maxLength={DEAL_TITLE_MAX} onChange={(e) => setTitleEs(e.target.value)} placeholder={title || 'Filled in when you press Preview'} />
+                </label>
+                <label className="block">
+                  <span className={label} style={labelStyle}>Medida <span className="normal-case tracking-normal font-semibold">optional</span></span>
+                  <input className="form-field w-full" value={sizeEs} maxLength={DEAL_SIZE_MAX} onChange={(e) => setSizeEs(e.target.value)} placeholder={size || '—'} />
+                </label>
+                <label className="block">
+                  <span className={label} style={labelStyle}>Descripción</span>
+                  <textarea className="form-field w-full min-h-[90px]" value={descriptionEs} maxLength={DEAL_DESCRIPTION_MAX} onChange={(e) => setDescriptionEs(e.target.value)} placeholder={description ? 'Filled in when you press Preview' : '—'} />
+                </label>
+                <label className="block">
+                  <span className={label} style={labelStyle}>Mensaje final</span>
+                  <textarea className="form-field w-full min-h-[64px]" value={messageEs} maxLength={DEAL_MESSAGE_MAX} onChange={(e) => setMessageEs(e.target.value)} placeholder="Filled in when you press Preview" />
+                </label>
+                <span className="block text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>Translated when you press Preview. Your corrections are kept; &quot;Translate again&quot; redoes it from the English. Metal, purity and the labels are built in, never machine-translated. An empty box uses the English words.</span>
+                <div className="rounded-lg border px-3 py-2 text-xs whitespace-pre-line" style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-low)', color: 'var(--color-on-surface)' }}>
+                  <span className="block font-bold">Texto como se leerá:</span>{previewTextEs}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-lg border px-3 py-2 text-xs whitespace-pre-line" style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-low)', color: 'var(--color-on-surface)' }}>
+              <span className="block font-bold">Text as it will read:</span>{previewText}
+            </div>
+          )}
 
           <div>
             <span className={label} style={labelStyle}>Pictures as they will be sent{pictures ? ` · ${pictures.length === 1 ? '1 picture' : `${pictures.length} pictures`} · ${formatPictureBytes(pictures.reduce((sum, picture) => sum + picture.bytes, 0))}${pictures.length > 1 ? ' in all' : ''}` : ''}</span>
@@ -478,15 +590,31 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
             ) : (
               <div className="rounded-lg border border-dashed p-6 text-center text-xs" style={{ borderColor: 'var(--color-outline-variant)', color: 'var(--color-on-surface-variant)' }}>Preview to render</div>
             )}
+            {picturesEs && picturesEs.length > 0 && (
+              <div className="mt-3">
+                <span className={label} style={labelStyle}>Spanish pictures · {picturesEs.length === 1 ? '1 picture' : `${picturesEs.length} pictures`} · {formatPictureBytes(picturesEs.reduce((sum, picture) => sum + picture.bytes, 0))}</span>
+                <div className="flex flex-wrap gap-2">
+                  {picturesEs.map((picture, index) => (
+                    // eslint-disable-next-line @next/next/no-img-element -- Supabase Storage pictures, as the English ones above.
+                    <img key={picture.url} src={picture.url} alt={index === 0 ? 'Spanish main picture preview' : `Spanish detail shot ${index} preview`} className="h-28 w-auto rounded-lg border object-cover" style={{ borderColor: 'var(--color-outline-variant)' }} />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-wrap gap-2">
             <button type="submit" className="outline-button text-xs" disabled={busy !== null}>{busy === 'preview' ? 'Rendering…' : 'Preview'}</button>
-            <button type="button" className="outline-button text-xs" onClick={onTest} disabled={busy !== null || !configured || !pictures} title={configured ? '' : 'Twilio is not configured yet'}>
+            <button type="button" className="outline-button text-xs" onClick={() => void onTest('en')} disabled={busy !== null || !configured || !pictures} title={configured ? '' : 'Twilio is not configured yet'}>
               {busy === 'test' ? 'Sending…' : `Send a test to ${formatUsPhone(forwardTo)}`}
             </button>
+            {spanishReady && (
+              <button type="button" className="outline-button text-xs" onClick={() => void onTest('es')} disabled={busy !== null || !configured || !pictures} title={configured ? 'The Spanish version to your cell' : 'Twilio is not configured yet'}>
+                {busy === 'test-es' ? 'Sending…' : 'Test in Español'}
+              </button>
+            )}
             <button type="button" className="gold-button text-xs" onClick={onSend} disabled={busy !== null || !configured || !pictures || confirmed === 0}>
-              {busy === 'send' ? 'Sending…' : `Send to ${confirmed}`}
+              {busy === 'send' ? 'Sending…' : spanishReady && confirmedEs > 0 ? `Send to ${confirmed} · ${confirmedEn} English · ${confirmedEs} Español` : `Send to ${confirmed}`}
             </button>
           </div>
         </form>
@@ -558,6 +686,12 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
                     <span className={label} style={labelStyle}>Auto-reply to late responders</span>
                     <input className="form-field w-full" value={soldReply} onChange={(e) => setSoldReply(e.target.value)} maxLength={200} />
                   </label>
+                  {'sold_reply_text_es' in detail.deal && (
+                    <label className="block">
+                      <span className={label} style={labelStyle}>Auto-reply in Spanish (Spanish subscribers)</span>
+                      <input className="form-field w-full" value={soldReplyEs} onChange={(e) => setSoldReplyEs(e.target.value)} maxLength={200} />
+                    </label>
+                  )}
                   <div className="flex flex-wrap gap-2">
                     {detail.deal.status === 'sold' ? (
                       <>

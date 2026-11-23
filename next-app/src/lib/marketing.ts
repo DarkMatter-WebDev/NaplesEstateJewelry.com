@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createServiceClient } from '@/lib/supabase/service';
 import { withMarketingFooter } from '@/lib/marketing-email-html';
 import { addressOneLine } from '@/lib/business-location';
+import { loadLatestOrderLanguageByEmail } from '@/lib/order-language-server';
 
 export type AudienceScope = 'subscribers' | 'accounts' | 'buyers' | 'all';
 export type MarketingSenderProfile = 'no_reply' | 'chris';
@@ -24,6 +25,12 @@ export type MarketingRecipient = {
   subscribedAt: string | null;
   /** `profiles.created_at` — when the site account was made (null when no account matched). */
   accountCreatedAt: string | null;
+  /**
+   * The language their emails go out in (2026-11-22): 'es' when their newsletter
+   * row is Spanish OR their latest order was Spanish (owner "4A"); otherwise
+   * English. Optional so hand-built recipients (the test send) stay English.
+   */
+  language?: 'en' | 'es';
 };
 
 export type MarketingSettings = {
@@ -71,18 +78,20 @@ export function combineSource(existing: string, incoming: 'subscriber' | 'accoun
 export async function buildMarketingAudience(scope: AudienceScope = 'all', audienceClient?: SupabaseClient) {
   const supabase = audienceClient ?? createServiceClient();
   const byEmail = new Map<string, MarketingRecipient>();
+  // Newsletter rows saved as Spanish (`homepage_subscribers.locale`).
+  const spanishSubscribers = new Set<string>();
 
   if (scope === 'subscribers' || scope === 'all') {
     let { data, error } = await supabase
       .from('homepage_subscribers')
-      .select('email, full_name, source, unsubscribe_token, unsubscribed_at, subscribed_at')
+      .select('email, full_name, source, unsubscribe_token, unsubscribed_at, subscribed_at, locale')
       .is('unsubscribed_at', null);
 
     if (error?.code === '42703') {
       const fallback = await supabase
         .from('homepage_subscribers')
         .select('email, full_name, source, unsubscribe_token');
-      data = fallback.data?.map((row) => ({ ...row, unsubscribed_at: null, subscribed_at: null })) ?? null;
+      data = fallback.data?.map((row) => ({ ...row, unsubscribed_at: null, subscribed_at: null, locale: null })) ?? null;
       error = fallback.error;
     }
 
@@ -90,7 +99,7 @@ export async function buildMarketingAudience(scope: AudienceScope = 'all', audie
       const fallback = await supabase
         .from('homepage_subscribers')
         .select('email, full_name');
-      data = fallback.data?.map((row) => ({ ...row, source: null, unsubscribe_token: null, unsubscribed_at: null, subscribed_at: null })) ?? null;
+      data = fallback.data?.map((row) => ({ ...row, source: null, unsubscribe_token: null, unsubscribed_at: null, subscribed_at: null, locale: null })) ?? null;
       error = fallback.error;
     }
 
@@ -99,6 +108,7 @@ export async function buildMarketingAudience(scope: AudienceScope = 'all', audie
     for (const row of data ?? []) {
       const email = normalizeEmail(row.email);
       if (!isValidEmail(email)) continue;
+      if ((row as { locale?: unknown }).locale === 'es') spanishSubscribers.add(email);
       byEmail.set(email, {
         email,
         name: row.full_name ?? null,
@@ -166,7 +176,31 @@ export async function buildMarketingAudience(scope: AudienceScope = 'all', audie
     }
   }
 
+  // Each recipient's language: Spanish newsletter row, or Spanish latest order (4A).
+  const orderLanguages = byEmail.size > 0 ? await loadLatestOrderLanguageByEmail(supabase) : new Map<string, 'en' | 'es'>();
+  for (const recipient of byEmail.values()) {
+    recipient.language = recipientLanguage({
+      subscriberSpanish: spanishSubscribers.has(recipient.email),
+      latestOrderLanguage: orderLanguages.get(recipient.email) ?? null,
+    });
+  }
+
   return [...byEmail.values()].sort((a, b) => a.email.localeCompare(b.email));
+}
+
+/**
+ * A recipient's email language (owner, 2026-11-22, "4A"): Spanish when they
+ * joined the newsletter in Spanish (or were switched to Spanish in Admin →
+ * Subscribers), or when their latest order was Spanish. Pure, for tests.
+ */
+export function recipientLanguage(input: { subscriberSpanish: boolean; latestOrderLanguage: 'en' | 'es' | null }): 'en' | 'es' {
+  return input.subscriberSpanish || input.latestOrderLanguage === 'es' ? 'es' : 'en';
+}
+
+/** Recipients split by language, for the composer's "38 English · 3 Español". */
+export function countByLanguage(recipients: Pick<MarketingRecipient, 'language'>[]): { en: number; es: number } {
+  const es = recipients.filter((recipient) => recipient.language === 'es').length;
+  return { en: recipients.length - es, es };
 }
 
 /** One line of Admin → Subscribers: an email recipient, a text-alert sign-up, or both. */
@@ -176,6 +210,8 @@ export type SubscriberDirectoryRow = MarketingRecipient & {
   /** E.164 mobile number when text alerts were requested. */
   phone: string | null;
   smsStatus: 'pending' | 'confirmed' | 'stopped' | null;
+  /** The newsletter row's own language (`homepage_subscribers.locale`) — what Edit's Language switch shows; null for account- or buyer-only lines. */
+  subscriberLanguage: 'en' | 'es' | null;
 };
 
 /**
@@ -191,13 +227,13 @@ export type SubscriberDirectoryRow = MarketingRecipient & {
 export async function buildSubscriberDirectory(audienceClient?: SupabaseClient): Promise<SubscriberDirectoryRow[]> {
   const supabase = audienceClient ?? createServiceClient();
   const audience = await buildMarketingAudience('all', supabase);
-  const rows: SubscriberDirectoryRow[] = audience.map((recipient) => ({ ...recipient, subscriberId: null, phone: null, smsStatus: null }));
+  const rows: SubscriberDirectoryRow[] = audience.map((recipient) => ({ ...recipient, subscriberId: null, phone: null, smsStatus: null, subscriberLanguage: null }));
 
   // Every newsletter row (not only those with a number) so each line knows
   // its row id — Edit and Combine work by id since 2026-11-02.
   const { data, error } = await supabase
     .from('homepage_subscribers')
-    .select('id, email, full_name, source, subscribed_at, phone_e164, sms_status');
+    .select('id, email, full_name, source, subscribed_at, phone_e164, sms_status, locale');
 
   if (error?.code === '42703') return rows;
   if (error) throw new Error(`Could not load text-alert subscribers. ${error.message}`);
@@ -210,8 +246,12 @@ export async function buildSubscriberDirectory(audienceClient?: SupabaseClient):
       : null;
     const email = normalizeEmail(row.email);
     const existing = email ? byEmail.get(email) : undefined;
+    const rowLanguage: 'en' | 'es' = (row as { locale?: unknown }).locale === 'es' ? 'es' : 'en';
     if (existing && (existing.subscriberEmail || phone)) {
       existing.subscriberId = row.id ?? null;
+      existing.subscriberLanguage = rowLanguage;
+      // A Spanish row makes the line Spanish even where the email list had no row of its own.
+      if (rowLanguage === 'es') existing.language = 'es';
       if (phone) {
         existing.phone = phone;
         existing.smsStatus = smsStatus;
@@ -233,6 +273,8 @@ export async function buildSubscriberDirectory(audienceClient?: SupabaseClient):
       accountCreatedAt: null,
       phone,
       smsStatus,
+      language: rowLanguage,
+      subscriberLanguage: rowLanguage,
     });
   }
 
@@ -307,11 +349,27 @@ export function senderForProfile(settings: MarketingSettings, profile: Marketing
   return settings.senderProfiles[profile] ?? settings.senderProfiles.chris;
 }
 
-export function unsubscribeUrlFor(recipient: MarketingRecipient, siteUrl = marketingSiteUrl()) {
+export function unsubscribeUrlFor(recipient: MarketingRecipient, siteUrl = marketingSiteUrl(), language: 'en' | 'es' = 'en') {
   const params = new URLSearchParams();
   if (recipient.unsubscribeToken) params.set('token', recipient.unsubscribeToken);
   params.set('email', recipient.email);
-  return `${siteUrl}/unsubscribe?${params.toString()}`;
+  // A Spanish email's unsubscribe link opens the Spanish page.
+  return `${siteUrl}${language === 'es' ? '/es' : ''}/unsubscribe?${params.toString()}`;
+}
+
+/** The Spanish version of a campaign; null or an empty part = Spanish recipients get the English email (owner "3A"). */
+export type SpanishCampaignVersion = { subject: string; html: string } | null;
+
+/** Which version a recipient gets: Spanish only when they are Spanish AND a full Spanish version exists. */
+export function campaignVersionFor(
+  recipient: Pick<MarketingRecipient, 'language'>,
+  english: { subject: string; html: string },
+  spanish: SpanishCampaignVersion,
+): { subject: string; html: string; language: 'en' | 'es' } {
+  if (recipient.language === 'es' && spanish?.subject.trim() && spanish.html.trim()) {
+    return { subject: spanish.subject, html: spanish.html, language: 'es' };
+  }
+  return { ...english, language: 'en' };
 }
 
 export function stableEventId(campaignId: string, email: string, type: string, url?: string | null) {
@@ -325,6 +383,7 @@ export async function sendDirectMarketingCampaign({
   recipients,
   senderProfile = 'chris',
   settings,
+  spanish = null,
 }: {
   campaignId: string;
   subject: string;
@@ -332,6 +391,8 @@ export async function sendDirectMarketingCampaign({
   recipients: MarketingRecipient[];
   senderProfile?: MarketingSenderProfile;
   settings: MarketingSettings;
+  /** The Spanish version (2026-11-22) for recipients whose language is Spanish. */
+  spanish?: SpanishCampaignVersion;
 }) {
   if (!settings.mailingAddress) throw new Error('A physical mailing address is required before sending marketing email.');
   const apiKey = process.env.EMAIL_PROVIDER_API_KEY || process.env.RESEND_API_KEY;
@@ -343,13 +404,14 @@ export async function sendDirectMarketingCampaign({
   const sender = senderForProfile(settings, senderProfile);
 
   for (const recipient of recipients) {
-    const unsubscribeUrl = unsubscribeUrlFor(recipient, settings.siteUrl);
+    const version = campaignVersionFor(recipient, { subject, html }, spanish);
+    const unsubscribeUrl = unsubscribeUrlFor(recipient, settings.siteUrl, version.language);
     try {
       await resend.emails.send({
         from: sender.fromAddress,
         to: recipient.email,
-        subject,
-        html: withMarketingFooter(html, unsubscribeUrl, settings.mailingAddress),
+        subject: version.subject,
+        html: withMarketingFooter(version.html, unsubscribeUrl, settings.mailingAddress, version.language),
         replyTo: sender.replyTo ?? undefined,
         headers: {
           'List-Unsubscribe': `<${unsubscribeUrl}>`,

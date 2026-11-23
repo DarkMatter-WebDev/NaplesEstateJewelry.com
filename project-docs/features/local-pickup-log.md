@@ -33,9 +33,12 @@ checkout, Remote sale set to pickup. Shipped orders look as before.
      else is picking up** button — it never switches by itself.
    - **ID type**, **ID last 4**.
    - **How will they sign?** With a finger on this iPad / iPhone, or on paper.
-   - **Email the customer their pickup copy** (ticked when the order has an
-     email; greyed out when not). Goes to the BUYER even when someone else
-     picks up. First log only.
+   - **Email the pickup copy** (2026-11-22): **To the email on the order**
+     (ticked when the order has an email; greyed out when not — goes to the
+     BUYER even when someone else picks up) and/or **To a different email**
+     (type the address the customer asks for; used for this email only, never
+     saved onto the order). Both ticked = a separate email to each. A shaded
+     line says where it will go. First log only.
 2. Finger: **Customer Signs Here →** opens the full-screen signing screen.
    Hand them the device: items (no prices), the statement, the signing box,
    Printed name. **Clear** wipes the box, **Cancel** saves nothing, **Done**

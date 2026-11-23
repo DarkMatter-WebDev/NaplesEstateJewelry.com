@@ -1265,6 +1265,7 @@ export default function OrderDetailPanel({
                 pickupHours={pickupHours}
                 pickupHoursEs={pickupHoursEs}
                 language={customerLanguage}
+                fulfillmentStatus={order.fulfillment_status}
                 onPickedUp={() => setOrder((current) => ({ ...current, fulfillment_status: 'picked_up' }))}
                 onEmailSent={(entry) => recordSentEmail(entry)}
               />

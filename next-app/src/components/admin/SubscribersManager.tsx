@@ -25,7 +25,40 @@ export type { SubscriberRow } from '@/lib/subscriber-sort';
 
 // Add Subscriber takes a mobile number too since 2026-11-02 (customers who ask
 // the shop to add them to text deals). The tick box is never pre-ticked.
-const EMPTY_ADD_FORM = { email: '', name: '', phone: '', smsConsent: false };
+// Language (2026-11-22): their texts and emails go out in it; Add starts on English.
+const EMPTY_ADD_FORM = { email: '', name: '', phone: '', smsConsent: false, language: 'en' as 'en' | 'es' };
+
+/**
+ * English | Español — the subscriber's language. Changing it sends nothing by
+ * itself; the next text or email simply goes out in it.
+ */
+function LanguageSwitch({ value, onChange, name }: { value: 'en' | 'es'; onChange: (value: 'en' | 'es') => void; name: string }) {
+  return (
+    <div role="radiogroup" aria-label="Language" className="inline-grid grid-flow-col overflow-hidden rounded-full border" style={{ borderColor: 'var(--color-outline-variant)' }}>
+      {(['en', 'es'] as const).map((option) => {
+        const on = value === option;
+        return (
+          <button
+            key={option}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            name={name}
+            onClick={() => onChange(option)}
+            className="px-4 py-2 text-[0.62rem] font-extrabold uppercase tracking-[0.14em] transition-colors hover:bg-[color-mix(in_srgb,var(--color-primary)_10%,white)] focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
+            style={{
+              fontFamily: 'var(--font-label)',
+              background: on ? 'var(--color-on-surface)' : undefined,
+              color: on ? '#e9c349' : 'var(--color-primary)',
+            }}
+          >
+            {option === 'en' ? 'English' : 'Español'}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 type AddResult = {
   phoneSaved?: boolean;
@@ -64,6 +97,8 @@ type SavedRow = {
   phone: string | null;
   smsStatus: SmsStatus | null;
   subscribedAt: string | null;
+  /** Absent on a combine answer. */
+  language?: 'en' | 'es';
 };
 
 /** The other entry that already has the typed email or number, and whether the two can become one. */
@@ -75,7 +110,8 @@ function editChanges(row: SubscriberRow, form: typeof EMPTY_ADD_FORM) {
   const phone = form.phone.trim();
   const emailChanged = email !== (row.email || '');
   const phoneChanged = phone ? normalizeUsPhone(phone) !== row.phone : Boolean(row.phone);
-  return { email, phone, emailChanged, phoneChanged, newPhone: Boolean(phone) && phoneChanged };
+  const languageChanged = form.language !== (row.subscriberLanguage ?? 'en');
+  return { email, phone, emailChanged, phoneChanged, newPhone: Boolean(phone) && phoneChanged, languageChanged };
 }
 
 // Column headers; a `sortKey` makes the header a sort button (lib/subscriber-sort.ts).
@@ -190,7 +226,7 @@ function EditBox({
   onCancel: () => void;
   onDismissOffer: () => void;
 }) {
-  const { newPhone } = editChanges(row, form);
+  const { newPhone, languageChanged } = editChanges(row, form);
   const other = combineOffer?.other;
   // What the one entry will hold: each field from whichever entry has it.
   const combinedName = form.name.trim() || row.name || other?.name || '';
@@ -206,7 +242,7 @@ function EditBox({
         if (!combineOffer?.canCombine) onSave();
       }}
     >
-      <div className="grid gap-3 md:grid-cols-[1fr_1.2fr_1fr] md:items-end">
+      <div className="grid gap-3 md:grid-cols-[1fr_1.2fr_1fr_auto] md:items-end">
         <label>
           <span className="form-label">Name</span>
           <input className="form-field mt-2 w-full" value={form.name} onChange={(event) => onChange({ name: event.target.value })} />
@@ -233,7 +269,22 @@ function EditBox({
             placeholder="(239) 555-0123"
           />
         </label>
+        <div>
+          <span className="form-label">Language</span>
+          <div className="mt-2">
+            <LanguageSwitch name={`language-${row.subscriberId ?? 'row'}`} value={form.language} onChange={(language) => onChange({ language })} />
+          </div>
+        </div>
       </div>
+
+      {languageChanged && !combineOffer && (
+        <p className="mt-3 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+          {form.language === 'es'
+            ? 'Texts and emails go to them in Spanish from now on.'
+            : 'Texts and emails go to them in English from now on.'}{' '}
+          Switching the language sends nothing by itself.
+        </p>
+      )}
 
       {newPhone && !combineOffer && (
         <label
@@ -353,7 +404,7 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
 
   function beginEdit(row: SubscriberRow) {
     setEditing(row);
-    setEditForm({ name: row.name ?? '', email: row.email, phone: formatUsPhone(row.phone), smsConsent: false });
+    setEditForm({ name: row.name ?? '', email: row.email, phone: formatUsPhone(row.phone), smsConsent: false, language: row.subscriberLanguage ?? 'en' });
     setEditNotice(null);
     setCombineOffer(null);
     setNotice(null);
@@ -401,6 +452,7 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
           fullName: trimmedName,
           phone: typedPhone,
           smsConsent: Boolean(typedPhone) && addForm.smsConsent,
+          language: addForm.language,
         }),
       });
       const data = await res.json().catch(() => null);
@@ -428,6 +480,8 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
               subscribedAt: new Date().toISOString(),
               phone: phone ?? row.phone,
               smsStatus: phone ? smsStatus : row.smsStatus,
+              subscriberLanguage: addForm.language,
+              language: addForm.language === 'es' ? 'es' : row.language,
             };
           });
         }
@@ -443,6 +497,8 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
             accountCreatedAt: null,
             phone,
             smsStatus,
+            language: addForm.language,
+            subscriberLanguage: addForm.language,
           },
           ...current,
         ];
@@ -492,6 +548,7 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
           fullName: editForm.name.trim(),
           ...(changes.emailChanged ? { email: changes.email } : {}),
           ...(changes.phoneChanged ? { phone: changes.phone, smsConsent: editForm.smsConsent } : {}),
+          ...(changes.languageChanged ? { language: editForm.language } : {}),
           ...(combineWithId ? { combineWithId } : {}),
         }),
       });
@@ -514,6 +571,9 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
               subscriberEmail: saved.email,
               phone: saved.phone,
               smsStatus: saved.smsStatus,
+              ...(saved.language
+                ? { subscriberLanguage: saved.language, language: saved.language === 'es' ? 'es' as const : item.language }
+                : {}),
             }
           : item)));
       cancelEdit();
@@ -523,6 +583,8 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
         setNotice({ text: `Combined into one entry: ${who}.${saved.phone && status ? ` ${formatUsPhone(saved.phone)} stays ${status}.` : ''}`, ok: true });
       } else if (changes.newPhone) {
         setNotice(addedNotice({ who, typedPhone: changes.phone, result: { phoneSaved: true, ...data, smsStatus: saved.smsStatus }, verb: 'updated' }));
+      } else if (changes.languageChanged) {
+        setNotice({ text: `Subscriber updated. Texts and emails go to ${who} in ${editForm.language === 'es' ? 'Spanish' : 'English'} from now on.`, ok: true });
       } else {
         setNotice({ text: 'Subscriber updated.', ok: true });
       }
@@ -634,7 +696,7 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
             Add a customer who asked to join, by email, text deals, or both.
           </p>
         </div>
-        <div className="grid gap-3 md:grid-cols-[1fr_1.2fr_1fr] md:items-end">
+        <div className="grid gap-3 md:grid-cols-[1fr_1.2fr_1fr_auto] md:items-end">
           <label>
             <span className="form-label">Name</span>
             <input
@@ -666,6 +728,12 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
               placeholder="(239) 555-0123"
             />
           </label>
+          <div>
+            <span className="form-label">Language</span>
+            <div className="mt-2">
+              <LanguageSwitch name="add-language" value={addForm.language} onChange={(language) => setAddForm((current) => ({ ...current, language }))} />
+            </div>
+          </div>
         </div>
         <label
           className="mt-3 flex cursor-pointer items-start gap-3 rounded-xl border px-3.5 py-3"
@@ -794,6 +862,16 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
                       <Pill color="var(--color-on-surface-variant)">{channel}</Pill>
                       {statusLabel && (
                         <Pill color={STATUS_COLORS[subscriber.smsStatus ?? ''] ?? 'var(--color-on-surface-variant)'}>{statusLabel}</Pill>
+                      )}
+                      {/* Spanish (2026-11-22): their texts and emails go out in Spanish. */}
+                      {subscriber.language === 'es' && (
+                        <span
+                          className="inline-block rounded-full px-2 py-0.5 text-[0.58rem] font-bold uppercase tracking-[0.12em]"
+                          style={{ background: 'var(--color-on-surface)', color: '#e9c349', fontFamily: 'var(--font-label)' }}
+                          title="Texts and emails go to them in Spanish"
+                        >
+                          ES
+                        </span>
                       )}
                       {subscriber.phone && subscriber.smsStatus === 'pending' && (
                         <button

@@ -12,9 +12,10 @@ import {
   ORDER_PICKUP_TABLE,
   orderPickupIdPhotoPath,
   orderPickupSignaturePath,
+  pickupEmailRecipients,
   type OrderPickupRow,
 } from '@/lib/order-pickup';
-import { loadPickupOrder, sendPickupEmail } from '@/lib/order-pickup-server';
+import { loadPickupOrder, sendPickupEmail, type PickupEmailEntry } from '@/lib/order-pickup-server';
 import { encodeProductImageToWebp, PRODUCT_IMAGE_MAX_UPLOAD_BYTES, toOwnedBuffer } from '@/lib/product-image-encode';
 
 /**
@@ -204,22 +205,26 @@ export async function POST(req: Request, context: Context) {
     else fulfillmentStatus = 'picked_up';
   }
 
-  let email = null;
+  // The order's email, a different address, or both (owner, 2026-11-22) — first log only.
+  let emails: PickupEmailEntry[] = [];
   let emailError: string | null = null;
-  if (!current && details.email) {
+  const recipients = current ? [] : pickupEmailRecipients(order.customer_email, details.email, details.email_other);
+  if (recipients.length > 0) {
     const sent = await sendPickupEmail({
       supabase: admin.supabase,
       order,
       pickup,
       sentBy: { id: admin.user.id, email: admin.user.email ?? null },
+      recipients,
     });
     if (sent.ok) {
       pickup = sent.pickup;
-      email = sent.email;
+      emails = sent.emails;
+      if (sent.failed.length) emailError = `It did not go to ${sent.failed.join(' or ')}.`;
     } else {
       emailError = sent.error;
     }
   }
 
-  return NextResponse.json({ pickup, fulfillmentStatus, email, emailError });
+  return NextResponse.json({ pickup, fulfillmentStatus, email: emails[0] ?? null, emails, emailError });
 }

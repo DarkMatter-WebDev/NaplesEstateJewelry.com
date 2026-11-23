@@ -2,7 +2,7 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createServiceClient } from '@/lib/supabase/service';
 import { brandMediaUrl, twilioConfigured } from './config';
-import { confirmationText } from './messages';
+import { confirmationText, textLanguage } from './messages';
 import { sendTwilioMessage, TwilioError } from './twilio';
 
 /**
@@ -38,6 +38,8 @@ type SubscriberRow = {
   phone_e164: string | null;
   sms_status: string | null;
   sms_confirmation_attempts: number | null;
+  /** 'es' = the Spanish confirmation (2026-11-22). */
+  locale: string | null;
 };
 
 async function logSystemMessage(
@@ -56,7 +58,7 @@ export async function sendConfirmation(phone: string, options: { force?: boolean
   const service = createServiceClient();
   const { data: subscriber } = await service
     .from('homepage_subscribers')
-    .select('id, phone_e164, sms_status, sms_confirmation_attempts')
+    .select('id, phone_e164, sms_status, sms_confirmation_attempts, locale')
     .eq('phone_e164', phone)
     .maybeSingle<SubscriberRow>();
   if (!subscriber?.phone_e164 || subscriber.sms_status !== 'pending') return { outcome: 'not_pending' };
@@ -74,7 +76,7 @@ export async function sendConfirmation(phone: string, options: { force?: boolean
 
   try {
     // MMS on purpose: see brandMediaUrl() — one thread on the customer's phone.
-    const sent = await sendTwilioMessage({ to: subscriber.phone_e164, body: confirmationText(), mediaUrl: brandMediaUrl() });
+    const sent = await sendTwilioMessage({ to: subscriber.phone_e164, body: confirmationText(textLanguage(subscriber.locale)), mediaUrl: brandMediaUrl() });
     await service
       .from('homepage_subscribers')
       .update({ sms_confirmation_sent_at: new Date().toISOString() })

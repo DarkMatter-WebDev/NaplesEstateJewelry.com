@@ -75,7 +75,8 @@ export default function InquiryForm({ locale, itemName, submitted: initialSubmit
         // The ad click (if any) rides along so the inquiry says where it came
         // from. ⛔ No lead conversion is fired here: this form is a BUYER asking
         // about a listing, and the ads are for sellers (lib/ads-tracking.ts).
-        body: JSON.stringify({ item: itemName, name, phone, email, message, preferred_contact: preferredContact, 'bot-field': botField, ...adClickFormValues() }),
+        // `locale`: the customer's confirmation email comes back in this page's language.
+        body: JSON.stringify({ item: itemName, name, phone, email, message, preferred_contact: preferredContact, locale: isEs ? 'es' : 'en', 'bot-field': botField, ...adClickFormValues() }),
       });
       if (!res.ok) throw new LeadSendError(res.status);
       setDone(true);

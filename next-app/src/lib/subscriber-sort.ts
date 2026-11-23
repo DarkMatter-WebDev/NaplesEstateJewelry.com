@@ -28,6 +28,10 @@ export type SubscriberRow = {
   phone: string | null;
   /** Where the number stands: waiting for the YES reply, confirmed, or stopped. */
   smsStatus: SmsStatus | null;
+  /** The language their texts and emails go out in (2026-11-22) — 'es' shows an ES label. */
+  language?: 'en' | 'es';
+  /** The newsletter row's own setting — what Edit's Language switch starts on. */
+  subscriberLanguage?: 'en' | 'es' | null;
 };
 
 export type SubscriberSortKey = 'name' | 'email' | 'phone' | 'alerts' | 'source' | 'subscribed';

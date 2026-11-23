@@ -42,6 +42,8 @@ export async function POST(req: Request) {
   const rawPhone = typeof body?.phone === 'string' ? body.phone.trim() : '';
   const phone = normalizeUsPhone(rawPhone);
   const smsConsent = body?.smsConsent === true;
+  // Their texts and emails go out in this language (2026-11-22); English unless switched.
+  const language = body?.language === 'es' ? 'es' : 'en';
 
   if (email && !isValidEmail(email)) {
     return NextResponse.json({ error: 'A valid subscriber email is required.' }, { status: 400 });
@@ -56,7 +58,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `Tick "${ADMIN_SMS_CONSENT_LABEL}" to add the number.` }, { status: 400 });
   }
 
-  if (phone) return addTextSubscriber({ email: email || null, fullName, phone });
+  if (phone) return addTextSubscriber({ email: email || null, fullName, phone, language });
 
   try {
     const supabase = createServiceClient();
@@ -66,7 +68,7 @@ export async function POST(req: Request) {
         email,
         full_name: fullName || null,
         source: 'admin_manual',
-        locale: 'en',
+        locale: language,
         subscribed: true,
         subscribed_at: new Date().toISOString(),
         consent_at: new Date().toISOString(),
@@ -84,7 +86,7 @@ export async function POST(req: Request) {
   }
 }
 
-async function addTextSubscriber(input: { email: string | null; fullName: string; phone: string }) {
+async function addTextSubscriber(input: { email: string | null; fullName: string; phone: string; language: 'en' | 'es' }) {
   try {
     const supabase = createServiceClient();
     const { data: existing, error: lookupError } = await supabase
@@ -100,7 +102,8 @@ async function addTextSubscriber(input: { email: string | null; fullName: string
     const { data, error: rpcError } = await supabase.rpc('subscribe_homepage_v2', {
       subscriber_email: input.email,
       subscriber_name: input.fullName || null,
-      subscriber_locale: 'en',
+      // The "reply YES" text below goes out in this language.
+      subscriber_locale: input.language,
       subscriber_phone: input.phone,
       subscriber_sms_consent: true,
       subscriber_sms_consent_text: ADMIN_SMS_CONSENT_TEXT,
@@ -150,9 +153,10 @@ type StoredRow = {
   phone_e164: string | null;
   sms_status: SmsStatus | null;
   subscribed_at: string | null;
+  locale: string | null;
 };
 
-const STORED_COLUMNS = 'id, email, full_name, phone_e164, sms_status, subscribed_at';
+const STORED_COLUMNS = 'id, email, full_name, phone_e164, sms_status, subscribed_at, locale';
 
 /** Supabase errors are plain objects, not `Error`s; this keeps their message (e.g. the combine function's refusals). */
 function errorText(err: unknown, fallback: string) {
@@ -168,6 +172,7 @@ function rowView(row: StoredRow) {
     phone: row.phone_e164,
     smsStatus: row.sms_status,
     subscribedAt: row.subscribed_at,
+    language: row.locale === 'es' ? 'es' : 'en',
   };
 }
 
@@ -199,6 +204,8 @@ export async function PATCH(req: Request) {
   const rawPhone = phoneChanged ? String(body.phone).trim() : '';
   const phone = rawPhone ? normalizeUsPhone(rawPhone) : null;
   const combineWithId = typeof body?.combineWithId === 'string' ? body.combineWithId : null;
+  // The Language switch (2026-11-22); absent = leave as is. Changing it sends nothing.
+  const language = body?.language === 'es' || body?.language === 'en' ? (body.language as 'en' | 'es') : null;
 
   if (!id) return NextResponse.json({ error: 'Which entry? Reload the page and try again.' }, { status: 400 });
   if (emailChanged && email && !isValidEmail(email)) {
@@ -295,6 +302,7 @@ export async function PATCH(req: Request) {
 
     const now = new Date().toISOString();
     const update: Record<string, unknown> = { full_name: fullName || null, updated_at: now };
+    if (language) update.locale = language;
     if (emailChanged) {
       update.email = nextEmail;
       // A row that had no email joins the email list now.

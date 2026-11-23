@@ -2,7 +2,17 @@ import 'server-only';
 import { createServiceClient } from '@/lib/supabase/service';
 import { normalizeUsPhone } from '@/lib/subscriber-phone';
 import { brandMediaUrl, twilioConfig } from './config';
-import { classifyInbound, DEFAULT_SOLD_REPLY, forwardText, optInReplyText, twiml } from './messages';
+import {
+  classifyInbound,
+  forwardText,
+  helpText,
+  isSpanishKeyword,
+  optInReplyText,
+  soldReplyFor,
+  spanishOptOutText,
+  textLanguage,
+  twiml,
+} from './messages';
 import { sendTwilioMessage } from './twilio';
 
 /**
@@ -21,6 +31,11 @@ import { sendTwilioMessage } from './twilio';
  *
  * Every inbound is keyed by Twilio's MessageSid, so a retried webhook is
  * inert.
+ *
+ * Spanish (2026-11-22): a Spanish subscriber's YES reply and late "sold"
+ * line are in Spanish, and their forwards are tagged "(ES)". The Spanish stop
+ * words (ALTO, PARAR, CANCELAR…) and AYUDA are classified as stop / help like
+ * the English ones — but Twilio does not answer those, so the site does, once.
  */
 export type InboundParams = {
   MessageSid?: string;
@@ -29,8 +44,8 @@ export type InboundParams = {
   NumMedia?: string;
 };
 
-type Subscriber = { id: string; full_name: string | null; sms_status: string | null; sms_last_deal_id: string | null };
-type Deal = { id: string; title: string; status: string; sold_at: string | null; sold_reply_text: string | null };
+type Subscriber = { id: string; full_name: string | null; sms_status: string | null; sms_last_deal_id: string | null; locale: string | null };
+type Deal = { id: string; title: string; status: string; sold_at: string | null; sold_reply_text: string | null; sold_reply_text_es?: string | null };
 
 export async function handleInbound(params: InboundParams): Promise<{ twiml: string; kind: string }> {
   const service = createServiceClient();
@@ -44,9 +59,12 @@ export async function handleInbound(params: InboundParams): Promise<{ twiml: str
 
   const { data: subscriber } = await service
     .from('homepage_subscribers')
-    .select('id, full_name, sms_status, sms_last_deal_id')
+    .select('id, full_name, sms_status, sms_last_deal_id, locale')
     .eq('phone_e164', from)
     .maybeSingle<Subscriber>();
+  const language = textLanguage(subscriber?.locale);
+  // A Spanish keyword is Spanish whatever the row says.
+  const spanishKeyword = isSpanishKeyword(body);
 
   const dealId = kind === 'reply' ? subscriber?.sms_last_deal_id ?? null : null;
 
@@ -77,7 +95,7 @@ export async function handleInbound(params: InboundParams): Promise<{ twiml: str
         .from('homepage_subscribers')
         .update({ sms_status: 'confirmed', sms_confirmed_at: now, sms_stopped_at: null, updated_at: now })
         .eq('id', subscriber.id);
-      return { twiml: twiml(optInReplyText(), brandMediaUrl()), kind };
+      return { twiml: twiml(optInReplyText(language), brandMediaUrl()), kind };
     }
     // Not on the list: they never signed up on the site, so there is no consent record to confirm.
     return { twiml: twiml(), kind: 'confirm_unknown' };
@@ -90,18 +108,20 @@ export async function handleInbound(params: InboundParams): Promise<{ twiml: str
         .update({ sms_status: 'stopped', sms_stopped_at: now, updated_at: now })
         .eq('id', subscriber.id);
     }
-    return { twiml: twiml(), kind };
+    // Twilio answers the English STOP words itself; a Spanish one gets our one-line answer.
+    return { twiml: spanishKeyword ? twiml(spanishOptOutText()) : twiml(), kind };
   }
 
-  if (kind === 'help') return { twiml: twiml(), kind };
+  if (kind === 'help') return { twiml: spanishKeyword ? twiml(helpText('es')) : twiml(), kind };
 
   // A reply. Which deal, and is it the first?
   let deal: Deal | null = null;
   let isFirst = false;
   if (dealId) {
+    // `*`: the Spanish "spoken for" line is there only once its SQL has run.
     const { data } = await service
       .from('text_deals')
-      .select('id, title, status, sold_at, sold_reply_text')
+      .select('*')
       .eq('id', dealId)
       .maybeSingle<Deal>();
     deal = data ?? null;
@@ -128,7 +148,7 @@ export async function handleInbound(params: InboundParams): Promise<{ twiml: str
     try {
       const forwarded = await sendTwilioMessage({
         to: config.forwardTo,
-        body: forwardText({ fromPhone: from, name: subscriber?.full_name ?? null, dealTitle: deal?.title ?? null, body, isFirst }),
+        body: forwardText({ fromPhone: from, name: subscriber?.full_name ?? null, dealTitle: deal?.title ?? null, body, isFirst, spanish: language === 'es' }),
       });
       if (inboundId) {
         await service.from('text_inbound').update({ forwarded_at: now, forward_sid: forwarded.sid }).eq('id', inboundId);
@@ -151,7 +171,7 @@ export async function handleInbound(params: InboundParams): Promise<{ twiml: str
       .not('auto_reply_sent_at', 'is', null);
     if ((count ?? 0) === 0) {
       if (inboundId) await service.from('text_inbound').update({ auto_reply_sent_at: now }).eq('id', inboundId);
-      return { twiml: twiml(deal.sold_reply_text || DEFAULT_SOLD_REPLY, brandMediaUrl()), kind: 'reply_sold' };
+      return { twiml: twiml(soldReplyFor(language, deal.sold_reply_text, deal.sold_reply_text_es), brandMediaUrl()), kind: 'reply_sold' };
     }
   }
 

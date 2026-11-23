@@ -92,10 +92,11 @@ describe('the words on file with Twilio', () => {
     // owner forward does not (their own cell, plain text is fine).
     const inbound = readFileSync(join(process.cwd(), 'src', 'lib', 'text-alerts', 'inbound.ts'), 'utf8');
     const confirmations = readFileSync(join(process.cwd(), 'src', 'lib', 'text-alerts', 'confirmations.ts'), 'utf8');
-    expect(inbound).toContain('twiml(optInReplyText(), brandMediaUrl())');
-    expect(inbound).toContain('DEFAULT_SOLD_REPLY, brandMediaUrl())');
+    // In the subscriber's language since 2026-11-22.
+    expect(inbound).toContain('twiml(optInReplyText(language), brandMediaUrl())');
+    expect(inbound).toContain('twiml(soldReplyFor(language, deal.sold_reply_text, deal.sold_reply_text_es), brandMediaUrl())');
     expect(inbound).not.toMatch(/forwardText\([^)]*\)[^;]*mediaUrl/);
-    expect(confirmations).toContain('body: confirmationText(), mediaUrl: brandMediaUrl()');
+    expect(confirmations).toContain('body: confirmationText(textLanguage(subscriber.locale)), mediaUrl: brandMediaUrl()');
     expect(existsSync(join(process.cwd(), 'public', 'assets', 'images', 'branding', 'text-brand-wordmark-v5.jpg'))).toBe(true);
   });
 
@@ -120,8 +121,9 @@ describe('the words on file with Twilio', () => {
     const route = readFileSync(join(process.cwd(), 'src', 'app', 'api', 'admin', 'text-deals', '[id]', 'route.ts'), 'utf8');
     expect(route).toContain('await notifyDealSold(id)');
     const deals = readFileSync(join(process.cwd(), 'src', 'lib', 'text-alerts', 'deals.ts'), 'utf8');
-    expect(deals).toContain("sendOne('deal_winner', winner, winnerText(");
-    expect(deals).toContain("sendOne('deal_sold', phone, notice)");
+    expect(deals).toMatch(/sendOne\(\s*'deal_winner',\s*winner,\s*winnerText\(/);
+    // Each person's "spoken for" line is in their own language (2026-11-22).
+    expect(deals).toContain("sendOne('deal_sold', phone, notices[languageOf(phone)])");
     expect(deals).toContain('const mediaUrl = brandMediaUrl();');
     expect(deals).toContain(".in('kind', ['deal_winner', 'deal_sold'])");
   });
@@ -153,7 +155,8 @@ describe('the words on file with Twilio', () => {
     const route = readFileSync(join(process.cwd(), 'src', 'app', 'api', 'admin', 'text-deals', '[id]', 'route.ts'), 'utf8');
     expect(route).toContain('const soldTo = body.soldToPhone ? normalizeUsPhone(body.soldToPhone) : null;');
     const deals = readFileSync(join(process.cwd(), 'src', 'lib', 'text-alerts', 'deals.ts'), 'utf8');
-    expect(deals).toContain('const winner = deal.sold_to_phone;\n  if (winner) {');
+    expect(deals).toContain('const winner = deal.sold_to_phone;');
+    expect(deals).toMatch(/\n {2}if \(winner\) \{\n\s*const spanish = languageOf\(winner\) === 'es';/);
     expect(deals).toContain('.filter((phone) => phone && phone !== winner)');
   });
 
@@ -287,7 +290,9 @@ describe('the deal form', () => {
     const deals = readFileSync(join(process.cwd(), 'src', 'lib', 'text-alerts', 'deals.ts'), 'utf8');
     expect(deals).toMatch(/export async function buildDealMedia[\s\S]*?const problem = dealReadyProblem\(deal\);\n\s*if \(problem\) throw new Error\(problem\);/);
     expect(deals.match(/dealText\(dealCopy\(deal\)\)/g)).toHaveLength(2);
-    expect(deals).toContain('winnerText({ title: dealLine(deal), price: deal.price_text })');
+    // The Spanish words go through the same layout (2026-11-22).
+    expect(deals.match(/dealText\(dealCopyEs\(deal\), 'es'\)/g)).toHaveLength(2);
+    expect(deals).toContain("winnerText({ title: spanish ? dealLineEs(deal) : dealLine(deal), price: deal.price_text }, spanish ? 'es' : 'en')");
     for (const route of ['route.ts', '[id]/route.ts']) {
       const source = readFileSync(join(process.cwd(), 'src', 'app', 'api', 'admin', 'text-deals', route), 'utf8');
       expect(source).toContain('normalizeDealDraft(body)');

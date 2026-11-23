@@ -103,6 +103,26 @@ export function isPickupOrder(order: { shipping_method?: string | null; payment_
   return !/^in_store_/.test(String(order.payment_method ?? ''));
 }
 
+/**
+ * What the Pickup card says, from BOTH the pickup log and the order's
+ * Fulfillment status (owner, 2026-11-22: "Mark Picked Up" in Fulfillment left
+ * the card at "not picked up yet").
+ *
+ *   waiting        no log, not marked
+ *   marked-no-log  marked Picked Up in Fulfillment, no log (no ID / signature on file)
+ *   logged         log saved, order Picked Up
+ *   log-unmarked   log saved, but Fulfillment was unmarked since — the log stays on file
+ *
+ * The other direction is the server's: saving a log marks the order Picked Up.
+ */
+export type PickupCardStatus = 'waiting' | 'marked-no-log' | 'logged' | 'log-unmarked';
+
+export function pickupCardStatus(hasLog: boolean, fulfillmentStatus: string | null | undefined): PickupCardStatus {
+  const marked = fulfillmentStatus === 'picked_up';
+  if (hasLog) return marked ? 'logged' : 'log-unmarked';
+  return marked ? 'marked-no-log' : 'waiting';
+}
+
 /** The order's own folder in the private bucket — everything in it belongs to that order's pickup. */
 export function orderPickupFolder(orderId: string): string {
   return `order-pickups/${orderId}`;
@@ -141,8 +161,14 @@ export type PickupDetailsInput = {
   signMethod: PickupSignMethod;
   /** The printed name under a finger signature. */
   signedName: string;
-  /** "Email the customer their pickup copy" — honoured on the first log only. */
+  /** "To the email on the order" — honoured on the first log only. */
   email: boolean;
+  /**
+   * "To a different email" (owner, 2026-11-22): the address typed when the
+   * customer asks; '' = box not ticked. Used for this email only — never saved
+   * onto the order. Honoured on the first log only, like `email`.
+   */
+  emailOther: string;
   /** Take the stored ID photo off (Remove on the strip). */
   removePhoto: boolean;
 };
@@ -155,8 +181,32 @@ export type PickupDetails = {
   sign_method: PickupSignMethod;
   signed_name: string | null;
   email: boolean;
+  /** The other address, lower case; null = none. */
+  email_other: string | null;
   removePhoto: boolean;
 };
+
+const EMAIL_PATTERN = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
+
+/** A usable email address, trimmed + lower case; null when it is not one. */
+export function cleanPickupEmail(value: unknown): string | null {
+  const text = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return text.length <= 254 && EMAIL_PATTERN.test(text) ? text : null;
+}
+
+/**
+ * Who gets the pickup copy (owner, 2026-11-22): the order's email when
+ * "To the email on the order" is ticked, the typed address when "To a
+ * different email" is, or both. The same address twice is sent once.
+ */
+export function pickupEmailRecipients(orderEmail: string | null | undefined, sendToOrder: boolean, other: string | null | undefined): string[] {
+  const list: string[] = [];
+  const fromOrder = sendToOrder ? cleanPickupEmail(orderEmail) : null;
+  if (fromOrder) list.push(fromOrder);
+  const typed = cleanPickupEmail(other);
+  if (typed && !list.includes(typed)) list.push(typed);
+  return list;
+}
 
 function collapse(value: unknown): string {
   return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '';
@@ -187,6 +237,10 @@ export function normalizePickupDetails(raw: unknown, buyerName: string | null | 
   const signMethod: PickupSignMethod = input.signMethod === 'digital' ? 'digital' : 'paper';
   const signedName = collapse(input.signedName).slice(0, 120) || null;
 
+  const otherText = typeof input.emailOther === 'string' ? input.emailOther.trim() : '';
+  const emailOther = otherText ? cleanPickupEmail(otherText) : null;
+  if (otherText && !emailOther) return { error: 'The other email address does not look right. Check it, or untick "To a different email".' };
+
   return {
     value: {
       picked_up_by: name,
@@ -196,6 +250,7 @@ export function normalizePickupDetails(raw: unknown, buyerName: string | null | 
       sign_method: signMethod,
       signed_name: signMethod === 'digital' ? signedName ?? name : null,
       email: input.email === true,
+      email_other: emailOther,
       removePhoto: input.removePhoto === true,
     },
   };

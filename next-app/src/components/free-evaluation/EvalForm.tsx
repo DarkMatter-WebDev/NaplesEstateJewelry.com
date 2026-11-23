@@ -80,6 +80,8 @@ export default function EvalForm({ locale, submitted, variant = 'free-evaluation
         return;
       }
       fd.append('source', variant);
+      // The customer's confirmation email comes back in this page's language.
+      fd.append('locale', isEs ? 'es' : 'en');
       // The Google Ads click this visitor arrived with, if any — so the lead
       // says where it came from. Nothing is added for anyone else.
       appendAdClickFields(fd);
