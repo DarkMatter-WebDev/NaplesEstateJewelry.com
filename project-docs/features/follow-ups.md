@@ -94,6 +94,8 @@ for leaving out unhappy customers.
   is given the first name, the language, the item NAMES (prices, weights, sizes
   and "3 ×" cut out first — `cleanItemForAi`) and the owner's note. Never the
   receipt's printed Notes, an amount, an address, ID data, a phone or an email.
+  A cut size takes its "de" / "of" with it and a doubled small word is folded
+  (2026-11-25 (13): cutting only "5mm" had left "Hueco de de Oro").
   Model: `AI_FOLLOW_UP_MODEL` → `AI_TRANSLATE_MODEL` → `AI_MODEL` (Anthropic,
   the same key as the listing assistant; no new env var).
 - **Checks before it is stored** (`checkAiOpening`, `lib/follow-up-opening.ts`):

@@ -1,6 +1,23 @@
 
 # Changelog
 
+## 2026-11-25 (13) — 🔍 The "de de" was OUR item cleaner, not the translation AI — fixed — BUILT + STAGED, not pushed; no SQL
+
+- **Owner:** *"i fixed the mary conversano order typo... the other one was automatically translated to spanish i think… investigate the typo cause further, it wasnt me that typed the spanish version"*.
+- **Found (evidence):** the listing's live Spanish title is correct — `/es/shop/10k-hollow-cuban-link-chain-necklace-01` h1 = *"Collar de Cadena de Eslabón Cubano Hueco de 5mm de Oro de 10K"* (EN: "10K Gold 5mm Hollow Cuban Link Chain Necklace"). The translator (`lib/ai-translate.ts`) passes the model's title through untouched and nothing else rewrites `title_es`. The doubled word came from `cleanItemForAi` (`lib/follow-up-opening.ts`, built 2026-11-25 (1)), which cuts sizes/weights out of the item names before the AI sees them: cutting only "5mm" left "Hueco **de de** Oro". Reproduced in a temporary test (deleted): the same input gave exactly the "What the AI reads" text seen in the View items pop-up; it also turned "diamante de 1.2 ct" into "diamante de".
+- **Fix:** a cut measurement now takes its "de" / "del" / "of" / "x" with it (not "with"/"con" — "Ring with 1 ct diamonds" → "Ring with diamonds"); a cut price takes "for" / "por" / "at"; and any doubled small word ("de de", "of of", "the the"…) is folded. NEW test with the real title and 9 more cases.
+- **Customer impact: none.** Ronal Lopez's AI opening (written before the fix) already reads correctly: *"Gracias por elegir el collar de cadena de eslabón cubano hueco de oro de 10K — esperamos que lo disfrute mucho."* (the AI smoothed it); the email's item name comes from the order / listing, never from this cleaner.
+- **Also checked:** Mary Conversano's fix is live — her order line reads "Marco Bicego Lariat Chain & Bracelet" with the change in Change history. The grey label under her order number in Upcoming still shows the old name: it is saved when the thank-you is queued (`source_note`), display only — the email and the AI read the order's current item name.
+- **Gate:** `npx tsc --noEmit` 0 · `npx eslint` (changed files) 0 · `npx vitest run` **2636/2636** · `npm run build` 0.
+- **To reverse:** restore `cleanItemForAi`'s `text.replace(MONEY, ' ').replace(WEIGHT, ' ')` and drop `LEAD_WORD` / `MONEY_WITH_LEAD` / `WEIGHT_WITH_LEAD` / `DOUBLED_WORD` + the new test.
+
+## 2026-11-25 (12) — ✅ "View items" pushed + deployed (owner); LIVE check in the owner's Chrome — all pass; nothing changed
+
+- Owner: *"pushed and deployed, verify it live with chrome"*.
+- Admin → Follow-ups: **16 "View items" buttons** (one per Upcoming line); openings now 13 "Written by the AI" / 3 still to come (the sweep did its job since the deploy).
+- Seller **BUY-00032**: pop-up shows name, "Buy receipt · Wed Nov 11, 3:19 PM", queued time, 1 × "jewelry" $5,784.00, total, "What the AI reads: jewelry" → closed with **Esc** ✅. Buyer **NEJ-20261121-EPKAU** (Mary Conversano): 1 item $6,200.00 → closed by **clicking outside** ✅. Spanish buyer **NEJ-20261120-IYRWI**: "Order · Fri Nov 20 · Picked up", item + order total $742.00, AI reads the Spanish title → closed with **Close** ✅. Seller **BUY-00031** → closed with **✕** ✅. (The two always-present `[role=dialog]` on admin pages are the site's hidden Saved items / Cart drawers, not this pop-up.)
+- **Found while looking (data, not code):** (1) Mary Conversano's item title still reads "…Braceleter -" — the AI would read "Braceleter"; ✎ Fix name on her order (TASKS 11-24 (11) item 3) also clears her opening so it is rewritten. (2) The Spanish title of the 10K hollow Cuban chain (Ronal Lopez's order) reads "Collar de Cadena de Eslabón Cubano Hueco **de de** Oro de 10K" — a doubled "de" in that listing's Spanish title. (3) Several receipts have one-word descriptions ("jewelry", "silver bowl"), so their openings are general — a "Note for the thank-you email" makes them personal.
+
 ## 2026-11-25 (11) — 👁️ Follow-ups → Upcoming: "View items" button + read-only pop-up — BUILT + STAGED, not pushed; no SQL, no env vars
 
 - **Owner:** *"on each queued line in the follow ups area, add a button for admin to view original item lines from the buy receipt... when clicked, open in a new overlay modal that can quickly be closed"* → mockup 1 (button under the receipt / order number; pop-up with the lines, the internal note and "What the AI reads"; shop buyers too) → *"Yes, build it"* (all three recommendations).

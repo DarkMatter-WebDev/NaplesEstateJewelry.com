@@ -39,6 +39,17 @@ export type OpeningInput = {
 const MONEY = /(?:US)?\$\s?\d[\d,]*(?:\.\d+)?|\b\d[\d,]*(?:\.\d{2})\s?(?:usd|dollars?)\b/gi;
 const WEIGHT = /\b\d+(?:[.,]\d+)?\s?(?:g|gr|grs|gram|grams|gramos|dwt|ozt|oz|ounces?|onzas?|ct|cts|ctw|tcw|carats?|kilates?\s+de\s+diamante|mm|cm|in|inch|inches|")(?![a-z])/gi;
 const QTY_PREFIX = /^\s*(?:\d{1,3}\s?[x×]\s+|\(\d{1,3}\)\s*|qty\s*\d+\s*)/i;
+/**
+ * A measurement together with the little word in front of it (2026-11-25):
+ * cutting only "5mm" out of "…Hueco de 5mm de Oro de 10K" left "Hueco de de
+ * Oro" — the translated Spanish title was right; this cleaner made the typo.
+ */
+// Only the size / "of" words — never "with" / "con" ("ring with 1 ct diamonds" keeps its "with").
+const LEAD_WORD = String.raw`(?:\b(?:de|del|of|x)\s+)?`;
+const MONEY_WITH_LEAD = new RegExp(String.raw`(?:\b(?:for|por|at)\s+)?` + `(?:${MONEY.source})`, 'gi');
+const WEIGHT_WITH_LEAD = new RegExp(LEAD_WORD + `(?:${WEIGHT.source})`, 'gi');
+/** "de de", "of of" — a doubled little word, whatever left it behind. */
+const DOUBLED_WORD = /\b(de|del|of|the|con|with|en|in|y|and)\s+\1\b/gi;
 
 /**
  * "1 × 14K yellow gold sapphire ring, 4.2 g — $380.00" → "14K yellow gold sapphire ring".
@@ -47,7 +58,7 @@ const QTY_PREFIX = /^\s*(?:\d{1,3}\s?[x×]\s+|\(\d{1,3}\)\s*|qty\s*\d+\s*)/i;
 export function cleanItemForAi(description: string | null | undefined): string {
   let text = String(description ?? '').replace(/\s+/g, ' ').trim();
   text = text.replace(QTY_PREFIX, '');
-  text = text.replace(MONEY, ' ').replace(WEIGHT, ' ');
+  text = text.replace(MONEY_WITH_LEAD, ' ').replace(WEIGHT_WITH_LEAD, ' ').replace(/\s+/g, ' ').replace(DOUBLED_WORD, '$1');
   // what a cut leaves behind: "ring, , —" → "ring"
   text = text
     .replace(/\s*[—–-]\s*(?=[,;]|$)/g, '')

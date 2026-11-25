@@ -24,6 +24,21 @@ describe('what the AI is given (2026-11-25)', () => {
     expect(piecesForAi(['Ring, 2 g', '', null, '$40.00'])).toEqual(['Ring']);
   });
 
+  it('a cut size takes its "de" / "of" with it — no "de de" (2026-11-25, the 10K Cuban chain\'s Spanish title)', () => {
+    // The listing's Spanish title was right; cutting only "5mm" left "Hueco de de Oro".
+    expect(cleanItemForAi('Collar de Cadena de Eslabón Cubano Hueco de 5mm de Oro de 10K')).toBe('Collar de Cadena de Eslabón Cubano Hueco de Oro de 10K');
+    expect(cleanItemForAi('Collar de Cadena de Eslabón Cubano Hueco de 5 mm de Oro de 10K')).toBe('Collar de Cadena de Eslabón Cubano Hueco de Oro de 10K');
+    expect(cleanItemForAi('Collar de cadena cubana hueca de oro de 10K de 5 mm')).toBe('Collar de cadena cubana hueca de oro de 10K');
+    expect(cleanItemForAi('Anillo de 18K con diamante de 1.2 ct')).toBe('Anillo de 18K con diamante');
+    expect(cleanItemForAi('Pulsera de oro de 14K de 7 pulgadas, 12.5 g')).toBe('Pulsera de oro de 14K de 7 pulgadas');
+    expect(cleanItemForAi('Chain of 5mm 14K gold')).toBe('Chain 14K gold');
+    expect(cleanItemForAi('Ring with 1 ct diamonds')).toBe('Ring with diamonds');
+    expect(cleanItemForAi('10K Gold 5mm Hollow Cuban Link Chain Necklace')).toBe('10K Gold Hollow Cuban Link Chain Necklace');
+    expect(cleanItemForAi('Gold bracelet sold for $380.00')).toBe('Gold bracelet sold');
+    // a doubled small word is folded whatever left it
+    expect(cleanItemForAi('Set de de plata')).toBe('Set de plata');
+  });
+
   it('the prompt carries name, language, pieces and the note — and nothing else', () => {
     const prompt = JSON.parse(openingUserPrompt({ audience: 'seller', language: 'es', firstName: 'Margaret', pieces: ['sapphire ring'], note: " her late mother's ring " }));
     expect(prompt).toEqual({ audience: 'seller', language: 'Spanish', first_name: 'Margaret', pieces: ['sapphire ring'], owner_note: "her late mother's ring" });
