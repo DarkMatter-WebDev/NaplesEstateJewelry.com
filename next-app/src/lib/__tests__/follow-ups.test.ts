@@ -414,7 +414,7 @@ describe('wiring', () => {
       expect(granted.has(secret), secret).toBe(false);
     }
 
-    const server = src('lib/follow-ups-server.ts') + '\n' + src('lib/follow-up-opening-server.ts');
+    const server = src('lib/follow-ups-server.ts') + '\n' + src('lib/follow-up-opening-server.ts') + '\n' + src('lib/follow-up-items-server.ts');
     const receiptConstant = /const RECEIPT_COLUMNS = '([^']+)'/.exec(server)![1];
     const used: string[] = [];
     // every .from('buy_receipts').select(...) and every filter on it
@@ -432,6 +432,21 @@ describe('wiring', () => {
     const columns = [...new Set(used.map((c) => c.trim()).filter(Boolean))];
     expect(columns.length).toBeGreaterThan(5); // positive control: the scan found the reads
     expect(columns.filter((c) => !granted.has(c))).toEqual([]);
+  });
+
+  it('"View items" is read-only, admin-gated, and on every Upcoming line (2026-11-25)', () => {
+    const route = src('app/api/admin/follow-ups/[id]/items/route.ts');
+    expect(route).toContain('requireAdmin()');
+    expect(route).not.toMatch(/export async function (POST|PUT|PATCH|DELETE)/);
+    const loader = src('lib/follow-up-items-server.ts');
+    expect(loader).not.toMatch(/\.(update|insert|upsert|delete)\(/);
+    for (const secret of ['seller_id_last4', 'seller_dob', 'seller_id_photo_path', 'seller_thumbprint_path', 'seller_street', 'payments', 'notes']) {
+      expect(loader, secret).not.toContain(secret);
+    }
+    const manager = src('components/admin/follow-ups/FollowUpsManager.tsx');
+    expect(manager).toContain('onViewItems={(row) => setItemsFor(row)}');
+    expect(manager).toContain('View items');
+    expect(src('components/admin/follow-ups/FollowUpItemsModal.tsx')).toContain('AdminModal');
   });
 
   it('the sweep is guarded by the existing cron secret (no new env var)', () => {

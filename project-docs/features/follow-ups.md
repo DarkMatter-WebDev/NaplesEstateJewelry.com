@@ -125,6 +125,19 @@ for leaving out unhappy customers.
   receipt / order) clears that person's AI opening so it is written again; an
   opening you typed yourself is never replaced.
 
+## View items (2026-11-25)
+
+Every Upcoming line has a **View items** button under its receipt / order number.
+It opens a read-only pop-up (`FollowUpItemsModal`, standard `AdminModal`: ✕ · Esc ·
+click outside · Close) with the original lines — buy receipt: Qty · Description ·
+Amount + total paid; order: Item · Price (Qty only when ≠ 1) + order total — the
+date and state, the queued send time, the internal "Note for the thank-you email"
+when set, and **What the AI reads** (the cleaned item names the opening is written
+from), plus "Open the receipt / order ↗" in a new tab. Data: `GET
+/api/admin/follow-ups/[id]/items` → `lib/follow-up-items-server.ts` (service client;
+buy receipts only through the service_role column grant — never ID / address /
+payment data; `follow-ups.test.ts` scans it).
+
 ## How it runs
 
 - pg_cron `nej-follow-ups-sweep` every 15 minutes → `POST /api/admin/follow-ups/sweep`

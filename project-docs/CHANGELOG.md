@@ -1,6 +1,34 @@
 
 # Changelog
 
+## 2026-11-25 (11) — 👁️ Follow-ups → Upcoming: "View items" button + read-only pop-up — BUILT + STAGED, not pushed; no SQL, no env vars
+
+- **Owner:** *"on each queued line in the follow ups area, add a button for admin to view original item lines from the buy receipt... when clicked, open in a new overlay modal that can quickly be closed"* → mockup 1 (button under the receipt / order number; pop-up with the lines, the internal note and "What the AI reads"; shop buyers too) → *"Yes, build it"* (all three recommendations).
+- **Built:**
+  - NEW `lib/follow-up-items.ts` (types + money format) and `lib/follow-up-items-server.ts` (`loadFollowUpItems`: the queued row → buy receipt `receipt_number, seller_name, total, status, created_at, items` (only service_role-granted columns — `follow-ups.test.ts` now scans this file too) or the order + `order_items(title_snapshot, price_snapshot, quantity)`; plus `openingInputFor` → the cleaned pieces + note the AI reads). Read-only.
+  - NEW route `GET /api/admin/follow-ups/[id]/items` (`requireAdmin`, UUID check, no-store).
+  - NEW `components/admin/follow-ups/FollowUpItemsModal.tsx` on the standard `AdminModal` (closes with ✕ · Esc · click outside · Close): name, Buy receipt/Order · date · state (Voided / Shipped / Picked up / Completed), queued send time, Qty (receipts; orders only when ≠ 1) · Description/Item · Amount/Price, total, "Note for the thank-you email · internal" when set, "What the AI reads" (step 1), "Open the receipt / order ↗" in a new tab.
+  - `FollowUpsManager.tsx`: **View items** outline button under the receipt / order number on every Upcoming line.
+  - `lib/follow-up-opening-server.ts`: `openingInputFor` + `RowForOpening` exported (no behaviour change).
+- **Tests:** `follow-ups.test.ts` — the grant scan covers the new loader; NEW test: route admin-gated + GET only, loader never writes and never names an ID / address / payment column, the button is wired, the pop-up uses `AdminModal`.
+- **Gate (from `next-app`):** `npx tsc --noEmit` 0 · `npx eslint` (changed files) 0 · `npx vitest run` **2635/2635** (219 files) · `npm run build` 0 (route listed). Dev: the new route signed out → **401**, `/admin/follow-ups` signed out → 307. Not seen behind the sign-in (admin) — first look after the push.
+- **To reverse:** delete the three new files + the route folder; remove the `itemsFor` state, the `onViewItems` prop and the button in `FollowUpsManager.tsx`; drop the new test and the third file in the grant scan.
+
+## 2026-11-25 (10) — ✅ Owner pushed + deployed; LIVE check in the owner's Chrome (`07fdee3a…`) — all pass; nothing sent
+
+- Owner: *"pushed and deployed, verify it live with chrome"*.
+- **Public (fetch inside the live site):** `/`, `/es`, `/about`, `/es/about`, `/faq`, `/es/faq`, `/contact`, `/es/contact`, `/shipping`, `/es/shipping`, `/estate-jewelry`, `/es/estate-jewelry`, `/sell/naples`, `/reviews`, `/free-evaluation`, `/returns-refunds` all **200, 0 × "sharon"**; the new sign sentence on About + Estate Jewelry (EN + ES); two product pages' pickup line = "Local pickup is free at 6240 Shirley St, Ste 104, Naples, FL 34109, Mon–Sat 10am–4pm, or by appointment." `/card`, `/kittcard`, `/es/card` checked by curl (not counted as scans): 200, 0 × "sharon".
+- **Admin → Follow-ups:** loads, no banner; "AI-written opening lines" **On**; Upcoming 16, Sent log 2, People 54. **Preview** (Dennis Gray, buyer) = the new layout exactly (opening → "If any questions come up about your order…" → review ask → button → help box with the plain address → two cards). **Write it now** pressed on that ONE row (writes the opening only, sends nothing) → "Written by the AI for this person": *"We hope you're enjoying your gold bar — it's a wonderful piece to own."* → the AI works on Netlify. The other 15 read "The AI writes this shortly" (the sweep writes 4 per 15-min run).
+- ⚠️ **Found: both step-1 switches ("Thank you for coming in" / "Thank you for your purchase") are OFF** — every queued thank-you shows "Off — holds until step 1 is turned on (Wed Nov 25, 10:00 AM)". Not changed by Claude (owner's switch). Code (`follow-ups-server.ts:873`): when a step is turned on, its past-due rows go out on the next sweeps (≤ 10 per run).
+- **Buy Receipts:** New receipt has no Customer input mode; a receipt page shows the "Note for the thank-you email" card ("Internal only · never printed", `print:hidden`), 0 × "sharon".
+- **Orders:** NEJ-20261124-LL8G0 shows the thank-you note card, ✎ Edit order, ✎ Fix name, Change history; 0 × "sharon".
+
+## 2026-11-25 (9) — 📝 Google Ads: one agent from now on (this project); owner pushing (docs only)
+
+- **Owner:** *"when it comes to 3, log that here... ill only work with an agent from this project"* (item 3 of the next-steps list was "tell the ads agent the 5 old ads are paused on purpose").
+- Logged: the separate ads agent is no longer in the loop — Google Ads changes run only through this project's agent, recorded in `CHANGELOG.md` / `TASKS.md` / `DECISIONS.md` like any other change. The paused originals (2026-11-25 (7)) stay paused.
+- Owner: *"will push and deploy now, standby"* — the push carries 2026-11-24 (10) + (11) and all of 2026-11-25. Not checked live by Claude (not asked).
+
 ## 2026-11-25 (7) — 📣 Google Ads: the "Inside Sharon Lynch Collections" description replaced in all 10 ads, copy-then-pause for the 5 running ones — APPLIED in the account (owner's yes)
 
 - **Owner:** *"proceed how you recommend best... if thats copying then pausing old, do it"* (after the risk answer: an edited ad goes back through review, so copy → approve → pause leaves no gap). Done in the owner's Chrome (`07fdee3a…`), account 321-137-8976.

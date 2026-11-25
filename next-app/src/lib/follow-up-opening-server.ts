@@ -109,10 +109,10 @@ async function askForOpening(input: OpeningInput): Promise<string> {
   }
 }
 
-type RowForOpening = { id: string; audience: 'seller' | 'buyer'; language: FollowUpLanguage; name: string | null; source_type: 'buy_receipt' | 'order'; source_id: string };
+export type RowForOpening = { id: string; audience: 'seller' | 'buyer'; language: FollowUpLanguage; name: string | null; source_type: 'buy_receipt' | 'order'; source_id: string };
 
 /** What the AI is given for one row: item names (cleaned) + the owner's note. */
-async function openingInputFor(client: SupabaseClient, row: RowForOpening): Promise<OpeningInput> {
+export async function openingInputFor(client: SupabaseClient, row: RowForOpening): Promise<OpeningInput> {
   let descriptions: string[] = [];
   let note: string | null = null;
   if (row.source_type === 'buy_receipt') {

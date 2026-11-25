@@ -18,6 +18,7 @@ import {
 import type { FollowUpMessageRow, FollowUpsPageData } from '@/lib/follow-ups-server';
 import ChangeTimeModal from './ChangeTimeModal';
 import FollowUpEditor from './FollowUpEditor';
+import FollowUpItemsModal from './FollowUpItemsModal';
 import FollowUpPeople from './FollowUpPeople';
 import OpeningLine from './OpeningLine';
 import { callJson, FOLLOW_UP_FROM_LINE, LABEL_CLASS, MUTED, Notice, SMALL_BUTTON, StatusText, Switch, TypeChip } from './shared';
@@ -49,6 +50,7 @@ export default function FollowUpsManager({ data, adminBasePath }: { data: Follow
   );
   const [viewing, setViewing] = useState<Viewing | null>(null);
   const [changing, setChanging] = useState<FollowUpMessageRow | null>(null);
+  const [itemsFor, setItemsFor] = useState<FollowUpMessageRow | null>(null);
   const [editing, setEditing] = useState<FollowUpAudience | null>(null);
 
   function refresh() {
@@ -243,6 +245,7 @@ export default function FollowUpsManager({ data, adminBasePath }: { data: Follow
             onSkip={(row) => void act(row, 'skip')}
             onChangeTime={(row) => setChanging(row)}
             onPreview={(row) => setViewing({ row })}
+            onViewItems={(row) => setItemsFor(row)}
             openings={{ ready: data.openings.ready, aiOn: settings.aiOpenings && data.openings.aiConfigured }}
             onOpeningChanged={(text, ok) => {
               setNotice({ text, ok });
@@ -275,6 +278,7 @@ export default function FollowUpsManager({ data, adminBasePath }: { data: Follow
         )}
       </div>
 
+      {itemsFor && <FollowUpItemsModal row={itemsFor} adminBasePath={adminBasePath} onClose={() => setItemsFor(null)} />}
       {viewing && 'row' in viewing && (
         <EmailCopyViewer
           title={`Step ${viewing.row.step} · ${stepName(viewing.row.audience, viewing.row.step)}`}
@@ -486,6 +490,7 @@ function UpcomingList({
   onSkip,
   onChangeTime,
   onPreview,
+  onViewItems,
   openings,
   onOpeningChanged,
 }: {
@@ -498,6 +503,8 @@ function UpcomingList({
   onSkip: (row: FollowUpMessageRow) => void;
   onChangeTime: (row: FollowUpMessageRow) => void;
   onPreview: (row: FollowUpMessageRow) => void;
+  /** "View items" — the original receipt / order lines in a pop-up (2026-11-25). */
+  onViewItems: (row: FollowUpMessageRow) => void;
   openings: { ready: boolean; aiOn: boolean };
   onOpeningChanged: (text: string, ok: boolean) => void;
 }) {
@@ -517,6 +524,9 @@ function UpcomingList({
             <div>
               {sourceLink(row, adminBasePath)}
               <div className="text-xs" style={MUTED}>{row.source_note}</div>
+              <button type="button" className="outline-button mt-1.5" style={SMALL_BUTTON} onClick={() => onViewItems(row)} aria-label={`View items on ${row.source_ref ?? (row.source_type === 'buy_receipt' ? 'the buy receipt' : 'the order')}`}>
+                View items
+              </button>
             </div>
             <div>
               Step {row.step} · {row.step === 1 ? 'Thank you' : row.audience === 'seller' ? 'Ready again' : 'Care tips'}
