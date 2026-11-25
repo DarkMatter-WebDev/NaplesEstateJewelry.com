@@ -28,12 +28,12 @@ describe('parseInStorePrice', () => {
 
 describe('inStoreTotals', () => {
   it('applies the Florida rate the way local pickup does online', () => {
-    expect(inStoreTotals(1460)).toEqual({ subtotal: 1460, shippingFee: 0, tax: 87.6, total: 1547.6 });
-    expect(inStoreTotals(1026)).toEqual({ subtotal: 1026, shippingFee: 0, tax: 61.56, total: 1087.56 });
+    expect(inStoreTotals(1460)).toEqual({ subtotal: 1460, shippingFee: 0, tax: 87.6, total: 1547.6, taxFree: 0, taxable: 1460 });
+    expect(inStoreTotals(1026)).toEqual({ subtotal: 1026, shippingFee: 0, tax: 61.56, total: 1087.56, taxFree: 0, taxable: 1026 });
   });
   it('taxes item + shipping in Florida and nothing out of state (the web checkout rule)', () => {
-    expect(inStoreTotals(1460, { shippingFee: 59 })).toEqual({ subtotal: 1460, shippingFee: 59, tax: 91.14, total: 1610.14 });
-    expect(inStoreTotals(1460, { shippingFee: 59, chargesTax: false })).toEqual({ subtotal: 1460, shippingFee: 59, tax: 0, total: 1519 });
+    expect(inStoreTotals(1460, { shippingFee: 59 })).toEqual({ subtotal: 1460, shippingFee: 59, tax: 91.14, total: 1610.14, taxFree: 0, taxable: 1460 });
+    expect(inStoreTotals(1460, { shippingFee: 59, chargesTax: false })).toEqual({ subtotal: 1460, shippingFee: 59, tax: 0, total: 1519, taxFree: 0, taxable: 1460 });
   });
 });
 

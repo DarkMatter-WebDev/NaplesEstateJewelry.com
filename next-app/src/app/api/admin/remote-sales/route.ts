@@ -4,7 +4,7 @@ import { normalizeOrderLanguage } from '@/lib/order-language';
 import { requireAdmin } from '@/lib/admin-auth';
 import { createServiceClient } from '@/lib/supabase/service';
 import { buildAddressObject, generateOrderNumber } from '@/lib/sales';
-import { buildSaleItemPayloads, createOrderErrorStatus } from '@/lib/instant-sale-server';
+import { buildSaleItemPayloads, bullionInternalNote, bullionNotReadyError, createOrderErrorStatus, markBullionLines } from '@/lib/instant-sale-server';
 import { IN_STORE_SHIPPING_LABELS } from '@/lib/in-store-sale';
 import { normalizeRemoteSaleInput, remoteLinkExpiry } from '@/lib/remote-sale';
 import { upsertOrderInvoice } from '@/lib/order-invoices';
@@ -44,6 +44,9 @@ export async function POST(req: Request) {
   const service = createServiceClient();
   const lines = await buildSaleItemPayloads(service, sale.items);
   if ('error' in lines) return NextResponse.json({ error: lines.error }, { status: lines.status });
+  // "Bullion — no sales tax" (2026-11-24): refused before anything is written if the SQL has not run.
+  const bullionBlocked = await bullionNotReadyError(service, sale.items);
+  if (bullionBlocked) return NextResponse.json({ error: bullionBlocked }, { status: 503 });
 
   // "Tax-exempt sale" (owner, 2026-10-27): settled before the order exists.
   const certificate = sale.taxExempt
@@ -61,7 +64,7 @@ export async function POST(req: Request) {
     ? `Ship · ${IN_STORE_SHIPPING_LABELS[delivery.shipping]} ${formatCurrency(delivery.shippingFee)}${delivery.address ? '' : ' · address from the customer'}`
     : null;
   const exemptNote = certificate ? `Tax-exempt · ${exemptShortTag({ certType: certificate.cert_type, certNumber: certificate.cert_number })}` : null;
-  const internalNotes = [`Remote sale · invoice · sent by ${admin.user.email ?? 'admin'}`, deliveryNote, exemptNote, sale.note]
+  const internalNotes = [`Remote sale · invoice · sent by ${admin.user.email ?? 'admin'}`, deliveryNote, exemptNote, bullionInternalNote(lines.payloads), sale.note]
     .filter(Boolean)
     .join(' | ');
   const orderNumber = generateOrderNumber();
@@ -104,6 +107,8 @@ export async function POST(req: Request) {
   const createdRow = Array.isArray(created) ? created[0] : created;
   const orderId = createdRow?.order_id as string | undefined;
   if (!orderId) return NextResponse.json({ error: 'Could not create the order.' }, { status: 500 });
+  // Before the invoice email, so it says which lines are bullion (and the pay page re-figures tax with them).
+  await markBullionLines(service, orderId, lines.payloads);
 
   // "Receipt language" (2026-11-21): the invoice email, its Pay link and the receipt.
   await saveOrderLanguage(service, orderId, normalizeOrderLanguage((body as Record<string, unknown> | null)?.receiptLanguage));

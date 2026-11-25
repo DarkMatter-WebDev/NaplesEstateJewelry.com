@@ -2,6 +2,8 @@ import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { loadOrderLanguage } from '@/lib/order-language-server';
+import { loadDeliveryEmailSetting } from '@/lib/order-delivery-emails-server';
+import { scanAllowsDeliveryEmail } from '@/lib/order-delivery-emails';
 import {
   createTracker,
   easyPostApiKey,
@@ -243,6 +245,12 @@ export async function applyTrackerUpdate(service: SupabaseClient, tracker: EasyP
   }
   if (!isValidEmail(order.customer_email)) return { ok: true, status, reason: 'No customer email on the order.' };
 
+  // "Send customer shipping updates" (2026-11-24): off = no automatic email
+  // for this order (the row above is still updated, so the page shows where
+  // the package is); turned back on = only scans from that moment on.
+  const setting = await loadDeliveryEmailSetting(service, order.id);
+  if (!setting.on) return { ok: true, status, reason: 'Shipping updates are off for this order — no email.' };
+
   const sent: DeliveryEmailKind[] = [];
   const nowMs = Date.now();
   const recent = (raw: string | null | undefined, maxAgeMs: number) => {
@@ -261,6 +269,7 @@ export async function applyTrackerUpdate(service: SupabaseClient, tracker: EasyP
     && !row.expected_email_at
     && !row.out_for_delivery_email_at
     && !row.delivered_email_at
+    && scanAllowsDeliveryEmail(setting, latest?.datetime)
   ) {
     if (await sendDeliveryEmail(service, order, row, 'expected_delivery', {
       when: formatScanTime(latest?.datetime),
@@ -271,7 +280,12 @@ export async function applyTrackerUpdate(service: SupabaseClient, tracker: EasyP
     })) sent.push('expected_delivery');
   }
 
-  if (status === 'out_for_delivery' && !row.out_for_delivery_email_at && recent(outForDelivery?.datetime, OUT_FOR_DELIVERY_MAX_AGE_MS)) {
+  if (
+    status === 'out_for_delivery'
+    && !row.out_for_delivery_email_at
+    && recent(outForDelivery?.datetime, OUT_FOR_DELIVERY_MAX_AGE_MS)
+    && scanAllowsDeliveryEmail(setting, (outForDelivery ?? latest)?.datetime)
+  ) {
     const scan = outForDelivery ?? latest;
     if (await sendDeliveryEmail(service, order, row, 'out_for_delivery', {
       when: formatScanTime(scan?.datetime),
@@ -280,7 +294,12 @@ export async function applyTrackerUpdate(service: SupabaseClient, tracker: EasyP
     })) sent.push('out_for_delivery');
   }
 
-  if (status === 'delivered' && !row.delivered_email_at && recent(delivered?.datetime, DELIVERED_MAX_AGE_MS)) {
+  if (
+    status === 'delivered'
+    && !row.delivered_email_at
+    && recent(delivered?.datetime, DELIVERED_MAX_AGE_MS)
+    && scanAllowsDeliveryEmail(setting, (delivered ?? latest)?.datetime)
+  ) {
     const scan = delivered ?? latest;
     if (await sendDeliveryEmail(service, order, row, 'delivered', {
       when: formatScanTime(scan?.datetime),

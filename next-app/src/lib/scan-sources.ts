@@ -18,8 +18,14 @@ export const SCAN_SOURCES = {
 export type ScanSource = keyof typeof SCAN_SOURCES;
 export const SCAN_SOURCE_KEYS = Object.keys(SCAN_SOURCES) as ScanSource[];
 
-/** Sources a PAGE may report through POST /api/scan. /magnet counts itself server side. */
-export const PAGE_SCAN_SOURCES = ['card', 'kittcard'] as const satisfies readonly ScanSource[];
+/**
+ * Sources a PAGE may report through POST /api/scan. `magnet` joined 2026-11-23
+ * for the /magnet landing page. It is counted ONE way at a time: while the page
+ * is held (lib/magnet-landing.ts) /api/magnet counts it server side and no page
+ * renders to ping; once live the proxy no longer sends /magnet to /api/magnet,
+ * so only the page's ping counts.
+ */
+export const PAGE_SCAN_SOURCES = ['card', 'kittcard', 'magnet'] as const satisfies readonly ScanSource[];
 export type PageScanSource = (typeof PAGE_SCAN_SOURCES)[number];
 
 export function isPageScanSource(value: unknown): value is PageScanSource {

@@ -1,9 +1,14 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import type { SubscriberDirectoryRow } from '../marketing';
 import {
   DEFAULT_SUBSCRIBER_SORT,
   nextSubscriberSort,
   sortSubscriberRows,
   subscriberAlertsLabel,
+  subscriberLanguageLabel,
+  subscriberRowFromDirectory,
   subscriberRowKey,
   subscriberSourceLabel,
   type SubscriberRow,
@@ -106,5 +111,73 @@ describe('nextSubscriberSort', () => {
   it('flips the direction when the same header is clicked again', () => {
     expect(nextSubscriberSort(DEFAULT_SUBSCRIBER_SORT, 'subscribed')).toEqual({ key: 'subscribed', direction: 'asc' });
     expect(nextSubscriberSort({ key: 'email', direction: 'asc' }, 'email')).toEqual({ key: 'email', direction: 'desc' });
+  });
+});
+
+// 2026-11-24: the owner switched a subscriber to Spanish, reopened Edit and it
+// showed English — the page dropped both languages when it built the table.
+describe('the subscriber language reaches the table and Edit', () => {
+  const directoryRow = (overrides: Partial<SubscriberDirectoryRow>): SubscriberDirectoryRow => ({
+    email: 'maria@example.com',
+    name: 'Maria',
+    source: 'subscriber',
+    subscriberSource: 'admin_manual',
+    unsubscribeToken: null,
+    userId: null,
+    subscriberEmail: 'maria@example.com',
+    subscribedAt: '2026-11-20T12:00:00Z',
+    accountCreatedAt: null,
+    subscriberId: 'row-1',
+    phone: '+12395550148',
+    smsStatus: 'confirmed',
+    language: 'es',
+    subscriberLanguage: 'es',
+    ...overrides,
+  });
+
+  it('a Spanish row keeps both languages, so Edit opens on Español and the line says Español', () => {
+    const line = subscriberRowFromDirectory(directoryRow({}));
+    expect(line.subscriberLanguage).toBe('es');
+    expect(line.language).toBe('es');
+    expect(subscriberLanguageLabel(line)).toBe('Español');
+  });
+
+  it('an English row, and a line with no newsletter row, read English and stay read-only', () => {
+    expect(subscriberRowFromDirectory(directoryRow({ language: 'en', subscriberLanguage: 'en' })).subscriberLanguage).toBe('en');
+    const buyerOnly = subscriberRowFromDirectory(directoryRow({ subscriberId: null, language: undefined, subscriberLanguage: null }));
+    expect(buyerOnly.language).toBe('en');
+    expect(buyerOnly.subscriberLanguage).toBeNull();
+    expect(subscriberLanguageLabel(buyerOnly)).toBe('English');
+  });
+
+  it('a buyer whose latest order was Spanish shows Español without a newsletter setting', () => {
+    const line = subscriberRowFromDirectory(directoryRow({ subscriberId: null, language: 'es', subscriberLanguage: null }));
+    expect(subscriberLanguageLabel(line)).toBe('Español');
+    expect(line.subscriberLanguage).toBeNull();
+  });
+
+  it('copies every field the table reads (none silently dropped)', () => {
+    const line = subscriberRowFromDirectory(directoryRow({}));
+    const expected: (keyof SubscriberRow)[] = ['subscriberId', 'email', 'name', 'source', 'subscriberSource', 'subscriberEmail', 'subscribedAt', 'accountCreatedAt', 'phone', 'smsStatus', 'language', 'subscriberLanguage'];
+    expect(Object.keys(line).sort()).toEqual([...expected].sort());
+  });
+
+  it('the page builds its lines through subscriberRowFromDirectory, and Edit opens on the saved setting', () => {
+    const src = join(process.cwd(), 'src');
+    const page = readFileSync(join(src, 'app', '[locale]', 'admin', 'subscribers', 'page.tsx'), 'utf8');
+    expect(page).toContain('audienceResult.data.map(subscriberRowFromDirectory)');
+    const manager = readFileSync(join(src, 'components', 'admin', 'SubscribersManager.tsx'), 'utf8');
+    expect(manager).toContain("language: row.subscriberLanguage ?? 'en' });");
+    expect(manager).toContain("{ label: 'Language', sortKey: 'language' },");
+  });
+
+  it('sorts by language, Español grouped after English ascending', () => {
+    const rows = [
+      row({ email: 'a@example.com', language: 'es' }),
+      row({ email: 'b@example.com', language: 'en' }),
+      row({ email: 'c@example.com' }),
+    ];
+    expect(sortSubscriberRows(rows, { key: 'language', direction: 'asc' }).map((r) => r.email)).toEqual(['b@example.com', 'c@example.com', 'a@example.com']);
+    expect(sortSubscriberRows(rows, { key: 'language', direction: 'desc' })[0].email).toBe('a@example.com');
   });
 });

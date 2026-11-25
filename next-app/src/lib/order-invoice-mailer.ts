@@ -10,7 +10,8 @@ import {
 import { getStoreHours } from '@/lib/store-hours';
 import { loadOrderTaxExemption } from '@/lib/tax-exempt-server';
 import { loadOrderGift } from '@/lib/order-gift-server';
-import { SPLIT_PAYMENTS_COLUMN, TRADE_IN_COLUMN } from '@/lib/in-store-sale';
+import { SPLIT_PAYMENTS_COLUMN, TRADE_IN_COLUMN, withBullionFlags } from '@/lib/in-store-sale';
+import { loadBullionLineIds } from '@/lib/bullion-sale-server';
 import { logOrderEmail } from '@/lib/email-copies';
 import { loadOrderLanguage, loadSpanishItemTitles } from '@/lib/order-language-server';
 import type { OrderLanguage } from '@/lib/order-language';
@@ -107,10 +108,10 @@ export async function buildOrderInvoiceEmail(
   }
 
   const invoiceNumber = invoices?.[0]?.invoice_number ?? null;
-  const emailOrder = withInvoiceLineDiscounts(
-    order as unknown as InvoiceEmailOrder,
-    opts.itemDiscounts ?? {},
-  );
+  const loadedOrder = order as unknown as InvoiceEmailOrder;
+  // "Bullion — not taxed" lines (2026-11-24); none before the SQL.
+  loadedOrder.order_items = withBullionFlags(loadedOrder.order_items ?? [], await loadBullionLineIds(supabase, orderId));
+  const emailOrder = withInvoiceLineDiscounts(loadedOrder, opts.itemDiscounts ?? {});
   // The customer's language (2026-11-21): set at checkout on /es, on the
   // Instant Sale forms, or on the order page. English until set.
   const language = await loadOrderLanguage(supabase, orderId);

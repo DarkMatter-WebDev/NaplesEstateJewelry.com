@@ -32,6 +32,7 @@ import {
   normalizeSaleItems,
   normalizeSalePayments,
   saleSubtotal,
+  saleTaxFreeSubtotal,
   type InStoreItem,
   type SalePaymentPart,
 } from '@/lib/in-store-sale';
@@ -50,8 +51,9 @@ export function tradeInBalance(tradeValue: number, saleTotal: number): TradeInBa
  * if the accountant confirms that Florida taxes only the difference on a
  * trade-in, this is the one place that changes.
  */
-export function tradeInSaleTotals(subtotal: number) {
-  return inStoreTotals(subtotal, { chargesTax: true });
+export function tradeInSaleTotals(subtotal: number, taxFree = 0) {
+  // `taxFree` (2026-11-24): the bullion items on the sale, never taxed.
+  return inStoreTotals(subtotal, { chargesTax: true, taxFree });
 }
 
 /** "14K yellow gold scrap · 18.2 g; 14K Cuban bracelet · 11 g" — the receipt's lines, for the sale's receipt. */
@@ -73,6 +75,9 @@ export type TradeInSaleInput = {
     shippingFee: number;
     tax: number;
     total: number;
+    /** The bullion part of the subtotal, left out of the tax (2026-11-24). */
+    taxFree: number;
+    taxable: number;
   };
   balance: TradeInBalance;
   tradeDescription: string;
@@ -147,7 +152,7 @@ export function normalizeTradeInSaleInput(body: unknown, now: Date = new Date())
   const items = normalizeSaleItems(saleSource);
   if ('error' in items) return { error: `What they're buying: ${items.error.charAt(0).toLowerCase()}${items.error.slice(1)}` };
   const subtotal = saleSubtotal(items.value);
-  const totals = tradeInSaleTotals(subtotal);
+  const totals = tradeInSaleTotals(subtotal, saleTaxFreeSubtotal(items.value));
   const balance = tradeInBalance(gold.value.total, totals.total);
 
   const payments = receiptPayments(receiptSource.payments, balance);

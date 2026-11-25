@@ -14,7 +14,7 @@ import {
   type StoreHoursSchedule,
 } from '@/lib/business-location';
 import { describeOrderShippingService } from '@/lib/checkout-shipping';
-import { IN_STORE_PAYMENT_LABELS, formatSalePayments, readSalePaymentParts, readSaleTradeIn, salePaymentPartLabel, tradeInReceiptLine, type SalePaymentMethod } from '@/lib/in-store-sale';
+import { BULLION_LAW_LINE, BULLION_LINE_LABEL, IN_STORE_PAYMENT_LABELS, bullionTaxLabel, formatSalePayments, orderBullionTaxFree,readSalePaymentParts, readSaleTradeIn, salePaymentPartLabel, tradeInReceiptLine, type SalePaymentMethod } from '@/lib/in-store-sale';
 import { paperDateLine } from '@/lib/order-receipt-paper';
 import { type TaxExemptSnapshot } from '@/lib/tax-exempt';
 import { type OrderGift } from '@/lib/order-gift';
@@ -93,6 +93,8 @@ export interface InvoiceEmailContent {
     taxLabel: string;
     /** The certificate line under the totals on a tax-exempt sale, else null. */
     exemptLine: string | null;
+    /** The bullion law line (2026-11-24) when any line is bullion, else null. */
+    bullionLine: string | null;
     shipping: string;
     total: string;
   };
@@ -222,6 +224,7 @@ export function buildInvoiceEmailContent(
       metalIn(item.metal_snapshot, language),
       item.purity_snapshot ? (es ? `pureza ${formatPublicPurity(item.purity_snapshot)}` : `${formatPublicPurity(item.purity_snapshot)} purity`) : null,
       item.gram_weight_snapshot ? `${item.gram_weight_snapshot}g` : null,
+      item.tax_free_bullion ? BULLION_LINE_LABEL[language] : null,
     ].filter(Boolean).join(' - ');
 
     return {
@@ -235,12 +238,17 @@ export function buildInvoiceEmailContent(
       imageUrl: absoluteImageUrl(normalizeLegacyLocalImageUrl(item.image_snapshot)),
     };
   });
+  // Bullion lines (2026-11-24): the tax label names what the 6% was on.
+  const bullionTaxFree = orderBullionTaxFree(order.order_items);
   const totals = {
     subtotal: formatCurrency(order.subtotal),
     discount: order.discount > 0 ? `-${formatCurrency(order.discount)}` : null,
     tax: formatCurrency(order.tax),
-    taxLabel: es ? (opts?.taxExempt ? 'Impuesto · exento' : 'Impuesto') : (opts?.taxExempt ? 'Tax · exempt' : 'Tax'),
+    taxLabel: !opts?.taxExempt && bullionTaxFree > 0
+      ? bullionTaxLabel(order, bullionTaxFree, es ? 'Impuesto' : 'Tax', language)
+      : es ? (opts?.taxExempt ? 'Impuesto · exento' : 'Impuesto') : (opts?.taxExempt ? 'Tax · exempt' : 'Tax'),
     exemptLine: opts?.taxExempt ? exemptReceiptLineIn(opts.taxExempt, language) : null,
+    bullionLine: bullionTaxFree > 0 ? BULLION_LAW_LINE[language] : null,
     shipping: formatCurrency(order.shipping_fee),
     total: formatCurrency(order.total),
   };
@@ -365,6 +373,7 @@ export function buildInvoiceEmailContent(
       ...(carriedOut ? [] : [`${es ? 'Envío' : 'Shipping'}: ${totals.shipping}`]),
       `Total: ${totals.total}`,
       ...(totals.exemptLine ? [totals.exemptLine] : []),
+      ...(totals.bullionLine ? [totals.bullionLine] : []),
       ...(payment?.payUrl
         ? ['', `${payment.payLabel.toUpperCase()}:`, payment.payUrl, payment.payHint, ...(payment.taxHint ? [payment.taxHint] : [])]
         : []),
@@ -503,6 +512,7 @@ function buildInvoiceEmailHtml({
                     ${totalRow(paid ? (es ? 'Total pagado' : 'Total Paid') : 'Total', totals.total, true)}
                   </table>
                   ${totals.exemptLine ? `<p style="margin:-10px 0 22px;padding:8px 12px;background:#fbf5dd;border-left:3px solid #d4af37;font-size:13px;line-height:1.5;color:#1d1a14;">${escapeHtml(totals.exemptLine)}</p>` : ''}
+                  ${totals.bullionLine ? `<p style="margin:-10px 0 22px;padding:8px 12px;background:#fbf5dd;border-left:3px solid #d4af37;font-size:13px;line-height:1.5;color:#1d1a14;">${escapeHtml(totals.bullionLine)}</p>` : ''}
                   ${payment ? paymentBlockHtml(payment, es) : ''}
 
                   ${hideShipping ? '' : `<div style="margin:0 0 22px;padding:14px 16px;background:#fbfaf5;border:1px solid #eadfbd;color:#746b5b;font-size:13px;line-height:1.5;">

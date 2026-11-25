@@ -26,6 +26,7 @@ import {
   normalizeSaleDelivery,
   normalizeSaleItems,
   saleSubtotal,
+  saleTaxFreeSubtotal,
   type InStoreDelivery,
   type InStoreItem,
   type InStoreMetal,
@@ -70,6 +71,9 @@ export type RemoteSaleInput = {
   shippingFee: number;
   tax: number;
   total: number;
+  /** The bullion part of the subtotal, left out of the tax (2026-11-24). */
+  taxFree: number;
+  taxable: number;
 };
 
 /**
@@ -89,10 +93,13 @@ export function remoteTotals(
   state: string | null | undefined,
   /** A tax-exempt invoice (owner, 2026-10-27): no Florida tax, whatever the address. */
   taxExempt = false,
+  /** The bullion part of the subtotal (2026-11-24): never taxed. */
+  taxFree = 0,
 ) {
   return inStoreTotals(subtotal, {
     shippingFee: delivery.method === 'ship' ? delivery.shippingFee ?? 0 : 0,
     chargesTax: !taxExempt && remoteChargesTax(delivery.method, state),
+    taxFree,
   });
 }
 
@@ -132,8 +139,9 @@ export function normalizeRemoteSaleInput(body: unknown): { value: RemoteSaleInpu
   const taxExempt = normalizeTaxExemptSaleInput(source.taxExempt);
   if ('error' in taxExempt) return taxExempt;
 
-  const owed = remoteTotals(subtotal, delivery.value, delivery.value.address?.state);
-  const totals = taxExempt.value ? remoteTotals(subtotal, delivery.value, delivery.value.address?.state, true) : owed;
+  const taxFree = saleTaxFreeSubtotal(items.value);
+  const owed = remoteTotals(subtotal, delivery.value, delivery.value.address?.state, false, taxFree);
+  const totals = taxExempt.value ? remoteTotals(subtotal, delivery.value, delivery.value.address?.state, true, taxFree) : owed;
   return {
     value: {
       items: items.value,
@@ -166,6 +174,8 @@ export type RemoteDraftItem = {
   purity: string;
   price: string;
   photoUrl: string | null;
+  /** "Bullion — no sales tax" (2026-11-24); a draft saved before it reopens unticked. */
+  bullion?: boolean;
 };
 
 export type RemoteDraftForm = {
@@ -207,6 +217,7 @@ export function sanitizeRemoteDraft(raw: unknown): RemoteDraftForm {
       purity: draftText(item.purity, 20),
       price: draftText(item.price, 20),
       photoUrl: isSalePhotoUrl(item.photoUrl) ? item.photoUrl : null,
+      bullion: item.bullion === true,
     } satisfies RemoteDraftItem;
   });
   const customer = (source.customer && typeof source.customer === 'object' ? source.customer : {}) as Record<string, unknown>;
@@ -374,11 +385,17 @@ export function normalizePayPageCustomer(
  * shipment shows WITH Florida tax — the figure the invoice email printed — so
  * the number only ever goes down (out of state), never up.
  */
-export function payPageTotals(order: { subtotal: number; shipping_fee: number; shipping_method: string | null; tax_exempt?: boolean }, state: string | null) {
+export function payPageTotals(
+  order: { subtotal: number; shipping_fee: number; shipping_method: string | null; tax_exempt?: boolean },
+  state: string | null,
+  /** The invoice's bullion lines (2026-11-24, `loadBullionTaxFree`): never taxed. */
+  taxFree = 0,
+) {
   const ships = order.shipping_method === 'shipping';
   return inStoreTotals(round2(order.subtotal), {
     shippingFee: ships ? order.shipping_fee : 0,
     // A tax-exempt invoice carries no Florida tax at any address.
     chargesTax: !order.tax_exempt && (ships ? remoteChargesTax('ship', state) : true),
+    taxFree,
   });
 }

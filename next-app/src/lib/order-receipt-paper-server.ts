@@ -4,7 +4,8 @@ import { hoursLine } from '@/lib/business-location';
 import { getStoreHours } from '@/lib/store-hours';
 import { buildPaperReceipt, type PaperReceipt, type PaperReceiptOrder } from '@/lib/order-receipt-paper';
 import { loadOrderTaxExemption } from '@/lib/tax-exempt-server';
-import { SPLIT_PAYMENTS_COLUMN, TRADE_IN_COLUMN } from '@/lib/in-store-sale';
+import { SPLIT_PAYMENTS_COLUMN, TRADE_IN_COLUMN, withBullionFlags } from '@/lib/in-store-sale';
+import { loadBullionLineIds } from '@/lib/bullion-sale-server';
 import { loadOrderLanguage, loadSpanishItemTitles } from '@/lib/order-language-server';
 import type { OrderLanguage } from '@/lib/order-language';
 
@@ -26,7 +27,7 @@ const PAPER_COLUMNS = [
   'shipping_method',
   'shipping_address',
   'created_at',
-  'order_items(product_id, inventory_number, title_snapshot, item_year_snapshot, metal_snapshot, purity_snapshot, gram_weight_snapshot, price_snapshot, quantity, discount, image_snapshot, created_at)',
+  'order_items(id, product_id, inventory_number, title_snapshot, item_year_snapshot, metal_snapshot, purity_snapshot, gram_weight_snapshot, price_snapshot, quantity, discount, image_snapshot, created_at)',
 ].join(', ');
 
 /**
@@ -35,17 +36,20 @@ const PAPER_COLUMNS = [
  * `language` says otherwise (2026-11-21).
  */
 export async function loadPaperReceipt(client: SupabaseClient, orderId: string, language?: OrderLanguage): Promise<PaperReceipt | null> {
-  const [{ data: order, error }, schedule, taxExempt, savedLanguage] = await Promise.all([
+  const [{ data: order, error }, schedule, taxExempt, savedLanguage, bullionIds] = await Promise.all([
     client.from('orders').select(PAPER_COLUMNS).eq('id', orderId).maybeSingle(),
     getStoreHours(),
     loadOrderTaxExemption(client, orderId),
     language ? Promise.resolve(language) : loadOrderLanguage(client, orderId),
+    loadBullionLineIds(client, orderId),
   ]);
   if (error || !order) {
     if (error) console.error('paper receipt read error:', error);
     return null;
   }
   const typed = order as unknown as PaperReceiptOrder;
+  // "Bullion — not taxed" lines (2026-11-24).
+  typed.order_items = withBullionFlags(typed.order_items, bullionIds);
   // Lines in the order they were entered on the form.
   (typed.order_items as Array<PaperReceiptOrder['order_items'][number] & { created_at?: string }>)
     .sort((a, b) => String(a.created_at ?? '').localeCompare(String(b.created_at ?? '')));

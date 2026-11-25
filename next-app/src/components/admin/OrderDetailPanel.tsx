@@ -13,7 +13,7 @@ import { buildInvoiceEmailContent, invoiceNumberForOrder, isOrderPaid, withInvoi
 import { buildFulfillmentUpdateEmailContent } from '@/lib/order-fulfillment-email';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 import { formatUsdPrice } from '@/lib/pricing';
-import { paymentMethodLabel, readSaleTradeIn } from '@/lib/in-store-sale';
+import { bullionTaxLabel, orderBullionTaxFree, paymentMethodLabel, readSaleTradeIn } from '@/lib/in-store-sale';
 import { describeShippingService } from '@/lib/shipping-service';
 import { adminUpdateProductsStatus } from '@/app/actions/admin-products';
 import { AppIcon } from '@/components/AppIcon';
@@ -23,6 +23,7 @@ import { heardAboutAdminLabel } from '@/lib/order-heard-about';
 import type { OrderGift } from '@/lib/order-gift';
 import OrderDeliveryTracking from '@/components/admin/OrderDeliveryTracking';
 import type { OrderTrackingRow } from '@/lib/shipment-tracking';
+import { DEFAULT_DELIVERY_EMAIL_SETTING, type DeliveryEmailSetting } from '@/lib/order-delivery-emails';
 import OrderPickupPanel from '@/components/admin/pickup/OrderPickupPanel';
 import EmailCopyViewer from '@/components/admin/EmailCopyViewer';
 import { paperDateLine } from '@/lib/order-receipt-paper';
@@ -98,6 +99,11 @@ interface Props {
   deliveryTracking?: OrderTrackingRow | null;
   /** EasyPost connected (EASYPOST_API_KEY set) — the shipped email then promises delivery updates. */
   deliveryTrackingEnabled?: boolean;
+  /**
+   * "Send customer shipping updates" (lib/order-delivery-emails.ts, 2026-11-24):
+   * this order's automatic carrier emails on/off; `ready: false` until its SQL runs.
+   */
+  deliveryEmails?: DeliveryEmailSetting;
   /** The Local Pickup log (lib/order-pickup.ts, 2026-11-21); `supported: false` until its SQL runs. */
   pickup?: OrderPickupState;
   /** The pickup hours in Spanish (`formatPickupHours(schedule, 'es')`), for Spanish previews and prints. */
@@ -126,6 +132,7 @@ export default function OrderDetailPanel({
   gift = null,
   deliveryTracking: initialDeliveryTracking = null,
   deliveryTrackingEnabled = false,
+  deliveryEmails: initialDeliveryEmails = DEFAULT_DELIVERY_EMAIL_SETTING,
   pickup = { supported: true, row: null },
   pickupHoursEs,
   customerLanguage: initialCustomerLanguage = { value: 'en', ready: false },
@@ -163,6 +170,9 @@ export default function OrderDetailPanel({
   const [emailMessage, setEmailMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const [pendingFulfillmentStatus, setPendingFulfillmentStatus] = useState<FulfillmentStatus | null>(null);
   const [notifyCustomerOnFulfillment, setNotifyCustomerOnFulfillment] = useState(true);
+  // The second box (2026-11-24): the automatic carrier emails, saved on the order.
+  const [deliveryEmails, setDeliveryEmails] = useState<DeliveryEmailSetting>(initialDeliveryEmails);
+  const [sendShippingUpdates, setSendShippingUpdates] = useState(initialDeliveryEmails.on);
   const [showEmailUpdate, setShowEmailUpdate] = useState(false);
   const [emailUpdateStatus, setEmailUpdateStatus] = useState<FulfillmentStatus | null>(null);
   const [emailUpdateRecipient, setEmailUpdateRecipient] = useState(order.customer_email ?? '');
@@ -192,8 +202,13 @@ export default function OrderDetailPanel({
   });
   // Same flag the email-update route uses, so the preview matches what is sent.
   const emailUpdateContent = emailUpdateStatus
-    ? buildFulfillmentUpdateEmailContent(order, emailUpdateStatus, { deliveryUpdates: deliveryTrackingEnabled, language: customerLanguage })
+    ? buildFulfillmentUpdateEmailContent(order, emailUpdateStatus, { deliveryUpdates: deliveryTrackingEnabled && deliveryEmails.on, language: customerLanguage })
     : null;
+
+  // The second box shows for a shipping order being marked Shipped; it can be
+  // changed only once its SQL has run and EasyPost is connected.
+  const shippingUpdatesBoxShown = order.shipping_method === 'shipping' && trackingSupported;
+  const shippingUpdatesBoxUsable = shippingUpdatesBoxShown && deliveryTrackingEnabled && deliveryEmails.ready;
 
   async function changeCustomerLanguage(next: OrderLanguage) {
     if (next === customerLanguage || languageSaving) return;
@@ -377,6 +392,7 @@ export default function OrderDetailPanel({
   function openFulfillmentUpdate(status: FulfillmentStatus) {
     setPendingFulfillmentStatus(status);
     setNotifyCustomerOnFulfillment(true);
+    setSendShippingUpdates(deliveryEmails.on);
     setMessage(null);
     if (status === 'shipped') {
       setShippingCarrier(order.shipping_carrier ?? '');
@@ -406,6 +422,15 @@ export default function OrderDetailPanel({
       return;
     }
     const shouldNotify = notifyCustomerOnFulfillment;
+    // Save "Send customer shipping updates" FIRST, before the order reads as
+    // Shipped: registering the package below can send an email at once.
+    if (status === 'shipped' && shippingUpdatesBoxUsable && sendShippingUpdates !== deliveryEmails.on) {
+      const saveError = await saveDeliveryEmails(sendShippingUpdates);
+      if (saveError) {
+        setMessage({ text: saveError, ok: false });
+        return;
+      }
+    }
     const ok = await updateFulfillment(status);
     if (!ok) return;
     setPendingFulfillmentStatus(null);
@@ -425,6 +450,23 @@ export default function OrderDetailPanel({
       setEmailUpdateRecipient(order.customer_email ?? '');
       setEmailUpdateMessage(null);
       setShowEmailUpdate(true);
+    }
+  }
+
+  /** Save the order's shipping updates setting. Returns an error to show, or null when saved. */
+  async function saveDeliveryEmails(on: boolean): Promise<string | null> {
+    try {
+      const response = await fetch(`/api/admin/orders/${order.id}/delivery-emails`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ on }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.setting) return result?.error ?? 'Could not save the shipping updates setting.';
+      setDeliveryEmails(result.setting as DeliveryEmailSetting);
+      return null;
+    } catch {
+      return 'Could not reach the site to save the shipping updates setting.';
     }
   }
 
@@ -1073,6 +1115,11 @@ export default function OrderDetailPanel({
                           ) : (
                             <span style={{ color: 'var(--color-on-surface)' }}>{item.title_snapshot}</span>
                           )}
+                          {item.tax_free_bullion && (
+                            <span className="ml-2 whitespace-nowrap rounded-full px-2 py-0.5 text-[0.6rem] font-bold uppercase tracking-[0.12em]" style={{ color: '#16653c', background: '#e3f1e8' }}>
+                              Bullion · no tax
+                            </span>
+                          )}
                         </td>
                         <td className="px-3 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
                           {meltValue != null ? formatUsdPrice(meltValue) : '-'}
@@ -1182,23 +1229,15 @@ export default function OrderDetailPanel({
                   tracking={deliveryTracking}
                   enabled={deliveryTrackingEnabled}
                   onChange={setDeliveryTracking}
+                  emails={deliveryEmails}
+                  onEmailsChange={saveDeliveryEmails}
                 />
               )}
               {pendingFulfillmentStatus && (
                 <div className="mt-3 grid gap-4 border px-4 py-4" style={{ borderColor: BORDER, background: 'var(--color-surface-container-low)' }}>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="text-sm" style={{ color: 'var(--color-on-surface)' }}>
-                      Mark this order as {orderStatusLabel(pendingFulfillmentStatus)}?
-                    </span>
-                    <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
-                      <input
-                        type="checkbox"
-                        checked={notifyCustomerOnFulfillment}
-                        onChange={(event) => setNotifyCustomerOnFulfillment(event.target.checked)}
-                      />
-                      Update customer via email
-                    </label>
-                  </div>
+                  <span className="text-sm" style={{ color: 'var(--color-on-surface)' }}>
+                    Mark this order as {orderStatusLabel(pendingFulfillmentStatus)}?
+                  </span>
                   {pendingFulfillmentStatus === 'shipped' && trackingSupported && (
                     <div className="grid gap-3 sm:grid-cols-2">
                       <label className="grid gap-1">
@@ -1237,6 +1276,57 @@ export default function OrderDetailPanel({
                       Apply supabase/order-shipping-tracking-2026-07.sql before saving shipment details.
                     </p>
                   )}
+                  {/* Two boxes (owner, 2026-11-24, mockup 1): the hand-sent email now,
+                      and the automatic carrier emails for this order. */}
+                  <div className="grid gap-2.5">
+                    <label className="flex items-start gap-2 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+                      <input
+                        type="checkbox"
+                        className="mt-1 shrink-0"
+                        checked={notifyCustomerOnFulfillment}
+                        onChange={(event) => setNotifyCustomerOnFulfillment(event.target.checked)}
+                      />
+                      <span>
+                        Update customer via email
+                        {pendingFulfillmentStatus === 'shipped' && shippingUpdatesBoxShown && (
+                          <span className="block text-xs">The Shipped email, sent now (you see it before it goes)</span>
+                        )}
+                      </span>
+                    </label>
+                    {pendingFulfillmentStatus === 'shipped' && shippingUpdatesBoxShown && (
+                      <>
+                        <label
+                          className="flex items-start gap-2 text-sm"
+                          style={{ color: 'var(--color-on-surface-variant)', opacity: shippingUpdatesBoxUsable ? 1 : 0.6 }}
+                        >
+                          <input
+                            type="checkbox"
+                            className="mt-1 shrink-0"
+                            checked={shippingUpdatesBoxUsable ? sendShippingUpdates : deliveryEmails.on && deliveryTrackingEnabled}
+                            disabled={!shippingUpdatesBoxUsable}
+                            onChange={(event) => setSendShippingUpdates(event.target.checked)}
+                          />
+                          <span>
+                            <strong className="font-semibold" style={{ color: 'var(--color-on-surface)' }}>Send customer shipping updates</strong>
+                            <span className="block text-xs">Automatic, from the carrier: expected delivery date · out for delivery · delivered</span>
+                          </span>
+                        </label>
+                        {!deliveryTrackingEnabled ? (
+                          <p className="ml-[21px] text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                            EasyPost is not connected (Admin → Settings → Delivery Tracking), so no automatic emails go out.
+                          </p>
+                        ) : !deliveryEmails.ready ? (
+                          <p className="ml-[21px] text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                            Run supabase/order-delivery-emails-2026-11.sql to turn this off per order. Until then the updates always go.
+                          </p>
+                        ) : !sendShippingUpdates && (
+                          <p className="ml-[21px] text-xs" style={{ color: 'var(--color-error)' }}>
+                            This customer gets no automatic delivery emails for this order.
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
                   <div className="flex flex-wrap items-center gap-3">
                     <button
                       type="button"
@@ -1323,7 +1413,14 @@ export default function OrderDetailPanel({
             <div className="border-t mt-4 pt-4" style={{ borderColor: BORDER }}>
               <MoneyRow label="Subtotal" value={order.subtotal} />
               {order.discount > 0 && <MoneyRow label="Discount" value={-order.discount} />}
-              <MoneyRow label={taxExemption ? 'Tax · exempt' : 'Tax'} value={order.tax} />
+              <MoneyRow
+                label={taxExemption
+                  ? 'Tax · exempt'
+                  : orderBullionTaxFree(order.order_items ?? []) > 0
+                    ? bullionTaxLabel(order, orderBullionTaxFree(order.order_items ?? []), 'Tax')
+                    : 'Tax'}
+                value={order.tax}
+              />
               <MoneyRow label="Shipping" value={order.shipping_fee} />
               <div className="border-t mt-3 pt-3" style={{ borderColor: BORDER }}>
                 <MoneyRow label="Total" value={order.total} strong />
@@ -1691,6 +1788,8 @@ function emailTypeLabel(email: { email_type: string; status: string | null }): s
   if (email.email_type === 'invoice') return 'Invoice';
   if (email.email_type === 'receipt') return 'Receipt';
   if (email.email_type === 'pickup_receipt') return 'Pickup Receipt';
+  // Admin → Follow-ups (2026-11-24): status = "step1" / "step2".
+  if (email.email_type === 'follow_up') return email.status === 'step2' ? 'Follow-up — Care tips' : 'Follow-up — Thank you';
   if (email.email_type === 'fulfillment_update') {
     return email.status ? `Update — ${orderStatusLabel(email.status)}` : 'Fulfillment Update';
   }

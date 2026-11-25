@@ -215,3 +215,11 @@ ran the file before drafts existed, run it once more). Without it only "Email
 invoice" / "Save draft" fail and the Open invoices / Drafts lists stay empty;
 the In-store sale and the rest of the site work as before. No new environment variables (the pay page
 uses the existing PayPal and Resend settings).
+
+## Bullion — no sales tax (2026-11-24)
+
+- **What:** a box on every item card (In-store, Remote, Trade-in). Ticked → that item is left out of the 6% FL tax; a shipment taxes only the non-bullion share of shipping. Listed Coin/Bullion pieces start ticked. Unlisted bullion must be Gold / Silver / Platinum.
+- **Law:** DOR TIP 25A01-03 (bullion, any price, from 2025-08-01); TIP 26A01-08 (99.5% gold / 99.9% silver coins, rounds, bars, from 2026-07-01). Jewelry, sterling, collectibles = taxed.
+- **Data:** `order_items.tax_free_bullion` (`supabase/order-items-bullion-2026-11.sql`), set by `markBullionLines` after `create_paypal_order`; the internal note also names the lines. Readers: `lib/bullion-sale-server.ts` (tolerant).
+- **Receipts:** paper, email, order page, invoice print, the Remote pay page: "Bullion — not taxed" on the line, "FL sales tax · 6% on $X", and "Gold, silver and platinum bullion is exempt from Florida sales tax (s. 212.08(7)(ww), F.S.)."
+- **Before the SQL:** a sale with a ticked item is refused ("needs a one-time database update first …"); untick to record it taxed.

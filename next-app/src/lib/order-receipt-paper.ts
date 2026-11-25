@@ -21,7 +21,7 @@ import { formatProductItemYear } from '@/types/product';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 import { cityLine, landmarkPhrase, streetLine } from '@/lib/business-location';
 import { BUSINESS_PHONE, SITE_DOMAIN_LABEL } from '@/lib/order-email-branding';
-import { readSaleTradeIn, tradeInReceiptLine } from '@/lib/in-store-sale';
+import { BULLION_LAW_LINE, BULLION_LINE_LABEL, bullionTaxLabel, orderBullionTaxFree, readSaleTradeIn, tradeInReceiptLine } from '@/lib/in-store-sale';
 import { type TaxExemptSnapshot } from '@/lib/tax-exempt';
 import { exemptReceiptLineIn, itemTitleIn, metalIn, orderDateTimeLine, paidByLinesIn, tradeInReceiptLineEs, type OrderLanguage } from '@/lib/order-language';
 
@@ -35,7 +35,7 @@ export type PaperReceiptOrder = Pick<
   split_payments?: unknown;
   /** A Trade-in sale's trade (`TRADE_IN_COLUMN`, 2026-11-21) — one line under the totals. */
   trade_in?: unknown;
-} & { order_items: Pick<OrderItem, 'product_id' | 'inventory_number' | 'title_snapshot' | 'item_year_snapshot' | 'metal_snapshot' | 'purity_snapshot' | 'gram_weight_snapshot' | 'price_snapshot' | 'quantity' | 'discount' | 'image_snapshot'>[] };
+} & { order_items: (Pick<OrderItem, 'product_id' | 'inventory_number' | 'title_snapshot' | 'item_year_snapshot' | 'metal_snapshot' | 'purity_snapshot' | 'gram_weight_snapshot' | 'price_snapshot' | 'quantity' | 'discount' | 'image_snapshot' | 'tax_free_bullion'> & { id?: string })[] };
 
 export type PaperReceipt = { title: string; css: string; body: string };
 
@@ -126,6 +126,7 @@ export function buildPaperReceipt(
       item.purity_snapshot ? formatPublicPurity(item.purity_snapshot) : null,
       item.gram_weight_snapshot ? `${item.gram_weight_snapshot} g` : null,
       qty > 1 ? `${es ? 'Cant.' : 'Qty'} ${qty} × ${formatCurrency(Number(item.price_snapshot))}` : null,
+      item.tax_free_bullion ? BULLION_LINE_LABEL[language] : null,
     ].filter(Boolean).join(' · ');
     const image = normalizeLegacyLocalImageUrl(item.image_snapshot);
     return `<tr>
@@ -147,9 +148,13 @@ ${anyPhoto ? `<td class="ph">${image ? `<img src="${esc(image)}" alt="">` : ''}<
       : `<div class="lab">Delivery</div>${pickedUp ? 'Picked up in store' : 'Pickup at the showroom'}`;
   const contact = [order.customer_email, order.customer_phone].filter(Boolean).map((v) => esc(String(v))).join(' · ');
 
-  const taxLabel = es
-    ? (opts.taxExempt ? 'Impuesto de ventas de FL · exento' : Number(order.tax) > 0 ? 'Impuesto de ventas de FL · 6%' : 'Impuesto de ventas')
-    : (opts.taxExempt ? 'FL sales tax · exempt' : Number(order.tax) > 0 ? 'FL sales tax · 6%' : 'Sales tax');
+  // Bullion lines (2026-11-24): the 6% names what it was figured on.
+  const bullionTaxFree = orderBullionTaxFree(items);
+  const taxLabel = !opts.taxExempt && bullionTaxFree > 0
+    ? bullionTaxLabel(order, bullionTaxFree, es ? 'Impuesto de ventas de FL' : 'FL sales tax', language)
+    : es
+      ? (opts.taxExempt ? 'Impuesto de ventas de FL · exento' : Number(order.tax) > 0 ? 'Impuesto de ventas de FL · 6%' : 'Impuesto de ventas')
+      : (opts.taxExempt ? 'FL sales tax · exempt' : Number(order.tax) > 0 ? 'FL sales tax · 6%' : 'Sales tax');
   const totals = [
     es
       ? `<div><span>Subtotal · ${count} artículo${count === 1 ? '' : 's'}</span><span>${esc(formatCurrency(order.subtotal))}</span></div>`
@@ -179,7 +184,8 @@ ${anyPhoto ? `<td class="ph">${image ? `<img src="${esc(image)}" alt="">` : ''}<
 <table><thead><tr><th></th>${anyPhoto ? '<th></th>' : ''}<th>${es ? 'Artículo' : 'Item'}</th><th class="m">${es ? 'Precio' : 'Price'}</th></tr></thead><tbody>${rows}</tbody></table>
 <div class="totals">${totals}</div>${opts.taxExempt ? `
 <div class="exempt">${esc(exemptReceiptLineIn(opts.taxExempt, language))}</div>` : ''}${tradeIn ? `
-<div class="exempt">${esc(es ? tradeInReceiptLineEs(tradeIn) : tradeInReceiptLine(tradeIn))}</div>` : ''}
+<div class="exempt">${esc(es ? tradeInReceiptLineEs(tradeIn) : tradeInReceiptLine(tradeIn))}</div>` : ''}${bullionTaxFree > 0 ? `
+<div class="exempt">${esc(BULLION_LAW_LINE[language])}</div>` : ''}
 <div class="foot">
   ${footer}
 </div>

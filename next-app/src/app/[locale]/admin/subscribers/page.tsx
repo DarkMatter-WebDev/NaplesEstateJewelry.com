@@ -5,6 +5,7 @@ import { getVerifiedUser } from '@/lib/auth-claims';
 import AdminHeader from '@/components/admin/AdminHeader';
 import SubscribersManager, { type SubscriberRow } from '@/components/admin/SubscribersManager';
 import { buildSubscriberDirectory } from '@/lib/marketing';
+import { subscriberRowFromDirectory } from '@/lib/subscriber-sort';
 
 export const metadata: Metadata = { title: 'Admin - Subscribers' };
 
@@ -49,18 +50,8 @@ export default async function AdminSubscribersPage({ params }: Props) {
       .eq('is_read', false),
   ]);
 
-  const rows: SubscriberRow[] = audienceResult.data.map((recipient) => ({
-    subscriberId: recipient.subscriberId,
-    email: recipient.email,
-    name: recipient.name,
-    source: recipient.source,
-    subscriberSource: recipient.subscriberSource,
-    subscriberEmail: recipient.subscriberEmail,
-    subscribedAt: recipient.subscribedAt,
-    accountCreatedAt: recipient.accountCreatedAt,
-    phone: recipient.phone,
-    smsStatus: recipient.smsStatus,
-  }));
+  // Both languages ride along (2026-11-24 fix) — see subscriberRowFromDirectory.
+  const rows: SubscriberRow[] = audienceResult.data.map(subscriberRowFromDirectory);
 
   // The three counts at the top: email is the newsletter, texts only count
   // once the number has replied YES (nothing is ever sent to a pending one).

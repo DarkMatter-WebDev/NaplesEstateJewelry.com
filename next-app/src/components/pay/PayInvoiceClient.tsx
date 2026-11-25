@@ -15,6 +15,8 @@ export type PayInvoiceData = {
   due: string;
   items: PayInvoiceItem[];
   subtotal: number;
+  /** The bullion lines' total (2026-11-24): never taxed, at any address. */
+  taxFree?: number;
   shippingFee: number;
   ships: boolean;
   shippingLabel: string;
@@ -56,7 +58,7 @@ export default function PayInvoiceClient({ data, locale, paypalClientId }: { dat
   const set = (patch: Partial<typeof form>) => setForm((current) => ({ ...current, ...patch }));
 
   const stateCode = data.ships ? normalizeUsState(form.state) : null;
-  const totals = payPageTotals({ subtotal: data.subtotal, shipping_fee: data.shippingFee, shipping_method: data.ships ? 'shipping' : 'pickup', tax_exempt: Boolean(data.taxExempt) }, stateCode);
+  const totals = payPageTotals({ subtotal: data.subtotal, shipping_fee: data.shippingFee, shipping_method: data.ships ? 'shipping' : 'pickup', tax_exempt: Boolean(data.taxExempt) }, stateCode, data.taxFree ?? 0);
 
   const missing: string[] = [];
   if (!form.first_name.trim()) missing.push(isEs ? 'nombre' : 'first name');
@@ -164,6 +166,7 @@ export default function PayInvoiceClient({ data, locale, paypalClientId }: { dat
           ) : (
           <span>
             {isEs ? 'Impuesto de FL' : 'FL sales tax'}{totals.tax > 0 ? ` · ${FL_TAX_RATE_LABEL}` : ''}
+            {totals.taxFree > 0 && <span className="text-xs" style={hintStyle}>{isEs ? ' · lingotes sin impuesto' : ' · bullion not taxed'}</span>}
             {data.ships && totals.tax === 0 && <span className="text-xs" style={hintStyle}>{isEs ? ` · ninguno fuera de Florida` : ' · none outside Florida'}</span>}
             {data.ships && !stateCode && <span className="text-xs" style={hintStyle}>{isEs ? ' · sale del total fuera de Florida' : ' · comes off outside Florida'}</span>}
           </span>

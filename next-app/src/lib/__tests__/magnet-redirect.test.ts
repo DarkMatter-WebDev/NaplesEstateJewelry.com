@@ -79,13 +79,15 @@ describe('QR scan counting (magnet + cards)', () => {
     vi.useRealTimers();
   });
 
-  it('lists the three printed codes, and only the cards may report from a page', () => {
+  it('lists the three printed codes, and each may report from its own page', () => {
     expect(SCAN_SOURCE_KEYS).toEqual(['magnet', 'card', 'kittcard']);
     expect(SCAN_SOURCES.card.path).toBe(CARD_HOLDERS.card.path);
     expect(SCAN_SOURCES.kittcard.path).toBe(CARD_HOLDERS.kittcard.path);
-    expect([...PAGE_SCAN_SOURCES]).toEqual(['card', 'kittcard']);
+    // `magnet` since 2026-11-23: the /magnet landing page pings once it is live;
+    // while it is held /api/magnet counts instead (magnet-landing.test.ts).
+    expect([...PAGE_SCAN_SOURCES]).toEqual(['card', 'kittcard', 'magnet']);
     expect(isPageScanSource('card')).toBe(true);
-    expect(isPageScanSource('magnet')).toBe(false); // counted server side only
+    expect(isPageScanSource('magnet')).toBe(true);
     expect(isPageScanSource('anything')).toBe(false);
     for (const key of SCAN_SOURCE_KEYS) expect(key).toMatch(/^[a-z0-9_-]{1,40}$/); // the SQL check constraint
     // This project never grants new tables to service_role on its own (live 42501, 10-31).

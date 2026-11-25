@@ -10,6 +10,7 @@
  * columns sort like the others; blanks sit last either way.
  */
 import { formatUsPhone, smsStatusLabel, subscriberChannelLabel, type SmsStatus } from './subscriber-phone';
+import type { SubscriberDirectoryRow } from './marketing';
 
 export type SubscriberRow = {
   /** The `homepage_subscribers` row behind this line (Edit / Combine / Delete act on it); null for account- or buyer-only lines. */
@@ -28,13 +29,37 @@ export type SubscriberRow = {
   phone: string | null;
   /** Where the number stands: waiting for the YES reply, confirmed, or stopped. */
   smsStatus: SmsStatus | null;
-  /** The language their texts and emails go out in (2026-11-22) — 'es' shows an ES label. */
+  /** The language their texts and emails go out in (2026-11-22) — the Language column (2026-11-24). */
   language?: 'en' | 'es';
   /** The newsletter row's own setting — what Edit's Language switch starts on. */
   subscriberLanguage?: 'en' | 'es' | null;
 };
 
-export type SubscriberSortKey = 'name' | 'email' | 'phone' | 'alerts' | 'source' | 'subscribed';
+/**
+ * One directory line as the admin table gets it (app/[locale]/admin/subscribers/page.tsx).
+ * Every field the table or Edit reads must pass through here: until 2026-11-24
+ * the page copied the fields by hand and left out both languages, so after any
+ * reload Edit's switch opened on English and the ES label never showed, though
+ * the saved setting was Spanish.
+ */
+export function subscriberRowFromDirectory(recipient: SubscriberDirectoryRow): SubscriberRow {
+  return {
+    subscriberId: recipient.subscriberId,
+    email: recipient.email,
+    name: recipient.name,
+    source: recipient.source,
+    subscriberSource: recipient.subscriberSource,
+    subscriberEmail: recipient.subscriberEmail,
+    subscribedAt: recipient.subscribedAt,
+    accountCreatedAt: recipient.accountCreatedAt,
+    phone: recipient.phone,
+    smsStatus: recipient.smsStatus,
+    language: recipient.language === 'es' ? 'es' : 'en',
+    subscriberLanguage: recipient.subscriberLanguage,
+  };
+}
+
+export type SubscriberSortKey = 'name' | 'email' | 'phone' | 'alerts' | 'language' | 'source' | 'subscribed';
 export type SubscriberSortDirection = 'asc' | 'desc';
 export interface SubscriberSort {
   key: SubscriberSortKey;
@@ -80,6 +105,16 @@ export function subscriberAlertsLabel(row: Pick<SubscriberRow, 'email' | 'phone'
   return status ? `${channel} · ${status}` : channel;
 }
 
+/**
+ * The Language column (owner, 2026-11-24): the language their texts and emails
+ * go out in — the one they signed up in, unless switched in Edit since (only
+ * the current setting is stored). A line with no language sorts as English,
+ * which is what it receives.
+ */
+export function subscriberLanguageLabel(row: Pick<SubscriberRow, 'language'>): 'English' | 'Español' {
+  return row.language === 'es' ? 'Español' : 'English';
+}
+
 /** The date the Subscribed column shows: the newsletter row, else the account creation. */
 export function subscriberSortDate(row: Pick<SubscriberRow, 'subscribedAt' | 'accountCreatedAt'>): number | null {
   const raw = row.subscribedAt ?? row.accountCreatedAt;
@@ -106,6 +141,8 @@ function sortValue(row: SubscriberRow, key: SubscriberSortKey): string | number 
       return row.phone ? formatUsPhone(row.phone) : null;
     case 'alerts':
       return subscriberAlertsLabel(row);
+    case 'language':
+      return subscriberLanguageLabel(row);
     case 'source':
       return subscriberSourceLabel(row);
     case 'subscribed':

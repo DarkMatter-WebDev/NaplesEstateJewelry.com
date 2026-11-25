@@ -23,6 +23,7 @@ import SaleItemsEditor, {
   saleItemLabel,
   saleItemPayload,
   saleItemsProblem,
+  saleItemsTaxFree,
   type InStoreProduct,
   type SaleItemDraft,
 } from '@/components/admin/instant-sale/SaleItemsEditor';
@@ -139,8 +140,10 @@ export default function InStoreSaleForm({
     : shipping === 'custom'
       ? parseInStoreShippingFee(customFee)
       : priceValue != null ? inStoreTableShippingFee(shipping, priceValue) : null;
+  // "Bullion — no sales tax" items (2026-11-24) are left out of the 6%.
+  const taxFree = saleItemsTaxFree(items);
   const totals = priceValue != null && shippingFee != null
-    ? inStoreTotals(priceValue, { shippingFee, chargesTax })
+    ? inStoreTotals(priceValue, { shippingFee, chargesTax, taxFree })
     : null;
   const paymentParts = salePaymentParts(payments, totals?.total ?? null);
   const paymentsProblem = salePaymentsProblem(payments, totals?.total ?? null);
@@ -414,7 +417,10 @@ export default function InStoreSaleForm({
           <h2 className="text-lg font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>Total</h2>
           {items.length > 1 && items.map((item, index) => (
             <div key={item.key} className="flex justify-between gap-3 text-sm">
-              <span className="min-w-0 truncate">{index + 1} · {saleItemLabel(item)}</span>
+              <span className="min-w-0 truncate">
+                {index + 1} · {saleItemLabel(item)}
+                {item.bullion && <span className="ml-1.5 text-[0.6rem] font-bold uppercase tracking-[0.12em]" style={{ color: '#16653c' }}>no tax</span>}
+              </span>
               <span>{prices[index] != null ? formatCurrency(prices[index] as number) : '—'}</span>
             </div>
           ))}
@@ -432,8 +438,15 @@ export default function InStoreSaleForm({
             <span>
               {exempt && owesTax
                 ? <>FL sales tax · <strong style={{ color: '#16653c' }}>exempt</strong></>
-                : chargesTax ? 'FL sales tax · 6%' : 'FL sales tax'}
-              {shipped && !exempt && (
+                : chargesTax
+                  ? totals && totals.taxFree > 0
+                    ? totals.tax > 0 ? `FL sales tax · 6% on ${formatCurrency(totals.taxable)}` : 'FL sales tax · none'
+                    : 'FL sales tax · 6%'
+                  : 'FL sales tax'}
+              {chargesTax && totals && totals.taxFree > 0 && (
+                <span className="text-xs" style={hintStyle}> (bullion {formatCurrency(totals.taxFree)} · <strong style={{ color: '#16653c' }}>no tax</strong>)</span>
+              )}
+              {shipped && !exempt && !(chargesTax && (totals?.taxFree ?? 0) > 0) && (
                 <span className="text-xs" style={hintStyle}>
                   {chargesTax ? (shippingFee ? ' (item + shipping)' : '') : ` · none, ships to ${stateCode}`}
                 </span>

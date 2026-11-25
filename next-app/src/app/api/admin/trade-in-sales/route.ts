@@ -14,7 +14,14 @@ import {
   type BuyReceiptPayment,
   type BuyReceiptRow,
 } from '@/lib/buy-receipts';
-import { buildSaleItemPayloads, createOrderErrorStatus, recordOfflinePayment } from '@/lib/instant-sale-server';
+import {
+  buildSaleItemPayloads,
+  bullionInternalNote,
+  bullionNotReadyError,
+  createOrderErrorStatus,
+  markBullionLines,
+  recordOfflinePayment,
+} from '@/lib/instant-sale-server';
 import {
   SALE_TRADE_CREDIT,
   inStorePaymentMethodValue,
@@ -62,6 +69,9 @@ export async function POST(req: Request) {
   // The listed items are checked BEFORE anything is written.
   const lines = await buildSaleItemPayloads(service, sale.items);
   if ('error' in lines) return NextResponse.json({ error: lines.error }, { status: lines.status });
+  // "Bullion — no sales tax" (2026-11-24): refused before anything is written if the SQL has not run.
+  const bullionBlocked = await bullionNotReadyError(service, sale.items);
+  if (bullionBlocked) return NextResponse.json({ error: bullionBlocked }, { status: 503 });
 
   // 1. The buy receipt.
   const { data: inserted, error: insertError } = await supabase
@@ -102,6 +112,7 @@ export async function POST(req: Request) {
     reference,
     balance.payout > 0 ? `Paid to the seller: ${formatCurrency(balance.payout)} (on ${receipt.receipt_number})` : null,
     `recorded by ${email ?? 'admin'}`,
+    bullionInternalNote(lines.payloads),
     sale.note,
   ].filter(Boolean).join(' | ');
 
@@ -136,6 +147,9 @@ export async function POST(req: Request) {
       { status: createError ? createOrderErrorStatus(createError.message) : 500 },
     );
   }
+
+  // Before the payment step emails the receipt, so it says which lines were bullion.
+  await markBullionLines(service, orderId, lines.payloads);
 
   // The buy receipt's "Seller's copy" switch sets both receipts (2026-11-21):
   // a Spanish seller's copy means a Spanish sale receipt too.

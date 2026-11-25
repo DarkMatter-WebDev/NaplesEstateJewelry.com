@@ -3367,6 +3367,72 @@ html[data-nej-magnet] body:has(main[data-magnet-landing]) [data-cookie-notice] {
   }
 }
 
+/* The /magnet landing page's "more below" arrow (owner, 2026-11-23, mockup 4
+   "C1"; components/magnet/ScrollCue.tsx). Fixed over the bottom of the first
+   screen, above the phone's home bar; bobs 6px; hidden until the page knows
+   there IS more below, gone after the first scroll. The page hides the cookie
+   notice (data-no-cookie-notice), so nothing else sits down there. The bob
+   owns `transform`, so hover/press answer with colour and shadow instead. */
+.scroll-cue {
+  position: fixed;
+  left: 50%;
+  bottom: calc(0.75rem + env(safe-area-inset-bottom));
+  z-index: 40;
+  width: 2.375rem;
+  height: 2.375rem;
+  margin-left: -1.1875rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1.5px solid #c9a227;
+  color: var(--color-primary);
+  box-shadow: 0 8px 20px rgba(38, 28, 6, 0.18);
+  cursor: pointer;
+  transition: opacity 0.25s, visibility 0.25s, background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  animation: scroll-cue-bob 1.8s ease-in-out infinite;
+}
+/* Shorter phones: the corner, where the centred hours lines leave room. */
+.scroll-cue[data-pos='right'] {
+  left: auto;
+  right: 0.75rem;
+  margin-left: 0;
+}
+.scroll-cue[data-state='hidden'],
+.scroll-cue[data-state='gone'] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+@media (hover: hover) {
+  .scroll-cue:hover {
+    border-color: var(--color-primary);
+    box-shadow: 0 12px 26px rgba(38, 28, 6, 0.26);
+  }
+}
+.scroll-cue:active {
+  background: #fff5d6;
+}
+.scroll-cue:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+@keyframes scroll-cue-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scroll-cue {
+    animation: none;
+  }
+}
+
 /* Hover sweep (2026-11-01 — owner: "check the site" against the rule "EVERY
    button reacts to hover"; DECISIONS.md top entry). A real-mouse audit of 38
    public pages found these with no hover change at all. Shared classes, so a

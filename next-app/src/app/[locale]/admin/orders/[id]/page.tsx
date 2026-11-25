@@ -8,12 +8,14 @@ import { loadCertificateEditorForOrder, loadOrderTaxExemption } from '@/lib/tax-
 import { createServiceClient } from '@/lib/supabase/service';
 import { loadOrderGift } from '@/lib/order-gift-server';
 import { loadOrderTracking } from '@/lib/order-tracking-server';
+import { loadDeliveryEmailSetting } from '@/lib/order-delivery-emails-server';
 import { loadOrderPickup } from '@/lib/order-pickup-server';
 import { isPickupOrder } from '@/lib/order-pickup';
 import { isDeliveryTrackingConfigured } from '@/lib/easypost';
 import { formatPickupHours } from '@/lib/order-invoice-email';
 import { getStoreHours } from '@/lib/store-hours';
-import { SPLIT_PAYMENTS_COLUMN, TRADE_IN_COLUMN } from '@/lib/in-store-sale';
+import { SPLIT_PAYMENTS_COLUMN, TRADE_IN_COLUMN, withBullionFlags } from '@/lib/in-store-sale';
+import { loadBullionLineIds } from '@/lib/bullion-sale-server';
 import AdminHeader from '@/components/admin/AdminHeader';
 import type { Order, OrderItem } from '@/types/sales';
 import type { Product } from '@/types/product';
@@ -229,6 +231,11 @@ export default async function AdminOrderDetailPage({ params }: Props) {
   // their sale-time snapshots; melt is inherently a live estimate, so it is
   // computed from the current product rows plus spot and omitted when the
   // product is gone or has no weight/purity.
+  // "Bullion — not taxed" lines (2026-11-24); none before the SQL.
+  (order as unknown as Order & { order_items: OrderItem[] }).order_items = withBullionFlags(
+    (order as unknown as Order & { order_items: OrderItem[] }).order_items ?? [],
+    await loadBullionLineIds(supabase, id),
+  );
   const orderItems = (order as unknown as Order & { order_items: OrderItem[] }).order_items ?? [];
   const meltProductIds = Array.from(
     new Set(orderItems.map((item) => item.product_id).filter((value): value is string => Boolean(value))),
@@ -284,6 +291,7 @@ export default async function AdminOrderDetailPage({ params }: Props) {
         gift={await loadOrderGift(supabase, id)}
         deliveryTracking={await loadOrderTracking(supabase, id)}
         deliveryTrackingEnabled={isDeliveryTrackingConfigured()}
+        deliveryEmails={await loadDeliveryEmailSetting(supabase, id)}
         pickup={isPickupOrder(order as unknown as Order) ? await loadOrderPickup(supabase, id) : undefined}
       />
     </div>

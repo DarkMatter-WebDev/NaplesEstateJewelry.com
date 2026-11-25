@@ -31,7 +31,7 @@ import {
   type RemoteLinkDays,
 } from '@/lib/remote-sale';
 import { normalizeUsState } from '@/lib/us-address';
-import SaleItemsEditor, { newSaleItem, saleItemLabel, saleItemPayload, saleItemsProblem, type InStoreProduct, type SaleItemDraft } from './SaleItemsEditor';
+import SaleItemsEditor, { newSaleItem, saleItemLabel, saleItemPayload, saleItemsProblem, saleItemsTaxFree, type InStoreProduct, type SaleItemDraft } from './SaleItemsEditor';
 import SaleDeliverySection, { EMPTY_SALE_ADDRESS, type DeliveryMethod, type SaleAddressDraft } from './SaleDeliverySection';
 import RemoteInvoiceCard from './RemoteInvoiceCard';
 import ReceiptLanguageSwitch from '@/components/admin/instant-sale/ReceiptLanguageSwitch';
@@ -63,6 +63,7 @@ function itemsFromDraft(form: RemoteDraftForm | null, products: InStoreProduct[]
       purity: item.purity,
       price: selected || item.mode === 'unlisted' ? item.price : '',
       photoUrl: item.photoUrl,
+      bullion: item.bullion === true && (item.mode === 'unlisted' || Boolean(selected)),
     };
   });
   return { items, gone };
@@ -143,7 +144,9 @@ export default function RemoteSaleForm({
       : priceValue != null ? inStoreTableShippingFee(shipping, priceValue) : null;
   // The route's rule (lib/remote-sale.ts): no address yet = drawn with Florida tax.
   const exempt = taxExemptApplies(taxBox);
-  const totals = priceValue != null && shippingFee != null ? remoteTotals(priceValue, { method: delivery, shippingFee }, shipped ? stateCode : null, exempt) : null;
+  // "Bullion — no sales tax" items (2026-11-24) are left out of the 6%.
+  const taxFree = saleItemsTaxFree(items);
+  const totals = priceValue != null && shippingFee != null ? remoteTotals(priceValue, { method: delivery, shippingFee }, shipped ? stateCode : null, exempt, taxFree) : null;
   const outOfStateTotal = !exempt && shipped && !stateCode && totals ? round2(totals.subtotal + totals.shippingFee) : null;
 
   /** The form as typed — what "Save draft" keeps (`sanitizeRemoteDraft` on the server). */
@@ -158,6 +161,7 @@ export default function RemoteSaleForm({
         purity: item.purity,
         price: item.price,
         photoUrl: item.photoUrl,
+        bullion: item.bullion,
       })),
       customer: { firstName, lastName, email, phone },
       delivery: { method: delivery, mailingOn, address, shipping, customFee },
@@ -389,7 +393,10 @@ export default function RemoteSaleForm({
           <h2 className="text-lg font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>Invoice total</h2>
           {items.length > 1 && items.map((item, index) => (
             <div key={item.key} className="flex justify-between gap-3 text-sm">
-              <span className="min-w-0 truncate">{index + 1} · {saleItemLabel(item)}</span>
+              <span className="min-w-0 truncate">
+              {index + 1} · {saleItemLabel(item)}
+              {item.bullion && <span className="ml-1.5 text-[0.6rem] font-bold uppercase tracking-[0.12em]" style={{ color: '#16653c' }}>no tax</span>}
+            </span>
               <span>{prices[index] != null ? formatCurrency(prices[index] as number) : '—'}</span>
             </div>
           ))}
@@ -408,7 +415,8 @@ export default function RemoteSaleForm({
               <span>FL sales tax · <strong style={{ color: '#16653c' }}>exempt</strong> <span className="text-xs" style={hintStyle}>(any address)</span></span>
             ) : (
             <span>
-              {totals && totals.tax === 0 ? 'FL sales tax' : 'FL sales tax · 6%'}
+              {totals && totals.tax === 0 ? 'FL sales tax' : totals && totals.taxFree > 0 ? `FL sales tax · 6% on ${formatCurrency(totals.taxable)}` : 'FL sales tax · 6%'}
+              {totals && totals.taxFree > 0 && <span className="text-xs" style={hintStyle}> (bullion {formatCurrency(totals.taxFree)} · <strong style={{ color: '#16653c' }}>no tax</strong>)</span>}
               {shipped && <span className="text-xs" style={hintStyle}>{totals && totals.tax === 0 ? ` · none, ships to ${stateCode}` : stateCode ? ' (FL address)' : ' (until an address is in)'}</span>}
             </span>
             )}

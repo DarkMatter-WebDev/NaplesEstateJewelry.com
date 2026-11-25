@@ -53,6 +53,8 @@ export async function buildSaleItemPayloads(
         quantity: 1,
         // A photo taken for this sale replaces the listing's own, on this order only.
         image_snapshot: item.photoUrl ?? getProductImages(p)[0] ?? null,
+        // Ignored by create_paypal_order; `markBullionLines` sets the column after.
+        tax_free_bullion: item.bullion === true,
       });
     } else {
       payloads.push({
@@ -66,10 +68,62 @@ export async function buildSaleItemPayloads(
         price_snapshot: item.price,
         quantity: 1,
         image_snapshot: item.photoUrl,
+        tax_free_bullion: item.bullion === true,
       });
     }
   }
   return { payloads, listedIds };
+}
+
+// ---- Bullion — no sales tax (owner, 2026-11-24) ----------------------------
+// A ticked item is left out of the Florida tax (`inStoreTotals` taxFree) and
+// its order line is marked `order_items.tax_free_bullion` so every receipt can
+// say "Bullion — not taxed" — Rule 12A-1.0371(6) wants the bullion lines on
+// record. `create_paypal_order` (the checkout's RPC) is deliberately NOT
+// changed: the mark is set right after it writes the lines.
+
+export const BULLION_SQL_FILE = 'supabase/order-items-bullion-2026-11.sql';
+
+/** True once `order-items-bullion-2026-11.sql` has run (the column exists). */
+export async function bullionColumnReady(service: SupabaseClient): Promise<boolean> {
+  const { error } = await service.from('order_items').select('tax_free_bullion').limit(1);
+  return !error;
+}
+
+/**
+ * The refusal a sale with a bullion item gets before the SQL has run — BEFORE
+ * any order exists, so nothing is half-recorded with a tax the receipt cannot
+ * explain. Null = go ahead (no bullion, or the column is there).
+ */
+export async function bullionNotReadyError(service: SupabaseClient, items: Pick<InStoreItem, 'bullion'>[]): Promise<string | null> {
+  if (!items.some((item) => item.bullion)) return null;
+  if (await bullionColumnReady(service)) return null;
+  return `Bullion — no sales tax needs a one-time database update first (${BULLION_SQL_FILE}). Untick it, or run the SQL and try again.`;
+}
+
+/**
+ * Mark the order's bullion lines. Listed lines are found by their product
+ * (one per order); unlisted ones by their typed title + price. Logged, never
+ * thrown: the order's internal note already names the bullion lines.
+ */
+export async function markBullionLines(service: SupabaseClient, orderId: string, payloads: SaleItemPayload[]): Promise<void> {
+  for (const line of payloads) {
+    if (line.tax_free_bullion !== true) continue;
+    let query = service.from('order_items').update({ tax_free_bullion: true }).eq('order_id', orderId);
+    query = line.product_id
+      ? query.eq('product_id', line.product_id)
+      : query.is('product_id', null).eq('title_snapshot', String(line.title_snapshot ?? '')).eq('price_snapshot', Number(line.price_snapshot));
+    const { error } = await query;
+    if (error) console.error('mark bullion line error:', orderId, error);
+  }
+}
+
+/** "Bullion, no FL tax: 1 oz Gold Maple Leaf $4,150.00" — for the order's internal note; null when none. */
+export function bullionInternalNote(payloads: SaleItemPayload[]): string | null {
+  const lines = payloads
+    .filter((line) => line.tax_free_bullion === true)
+    .map((line) => `${String(line.title_snapshot ?? '')} $${Number(line.price_snapshot).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+  return lines.length > 0 ? `Bullion, no FL tax: ${lines.join('; ')}` : null;
 }
 
 /** "No longer available: …" from create_paypal_order → a 409 the form can show. */

@@ -9,6 +9,7 @@ import {
   trackingStatusLabel,
   type OrderTrackingRow,
 } from '@/lib/shipment-tracking';
+import { DEFAULT_DELIVERY_EMAIL_SETTING, type DeliveryEmailSetting } from '@/lib/order-delivery-emails';
 
 const BORDER = 'var(--color-outline-variant)';
 
@@ -17,19 +18,36 @@ const BORDER = 'var(--color-outline-variant)';
  * the last carrier scan, and which automatic emails have gone. "Check
  * tracking now" re-registers / re-reads the package on demand; otherwise the
  * EasyPost webhook and the hourly sweep keep it current.
+ *
+ * 2026-11-24: "Shipping updates on / off" + Turn off / Turn on — this order's
+ * automatic carrier emails (lib/order-delivery-emails.ts). Off = the package
+ * is still tracked here; only the customer emails stop.
  */
+/** "sent" / "not yet", or "off" for one not sent while this order's updates are off. */
+function emailState(sentAt: string | null | undefined, on: boolean): string {
+  if (sentAt) return 'sent';
+  return on ? 'not yet' : 'off';
+}
+
 export default function OrderDeliveryTracking({
   orderId,
   tracking,
   enabled,
   onChange,
+  emails = DEFAULT_DELIVERY_EMAIL_SETTING,
+  onEmailsChange,
 }: {
   orderId: string;
   tracking: OrderTrackingRow | null;
   enabled: boolean;
   onChange: (row: OrderTrackingRow | null) => void;
+  /** This order's "Send customer shipping updates" setting. */
+  emails?: DeliveryEmailSetting;
+  /** Save it; resolves to an error to show, or null when saved. */
+  onEmailsChange?: (on: boolean) => Promise<string | null>;
 }) {
   const [checking, setChecking] = useState(false);
+  const [emailsSaving, setEmailsSaving] = useState(false);
   const [note, setNote] = useState<{ text: string; ok: boolean } | null>(null);
   const muted = { color: 'var(--color-on-surface-variant)' };
 
@@ -57,6 +75,23 @@ export default function OrderDeliveryTracking({
       </p>
     );
   }
+
+  const toggleEmails = async () => {
+    if (!onEmailsChange || emailsSaving) return;
+    setEmailsSaving(true);
+    setNote(null);
+    const turningOn = !emails.on;
+    const error = await onEmailsChange(turningOn);
+    setEmailsSaving(false);
+    setNote(error
+      ? { text: error, ok: false }
+      : {
+        text: turningOn
+          ? 'Shipping updates on. The customer gets the next carrier update; skipped ones are not sent late.'
+          : 'Shipping updates off. The customer gets no automatic delivery emails for this order.',
+        ok: true,
+      });
+  };
 
   const scanTime = formatScanTime(tracking?.last_event_at);
   const place = formatScanPlace(tracking?.last_event_city, tracking?.last_event_state, tracking?.last_event_zip);
@@ -94,9 +129,15 @@ export default function OrderDeliveryTracking({
                 </p>
               )}
               <p className="mt-0.5 text-xs" style={muted}>
-                {hasExpectedColumns && <>Expected-date email: {tracking.expected_email_at ? 'sent' : 'not yet'} &middot; </>}
-                Out-for-delivery email: {tracking.out_for_delivery_email_at ? 'sent' : 'not yet'} &middot; Delivered email:{' '}
-                {tracking.delivered_email_at ? 'sent' : 'not yet'}
+                {!emails.on && !tracking.expected_email_at && !tracking.out_for_delivery_email_at && !tracking.delivered_email_at ? (
+                  <>Automatic emails: none. Shipping updates are off for this order.</>
+                ) : (
+                  <>
+                    {hasExpectedColumns && <>Expected-date email: {emailState(tracking.expected_email_at, emails.on)} &middot; </>}
+                    Out-for-delivery email: {emailState(tracking.out_for_delivery_email_at, emails.on)} &middot; Delivered email:{' '}
+                    {emailState(tracking.delivered_email_at, emails.on)}
+                  </>
+                )}
               </p>
             </>
           )}
@@ -105,6 +146,21 @@ export default function OrderDeliveryTracking({
           {checking ? 'Checking…' : 'Check tracking now'}
         </button>
       </div>
+      {emails.ready && onEmailsChange && (
+        <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
+          <span
+            className="rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider"
+            style={emails.on
+              ? { background: '#e3efe0', color: '#2e6b2a' }
+              : { background: '#fbe3e3', color: 'var(--color-error)' }}
+          >
+            {emails.on ? 'Shipping updates on' : 'Shipping updates off'}
+          </span>
+          <button type="button" className="outline-button text-xs" onClick={() => void toggleEmails()} disabled={emailsSaving}>
+            {emailsSaving ? 'Saving…' : emails.on ? 'Turn off' : 'Turn on'}
+          </button>
+        </div>
+      )}
       {note && (
         <p className="mt-2 text-xs" role="status" style={{ color: note.ok ? 'var(--color-primary)' : 'var(--color-error)' }}>
           {note.text}

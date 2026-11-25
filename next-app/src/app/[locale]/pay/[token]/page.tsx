@@ -11,6 +11,8 @@ import { formatPublicPurity } from '@/types/sales';
 import { isProductPurchasable } from '@/types/product';
 import { loadOrderTaxExemption } from '@/lib/tax-exempt-server';
 import { exemptShortTag } from '@/lib/tax-exempt';
+import { loadBullionLineIds } from '@/lib/bullion-sale-server';
+import { BULLION_LINE_LABEL } from '@/lib/in-store-sale';
 
 interface Props {
   params: Promise<{ locale: string; token: string }>;
@@ -67,6 +69,8 @@ export default async function PayInvoicePage({ params }: Props) {
     const name = parseFullName(order.customer_name);
     const address = order.shipping_address ?? {};
     const exemption = await loadOrderTaxExemption(service, order.id);
+    // "Bullion — no sales tax" lines (2026-11-24): marked on the invoice and left out of the tax.
+    const bullionIds = await loadBullionLineIds(service, order.id);
     const data: PayInvoiceData = {
       token: invoice.pay_token,
       orderNumber: order.order_number,
@@ -78,11 +82,13 @@ export default async function PayInvoicePage({ params }: Props) {
           item.inventory_number ? `#${item.inventory_number}` : null,
           item.purity_snapshot ? formatPublicPurity(item.purity_snapshot) : null,
           item.gram_weight_snapshot ? `${item.gram_weight_snapshot} g` : null,
+          bullionIds.has(item.id) ? BULLION_LINE_LABEL[isEs ? 'es' : 'en'] : null,
         ].filter(Boolean).join(' · '),
         image: item.image_snapshot,
         price: Number(item.price_snapshot),
       })),
       subtotal: Number(order.subtotal),
+      taxFree: Math.round(items.reduce((sum, item) => sum + (bullionIds.has(item.id) ? Number(item.price_snapshot) : 0), 0) * 100) / 100,
       shippingFee: Number(order.shipping_fee),
       ships: order.shipping_method === 'shipping',
       shippingLabel: Number(order.shipping_fee) > 0 ? (isEs ? 'Envío' : 'Shipping') : (isEs ? 'Envío · sin cargo' : 'Shipping · no charge'),

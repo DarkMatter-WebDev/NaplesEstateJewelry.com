@@ -4,7 +4,8 @@ import { useEffect } from 'react';
 import type { PageScanSource } from '@/lib/scan-sources';
 
 /**
- * Counts one visit to a printed-code page (2026-10-31; /card, /kittcard) —
+ * Counts one visit to a printed-code page (2026-10-31; /card, /kittcard;
+ * /magnet's landing page from 2026-11-23) —
  * Admin → Insights. Sends `{ source }` to POST /api/scan once per browser tab:
  * a reload or the EN ↔ ES switch on the card does not count again. Sends
  * nothing about the visitor; renders nothing.

@@ -460,5 +460,10 @@ export async function suppressMarketingEmail(email: string) {
       .from('buyers')
       .update({ marketing_opt_out: true })
       .eq('email', normalized),
+    // Admin → Follow-ups (2026-11-24): a seller-only email has nowhere else to
+    // keep it, and any queued thank-you for them is called off.
+    import('@/lib/follow-ups-server').then(({ recordFollowUpUnsubscribe }) => recordFollowUpUnsubscribe(supabase, normalized)).catch((error) => {
+      console.error('[unsubscribe] follow-ups:', error);
+    }),
   ]);
 }

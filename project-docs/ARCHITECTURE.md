@@ -144,6 +144,7 @@ Current route families include:
 - `/shop` and `/shop/[id]`
 - `/account`, `/account/sign-in`, `/account/sign-up`
 - `/card`, `/kittcard` (business-card QR landing pages; noindex, one shared component)
+- `/magnet` (vehicle-magnet QR landing page, 2026-11-23; noindex; HELD — a counted 302 to `/free-evaluation` until `MAGNET_TRUCK_PHOTO` is set in `lib/magnet-landing.ts`)
 - `/order-lookup` (guest order page: order number + email/phone; noindex) → `POST /api/orders/lookup`
 - `/admin`, `/admin/orders`, `/admin/orders/[id]`, `/admin/in-store-sale`, `/admin/messages`,
   `/admin/inquiries`, `/admin/subscribers`, `/admin/marketing`,
@@ -1031,6 +1032,16 @@ Visitor lands with ?gclid=… (auto-tagging)      Visitor lands without one
 - **Local Pickup log (2026-11-21):** `order_pickups` (one row per order, admin-only RLS; `supabase/order-pickups-2026-11.sql`) holds who picked up, ID type / last 4, and PATHS to the ID photo + finger signature in the private `buy-receipt-ids` bucket (`order-pickups/<order id>/`). Saved through `POST /api/admin/orders/[id]/pickup` (multipart; marks the order Picked Up; first-log email `order-pickup-email.ts`, logged in `order_emails` as `pickup_receipt`); the store + customer copies are built by `buildPickupPaper` and print here or through the Print Station's `sale_print_requests` queue, private pictures filled at print time. Runbook `features/local-pickup-log.md`.
 - **Data:** `order_tracking` (one row per order, service-role writes, admin read via RLS); scan times kept as EasyPost's raw strings (local offset). Automatic emails logged in `order_emails` (`fulfillment_update`, status `expected_delivery` (2026-11-19, once, in transit, carrier date as given in `order_tracking.est_delivery_date`, claim `expected_email_at`) / `out_for_delivery` / `delivered`, `sent_by_email` "Automatic (delivery tracking)").
 - **Config:** `EASYPOST_API_KEY`, `EASYPOST_WEBHOOK_SECRET` (Netlify); webhook registered from Admin → Settings → Delivery Tracking → Connect (`/api/admin/easypost`). Runbook `features/delivery-tracking.md`.
+
+## Follow-ups — thank-you emails to sellers and shop buyers (2026-11-24)
+
+- **Data (`supabase/follow-ups-2026-11.sql`):** `follow_up_settings` (one row: auto-send, four step switches, two delays, the owner's edited wording in `templates` jsonb), `follow_up_messages` (the queue AND the log — one row per email, unique `(source_type, source_id, step)`, saved copy in `body_html` / `body_text`, `click_token` for the review link), `follow_up_stops` (unsubscribed / stopped emails). Admin read via RLS; every write goes through the service role after `requireAdmin`.
+- **Sources:** sellers = `buy_receipts` with `status = 'recorded'` and a `seller_email` (Trade-ins included); buyers = `orders` paid with a `customer_email` (website, In-store, Remote, Trade-in). eBay / Etsy sale records carry no email and never appear.
+- **Flow:** `reconcileFollowUps` (`lib/follow-ups-server.ts`) queues new step-1 rows (receipts from the last 14 days; orders from the last 30 whose pickup / delivery is within 14), moves buyer rows `waiting → scheduled` once picked up (`order_pickups`) or delivered (`order_tracking.delivered_at`; 7 days after shipping as the fallback), cancels rows whose receipt was voided or order cancelled / refunded, and queues step 2 when on. `sendFollowUp` claims a row (`scheduled → sending`), re-checks unsubscribes (`follow_up_stops`, `homepage_subscribers`, `profiles`, `buyers`), the source, and the 90-day rule, renders (`renderFollowUp`, `lib/follow-ups.ts`), sends through Resend as the Email Campaigns "chris" sender, saves the copy, and — for buyers — logs an `order_emails` row (`email_type 'follow_up'`, status `step1` / `step2`).
+- **Scheduler:** pg_cron `nej-follow-ups-sweep` every 15 min → `POST /api/admin/follow-ups/sweep` (`TEXT_ALERTS_CRON_SECRET`, no new secret). The admin page also runs the reconcile on load.
+- **Review clicks:** the email links `/review?f=<click_token>`; `app/review/route.ts` marks `review_clicked_at` (best effort) and 302s to Google as before.
+- **Unsubscribe:** the footer link is the existing `/unsubscribe?email=…`; `suppressMarketingEmail` now also calls `recordFollowUpUnsubscribe`.
+- **Admin:** `/admin/follow-ups` (`components/admin/follow-ups/*`); APIs `/api/admin/follow-ups/{settings,[id],preview,people,sweep}`. Runbook `features/follow-ups.md`.
 
 ## Public-shop cache invalidation (2026-07-02)
 

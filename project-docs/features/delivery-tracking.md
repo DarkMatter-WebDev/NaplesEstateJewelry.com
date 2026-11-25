@@ -85,6 +85,23 @@ pg_cron hourly ───► POST /api/admin/orders/tracking-sweep ─┴► appl
 - **Order page:** Fulfillment box → "Delivery" line: status, last scan, which
   emails went, **Check tracking now**. Email history shows the automatic ones as
   "Update — Out For Delivery / Delivered", "Automatic (delivery tracking)".
+- **Per order on/off — "Send customer shipping updates" (2026-11-24, mockup 1):**
+  Mark Shipped / Edit Shipping Details has two boxes. **Update customer via email**
+  only opens the hand-sent Shipped email (unchanged). **Send customer shipping
+  updates** (starts on the saved setting; new orders = on) controls the three
+  automatic emails above. Stored on `orders.delivery_emails` (+
+  `delivery_emails_on_at`, `supabase/order-delivery-emails-2026-11.sql`), read and
+  written ONLY by `lib/order-delivery-emails-server.ts` on its own query.
+  - Off: the package is still registered and tracked (the Delivery line keeps
+    working); `applyTrackerUpdate` stores the scan, then sends nothing. The Shipped
+    email drops its "we'll email you the expected date…" line (send route, Email
+    History rebuild and the page preview all read the setting).
+  - Turned back on (Delivery line **Turn on**): `delivery_emails_on_at` = now, and
+    only scans at or after that moment send (owner pick 3: no catching up).
+  - Save Fulfillment saves the setting BEFORE marking Shipped — registering the
+    package can send an email at once.
+  - Before the SQL: every order reads as on, the box is greyed with a "run the SQL"
+    note, the Turn off / on button is hidden.
 - **Settings:** Admin → Settings → **Delivery Tracking** — key set? (test/production
   by the `EZTK` / `EZAK` prefix), secret set?, webhook connected?, and
   **Connect** (creates or repairs the EasyPost webhook for
@@ -108,6 +125,9 @@ pg_cron hourly ───► POST /api/admin/orders/tracking-sweep ─┴► appl
 `OrderDetailPanel.tsx`, `AdminSettingsPanel.tsx` · `[locale]/admin/orders/[id]/page.tsx` ·
 `api/admin/orders/[id]/email-update/route.ts` · SQL `supabase/order-tracking-2026-11.sql` ·
 tests `lib/__tests__/shipment-tracking.test.ts`, `delivery-tracking-email.test.ts`.
+Per-order on/off (2026-11-24): `src/lib/order-delivery-emails.ts` (pure) ·
+`src/lib/order-delivery-emails-server.ts` · route `api/admin/orders/[id]/delivery-emails` (PUT `{ on }`) ·
+SQL `supabase/order-delivery-emails-2026-11.sql` · test `lib/__tests__/order-delivery-emails.test.ts`.
 
 ## To turn it off
 

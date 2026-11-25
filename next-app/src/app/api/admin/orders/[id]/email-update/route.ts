@@ -5,6 +5,7 @@ import { buildFulfillmentUpdateEmailContent } from '@/lib/order-fulfillment-emai
 import { isDeliveryTrackingConfigured } from '@/lib/easypost';
 import { logOrderEmail } from '@/lib/email-copies';
 import { loadOrderLanguage } from '@/lib/order-language-server';
+import { loadDeliveryEmailSetting } from '@/lib/order-delivery-emails-server';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -75,7 +76,8 @@ export async function POST(req: Request, { params }: Props) {
     shipping_carrier: 'shipping_carrier' in order ? order.shipping_carrier : null,
     tracking_number: 'tracking_number' in order ? order.tracking_number : null,
   }, status, {
-    deliveryUpdates: isDeliveryTrackingConfigured(),
+    // The follow-up promise only when this order's shipping updates are on (2026-11-24).
+    deliveryUpdates: isDeliveryTrackingConfigured() && (await loadDeliveryEmailSetting(supabase, id)).on,
     // The customer's language (2026-11-21): Spanish when the order is set to Español.
     language: await loadOrderLanguage(supabase, id),
   });

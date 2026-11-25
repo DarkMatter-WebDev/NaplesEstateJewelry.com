@@ -7,7 +7,8 @@ import { buildPaperReceipt, isPaidStatus } from '@/lib/order-receipt-paper';
 import { hoursLine } from '@/lib/business-location';
 import { getStoreHours } from '@/lib/store-hours';
 import { loadOrderTaxExemption } from '@/lib/tax-exempt-server';
-import { SPLIT_PAYMENTS_COLUMN, TRADE_IN_COLUMN } from '@/lib/in-store-sale';
+import { SPLIT_PAYMENTS_COLUMN, TRADE_IN_COLUMN, withBullionFlags } from '@/lib/in-store-sale';
+import { loadBullionLineIds } from '@/lib/bullion-sale-server';
 import { loadOrderLanguage, loadSpanishItemTitles } from '@/lib/order-language-server';
 import { printLanguage } from '@/lib/order-language';
 import type { Order, OrderItem } from '@/types/sales';
@@ -99,6 +100,8 @@ export default async function AdminOrderInvoicePrintPage({ params, searchParams 
   if (!order) notFound();
 
   const typedOrder = order as unknown as Order & { order_items: OrderItem[] };
+  // "Bullion — not taxed" lines (2026-11-24); none before the SQL.
+  typedOrder.order_items = withBullionFlags(typedOrder.order_items ?? [], await loadBullionLineIds(supabase, id));
   const latestInvoiceNumber = invoices?.[0]?.invoice_number ?? null;
   // The customer's language (2026-11-21): the order's, unless "Print in" picked the other.
   const orderLanguage = await loadOrderLanguage(supabase, id);

@@ -4,7 +4,14 @@ import { normalizeOrderLanguage } from '@/lib/order-language';
 import { requireAdmin } from '@/lib/admin-auth';
 import { createServiceClient } from '@/lib/supabase/service';
 import { buildAddressObject, generateOrderNumber } from '@/lib/sales';
-import { buildSaleItemPayloads, createOrderErrorStatus, recordOfflinePayment } from '@/lib/instant-sale-server';
+import {
+  buildSaleItemPayloads,
+  bullionInternalNote,
+  bullionNotReadyError,
+  createOrderErrorStatus,
+  markBullionLines,
+  recordOfflinePayment,
+} from '@/lib/instant-sale-server';
 import {
   IN_STORE_PAYMENT_LABELS,
   IN_STORE_SHIPPING_LABELS,
@@ -64,6 +71,9 @@ export async function POST(req: Request) {
 
   const lines = await buildSaleItemPayloads(service, sale.items);
   if ('error' in lines) return NextResponse.json({ error: lines.error }, { status: lines.status });
+  // "Bullion — no sales tax" (2026-11-24): refused before anything is written if the SQL has not run.
+  const bullionBlocked = await bullionNotReadyError(service, sale.items);
+  if (bullionBlocked) return NextResponse.json({ error: bullionBlocked }, { status: 503 });
 
   // "Tax-exempt sale" (owner, 2026-10-27): the certificate is settled BEFORE
   // any order exists, so a problem with it leaves nothing half-recorded.
@@ -85,7 +95,7 @@ export async function POST(req: Request) {
     ? `Ship · ${IN_STORE_SHIPPING_LABELS[delivery.shipping]} ${formatCurrency(delivery.shippingFee)}`
     : null;
   const exemptNote = certificate ? `Tax-exempt · ${exemptShortTag({ certType: certificate.cert_type, certNumber: certificate.cert_number })}` : null;
-  const internalNotes = [`In-store sale · ${paidByLabel} · recorded by ${admin.user.email ?? 'admin'}`, deliveryNote, exemptNote, sale.note]
+  const internalNotes = [`In-store sale · ${paidByLabel} · recorded by ${admin.user.email ?? 'admin'}`, deliveryNote, exemptNote, bullionInternalNote(lines.payloads), sale.note]
     .filter(Boolean)
     .join(' | ');
   const shippingAddress = delivery.address
@@ -129,6 +139,8 @@ export async function POST(req: Request) {
   const createdRow = Array.isArray(created) ? created[0] : created;
   const orderId = createdRow?.order_id as string | undefined;
   if (!orderId) return NextResponse.json({ error: 'Could not create the order.' }, { status: 500 });
+  // Before the payment step emails the receipt, so it says which lines were bullion.
+  await markBullionLines(service, orderId, lines.payloads);
 
   // "Receipt language" (2026-11-21): before the payment step emails the receipt.
   await saveOrderLanguage(service, orderId, normalizeOrderLanguage((body as Record<string, unknown> | null)?.receiptLanguage));

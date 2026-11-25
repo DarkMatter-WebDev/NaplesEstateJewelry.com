@@ -26,6 +26,21 @@ export const runtime = 'nodejs';
  * reviews. Google disallows self-serving review markup on LocalBusiness and it
  * risks a structured-data manual action.
  */
-export function GET() {
+export async function GET(req: Request) {
+  // `/review?f=<token>` = the link in a Follow-ups thank-you email (2026-11-24):
+  // mark "clicked review link" on that email's log row, then go to Google as
+  // always. Best effort — a failure never stops the redirect.
+  const token = new URL(req.url).searchParams.get('f');
+  if (token) {
+    try {
+      const [{ createServiceClient }, { recordReviewClick }] = await Promise.all([
+        import('@/lib/supabase/service'),
+        import('@/lib/follow-ups-server'),
+      ]);
+      await recordReviewClick(createServiceClient(), token);
+    } catch {
+      // ignore
+    }
+  }
   return NextResponse.redirect(GOOGLE_REVIEW_URL, 302);
 }

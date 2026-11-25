@@ -9,7 +9,7 @@ import type { InStoreProduct } from './SaleItemsEditor';
 
 const PRODUCT_COLUMNS =
   'id, title, status, quantity, inventory_number, category, metal_variant, purity, gram_weight, weight_grams, '
-  + 'price_mode, pricing_multiplier, manual_price_label, asking_price, sold_price, image_urls, images';
+  + 'price_mode, pricing_multiplier, manual_price_label, asking_price, sold_price, image_urls, images, jewelry_type';
 
 /**
  * The admin gate + data the Instant Sale pages share (was the In-Store Sale

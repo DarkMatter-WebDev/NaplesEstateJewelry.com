@@ -16,6 +16,7 @@ import SaleItemsEditor, {
   saleItemLabel,
   saleItemPayload,
   saleItemsProblem,
+  saleItemsTaxFree,
   type InStoreProduct,
   type SaleItemDraft,
 } from './SaleItemsEditor';
@@ -80,7 +81,7 @@ type SaleState = {
   round: number;
   prices: (number | null)[];
   subtotal: number | null;
-  totals: { subtotal: number; shippingFee: number; tax: number; total: number } | null;
+  totals: { subtotal: number; shippingFee: number; tax: number; total: number; taxFree: number; taxable: number } | null;
 };
 const SaleStateContext = createContext<SaleState | null>(null);
 
@@ -132,7 +133,10 @@ function TradeSaleSide({ context }: { context: TradeSideContext }) {
         <h2 className="text-lg font-bold" style={headline}><Step n={3} />The difference</h2>
         {items.length > 1 && items.map((item, index) => (
           <div key={item.key} className="flex justify-between gap-3 text-sm">
-            <span className="min-w-0 truncate">{index + 1} · {saleItemLabel(item)}</span>
+            <span className="min-w-0 truncate">
+              {index + 1} · {saleItemLabel(item)}
+              {item.bullion && <span className="ml-1.5 text-[0.6rem] font-bold uppercase tracking-[0.12em]" style={{ color: '#16653c' }}>no tax</span>}
+            </span>
             <span>{prices[index] != null ? formatCurrency(prices[index] as number) : '—'}</span>
           </div>
         ))}
@@ -141,7 +145,14 @@ function TradeSaleSide({ context }: { context: TradeSideContext }) {
           <span>{subtotal != null ? formatCurrency(subtotal) : '—'}</span>
         </div>
         <div className="flex justify-between gap-3 text-sm">
-          <span>FL sales tax · 6% <span className="text-xs" style={hintStyle}>(full price, as on every pickup)</span></span>
+          {totals && totals.taxFree > 0 ? (
+            <span>
+              {totals.tax > 0 ? `FL sales tax · 6% on ${formatCurrency(totals.taxable)}` : 'FL sales tax · none'}
+              <span className="text-xs" style={hintStyle}> (bullion {formatCurrency(totals.taxFree)} · <strong style={{ color: '#16653c' }}>no tax</strong>)</span>
+            </span>
+          ) : (
+            <span>FL sales tax · 6% <span className="text-xs" style={hintStyle}>(full price, as on every pickup)</span></span>
+          )}
           <span>{totals ? formatCurrency(totals.tax) : '—'}</span>
         </div>
         <div className="flex justify-between gap-3 border-t border-dashed pt-2 text-sm font-bold" style={cardStyle}>
@@ -308,7 +319,8 @@ export default function TradeInSaleForm({
 
   const prices = items.map((item) => parseInStorePrice(item.price));
   const subtotal = prices.every((value) => value != null) ? round2(prices.reduce<number>((sum, value) => sum + (value ?? 0), 0)) : null;
-  const totals = subtotal != null ? tradeInSaleTotals(subtotal) : null;
+  // "Bullion — no sales tax" items (2026-11-24) are left out of the 6%.
+  const totals = subtotal != null ? tradeInSaleTotals(subtotal, saleItemsTaxFree(items)) : null;
 
   function clearSale() {
     setItems([listedItem()]);

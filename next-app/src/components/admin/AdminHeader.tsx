@@ -9,7 +9,7 @@ import { AppIcon } from '@/components/AppIcon';
 
 const GOLD = '#735c00';
 
-export type AdminSection = 'products' | 'social-queues' | 'orders' | 'offers' | 'instant-sale' | 'tax-exempt' | 'buy-receipts' | 'buyers' | 'messages' | 'subscribers' | 'text-deals' | 'marketing' | 'insights' | 'discount-codes' | 'users' | 'settings';
+export type AdminSection = 'products' | 'social-queues' | 'orders' | 'offers' | 'instant-sale' | 'tax-exempt' | 'buy-receipts' | 'buyers' | 'follow-ups' | 'messages' | 'subscribers' | 'text-deals' | 'marketing' | 'insights' | 'discount-codes' | 'users' | 'settings';
 
 const SECTION_LABELS: Record<AdminSection, string> = {
   products: 'Products',
@@ -20,6 +20,7 @@ const SECTION_LABELS: Record<AdminSection, string> = {
   'tax-exempt': 'Tax Exempt',
   'buy-receipts': 'Buy Receipts',
   buyers: 'Buyers',
+  'follow-ups': 'Follow-ups',
   messages: 'Messages',
   subscribers: 'Subscribers',
   'text-deals': 'Text Deals',
@@ -271,6 +272,9 @@ export default function AdminHeader({
       </AdminNavItem>
       <AdminNavItem href={`${adminBasePath}/buyers`} active={active === 'buyers'}>
         Buyers
+      </AdminNavItem>
+      <AdminNavItem href={`${adminBasePath}/follow-ups`} active={active === 'follow-ups'}>
+        Follow-ups
       </AdminNavItem>
       <AdminMessagesLink
         href={`${adminBasePath}/messages`}

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { loadOrderLanguage } from '@/lib/order-language-server';
+import { loadDeliveryEmailSetting } from '@/lib/order-delivery-emails-server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { isMissingCopyColumn, rebuildPlan, type EmailCopyResponse } from '@/lib/email-copies';
 import { buildOrderInvoiceEmail } from '@/lib/order-invoice-mailer';
@@ -59,7 +60,7 @@ export async function GET(_req: Request, context: Context) {
       rebuilt = buildFulfillmentUpdateEmailContent(
         { ...order, shipping_carrier: order.shipping_carrier ?? null, tracking_number: order.tracking_number ?? null },
         plan.status,
-        { deliveryUpdates: isDeliveryTrackingConfigured(), language: await loadOrderLanguage(admin.supabase, id) },
+        { deliveryUpdates: isDeliveryTrackingConfigured() && (await loadDeliveryEmailSetting(admin.supabase, id)).on, language: await loadOrderLanguage(admin.supabase, id) },
       );
     }
   } else if (plan.kind === 'pickup') {

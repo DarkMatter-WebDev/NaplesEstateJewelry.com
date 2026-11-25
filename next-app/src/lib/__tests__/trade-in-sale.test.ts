@@ -53,7 +53,7 @@ describe('trade-in sale: the money', () => {
   });
 
   it('taxes the full price, like every pickup (owner pick 3 — until the accountant says otherwise)', () => {
-    expect(tradeInSaleTotals(2500)).toEqual({ subtotal: 2500, shippingFee: 0, tax: 150, total: 2650 });
+    expect(tradeInSaleTotals(2500)).toEqual({ subtotal: 2500, shippingFee: 0, tax: 150, total: 2650, taxFree: 0, taxable: 2500 });
   });
 
   it('example A: $900 of gold toward a $2,500 ring — the customer pays $1,750 on Zettle', () => {

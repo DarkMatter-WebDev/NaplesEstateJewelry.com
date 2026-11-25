@@ -212,8 +212,9 @@ describe('Save draft (owner, 2026-10-21)', () => {
       message: 'x'.repeat(400),
     });
     expect(form.items).toEqual([
-      { mode: 'listed', productId: 'halo-ring-212', title: '', metal: 'Gold', gramWeight: '', purity: '', price: '1150', photoUrl: photo },
-      { mode: 'unlisted', productId: null, title: '14K rope chain', metal: 'Gold', gramWeight: '', purity: '', price: '1460', photoUrl: null },
+      { mode: 'listed', productId: 'halo-ring-212', title: '', metal: 'Gold', gramWeight: '', purity: '', price: '1150', photoUrl: photo, bullion: false },
+      // Platinum is a real metal since 2026-11-24 (bullion, owner pick 4), so it is kept.
+      { mode: 'unlisted', productId: null, title: '14K rope chain', metal: 'Platinum', gramWeight: '', purity: '', price: '1460', photoUrl: null, bullion: false },
     ]);
     expect(form.delivery).toEqual({ method: 'ship', mailingOn: false, address: { line1: '', line2: '', city: '', state: 'FL', zip: '' }, shipping: 'insured', customFee: '' });
     // Every box off → the defaults come back (the form cannot send with none ticked).

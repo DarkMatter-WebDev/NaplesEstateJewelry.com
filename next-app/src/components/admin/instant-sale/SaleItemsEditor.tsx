@@ -5,6 +5,7 @@ import type { Product, SpotData } from '@/types/product';
 import { formatCurrency } from '@/types/sales';
 import { getProductImages, getSnapshotPrice } from '@/lib/sales';
 import {
+  BULLION_METALS,
   IN_STORE_METALS,
   IN_STORE_TITLE_MAX,
   SALE_ITEMS_MAX,
@@ -19,8 +20,14 @@ export type InStoreProduct = Pick<
   Product,
   | 'id' | 'title' | 'status' | 'quantity' | 'inventory_number' | 'category' | 'metal_variant' | 'purity'
   | 'gram_weight' | 'weight_grams' | 'price_mode' | 'pricing_multiplier' | 'manual_price_label' | 'asking_price'
-  | 'sold_price' | 'image_urls' | 'images'
+  | 'sold_price' | 'image_urls' | 'images' | 'jewelry_type'
 >;
+
+/** A listed piece typed Coin or Bullion starts with "Bullion — no sales tax" ticked (owner pick 2, 2026-11-24). */
+export function isBullionProduct(product: Pick<InStoreProduct, 'jewelry_type'> | null | undefined): boolean {
+  const type = String(product?.jewelry_type ?? '').trim().toLowerCase();
+  return type === 'coin' || type === 'bullion';
+}
 
 export type SaleItemDraft = {
   key: string;
@@ -35,6 +42,8 @@ export type SaleItemDraft = {
   photoUrl: string | null;
   photoUploading: boolean;
   photoError: string | null;
+  /** "Bullion — no sales tax" (owner, 2026-11-24): this item is left out of the Florida tax. */
+  bullion: boolean;
 };
 
 let keySeed = 0;
@@ -54,14 +63,25 @@ export function newSaleItem(): SaleItemDraft {
     photoUrl: null,
     photoUploading: false,
     photoError: null,
+    bullion: false,
   };
 }
 
 /** One line in the request body (`lib/in-store-sale.ts` → `normalizeSaleItems`). */
 export function saleItemPayload(item: SaleItemDraft): Record<string, unknown> {
   return item.mode === 'listed'
-    ? { kind: 'listed', productId: item.selected?.id, price: item.price, photoUrl: item.photoUrl }
-    : { kind: 'unlisted', title: item.title, metal: item.metal, price: item.price, gramWeight: item.gramWeight, purity: item.purity, photoUrl: item.photoUrl };
+    ? { kind: 'listed', productId: item.selected?.id, price: item.price, photoUrl: item.photoUrl, bullion: item.bullion }
+    : { kind: 'unlisted', title: item.title, metal: item.metal, price: item.price, gramWeight: item.gramWeight, purity: item.purity, photoUrl: item.photoUrl, bullion: item.bullion };
+}
+
+/** The ticked bullion items' prices, for the form's total (the server figures its own). */
+export function saleItemsTaxFree(items: SaleItemDraft[]): number {
+  const cents = items.reduce((sum, item) => {
+    if (!item.bullion) return sum;
+    const price = parseInStorePrice(item.price);
+    return price == null ? sum : sum + Math.round(price * 100);
+  }, 0);
+  return cents / 100;
 }
 
 /** A short name for the total card and the success screen. */
@@ -78,6 +98,7 @@ export function saleItemsProblem(items: SaleItemDraft[]): string | null {
     if (item.photoUploading) return `${name}wait for the photo to finish uploading.`;
     if (item.mode === 'listed' && !item.selected) return `${name}pick the listed item first.`;
     if (item.mode === 'unlisted' && !item.title.trim()) return `${name}describe what it is.`;
+    if (item.mode === 'unlisted' && item.bullion && !BULLION_METALS.includes(item.metal)) return `${name}pick the metal — bullion is gold, silver or platinum.`;
     if (parseInStorePrice(item.price) == null) return `${name}enter the price, e.g. 1460.`;
   }
   return null;
@@ -172,6 +193,11 @@ export default function SaleItemsEditor({
                   </button>
                 ))}
               </div>
+              {item.bullion && (
+                <span className="rounded-full px-2.5 py-1 text-[0.6rem] font-bold uppercase tracking-[0.12em]" style={{ fontFamily: 'var(--font-label)', color: '#16653c', background: '#e3f1e8' }}>
+                  Bullion · no tax
+                </span>
+              )}
               {items.length > 1 && (
                 <button type="button" className="ml-auto whitespace-nowrap text-xs underline" style={hintStyle} onClick={() => setItems((current) => current.filter((x) => x.key !== item.key))}>
                   Remove
@@ -193,7 +219,7 @@ export default function SaleItemsEditor({
                       <li key={p.id}>
                         <button
                           type="button"
-                          onClick={() => update(item.key, { selected: p, query: '', price: String(tradeInPrices?.[p.id] ?? (getSnapshotPrice(p as Product, spotData) || '')) })}
+                          onClick={() => update(item.key, { selected: p, query: '', price: String(tradeInPrices?.[p.id] ?? (getSnapshotPrice(p as Product, spotData) || '')), bullion: isBullionProduct(p) })}
                           className="w-full text-left rounded-lg border px-3 py-2 text-sm hover:bg-[var(--color-surface-container-low)]"
                           style={cardStyle}
                         >
@@ -224,7 +250,7 @@ export default function SaleItemsEditor({
                         {' · '}{listedNote}
                       </span>
                     </div>
-                    <button type="button" className="ml-auto text-xs underline flex-shrink-0" style={hintStyle} onClick={() => update(item.key, { selected: null, price: '' })}>Change</button>
+                    <button type="button" className="ml-auto text-xs underline flex-shrink-0" style={hintStyle} onClick={() => update(item.key, { selected: null, price: '', bullion: false })}>Change</button>
                   </div>
                 )}
                 <label className="block">
@@ -263,6 +289,26 @@ export default function SaleItemsEditor({
                 <span className="text-xs" style={hintStyle}>Recorded on the order only. No product is created, so nothing can show in the shop.</span>
               </>
             )}
+
+            <label
+              className="bullion-box flex cursor-pointer items-start gap-2.5 rounded-xl border-[1.5px] px-3 py-2.5 transition-shadow hover:shadow-md focus-within:shadow-md"
+              style={item.bullion ? { borderColor: '#16653c', background: '#eef7f1' } : { ...cardStyle, background: '#fff' }}
+            >
+              <input
+                type="checkbox"
+                className="mt-0.5 h-5 w-5 flex-shrink-0"
+                style={{ accentColor: '#16653c' }}
+                checked={item.bullion}
+                onChange={(e) => update(item.key, { bullion: e.target.checked })}
+              />
+              <span className="grid gap-0.5">
+                <span className="text-sm font-bold" style={{ color: 'var(--color-on-surface)' }}>Bullion — no sales tax</span>
+                <span className="text-xs" style={hintStyle}>Bars, rounds, ingots, bullion coins (stamped weight &amp; purity). Not jewelry, sterling or collectibles.</span>
+                {item.bullion && item.mode === 'unlisted' && !BULLION_METALS.includes(item.metal) && (
+                  <span className="text-xs font-semibold" style={{ color: 'var(--color-error)' }}>Pick the metal — bullion is gold, silver or platinum.</span>
+                )}
+              </span>
+            </label>
 
             <SalePhotoField
               photoUrl={item.photoUrl}

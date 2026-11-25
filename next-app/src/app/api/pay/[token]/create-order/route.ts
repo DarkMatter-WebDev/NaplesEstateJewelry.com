@@ -6,6 +6,7 @@ import { buildAddressObject } from '@/lib/sales';
 import { upsertOrderInvoice } from '@/lib/order-invoices';
 import { saveOrderLanguage } from '@/lib/order-language-server';
 import { normalizePayPageCustomer, payPageTotals } from '@/lib/remote-sale';
+import { loadBullionTaxFree } from '@/lib/bullion-sale-server';
 import { loadOrderTaxExemption } from '@/lib/tax-exempt-server';
 import { findRemoteInvoiceByToken } from '@/lib/remote-sale-server';
 import { isProductPurchasable } from '@/types/product';
@@ -74,9 +75,12 @@ export async function POST(req: Request, { params }: Props) {
   const address = customer.value.address;
   // A tax-exempt invoice (owner, 2026-10-27) stays at $0 tax for any address.
   const exemption = await loadOrderTaxExemption(service, order.id);
+  // Bullion lines (2026-11-24) stay out of the tax at any address.
+  const taxFree = await loadBullionTaxFree(service, order.id);
   const totals = payPageTotals(
     { subtotal: Number(order.subtotal), shipping_fee: Number(order.shipping_fee), shipping_method: order.shipping_method, tax_exempt: Boolean(exemption) },
     address?.state ?? null,
+    taxFree,
   );
   const { data: updated, error: updateError } = await service
     .from('orders')

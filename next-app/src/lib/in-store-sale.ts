@@ -265,7 +265,8 @@ export function tradeInReceiptLine(trade: SaleTradeIn): string {
   return `Your trade-in: ${what ? `${what} ` : ''}(receipt ${trade.receipt_number}, ${money(trade.value)}).`;
 }
 
-export const IN_STORE_METALS = ['Gold', 'Silver', 'Other'] as const;
+// Platinum added 2026-11-24 (owner pick 4): platinum bullion is tax-free too.
+export const IN_STORE_METALS = ['Gold', 'Silver', 'Platinum', 'Other'] as const;
 export type InStoreMetal = (typeof IN_STORE_METALS)[number];
 
 export const IN_STORE_TITLE_MAX = 120;
@@ -274,8 +275,12 @@ export const IN_STORE_PRICE_MAX = 250_000;
 /** Items on one sale — a counter of pieces, not a cart; past this it is two sales. */
 export const SALE_ITEMS_MAX = 20;
 
-/** `photoUrl`: a photo taken for THIS sale. Null = the listing's own photo (listed) or none (unlisted). */
-export type InStoreListedItem = { kind: 'listed'; productId: string; price: number; photoUrl: string | null };
+/**
+ * `photoUrl`: a photo taken for THIS sale. Null = the listing's own photo (listed) or none (unlisted).
+ * `bullion` (owner, 2026-11-24): "Bullion — no sales tax" was ticked, so this
+ * item is left out of the Florida tax (see `inStoreTotals`). Absent = false.
+ */
+export type InStoreListedItem = { kind: 'listed'; productId: string; price: number; photoUrl: string | null; bullion?: boolean };
 export type InStoreUnlistedItem = {
   kind: 'unlisted';
   title: string;
@@ -284,6 +289,7 @@ export type InStoreUnlistedItem = {
   gramWeight: number | null;
   purity: string | null;
   photoUrl: string | null;
+  bullion?: boolean;
 };
 export type InStoreItem = InStoreListedItem | InStoreUnlistedItem;
 
@@ -363,6 +369,10 @@ export type InStoreSaleInput = {
   shippingFee: number;
   tax: number;
   total: number;
+  /** The bullion part of the subtotal, left out of the tax (2026-11-24); 0 when none. */
+  taxFree: number;
+  /** The item amount the 6% was figured on (subtotal − taxFree). */
+  taxable: number;
 };
 
 /** "$1,460", "1460.50", " 1,460 " → 1460 / 1460.5; anything else → null. */
@@ -378,16 +388,77 @@ export function parseInStorePrice(raw: unknown): number | null {
  * The totals the form shows and the route records, from one function.
  * Florida tax is on the item plus any shipping charged (the site's policy,
  * `calculateFlSalesTax`). `chargesTax: false` means shipped out of state.
+ *
+ * `taxFree` (owner, 2026-11-24): the part of the price that is BULLION — gold,
+ * silver or platinum bullion and 99.5% gold / 99.9% silver coins, exempt from
+ * Florida sales tax at any price (DOR TIP 25A01-03, TIP 26A01-08). Tax is on
+ * the rest only, plus the rest's SHARE of the shipping (owner pick 3: an
+ * all-bullion shipment carries no tax on shipping at all). `taxable` is the
+ * item amount the 6% was figured on, for the "6% on $1,460.00" line.
  */
 export function inStoreTotals(
   price: number,
-  options: { shippingFee?: number; chargesTax?: boolean } = {},
-): { subtotal: number; shippingFee: number; tax: number; total: number } {
+  options: { shippingFee?: number; chargesTax?: boolean; taxFree?: number } = {},
+): { subtotal: number; shippingFee: number; tax: number; total: number; taxFree: number; taxable: number } {
   const subtotal = round2(price);
   const shippingFee = round2(Math.max(0, options.shippingFee ?? 0));
-  const tax = options.chargesTax === false ? 0 : calculateFlSalesTax(subtotal, shippingFee);
-  return { subtotal, shippingFee, tax, total: round2(subtotal + shippingFee + tax) };
+  const taxFree = round2(Math.min(Math.max(0, options.taxFree ?? 0), subtotal));
+  const taxable = round2(subtotal - taxFree);
+  const taxableShipping = taxFree > 0 && subtotal > 0 ? round2((shippingFee * taxable) / subtotal) : shippingFee;
+  const tax = options.chargesTax === false ? 0 : calculateFlSalesTax(taxable, taxableShipping);
+  return { subtotal, shippingFee, tax, total: round2(subtotal + shippingFee + tax), taxFree, taxable };
 }
+
+/** The bullion part of a sale's price (items ticked "Bullion — no sales tax"), to the cent. */
+export function saleTaxFreeSubtotal(items: Pick<InStoreItem, 'price' | 'bullion'>[]): number {
+  return round2(items.reduce((sum, item) => sum + (item.bullion ? item.price : 0), 0));
+}
+
+/** The metals bullion comes in. An unlisted item ticked bullion must name one (Rule 12A-1.0371(6): the record names the metal). */
+export const BULLION_METALS: readonly InStoreMetal[] = ['Gold', 'Silver', 'Platinum'];
+
+/** Receipt + order-note wording for a bullion line (owner, 2026-11-24). */
+export const BULLION_LINE_LABEL = { en: 'Bullion — not taxed', es: 'Lingote — sin impuesto' } as const;
+type BullionReceiptLine = { price_snapshot: number; quantity?: number | null; discount?: number | null; tax_free_bullion?: boolean };
+
+/** The items with `tax_free_bullion: true` on the ids `loadBullionLineIds` returned. */
+export function withBullionFlags<T extends { id?: string }>(items: T[], bullionIds: ReadonlySet<string>): Array<T & { tax_free_bullion?: boolean }> {
+  if (bullionIds.size === 0) return items;
+  return items.map((item) => (item.id && bullionIds.has(item.id) ? { ...item, tax_free_bullion: true } : item));
+}
+
+/** The bullion lines' total on an order (after any line discount); 0 when none. */
+export function orderBullionTaxFree(items: readonly BullionReceiptLine[]): number {
+  return round2(items.reduce((sum, item) => {
+    if (!item.tax_free_bullion) return sum;
+    const qty = Math.max(1, Math.floor(Number(item.quantity ?? 1)) || 1);
+    const line = Number(item.price_snapshot) * qty;
+    return sum + line - Math.min(Math.max(0, Number(item.discount ?? 0)), line);
+  }, 0));
+}
+
+/**
+ * The receipt's tax label when the order has bullion lines (2026-11-24):
+ * "FL sales tax · 6% on $1,460.00", or "· none — bullion" when every line is
+ * bullion. `prefix` is the receipt's own word ("FL sales tax" / "Tax").
+ */
+export function bullionTaxLabel(
+  order: { subtotal: number; discount?: number | null; tax: number },
+  taxFree: number,
+  prefix: string,
+  language: 'en' | 'es' = 'en',
+): string {
+  const es = language === 'es';
+  const taxable = round2(Math.max(0, Number(order.subtotal) - Math.max(0, Number(order.discount ?? 0)) - taxFree));
+  if (!(Number(order.tax) > 0)) return `${prefix} · ${es ? 'ninguno — lingotes' : 'none — bullion'}`;
+  return `${prefix} · 6% ${es ? 'sobre' : 'on'} ${money(taxable)}`;
+}
+
+/** The law line under a receipt's totals when any line is bullion (owner pick 5: keep it). */
+export const BULLION_LAW_LINE = {
+  en: 'Gold, silver and platinum bullion is exempt from Florida sales tax (s. 212.08(7)(ww), F.S.).',
+  es: 'Los lingotes de oro, plata y platino están exentos del impuesto de ventas de Florida (s. 212.08(7)(ww), F.S.).',
+} as const;
 
 /** A typed shipping charge: "$25", "12.50" → 25 / 12.5. Zero is allowed, though "No charge" says it better. */
 export function parseInStoreShippingFee(raw: unknown): number | null {
@@ -483,18 +554,20 @@ function normalizeSaleItem(raw: unknown): { value: InStoreItem } | { error: stri
   const photoText = String(itemSource.photoUrl ?? '').trim();
   if (photoText && !isSalePhotoUrl(photoText)) return { error: 'That photo did not upload. Take or choose it again, or remove it.' };
   const photoUrl = photoText || null;
+  const bullion = itemSource.bullion === true;
 
   if (itemSource.kind === 'listed') {
     const productId = String(itemSource.productId ?? '').trim();
     if (!productId) return { error: 'Pick the listed item.' };
-    return { value: { kind: 'listed', productId, price, photoUrl } };
+    return { value: { kind: 'listed', productId, price, photoUrl, ...(bullion ? { bullion } : {}) } };
   }
   if (itemSource.kind === 'unlisted') {
     const title = String(itemSource.title ?? '').replace(/\s+/g, ' ').trim();
     if (!title) return { error: 'Describe what sold, e.g. "14K rope chain · 22 in · 18.4 g".' };
     if (title.length > IN_STORE_TITLE_MAX) return { error: `Keep the item under ${IN_STORE_TITLE_MAX} characters.` };
     const metal = String(itemSource.metal ?? 'Other') as InStoreMetal;
-    if (!IN_STORE_METALS.includes(metal)) return { error: 'Pick Gold, Silver or Other.' };
+    if (!IN_STORE_METALS.includes(metal)) return { error: 'Pick Gold, Silver, Platinum or Other.' };
+    if (bullion && !BULLION_METALS.includes(metal)) return { error: 'Bullion must be gold, silver or platinum — pick the metal.' };
     const weightText = String(itemSource.gramWeight ?? '').trim();
     let gramWeight: number | null = null;
     if (weightText) {
@@ -502,7 +575,7 @@ function normalizeSaleItem(raw: unknown): { value: InStoreItem } | { error: stri
       if (!Number.isFinite(weight) || weight <= 0 || weight > 100_000) return { error: 'Weight must be a number of grams.' };
       gramWeight = round2(weight);
     }
-    return { value: { kind: 'unlisted', title, metal, price, gramWeight, purity: optionalText(itemSource.purity, 20), photoUrl } };
+    return { value: { kind: 'unlisted', title, metal, price, gramWeight, purity: optionalText(itemSource.purity, 20), photoUrl, ...(bullion ? { bullion } : {}) } };
   }
   return { error: 'Choose a listed item or describe an unlisted one.' };
 }
@@ -571,9 +644,10 @@ export function normalizeInStoreSaleInput(body: unknown): { value: InStoreSaleIn
   if ('error' in taxExempt) return taxExempt;
 
   const shippingFee = delivery.value.method === 'ship' ? delivery.value.shippingFee : 0;
+  const taxFree = saleTaxFreeSubtotal(items.value);
   const owes = inStoreChargesTax(delivery.value.method, delivery.value.address?.state);
-  const totals = inStoreTotals(subtotal, { shippingFee, chargesTax: owes && !taxExempt.value });
-  const taxNotCharged = owes && taxExempt.value ? inStoreTotals(subtotal, { shippingFee, chargesTax: true }).tax : 0;
+  const totals = inStoreTotals(subtotal, { shippingFee, chargesTax: owes && !taxExempt.value, taxFree });
+  const taxNotCharged = owes && taxExempt.value ? inStoreTotals(subtotal, { shippingFee, chargesTax: true, taxFree }).tax : 0;
   // Checked against the total computed HERE, so a split the form showed as
   // adding up must still add up to what is recorded.
   const paid = normalizeSalePayments(source, totals.total);

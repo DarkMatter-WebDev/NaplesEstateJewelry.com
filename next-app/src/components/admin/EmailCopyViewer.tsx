@@ -26,6 +26,8 @@ export default function EmailCopyViewer({
   subject,
   sentLabel,
   onClose,
+  fromLine = EMAIL_FROM_LINE,
+  sentTerm = 'Sent',
 }: {
   /** "Pickup Receipt", "Update — Shipped", "Seller's copy" … */
   title: string;
@@ -36,6 +38,10 @@ export default function EmailCopyViewer({
   /** "Sat, Nov 21, 2026 · 2:15 PM · by admin@…" */
   sentLabel: string;
   onClose: () => void;
+  /** The From line; Admin → Follow-ups sends as "Chris at Naples Estate Jewelry". */
+  fromLine?: string;
+  /** "Sent" — or "Sends" for a follow-up still in the queue (a preview). */
+  sentTerm?: string;
 }) {
   const [loaded, setLoaded] = useState<Loaded>(url ? { state: 'loading' } : { state: 'error', message: 'This email was just sent. Reload the page to view it.' });
   const [view, setView] = useState<'email' | 'text'>('email');
@@ -69,14 +75,14 @@ export default function EmailCopyViewer({
         <dt className="font-semibold" style={muted}>To</dt>
         <dd className="break-words">{to}</dd>
         <dt className="font-semibold" style={muted}>From</dt>
-        <dd className="break-words">{EMAIL_FROM_LINE}</dd>
+        <dd className="break-words">{fromLine}</dd>
         {shownSubject && (
           <>
             <dt className="font-semibold" style={muted}>Subject</dt>
             <dd className="break-words">{shownSubject}</dd>
           </>
         )}
-        <dt className="font-semibold" style={muted}>Sent</dt>
+        <dt className="font-semibold" style={muted}>{sentTerm}</dt>
         <dd className="break-words">{sentLabel}</dd>
       </dl>
 

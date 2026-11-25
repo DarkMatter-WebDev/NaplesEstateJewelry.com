@@ -32,6 +32,12 @@ export interface OrderItem {
   discount?: number;
   image_snapshot: string | null;
   created_at: string;
+  /**
+   * "Bullion — no sales tax" (2026-11-24, `order-items-bullion-2026-11.sql`).
+   * Never in the item selects: merged in by `loadBullionLineIds` so pages
+   * work before the SQL. Absent = false.
+   */
+  tax_free_bullion?: boolean;
 }
 
 export interface Order {

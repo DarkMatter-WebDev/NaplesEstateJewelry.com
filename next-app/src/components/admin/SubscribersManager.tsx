@@ -7,6 +7,7 @@ import {
   DEFAULT_SUBSCRIBER_SORT,
   nextSubscriberSort,
   sortSubscriberRows,
+  subscriberLanguageLabel,
   subscriberRowKey,
   subscriberSourceLabel,
   type SubscriberRow,
@@ -122,6 +123,8 @@ const COLUMNS: { label: string; sortKey: SubscriberSortKey | null }[] = [
   { label: 'Email', sortKey: 'email' },
   { label: 'Phone', sortKey: 'phone' },
   { label: 'Alerts', sortKey: 'alerts' },
+  // 2026-11-24: which language their texts and emails go out in (replaced the ES label in Alerts).
+  { label: 'Language', sortKey: 'language' },
   { label: 'Source', sortKey: 'source' },
   { label: 'Subscribed', sortKey: 'subscribed' },
   { label: 'Actions', sortKey: null },
@@ -572,7 +575,7 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
               phone: saved.phone,
               smsStatus: saved.smsStatus,
               ...(saved.language
-                ? { subscriberLanguage: saved.language, language: saved.language === 'es' ? 'es' as const : item.language }
+                ? { subscriberLanguage: saved.language, language: saved.language }
                 : {}),
             }
           : item)));
@@ -863,16 +866,6 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
                       {statusLabel && (
                         <Pill color={STATUS_COLORS[subscriber.smsStatus ?? ''] ?? 'var(--color-on-surface-variant)'}>{statusLabel}</Pill>
                       )}
-                      {/* Spanish (2026-11-22): their texts and emails go out in Spanish. */}
-                      {subscriber.language === 'es' && (
-                        <span
-                          className="inline-block rounded-full px-2 py-0.5 text-[0.58rem] font-bold uppercase tracking-[0.12em]"
-                          style={{ background: 'var(--color-on-surface)', color: '#e9c349', fontFamily: 'var(--font-label)' }}
-                          title="Texts and emails go to them in Spanish"
-                        >
-                          ES
-                        </span>
-                      )}
                       {subscriber.phone && subscriber.smsStatus === 'pending' && (
                         <button
                           type="button"
@@ -886,6 +879,20 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
                         </button>
                       )}
                     </span>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {/* Spanish keeps the dark-and-gold look the old ES label had, so it stands out in a mostly English list. */}
+                    {subscriber.language === 'es' ? (
+                      <span
+                        className="inline-block rounded-full px-2.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-[0.12em]"
+                        style={{ background: 'var(--color-on-surface)', color: '#e9c349', fontFamily: 'var(--font-label)' }}
+                        title="Texts and emails go to them in Spanish"
+                      >
+                        {subscriberLanguageLabel(subscriber)}
+                      </span>
+                    ) : (
+                      <span style={{ color: 'var(--color-on-surface-variant)' }}>{subscriberLanguageLabel(subscriber)}</span>
+                    )}
                   </td>
                   <td className="px-4 py-3" style={{ color: 'var(--color-on-surface-variant)' }}>
                     {subscriberSourceLabel(subscriber)}
