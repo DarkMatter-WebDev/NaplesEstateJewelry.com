@@ -9,6 +9,8 @@ import { formatFollowUpTime, stepName } from '@/lib/follow-ups';
 import type { FollowUpMessageRow, FollowUpPersonRow, PersonDetail } from '@/lib/follow-ups-server';
 import { callJson, FOLLOW_UP_FROM_LINE, LABEL_CLASS, money, MUTED, shortDate, SMALL_BUTTON, StatusText, TypeChip } from './shared';
 import { messageResult } from './status';
+import { ItemLines } from './FollowUpItemsModal';
+import OpeningLine from './OpeningLine';
 
 type Filter = 'all' | 'sellers' | 'buyers' | 'unsubscribed';
 
@@ -37,10 +39,13 @@ export default function FollowUpPeople({
   people,
   adminBasePath,
   onChanged,
+  openings = { ready: false, aiOn: false },
 }: {
   people: FollowUpPersonRow[];
   adminBasePath: string;
   onChanged: (message: string, ok: boolean) => void;
+  /** For the Thank-you box's opening line (same as Upcoming). */
+  openings?: { ready: boolean; aiOn: boolean };
 }) {
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
@@ -169,6 +174,7 @@ export default function FollowUpPeople({
         <PersonModal
           person={open}
           adminBasePath={adminBasePath}
+          openings={openings}
           onClose={() => setOpen(null)}
           onChanged={(message, ok) => {
             onChanged(message, ok);
@@ -182,11 +188,13 @@ export default function FollowUpPeople({
 function PersonModal({
   person,
   adminBasePath,
+  openings,
   onClose,
   onChanged,
 }: {
   person: FollowUpPersonRow;
   adminBasePath: string;
+  openings: { ready: boolean; aiOn: boolean };
   onClose: () => void;
   onChanged: (message: string, ok: boolean) => void;
 }) {
@@ -194,6 +202,7 @@ function PersonModal({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [viewing, setViewing] = useState<FollowUpMessageRow | null>(null);
+  const [previewId, setPreviewId] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -212,11 +221,31 @@ function PersonModal({
 
   async function act(action: 'send_now' | 'stop' | 'resume') {
     if (action === 'stop' && !window.confirm(`Stop all follow-up emails to ${person.email}? Anything queued for them is called off.`)) return;
+    if (action === 'send_now' && !window.confirm(`Send this thank-you to ${person.email} now?`)) return;
     setBusy(true);
     const { ok, data } = await callJson('/api/admin/follow-ups/people', { body: { email: person.email, action } });
     setBusy(false);
     const message = data.message ?? data.error ?? (ok ? 'Done.' : 'Something went wrong.');
     onChanged(action === 'stop' && ok ? `Follow-ups stopped for ${person.email}.` : action === 'resume' && ok ? `Follow-ups back on for ${person.email}.` : message, ok);
+    setReloadKey((value) => value + 1);
+  }
+
+  /** "Preview the email": the visit's row is prepared (held, never sent by the sweep) so the preview is exactly what "Send it" sends. */
+  async function previewThankYou() {
+    const box = detail?.thankYou;
+    if (!box || box.kind !== 'visit') return;
+    if (box.row) {
+      setPreviewId(box.row.id);
+      return;
+    }
+    setBusy(true);
+    const { ok, data } = await callJson<{ id?: string }>('/api/admin/follow-ups/people', { body: { email: person.email, action: 'prepare' } });
+    setBusy(false);
+    if (!ok || !data.id) {
+      onChanged(data.error ?? 'Could not prepare the preview.', false);
+      return;
+    }
+    setPreviewId(data.id);
     setReloadKey((value) => value + 1);
   }
 
@@ -242,10 +271,44 @@ function PersonModal({
                 Email bounced{detail.optOut?.at ? ` ${shortDate(detail.optOut.at)}` : ''} — this address cannot receive mail (often a typo). Ask them for the right email and correct it on their order or receipt.
               </p>
             )}
+            {detail.thankYou?.kind === 'none' && (
+              <p className="border px-3 py-2" style={{ borderColor: 'var(--color-outline-variant)', ...MUTED }}>{detail.thankYou.message}</p>
+            )}
+            {detail.thankYou?.kind === 'visit' && (
+              <section className="border px-3 py-3" style={{ borderColor: '#e3d9bf', background: '#fffdf6' }} aria-label="Thank-you">
+                <h3 className={`mb-1.5 ${LABEL_CLASS}`} style={MUTED}>Thank-you · not sent yet</h3>
+                <div className="mb-2">
+                  <TypeChip type={detail.thankYou.audience} />{' '}
+                  <Link className="font-semibold underline-offset-2 hover:underline" style={{ color: 'var(--color-primary)' }} target="_blank" rel="noopener"
+                    href={detail.thankYou.visitKind === 'receipt' ? `${adminBasePath}/buy-receipts/${detail.thankYou.sourceId}` : `${adminBasePath}/orders/${detail.thankYou.sourceId}`}>
+                    {detail.thankYou.ref ?? (detail.thankYou.visitKind === 'receipt' ? 'Buy receipt' : 'Order')}
+                  </Link>{' '}
+                  <span style={MUTED}>· {shortDate(detail.thankYou.at)}{detail.thankYou.language === 'es' ? ' · Español' : ''}</span>
+                </div>
+                {detail.thankYou.items ? <ItemLines view={detail.thankYou.items} showAiReads compact /> : <p style={MUTED}>Could not load the items.</p>}
+                <div className="mt-3">
+                  {detail.thankYou.row ? (
+                    <OpeningLine row={detail.thankYou.row} aiOn={openings.aiOn} ready={openings.ready}
+                      onChanged={(text, ok) => {
+                        onChanged(text, ok);
+                        setReloadKey((value) => value + 1);
+                      }} />
+                  ) : (
+                    <p className="text-xs" style={MUTED}>Opening line: written when you press Preview the email (or Send it).</p>
+                  )}
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button type="button" className="outline-button" style={SMALL_BUTTON} disabled={busy || unsubscribed || bounced || stopped} onClick={() => void previewThankYou()}>
+                    {busy ? 'Working…' : 'Preview the email'}
+                  </button>
+                  <button type="button" className="gold-button" style={SMALL_BUTTON} disabled={busy || unsubscribed || bounced || stopped} onClick={() => void act('send_now')}>
+                    Send it
+                  </button>
+                  <span className="text-xs" style={MUTED}>Sends right away to {person.email}</span>
+                </div>
+              </section>
+            )}
             <div className="flex flex-wrap gap-2">
-              <button type="button" className="gold-button" style={SMALL_BUTTON} disabled={busy || unsubscribed || bounced || stopped} onClick={() => void act('send_now')}>
-                Send a thank-you now
-              </button>
               {stopped ? (
                 <button type="button" className="outline-button" style={SMALL_BUTTON} disabled={busy} onClick={() => void act('resume')}>Turn follow-ups back on</button>
               ) : (
@@ -298,6 +361,18 @@ function PersonModal({
           </>
         )}
       </div>
+      {previewId && (
+        <EmailCopyViewer
+          title="Preview · not sent yet"
+          url={`/api/admin/follow-ups/${previewId}`}
+          to={person.email}
+          subject={null}
+          sentLabel={'Only when you press "Send it" — this is exactly what it sends'}
+          sentTerm="Sends"
+          fromLine={FOLLOW_UP_FROM_LINE}
+          onClose={() => setPreviewId(null)}
+        />
+      )}
       {viewing && (
         <EmailCopyViewer
           title={`Step ${viewing.step} · ${stepName(viewing.audience, viewing.step)}`}

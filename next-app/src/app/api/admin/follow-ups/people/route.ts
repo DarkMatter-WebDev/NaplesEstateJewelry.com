@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { createServiceClient } from '@/lib/supabase/service';
 import { isValidEmail, normalizeEmail } from '@/lib/marketing';
-import { loadPersonDetail, resumePerson, sendPersonNow, stopPerson } from '@/lib/follow-ups-server';
+import { loadPersonDetail, preparePersonThankYou, resumePerson, sendPersonNow, stopPerson } from '@/lib/follow-ups-server';
 
 export const runtime = 'nodejs';
 
@@ -19,7 +19,7 @@ export async function GET(req: Request) {
   }
 }
 
-/** Send a thank-you now · Stop all follow-ups · Resume. */
+/** Send a thank-you now · Prepare it for a preview (2026-11-25 (15)) · Stop all follow-ups · Resume. */
 export async function POST(req: Request) {
   const { user, error } = await requireAdmin();
   if (error) return error;
@@ -31,6 +31,10 @@ export async function POST(req: Request) {
     if (body?.action === 'send_now') {
       const outcome = await sendPersonNow(service, email, user.email ?? null);
       return NextResponse.json(outcome, { status: outcome.ok ? 200 : 409 });
+    }
+    if (body?.action === 'prepare') {
+      const prepared = await preparePersonThankYou(service, email);
+      return 'error' in prepared ? NextResponse.json({ error: prepared.error }, { status: 409 }) : NextResponse.json(prepared);
     }
     if (body?.action === 'stop') {
       const failure = await stopPerson(service, email, user.email ?? null);

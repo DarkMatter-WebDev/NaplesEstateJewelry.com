@@ -33,8 +33,15 @@ export async function loadFollowUpItems(client: SupabaseClient, id: string): Pro
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!message) return null;
-  const row = message as RowForOpening & { source_ref: string | null };
+  return loadItemsForSource(client, message as RowForOpening & { source_ref: string | null });
+}
 
+/**
+ * The item lines of one receipt / order — for a queued thank-you (Upcoming →
+ * View items) or for the visit People → "Send a thank-you" is about to thank,
+ * before any row exists (2026-11-25 (15)).
+ */
+export async function loadItemsForSource(client: SupabaseClient, row: RowForOpening & { source_ref: string | null }): Promise<FollowUpItemsView> {
   // What the AI reads (item names cleaned + the owner's note) — the same input the opening is written from.
   const input = await openingInputFor(client, row).catch(() => null);
 

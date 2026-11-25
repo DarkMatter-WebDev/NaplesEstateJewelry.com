@@ -140,6 +140,18 @@ from), plus "Open the receipt / order ↗" in a new tab. Data: `GET
 buy receipts only through the service_role column grant — never ID / address /
 payment data; `follow-ups.test.ts` scans it).
 
+## People → Thank-you box (2026-11-25 (15))
+
+People → Open shows, instead of a send-straight-away button, a **Thank-you box** for
+the visit a thank-you would go to (the newest recorded buy receipt or paid order with
+no SENT thank-you — `personThankYouTarget`, the same rule for box, preview and send):
+the item lines (+ internal note + "What the AI reads"), the opening line (Edit /
+Rewrite / Use standard wording once prepared), **Preview the email** and **Send it**
+(confirm first). Preview prepares the visit's step-1 row — a NEW row is held as
+`not_sent` with no send time (the sweep only sends `scheduled`), so it shows in the
+Sent log as "Not sent — Ready to send…" until sent from People or the log; the
+preview is exactly what Send it sends.
+
 ## How it runs
 
 - pg_cron `nej-follow-ups-sweep` every 15 minutes → `POST /api/admin/follow-ups/sweep`

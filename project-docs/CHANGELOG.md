@@ -1,6 +1,23 @@
 
 # Changelog
 
+## 2026-11-25 (15) — 👁️ People → Open: a Thank-you box with the visit's items, the opening line, "Preview the email" and "Send it" (with a confirm) — BUILT + STAGED, not pushed; no SQL
+
+- **Owner:** *"when i click 'open'… show me the items they had... and then another button to preview the thank you email before it goes out... currently i send it a little blindly"* → mockup 1 → *"Yes, build it"* (preview not required before Send; confirm before sending; Edit / Rewrite / Standard on the opening line).
+- **Built:**
+  - `lib/follow-ups-server.ts`: ONE rule for the visit — `personThankYouTarget` (newest recorded buy receipt / paid order without a SENT thank-you + its step-1 row if any) — now used by the box, the preview and the send. `sendPersonNow` refactored onto it (same behaviour: a prepared row is the one sent). NEW `preparePersonThankYou`: a visit with no row gets one **held as `not_sent`, `send_at` null, reason "Ready to send — press "Send it" in People (prepared for a preview)."** — the sweep only sends `scheduled` rows, manual send allows `not_sent` — then its AI opening is written. `loadPersonDetail` returns `thankYou` (visit, items via `loadItemsForSource`, the row + opening once prepared).
+  - `lib/follow-up-items-server.ts`: `loadItemsForSource` split out of `loadFollowUpItems` (works before any row exists).
+  - `api/admin/follow-ups/people` POST `prepare`.
+  - `FollowUpPeople.tsx`: the gold "Send a thank-you now" became the **Thank-you box** — chip + receipt/order link (new tab) + date (+ "Español"), the item lines + internal note + "What the AI reads" (shared `ItemLines` from `FollowUpItemsModal.tsx`), the opening line with Edit / Rewrite / Use standard wording (`OpeningLine`, as in Upcoming; before preparing: "written when you press Preview the email (or Send it)"), **Preview the email** (prepares, then the standard email viewer: "Sends — only when you press "Send it" — this is exactly what it sends") and **Send it** (`window.confirm("Send this thank-you to … now?")`). "Every visit already has a thank-you" shows instead when there is nothing to send. `FollowUpsManager` passes the AI-openings switch down.
+- **If the owner previews but never sends:** the Sent log shows one "Not sent — Ready to send…" line for that visit; "Send it" (People) or Send (Sent log) sends it later. Nothing sends it on its own.
+- **Tests:** `follow-ups.test.ts` NEW — one visit rule used 3×, prepared rows held (`not_sent`, no send time), sweep sends only `scheduled`, manual send allows `not_sent`, route `prepare`, UI has Preview + the confirm + items, old button gone.
+- **Gate (from `next-app`):** `npx tsc --noEmit` 0 · `npm run lint` 0 errors (4 old warnings) · `npx vitest run` **2637/2637** · `npm run build` 0. Dev: `POST /api/admin/follow-ups/people` signed out → 401. Not seen behind the admin sign-in — first look after the push.
+- **To reverse:** restore the gold "Send a thank-you now" button + drop the box / `previewThankYou` / `previewId` in `FollowUpPeople.tsx`; remove the `prepare` action; `personThankYouBox` + `thankYou` from `loadPersonDetail` (the `sendPersonNow` refactor can stay — same behaviour).
+
+## 2026-11-25 (14) — ✅ "de de" fix pushed + deployed (owner); LIVE check — pass
+
+- Owner: *"pushed and deployed, verify it live with chrome"*. Admin → Follow-ups → View items on NEJ-20261120-IYRWI (Ronal Lopez, Spanish): "What the AI reads" = **"Collar de Cadena de Eslabón Cubano Hueco de Oro de 10K"** — no "de de". Closed with Esc. Nothing changed.
+
 ## 2026-11-25 (13) — 🔍 The "de de" was OUR item cleaner, not the translation AI — fixed — BUILT + STAGED, not pushed; no SQL
 
 - **Owner:** *"i fixed the mary conversano order typo... the other one was automatically translated to spanish i think… investigate the typo cause further, it wasnt me that typed the spanish version"*.

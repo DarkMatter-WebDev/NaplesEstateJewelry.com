@@ -40,9 +40,6 @@ export default function FollowUpItemsModal({
   const isReceipt = row.source_type === 'buy_receipt';
   const href = isReceipt ? `${adminBasePath}/buy-receipts/${row.source_id}` : `${adminBasePath}/orders/${row.source_id}`;
   const ref = view?.ref ?? row.source_ref ?? (isReceipt ? 'Buy receipt' : 'Order');
-  const showQty = !!view && (view.kind === 'receipt' || view.lines.some((line) => line.qty !== null));
-  const cell = 'px-2 py-2 align-top';
-  const head = `px-2 py-1.5 text-left text-[10.5px] font-bold uppercase tracking-[0.14em]`;
 
   return (
     <AdminModal title={`${ref} · Items`} onClose={onClose} maxWidth="max-w-xl">
@@ -65,46 +62,7 @@ export default function FollowUpItemsModal({
               )}
             </div>
 
-            {view.lines.length === 0 ? (
-              <p style={MUTED}>No item lines on this {view.kind === 'receipt' ? 'receipt' : 'order'}.</p>
-            ) : (
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b" style={{ borderColor: 'var(--color-outline-variant)', ...MUTED }}>
-                    {showQty && <th className={head}>Qty</th>}
-                    <th className={head}>{view.kind === 'receipt' ? 'Description' : 'Item'}</th>
-                    <th className={`${head} text-right`}>{view.kind === 'receipt' ? 'Amount' : 'Price'}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {view.lines.map((line, index) => (
-                    <tr key={index} className="border-b" style={{ borderColor: '#ece8de' }}>
-                      {showQty && <td className={cell}>{line.qty ?? 1}</td>}
-                      <td className={cell}>{line.description}</td>
-                      <td className={`${cell} whitespace-nowrap text-right`}>{formatItemMoney(line.amount)}</td>
-                    </tr>
-                  ))}
-                  <tr className="border-t-2 font-bold" style={{ borderColor: 'var(--color-on-surface)' }}>
-                    {showQty && <td className={cell} />}
-                    <td className={cell}>{view.kind === 'receipt' ? 'Total paid to seller' : 'Order total'}</td>
-                    <td className={`${cell} whitespace-nowrap text-right`}>{formatItemMoney(view.total)}</td>
-                  </tr>
-                </tbody>
-              </table>
-            )}
-
-            {view.note && (
-              <div className="mt-4 border px-3 py-2.5 text-[13.5px]" style={{ borderColor: '#e7dfcf', background: '#fcfaf4' }}>
-                <span className={`block ${LABEL_CLASS}`} style={MUTED}>Note for the thank-you email · internal</span>
-                {view.note}
-              </div>
-            )}
-            {row.step === 1 && view.aiPieces.length > 0 && (
-              <div className="mt-3 text-[13px]" style={{ color: '#444' }}>
-                <span className={`block ${LABEL_CLASS}`} style={MUTED}>What the AI reads (prices, weights and counts cut out)</span>
-                {view.aiPieces.join(' · ')}
-              </div>
-            )}
+            <ItemLines view={view} showAiReads={row.step === 1} />
           </>
         )}
 
@@ -116,5 +74,56 @@ export default function FollowUpItemsModal({
         </div>
       </div>
     </AdminModal>
+  );
+}
+
+/** The lines table + internal note + "What the AI reads" — shared by View items and People → Thank-you box. */
+export function ItemLines({ view, showAiReads, compact = false }: { view: FollowUpItemsView; showAiReads: boolean; compact?: boolean }) {
+  const showQty = view.kind === 'receipt' || view.lines.some((line) => line.qty !== null);
+  const cell = compact ? 'px-1.5 py-1.5 align-top' : 'px-2 py-2 align-top';
+  const head = `${compact ? 'px-1.5 py-1' : 'px-2 py-1.5'} text-left text-[10.5px] font-bold uppercase tracking-[0.14em]`;
+  return (
+    <>
+      {view.lines.length === 0 ? (
+        <p style={MUTED}>No item lines on this {view.kind === 'receipt' ? 'receipt' : 'order'}.</p>
+      ) : (
+        <table className={`w-full border-collapse ${compact ? 'text-[13.5px]' : ''}`}>
+          <thead>
+            <tr className="border-b" style={{ borderColor: 'var(--color-outline-variant)', ...MUTED }}>
+              {showQty && <th className={head}>Qty</th>}
+              <th className={head}>{view.kind === 'receipt' ? 'Description' : 'Item'}</th>
+              <th className={`${head} text-right`}>{view.kind === 'receipt' ? 'Amount' : 'Price'}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {view.lines.map((line, index) => (
+              <tr key={index} className="border-b" style={{ borderColor: '#ece8de' }}>
+                {showQty && <td className={cell}>{line.qty ?? 1}</td>}
+                <td className={cell}>{line.description}</td>
+                <td className={`${cell} whitespace-nowrap text-right`}>{formatItemMoney(line.amount)}</td>
+              </tr>
+            ))}
+            <tr className="border-t-2 font-bold" style={{ borderColor: 'var(--color-on-surface)' }}>
+              {showQty && <td className={cell} />}
+              <td className={cell}>{view.kind === 'receipt' ? 'Total paid to seller' : 'Order total'}</td>
+              <td className={`${cell} whitespace-nowrap text-right`}>{formatItemMoney(view.total)}</td>
+            </tr>
+          </tbody>
+        </table>
+      )}
+
+      {view.note && (
+        <div className={`${compact ? 'mt-3' : 'mt-4'} border px-3 py-2.5 text-[13.5px]`} style={{ borderColor: '#e7dfcf', background: '#fcfaf4' }}>
+          <span className={`block ${LABEL_CLASS}`} style={MUTED}>Note for the thank-you email · internal</span>
+          {view.note}
+        </div>
+      )}
+      {showAiReads && view.aiPieces.length > 0 && (
+        <div className="mt-3 text-[13px]" style={{ color: '#444' }}>
+          <span className={`block ${LABEL_CLASS}`} style={MUTED}>What the AI reads (prices, weights and counts cut out)</span>
+          {view.aiPieces.join(' · ')}
+        </div>
+      )}
+    </>
   );
 }

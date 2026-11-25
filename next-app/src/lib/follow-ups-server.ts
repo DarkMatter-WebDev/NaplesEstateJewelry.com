@@ -37,6 +37,8 @@ import { BUSINESS_PHONE, getSiteUrl } from '@/lib/order-email-branding';
 import { loadLatestOrderLanguageByEmail, loadOrderLanguage, loadSpanishItemTitles } from '@/lib/order-language-server';
 import type { OpeningSource } from '@/lib/follow-up-opening';
 import { aiOpeningsConfigured, loadOpenings, openingsReady, writeDueOpenings, writeOpeningNow } from '@/lib/follow-up-opening-server';
+import { loadItemsForSource } from '@/lib/follow-up-items-server';
+import type { FollowUpItemsView } from '@/lib/follow-up-items';
 
 /**
  * Admin → Follow-ups, the database + sending half (the pure rules are in
@@ -965,22 +967,32 @@ export async function recordReviewClick(client: SupabaseClient, token: string): 
   }
 }
 
+type PersonVisit =
+  | { kind: 'receipt'; at: string; receipt: ReceiptSource }
+  | { kind: 'order'; at: string; order: OrderSource };
+
+type PersonTarget =
+  | { kind: 'none'; message: string }
+  | { kind: 'visit'; visit: PersonVisit; row: { id: string; status: string } | null };
+
+/** The reason a People → "Preview the email" row carries until it is sent (2026-11-25 (15)). */
+export const PREPARED_REASON = 'Ready to send — press "Send it" in People (prepared for a preview).';
+
 /**
- * "Send a thank-you now" on a person: their latest visit that has no
- * thank-you yet gets one, sent right away.
+ * The visit People → "Send a thank-you" is about: their newest buy receipt or
+ * paid order with no SENT thank-you, and its existing step-1 row if there is
+ * one. One rule for the box, the preview and the send.
  */
-export async function sendPersonNow(client: SupabaseClient, email: string, byEmail: string | null): Promise<SendOutcome> {
-  const normalized = normalizeEmail(email);
-  const { settings } = await loadFollowUpSettings(client);
+async function personThankYouTarget(client: SupabaseClient, normalized: string): Promise<PersonTarget> {
   const [{ data: receipts }, { data: orders }] = await Promise.all([
     client.from('buy_receipts').select(RECEIPT_COLUMNS).eq('status', 'recorded').ilike('seller_email', likeExact(normalized)).order('created_at', { ascending: false }).limit(10),
     client.from('orders').select(ORDER_COLUMNS).eq('payment_status', 'paid').ilike('customer_email', likeExact(normalized)).is('deleted_at', null).order('created_at', { ascending: false }).limit(10),
   ]);
-  const visits = [
+  const visits: PersonVisit[] = [
     ...((receipts ?? []) as ReceiptSource[]).map((receipt) => ({ kind: 'receipt' as const, at: receipt.created_at, receipt })),
     ...((orders ?? []) as OrderSource[]).map((order) => ({ kind: 'order' as const, at: order.created_at, order })),
   ].sort((a, b) => b.at.localeCompare(a.at));
-  if (visits.length === 0) return { ok: false, status: 'failed', message: 'No buy receipt or paid order with this email.' };
+  if (visits.length === 0) return { kind: 'none', message: 'No buy receipt or paid order with this email.' };
 
   const existing = new Map(
     (await selectIn<{ id: string; source_id: string; status: string; step: number }>(client, MESSAGES, 'id, source_id, status, step', 'source_id', visits.map((v) => (v.kind === 'receipt' ? v.receipt.id : v.order.id))))
@@ -988,51 +1000,130 @@ export async function sendPersonNow(client: SupabaseClient, email: string, byEma
       .map((row) => [row.source_id, row]),
   );
   for (const visit of visits) {
-    const sourceId = visit.kind === 'receipt' ? visit.receipt.id : visit.order.id;
-    const row = existing.get(sourceId);
+    const row = existing.get(visit.kind === 'receipt' ? visit.receipt.id : visit.order.id);
     if (row && row.status === 'sent') continue;
-    if (row) return sendFollowUp(client, row.id, { manual: true, byEmail, settings });
-    const now = new Date();
-    let fresh: NewRow;
-    if (visit.kind === 'receipt') {
-      fresh = {
-        email: normalized,
-        name: visit.receipt.seller_name,
-        audience: 'seller',
-        step: 1,
-        source_type: 'buy_receipt',
-        source_id: visit.receipt.id,
-        source_ref: visit.receipt.receipt_number,
-        source_note: `${money(visit.receipt.total)} paid`,
-        language: visit.receipt.seller_language === 'es' ? 'es' : 'en',
-        status: 'scheduled',
-        event_at: visit.receipt.created_at,
-        send_at: now.toISOString(),
-      };
-    } else {
-      const language = await loadOrderLanguage(client, visit.order.id).catch(() => 'en' as const);
-      const titles = await orderItemTitles(client, [visit.order.id]);
-      fresh = {
-        email: normalized,
-        name: visit.order.customer_name,
-        audience: 'buyer',
-        step: 1,
-        source_type: 'order',
-        source_id: visit.order.id,
-        source_ref: visit.order.order_number,
-        source_note: itemPhrase(titles.get(visit.order.id) ?? [], language),
-        language,
-        status: 'scheduled',
-        event_at: visit.order.created_at,
-        send_at: now.toISOString(),
-      };
-    }
-    await insertRows(client, [fresh]);
-    const { data: inserted } = await client.from(MESSAGES).select('id').eq('source_type', fresh.source_type).eq('source_id', fresh.source_id).eq('step', 1).maybeSingle();
-    if (!inserted) return { ok: false, status: 'failed', message: 'Could not queue the thank-you.' };
-    return sendFollowUp(client, inserted.id as string, { manual: true, byEmail, settings });
+    return { kind: 'visit', visit, row: row ? { id: row.id, status: row.status } : null };
   }
-  return { ok: false, status: 'sent', message: 'Every visit of theirs already has a thank-you. Open the Sent log to see it.' };
+  return { kind: 'none', message: 'Every visit of theirs already has a thank-you. Open the Sent log to see it.' };
+}
+
+/** A new step-1 row for a People visit (sent right away, or held for a preview). */
+async function personRowFor(client: SupabaseClient, normalized: string, visit: PersonVisit, now: Date, prepared: boolean): Promise<NewRow> {
+  const held = prepared ? { status: 'not_sent' as const, send_at: null, reason: PREPARED_REASON } : { status: 'scheduled' as const, send_at: now.toISOString() };
+  if (visit.kind === 'receipt') {
+    return {
+      email: normalized,
+      name: visit.receipt.seller_name,
+      audience: 'seller',
+      step: 1,
+      source_type: 'buy_receipt',
+      source_id: visit.receipt.id,
+      source_ref: visit.receipt.receipt_number,
+      source_note: `${money(visit.receipt.total)} paid`,
+      language: visit.receipt.seller_language === 'es' ? 'es' : 'en',
+      event_at: visit.receipt.created_at,
+      ...held,
+    };
+  }
+  const language = await loadOrderLanguage(client, visit.order.id).catch(() => 'en' as const);
+  const titles = await orderItemTitles(client, [visit.order.id]);
+  return {
+    email: normalized,
+    name: visit.order.customer_name,
+    audience: 'buyer',
+    step: 1,
+    source_type: 'order',
+    source_id: visit.order.id,
+    source_ref: visit.order.order_number,
+    source_note: itemPhrase(titles.get(visit.order.id) ?? [], language),
+    language,
+    event_at: visit.order.created_at,
+    ...held,
+  };
+}
+
+async function insertPersonRow(client: SupabaseClient, row: NewRow): Promise<string | null> {
+  await insertRows(client, [row]);
+  const { data } = await client.from(MESSAGES).select('id').eq('source_type', row.source_type).eq('source_id', row.source_id).eq('step', 1).maybeSingle();
+  return (data?.id as string | undefined) ?? null;
+}
+
+/**
+ * "Send a thank-you now" on a person: their latest visit that has no
+ * thank-you yet gets one, sent right away. A row prepared for a preview
+ * (People → "Preview the email") is the one that is sent, opening and all.
+ */
+export async function sendPersonNow(client: SupabaseClient, email: string, byEmail: string | null): Promise<SendOutcome> {
+  const normalized = normalizeEmail(email);
+  const { settings } = await loadFollowUpSettings(client);
+  const target = await personThankYouTarget(client, normalized);
+  if (target.kind === 'none') {
+    return { ok: false, status: target.message.startsWith('No buy') ? 'failed' : 'sent', message: target.message };
+  }
+  if (target.row) return sendFollowUp(client, target.row.id, { manual: true, byEmail, settings });
+  const id = await insertPersonRow(client, await personRowFor(client, normalized, target.visit, new Date(), false));
+  if (!id) return { ok: false, status: 'failed', message: 'Could not queue the thank-you.' };
+  return sendFollowUp(client, id, { manual: true, byEmail, settings });
+}
+
+/**
+ * People → "Preview the email": make sure the visit has its step-1 row (a new
+ * one is HELD as not_sent — the sweep never sends it), write the AI opening if
+ * it has none, and return the row id so the preview shows exactly the email
+ * "Send it" will send.
+ */
+export async function preparePersonThankYou(client: SupabaseClient, email: string): Promise<{ id: string } | { error: string }> {
+  const normalized = normalizeEmail(email);
+  const target = await personThankYouTarget(client, normalized);
+  if (target.kind === 'none') return { error: target.message };
+  let id = target.row?.id ?? null;
+  if (!id) id = await insertPersonRow(client, await personRowFor(client, normalized, target.visit, new Date(), true));
+  if (!id) return { error: 'Could not prepare the thank-you.' };
+  const { settings } = await loadFollowUpSettings(client);
+  if (settings.aiOpenings && aiOpeningsConfigured()) {
+    const state = (await loadOpenings(client, [id]).catch(() => null))?.get(id);
+    if (state && state.source === null) await writeOpeningNow(client, id).catch(() => null);
+  }
+  return { id };
+}
+
+/** People → Open: the visit the Thank-you box is about, its items and (once prepared) its row + opening. */
+async function personThankYouBox(client: SupabaseClient, normalized: string): Promise<PersonDetail['thankYou']> {
+  const target = await personThankYouTarget(client, normalized);
+  if (target.kind === 'none') return { kind: 'none', message: target.message };
+  const visit = target.visit;
+  const draft = await personRowFor(client, normalized, visit, new Date(), true);
+  const items = await loadItemsForSource(client, {
+    id: target.row?.id ?? '',
+    audience: draft.audience,
+    language: draft.language,
+    name: draft.name,
+    source_type: draft.source_type,
+    source_id: draft.source_id,
+    source_ref: draft.source_ref,
+  }).catch(() => null);
+  let row: FollowUpMessageRow | null = null;
+  if (target.row) {
+    const { data } = await client.from(MESSAGES).select(MESSAGE_COLUMNS).eq('id', target.row.id).maybeSingle();
+    row = (data as FollowUpMessageRow | null) ?? null;
+    if (row) {
+      const state = (await loadOpenings(client, [row.id]).catch(() => null))?.get(row.id);
+      row.opening = state?.opening ?? null;
+      row.opening_source = state?.source ?? null;
+    }
+  }
+  return {
+    kind: 'visit',
+    visitKind: visit.kind,
+    sourceId: draft.source_id,
+    ref: draft.source_ref,
+    at: visit.at,
+    amount: Number((visit.kind === 'receipt' ? visit.receipt.total : null) ?? 0) || null,
+    language: draft.language,
+    audience: draft.audience,
+    items,
+    row,
+  };
 }
 
 // ---- The page ---------------------------------------------------------------
@@ -1185,6 +1276,22 @@ export type PersonDetail = {
   visits: Array<{ kind: 'receipt' | 'order'; id: string; ref: string | null; at: string; amount: number; note: string | null }>;
   messages: FollowUpMessageRow[];
   optOut: OptOut | null;
+  /** The Thank-you box (2026-11-25 (15)): the visit "Send it" will thank, its items, and its row once prepared. */
+  thankYou:
+    | { kind: 'none'; message: string }
+    | {
+        kind: 'visit';
+        visitKind: 'receipt' | 'order';
+        sourceId: string;
+        ref: string | null;
+        at: string;
+        amount: number | null;
+        language: FollowUpLanguage;
+        audience: FollowUpAudience;
+        items: FollowUpItemsView | null;
+        row: FollowUpMessageRow | null;
+      }
+    | null;
 };
 
 export async function loadPersonDetail(client: SupabaseClient, email: string): Promise<PersonDetail> {
@@ -1213,5 +1320,6 @@ export async function loadPersonDetail(client: SupabaseClient, email: string): P
       note: order.payment_status === 'paid' ? `They paid · ${String(order.fulfillment_status ?? '').replace(/_/g, ' ')}` : String(order.payment_status ?? '').replace(/_/g, ' '),
     })),
   ].sort((a, b) => b.at.localeCompare(a.at));
-  return { email: normalized, visits, messages: (messages.data ?? []) as FollowUpMessageRow[], optOut };
+  const thankYou = await personThankYouBox(client, normalized).catch(() => null);
+  return { email: normalized, visits, messages: (messages.data ?? []) as FollowUpMessageRow[], optOut, thankYou };
 }

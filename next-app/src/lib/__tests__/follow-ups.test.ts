@@ -449,6 +449,24 @@ describe('wiring', () => {
     expect(src('components/admin/follow-ups/FollowUpItemsModal.tsx')).toContain('AdminModal');
   });
 
+  it('People → Thank-you box: preview first, prepared rows are HELD, send confirms (2026-11-25 (15))', () => {
+    const server = src('lib/follow-ups-server.ts');
+    // one rule picks the visit for the box, the preview and the send
+    expect(server).toContain('async function personThankYouTarget(');
+    expect(server.match(/personThankYouTarget\(client, normalized\)/g)?.length).toBeGreaterThanOrEqual(3);
+    // a row prepared for a preview is not_sent with no send time — the sweep only ever sends 'scheduled'
+    expect(server).toMatch(/prepared \? \{ status: 'not_sent' as const, send_at: null, reason: PREPARED_REASON \}/);
+    expect(server).toMatch(/\.eq\('status', 'scheduled'\)[\s\S]{0,200}\.lte\('send_at'|\.lte\('send_at'[\s\S]{0,200}\.eq\('status', 'scheduled'\)/);
+    expect(server).toContain("const allowed = options.manual ? ['scheduled', 'waiting', 'failed', 'skipped', 'not_sent'] : ['scheduled'];");
+    const route = src('app/api/admin/follow-ups/people/route.ts');
+    expect(route).toContain("body?.action === 'prepare'");
+    const people = src('components/admin/follow-ups/FollowUpPeople.tsx');
+    expect(people).toContain('Preview the email');
+    expect(people).toContain('Send this thank-you to ${person.email} now?');
+    expect(people).toContain('<ItemLines');
+    expect(people).not.toContain('Send a thank-you now');
+  });
+
   it('the sweep is guarded by the existing cron secret (no new env var)', () => {
     const route = src('app/api/admin/follow-ups/sweep/route.ts');
     expect(route).toContain('TEXT_ALERTS_CRON_SECRET');

@@ -270,6 +270,7 @@ export default function FollowUpsManager({ data, adminBasePath }: { data: Follow
           <FollowUpPeople
             people={data.people}
             adminBasePath={adminBasePath}
+            openings={{ ready: data.openings.ready, aiOn: settings.aiOpenings && data.openings.aiConfigured }}
             onChanged={(text, ok) => {
               setNotice({ text, ok });
               refresh();
