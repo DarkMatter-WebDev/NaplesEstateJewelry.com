@@ -4,7 +4,6 @@ import { createClient } from '@/lib/supabase/server';
 import { getVerifiedUser } from '@/lib/auth-claims';
 import { invoiceNumberForOrder } from '@/lib/order-invoice-email';
 import type { Order, OrderItem } from '@/types/sales';
-import CustomerModeTabGuard from '@/components/admin/buy-receipts/CustomerModeTabGuard';
 import { loadOrderLanguage, loadSpanishItemTitles } from '@/lib/order-language-server';
 import { printLanguage } from '@/lib/order-language';
 import PrintOrderClient from './PrintOrderClient';
@@ -167,7 +166,6 @@ export default async function AdminOrderPrintPage({ params, searchParams }: Prop
         basePath={`${adminBasePath}/orders/${id}/print`}
       />
       {/* No admin menu on this page, so the guard the menu carries is added here. Draws nothing. */}
-      <CustomerModeTabGuard />
     </>
   );
 }

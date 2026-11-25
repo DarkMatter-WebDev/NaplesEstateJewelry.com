@@ -44,6 +44,7 @@ export default async function AdminFollowUpsPage({ params }: Props) {
   const data: FollowUpsPageData = pageResult.data ?? {
     ready: true,
     settings: settingsFromRow(null),
+    openings: { ready: false, aiConfigured: false },
     upcoming: [],
     log: [],
     people: [],

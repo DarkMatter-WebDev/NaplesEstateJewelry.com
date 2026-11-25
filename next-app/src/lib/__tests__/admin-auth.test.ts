@@ -18,7 +18,6 @@ vi.mock('@/lib/supabase/server', () => ({
 }));
 
 import { requireAdmin } from '../admin-auth';
-import { CUSTOMER_MODE_COOKIE } from '../customer-mode-lock';
 
 async function statusOf(result: Awaited<ReturnType<typeof requireAdmin>>): Promise<number | 'ok'> {
   return result.error ? result.error.status : 'ok';
@@ -42,30 +41,11 @@ describe('requireAdmin', () => {
     expect(await statusOf(await requireAdmin())).toBe(401);
   });
 
-  it('refuses an admin whose browser is in customer input mode (owner, 2026-10-03)', async () => {
-    state.cookies.add(CUSTOMER_MODE_COOKIE);
-    const locked = await requireAdmin();
-    expect(await statusOf(locked)).toBe(423);
-    await expect(locked.error?.json()).resolves.toEqual({
-      error: 'This device is in customer input mode. Open Buy Receipts and enter the staff code to unlock it.',
-    });
-    // Explicit `false` is the same as not asking.
-    expect(await statusOf(await requireAdmin({ duringCustomerMode: false }))).toBe(423);
-  });
-
-  it('still answers the two calls that start and end that mode', async () => {
-    state.cookies.add(CUSTOMER_MODE_COOKIE);
-    expect(await statusOf(await requireAdmin({ duringCustomerMode: true }))).toBe('ok');
-  });
-
-  it('keeps the signed-out and not-an-admin answers the same on a locked browser', async () => {
-    state.cookies.add(CUSTOMER_MODE_COOKIE);
+  it('no longer reads a customer-input-mode lock (mode removed 2026-11-25): an old lock cookie changes nothing', async () => {
+    state.cookies.add('nej_customer_mode');
+    expect(await statusOf(await requireAdmin())).toBe('ok');
     state.profile = { is_admin: false };
     expect(await statusOf(await requireAdmin())).toBe(403);
-    // The lock exemption is not a way in for a non-admin.
-    expect(await statusOf(await requireAdmin({ duringCustomerMode: true }))).toBe(403);
-    state.claims = null;
-    expect(await statusOf(await requireAdmin())).toBe(401);
   });
 
   it('is unaffected by other cookies', async () => {

@@ -12,7 +12,6 @@ import { loadBullionLineIds } from '@/lib/bullion-sale-server';
 import { loadOrderLanguage, loadSpanishItemTitles } from '@/lib/order-language-server';
 import { printLanguage } from '@/lib/order-language';
 import type { Order, OrderItem } from '@/types/sales';
-import CustomerModeTabGuard from '@/components/admin/buy-receipts/CustomerModeTabGuard';
 import PrintInvoiceClient from './PrintInvoiceClient';
 
 export const metadata: Metadata = { title: 'Print Invoice' };
@@ -128,7 +127,6 @@ export default async function AdminOrderInvoicePrintPage({ params, searchParams 
         basePath={`${adminBasePath}/orders/${id}/invoice`}
       />
       {/* No admin menu on this page, so the guard the menu carries is added here. Draws nothing. */}
-      <CustomerModeTabGuard />
     </>
   );
 }

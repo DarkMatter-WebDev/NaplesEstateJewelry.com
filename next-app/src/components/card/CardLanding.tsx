@@ -352,10 +352,9 @@ export default async function CardLanding({ locale, holder }: CardLandingProps) 
           />
         </div>
 
-        {/* Address — pinned to the bottom of the screen on a tall phone. The
-            landmark line is included on purpose (approved in the mockup): the
-            sign out front is the other business's, and this page is read by
-            someone standing in the parking lot. */}
+        {/* Address — pinned to the bottom of the screen on a tall phone.
+            (The shared-suite landmark line was removed 2026-11-25:
+            our own sign is up now.) */}
         <div className="mt-5 text-center text-[0.9rem] leading-relaxed" style={{ color: 'var(--color-on-surface)' }}>
           <div className="flex items-start justify-center gap-2">
             <ShowroomAddress locale={locale} />

@@ -50,7 +50,7 @@ export interface ServiceArea {
   h1Es?: string;
   /**
    * The one city that physically hosts the showroom renders a walk-in band
-   * (address, live hours, what-to-bring). Address/landmark/hours come from
+   * (address, live hours, what-to-bring). Address/hours come from
    * their single sources — never hardcoded here.
    */
   hasShowroom?: boolean;

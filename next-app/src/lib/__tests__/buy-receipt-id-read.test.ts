@@ -226,7 +226,7 @@ describe('fill form from ID: where the photo goes and what is kept', () => {
     expect(form).toContain('const [fillFromId, setFillFromId] = useState(true);');
     expect(form).toContain('if (fillFromId) void fillFromPhoto(blob);');
     // Clear puts the tick back.
-    const startOver = form.slice(form.indexOf('function startOver()'), form.indexOf('async function enterCustomerMode()'));
+    const startOver = form.slice(form.indexOf('function startOver()'), form.indexOf('function startOverTrade()'));
     expect(startOver).toContain('setFillFromId(true);');
     // readIdPhoto is called from one place only.
     expect(form.match(/readIdPhoto\(/g)).toHaveLength(1);

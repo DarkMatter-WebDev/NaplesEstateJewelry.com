@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { AppIcon } from '@/components/AppIcon';
 import TextUsLink from '@/components/cta/TextUsLink';
-import { addressWithLandmark, streetLine } from '@/lib/business-location';
+import { addressOneLine, streetLine } from '@/lib/business-location';
 
 // Product-page trust layer (owner request 2026-08-04, modeled on the
 // mels-treasures.com review): three compact policy accordions plus a
@@ -36,8 +36,8 @@ export function ProductPolicyAccordions({ isEs, prefix, pickupHoursLine }: Props
         <>
           <p>
             {isEs
-              ? 'Cada pedido enviado viaja totalmente asegurado con confirmación de firma — las tarifas según el valor se muestran al pagar, y los pedidos de $5,000+ se envían por USPS Registered Mail, el servicio más seguro del Servicio Postal. ¿Prefiere evitar el envío? La recogida local es gratuita en ' + addressWithLandmark(true) + ', ' + pickupHoursLine + '.'
-              : 'Every shipped order travels fully insured with signature confirmation — value-based rates are shown at checkout, and orders of $5,000+ ship USPS Registered Mail, the most secure service the Postal Service offers. Prefer to skip shipping entirely? Local pickup is free at ' + addressWithLandmark(false) + ', ' + pickupHoursLine + '.'}
+              ? 'Cada pedido enviado viaja totalmente asegurado con confirmación de firma — las tarifas según el valor se muestran al pagar, y los pedidos de $5,000+ se envían por USPS Registered Mail, el servicio más seguro del Servicio Postal. ¿Prefiere evitar el envío? La recogida local es gratuita en ' + addressOneLine() + ', ' + pickupHoursLine + '.'
+              : 'Every shipped order travels fully insured with signature confirmation — value-based rates are shown at checkout, and orders of $5,000+ ship USPS Registered Mail, the most secure service the Postal Service offers. Prefer to skip shipping entirely? Local pickup is free at ' + addressOneLine() + ', ' + pickupHoursLine + '.'}
           </p>
           <p className="mt-2">
             {isEs ? 'Detalles completos: ' : 'Full details: '}

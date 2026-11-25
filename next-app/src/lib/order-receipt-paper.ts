@@ -19,7 +19,7 @@ import type { Order, OrderItem } from '@/types/sales';
 import { formatCurrency, formatPublicPurity } from '@/types/sales';
 import { formatProductItemYear } from '@/types/product';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
-import { cityLine, landmarkPhrase, streetLine } from '@/lib/business-location';
+import { cityLine, streetLine } from '@/lib/business-location';
 import { BUSINESS_PHONE, SITE_DOMAIN_LABEL } from '@/lib/order-email-branding';
 import { BULLION_LAW_LINE, BULLION_LINE_LABEL, bullionTaxLabel, orderBullionTaxFree, readSaleTradeIn, tradeInReceiptLine } from '@/lib/in-store-sale';
 import { type TaxExemptSnapshot } from '@/lib/tax-exempt';
@@ -169,8 +169,8 @@ ${anyPhoto ? `<td class="ph">${image ? `<img src="${esc(image)}" alt="">` : ''}<
     ? `${paid ? 'Recibo' : 'Factura'} ${order.order_number}`
     : `${kind === 'RECEIPT' ? 'Receipt' : 'Invoice'} ${order.order_number}`;
   const footer = es
-    ? `<strong>¡Gracias!</strong> ¿Preguntas? Llame o envíe un texto al ${esc(BUSINESS_PHONE)} · Vea este pedido cuando quiera en ${esc(SITE_DOMAIN_LABEL)}/es/order-lookup${opts.hoursLine ? `<br>Salón: ${esc(opts.hoursLine)} · ${esc(landmarkPhrase(true))}` : ''}`
-    : `<strong>Thank you!</strong> Questions? Call or text ${esc(BUSINESS_PHONE)} · View this order anytime at ${esc(SITE_DOMAIN_LABEL)}/order-lookup${opts.hoursLine ? `<br>Showroom: ${esc(opts.hoursLine)} · ${esc(landmarkPhrase(false))}` : ''}`;
+    ? `<strong>¡Gracias!</strong> ¿Preguntas? Llame o envíe un texto al ${esc(BUSINESS_PHONE)} · Vea este pedido cuando quiera en ${esc(SITE_DOMAIN_LABEL)}/es/order-lookup${opts.hoursLine ? `<br>Salón: ${esc(opts.hoursLine)}` : ''}`
+    : `<strong>Thank you!</strong> Questions? Call or text ${esc(BUSINESS_PHONE)} · View this order anytime at ${esc(SITE_DOMAIN_LABEL)}/order-lookup${opts.hoursLine ? `<br>Showroom: ${esc(opts.hoursLine)}` : ''}`;
   const body = `<div class="nej-paper">
 <div class="top">
   <div class="brand"><img src="${LOGO_PATH}" alt=""><div><div class="name">Naples Estate Jewelry</div><div class="addr">${esc(streetLine())}, ${esc(cityLine())} · ${esc(BUSINESS_PHONE)}<br>${esc(SITE_DOMAIN_LABEL)}</div></div></div>

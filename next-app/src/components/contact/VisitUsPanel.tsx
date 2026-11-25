@@ -31,13 +31,9 @@ interface Props {
  * have to re-learn where to look. Keep them in step — if one changes shape, so
  * does the other.
  *
- * ⚠️ The shared-suite landmark ("inside Sharon Lynch Collections") was REMOVED
- * from this panel on 2026-08-23 at the owner's request, along with the homepage
- * block and the order-email footer. A comment here previously called it
- * load-bearing and said "do not trim it to just the street address" — that was
- * a real concern (the sign out front is the other business's) and it has been
- * overridden deliberately, not lost. It still appears on the About page via
- * `wayfindingSentence()`. Do not re-add it here without asking.
+ * ⛔ The shared-suite landmark was removed here on 2026-08-23 and from the
+ * whole site on 2026-11-25 (owner: proper signage now, "we are just as much
+ * the shop"). Do not re-add it.
  */
 export default function VisitUsPanel({ locale = 'en' }: Props) {
   const isEs = locale === 'es';

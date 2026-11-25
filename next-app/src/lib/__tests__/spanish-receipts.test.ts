@@ -90,7 +90,7 @@ describe('the one-page paper', () => {
     const { body, title } = buildPaperReceipt(sale, { hoursLine: 'lun–sáb 10–4', language: 'es', spanishTitles: titles });
     expect(title).toBe('Recibo NEJ-20261121-7KQ2M');
     for (const text of ['RECIBO', 'PAGADO', 'Pedido NEJ-20261121-7KQ2M', '21 de noviembre de 2026 · 2:42 p. m.', 'Vendido a', 'Forma de pago', 'Entrega', 'Recogido en la tienda',
-      'Artículo', 'Precio', 'Subtotal · 2 artículos', 'Impuesto de ventas de FL · 6%', 'Total pagado', 'Su intercambio:', '¡Gracias!', '/es/order-lookup', 'Salón: lun–sáb 10–4', 'dentro de Sharon Lynch Collections',
+      'Artículo', 'Precio', 'Subtotal · 2 artículos', 'Impuesto de ventas de FL · 6%', 'Total pagado', 'Su intercambio:', '¡Gracias!', '/es/order-lookup', 'Salón: lun–sáb 10–4',
       'Anillo solitario de diamante en oro de 18K', '14K rope chain', 'Oro amarillo']) {
       expect(body, text).toContain(text);
     }

@@ -19,6 +19,7 @@ import type { FollowUpMessageRow, FollowUpsPageData } from '@/lib/follow-ups-ser
 import ChangeTimeModal from './ChangeTimeModal';
 import FollowUpEditor from './FollowUpEditor';
 import FollowUpPeople from './FollowUpPeople';
+import OpeningLine from './OpeningLine';
 import { callJson, FOLLOW_UP_FROM_LINE, LABEL_CLASS, MUTED, Notice, SMALL_BUTTON, StatusText, Switch, TypeChip } from './shared';
 import { messageResult, upcomingStatus } from './status';
 
@@ -159,6 +160,24 @@ export default function FollowUpsManager({ data, adminBasePath }: { data: Follow
           <b style={{ color: 'var(--color-on-surface)' }}>Never sends:</b> to anyone unsubscribed · for a voided receipt or a cancelled / refunded order · a second thank-you within 90 days · on Sunday (moves to Monday 10 AM) · anything while &ldquo;Pause all&rdquo; is on.
           Sent as &ldquo;Chris at Naples Estate Jewelry&rdquo;; replies land in info@.
         </p>
+        <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-3 border bg-white px-5 py-3" style={{ borderColor: 'var(--color-outline-variant)' }}>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-semibold">AI-written opening lines</div>
+            <div className="text-[12.5px]" style={MUTED}>
+              {!data.openings.ready
+                ? 'Run supabase/follow-ups-ai-openings-2026-11.sql in Supabase to turn this on. Until then every thank-you uses the standard opening line.'
+                : !data.openings.aiConfigured
+                  ? 'The AI is not set up on this server, so every thank-you uses the standard opening line.'
+                  : 'The AI writes the first line of each thank-you from the receipt or order (and your "Note for the thank-you email"). The review request stays the same for everyone. Check or change each one in Upcoming.'}
+            </div>
+          </div>
+          <Switch
+            checked={settings.aiOpenings}
+            disabled={savingSettings || !data.openings.ready}
+            label="AI-written opening lines"
+            onChange={(next) => void saveSettings({ aiOpenings: next }, next ? 'AI openings on: the AI writes the first line of each new thank-you.' : 'AI openings off: every thank-you uses the standard opening line.')}
+          />
+        </div>
       </div>
 
       <div className="flex flex-wrap items-end gap-1 border-b" style={{ borderColor: 'var(--color-outline-variant)' }} role="tablist">
@@ -224,6 +243,11 @@ export default function FollowUpsManager({ data, adminBasePath }: { data: Follow
             onSkip={(row) => void act(row, 'skip')}
             onChangeTime={(row) => setChanging(row)}
             onPreview={(row) => setViewing({ row })}
+            openings={{ ready: data.openings.ready, aiOn: settings.aiOpenings && data.openings.aiConfigured }}
+            onOpeningChanged={(text, ok) => {
+              setNotice({ text, ok });
+              refresh();
+            }}
           />
         )}
 
@@ -363,7 +387,7 @@ function SeriesCard({
   const step2On = settings[step2Key];
   const delay = settings[delayKey];
   const step1Detail = audience === 'seller'
-    ? `${FOLLOW_UP_DELAY_LABELS[delay]} · the review link is the soft last line`
+    ? `${FOLLOW_UP_DELAY_LABELS[delay]} · a personal opening line, then the review request`
     : `Pickup / in-store: ${FOLLOW_UP_DELAY_LABELS[delay].toLowerCase()} · Shipped: counted from the carrier's "Delivered"`;
   const step2Detail = audience === 'seller'
     ? `About 6 months after the thank-you · no review ask · only if they haven't sold to us since`
@@ -462,6 +486,8 @@ function UpcomingList({
   onSkip,
   onChangeTime,
   onPreview,
+  openings,
+  onOpeningChanged,
 }: {
   rows: FollowUpMessageRow[];
   settings: FollowUpSettings;
@@ -472,6 +498,8 @@ function UpcomingList({
   onSkip: (row: FollowUpMessageRow) => void;
   onChangeTime: (row: FollowUpMessageRow) => void;
   onPreview: (row: FollowUpMessageRow) => void;
+  openings: { ready: boolean; aiOn: boolean };
+  onOpeningChanged: (text: string, ok: boolean) => void;
 }) {
   if (rows.length === 0) return <p className="px-4 py-12 text-center text-sm" style={MUTED}>{empty}</p>;
   return (
@@ -505,6 +533,11 @@ function UpcomingList({
               <button type="button" className="outline-button" style={{ ...SMALL_BUTTON, opacity: 0.85 }} onClick={() => onPreview(row)}>Preview</button>
               <button type="button" className="outline-button social-danger-button" style={SMALL_BUTTON} disabled={busy || row.status === 'sending'} onClick={() => onSkip(row)}>Skip</button>
             </div>
+            {row.step === 1 && (
+              <div className="col-span-2 md:col-span-6 md:max-w-[52rem]">
+                <OpeningLine row={row} aiOn={openings.aiOn} ready={openings.ready} onChanged={onOpeningChanged} />
+              </div>
+            )}
           </li>
         );
       })}

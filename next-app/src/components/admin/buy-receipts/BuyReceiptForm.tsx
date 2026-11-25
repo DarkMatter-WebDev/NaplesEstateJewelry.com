@@ -21,20 +21,12 @@ import {
   type BuyReceiptPrintSetKey,
   type BuyReceiptRow,
 } from '@/lib/buy-receipts';
-import {
-  CUSTOMER_MODE_STORAGE_KEY,
-  customerHandBack,
-  readCustomerModeSnapshot,
-  writeCustomerModeSnapshot,
-  type CustomerHandBackReason,
-} from '@/lib/buy-receipt-customer-mode';
-import { CUSTOMER_MODE_MARKER_KEY } from '@/lib/customer-mode-lock';
 import { formatCurrency } from '@/types/sales';
-import BuyReceiptCustomerMode, { releaseCustomerModePage } from './BuyReceiptCustomerMode';
-import BuyReceiptSheet, { type BuyReceiptCustomerView } from './BuyReceiptSheet';
+import BuyReceiptSheet from './BuyReceiptSheet';
 import BuyReceiptTabs from './BuyReceiptTabs';
 import IdPhotoField from './IdPhotoField';
 import ReceiptPrintControls, { PrintSetSelect, printSetAllowed } from './ReceiptPrintControls';
+import ThankYouNoteCard from '@/components/admin/ThankYouNoteCard';
 import SellerLanguageSwitch from './SellerLanguageSwitch';
 import ThumbprintField from './ThumbprintField';
 import {
@@ -45,12 +37,10 @@ import {
   removeIdPhoto,
   removeThumbprint,
   saveDraftReceipt,
-  startCustomerMode,
   uploadIdPhoto,
   uploadThumbprint,
   useIdPhotoUrl,
 } from './buy-receipt-client';
-import { CUSTOMER_MODE_PAGE_CSS } from './buy-receipt-customer-css';
 
 /**
  * Admin → Buy Receipts → New receipt (owner mockups 2026-09-29/30).
@@ -62,17 +52,11 @@ import { CUSTOMER_MODE_PAGE_CSS } from './buy-receipt-customer-css';
  * and one that fails to upload never costs the receipt — the after-save panel
  * says so and offers a retry.
  *
- * "Customer input mode" (owner, 2026-10-03) is OPTIONAL: one small button on
- * the tabs row hands the tablet to the seller. They see this same paper,
- * locked to the whole screen, with only their own contact boxes switched on
- * and everything else faded (`BuyReceiptCustomerMode` is the locked screen; it
- * draws the paper through `sheet()` below, so it is the very same paper on the
- * very same draft). When the tablet comes back the form simply has the details
- * in it. The owner can equally ignore the button and type everything here.
+ * ("Customer input mode", 2026-10-03 — handing the tablet to the seller — was
+ * removed on 2026-11-25: the owner fills the form from the ID instead.)
  *
  * "Mailing list" (owner, 2026-10-03) is the second small box beside "Email
- * copy": ticked — by the owner here, or by the seller in customer input mode —
- * the email joins the mailing list when the receipt is saved.
+ * copy": ticked, the email joins the mailing list when the receipt is saved.
  *
  * "Save draft" (owner, 2026-10-09: "start on ipad, then pick up and finish on
  * the laptop where i can use the thumbprint reader"): saves the form as typed
@@ -117,7 +101,7 @@ export type TradeSideContext = {
  * The Trade-in sale screen (owner, 2026-11-21, option C): THIS form, the same
  * paper, with the sale beside it. The screen (`TradeInSaleForm`) owns the
  * sale's state and hands the form what it needs; the form owns the receipt,
- * its pictures, customer input mode — and the one save of both.
+ * its pictures — and the one save of both.
  */
 export type BuyReceiptTradeMode = {
   /** The sale's total, or null while it is not priced yet. */
@@ -136,8 +120,6 @@ export type BuyReceiptTradeMode = {
   onClear: () => void;
 };
 type EmailState = { status: 'sent'; to: string } | { status: 'failed'; error: string } | null;
-/** The tablet is with the seller: on their boxes, or on the locked Thank-you screen. */
-type CustomerMode = { phase: 'form' | 'thanks'; tried: boolean };
 
 const hintStyle = { color: 'var(--color-on-surface-variant)' } as const;
 const cardStyle = { borderColor: 'var(--color-outline-variant)' } as const;
@@ -147,7 +129,6 @@ export default function BuyReceiptForm({
   nowIso,
   initialDraft,
   duplicatedFrom = null,
-  startInCustomerMode = false,
   draftReceipt = null,
   draftForm = null,
   trade,
@@ -159,8 +140,6 @@ export default function BuyReceiptForm({
   nowIso: string;
   initialDraft?: BuyReceiptDraft;
   duplicatedFrom?: { id: string; number: string } | null;
-  /** This browser carries the customer-mode lock (a refresh, or a bounced address): open straight into the seller's screen. */
-  startInCustomerMode?: boolean;
   /** A saved draft opened to carry on with it (`?draft=<id>`), and the form it was saved with. */
   draftReceipt?: BuyReceiptRow | null;
   draftForm?: BuyReceiptDraftForm | null;
@@ -198,16 +177,9 @@ export default function BuyReceiptForm({
   const [emailCopy, setEmailCopy] = useState(draftForm?.emailCopy ?? false);
   const [emailState, setEmailState] = useState<EmailState>(null);
   const [emailing, setEmailing] = useState(false);
-  const [customerMode, setCustomerMode] = useState<CustomerMode | null>(startInCustomerMode ? { phase: 'form', tried: false } : null);
-  /** Browser storage has been read: the seller's screen may be drawn, and the form may be stored again. */
-  const [restored, setRestored] = useState(false);
-  const [modeBusy, setModeBusy] = useState(false);
-  const [modeError, setModeError] = useState<string | null>(null);
-  /** "Mailing list" is ticked (by the owner on this form, or by the seller in customer input mode); acted on when the receipt is saved. */
+  /** "Mailing list" is ticked; acted on when the receipt is saved. */
   const [mailingList, setMailingList] = useState(draftForm?.mailingList ?? false);
   const [listState, setListState] = useState<'added' | 'failed' | null>(null);
-  /** How the tablet last came back; the line it may leave on the form is worked out from this, live. */
-  const [handBackReason, setHandBackReason] = useState<CustomerHandBackReason | null>(null);
   /** The after-save panel's automatic print (or send) of the buy receipt has finished. */
   const [buyPrintDone, setBuyPrintDone] = useState(false);
 
@@ -231,46 +203,6 @@ export default function BuyReceiptForm({
       if (url) URL.revokeObjectURL(url);
     };
   }, [thumbprint]);
-
-  useEffect(() => {
-    // A refresh in customer input mode: bring back what was typed (the owner's
-    // items as well as the seller's boxes). Browser storage only exists after
-    // mount — reading it here, post-hydration, is the intended pattern, so the
-    // set-state-in-effect flag is a false positive.
-    try {
-      if (startInCustomerMode) {
-        // The note other tabs listen for (see CustomerModeTabGuard).
-        window.localStorage.setItem(CUSTOMER_MODE_MARKER_KEY, '1');
-        const snapshot = readCustomerModeSnapshot(window.sessionStorage.getItem(CUSTOMER_MODE_STORAGE_KEY));
-        if (snapshot) {
-          // eslint-disable-next-line react-hooks/set-state-in-effect
-          setDraft(snapshot.draft);
-          setEmailCopy(snapshot.emailCopy);
-          setMailingList(snapshot.mailingList);
-          setCustomerMode({ phase: snapshot.phase, tried: snapshot.tried });
-        }
-      } else {
-        // Not locked: anything still stored belongs to a hand-over that has ended.
-        window.sessionStorage.removeItem(CUSTOMER_MODE_STORAGE_KEY);
-        window.localStorage.removeItem(CUSTOMER_MODE_MARKER_KEY);
-      }
-    } catch {
-      // No storage (private mode): the mode still works, a refresh just starts the boxes empty.
-    }
-    setRestored(true);
-  }, [startInCustomerMode]);
-
-  useEffect(() => {
-    if (!restored || !customerMode) return;
-    try {
-      window.sessionStorage.setItem(
-        CUSTOMER_MODE_STORAGE_KEY,
-        writeCustomerModeSnapshot({ draft, emailCopy, mailingList, phase: customerMode.phase, tried: customerMode.tried }),
-      );
-    } catch {
-      // See above.
-    }
-  }, [restored, customerMode, draft, emailCopy, mailingList]);
 
   /** Any answer still on its way is for a photo (or a form) that is no longer the current one: drop it. */
   function dropIdRead() {
@@ -436,8 +368,6 @@ export default function BuyReceiptForm({
     setEmailState(null);
     setMailingList(false);
     setListState(null);
-    setHandBackReason(null);
-    setModeError(null);
     setBuyPrintDone(false);
   }
 
@@ -536,43 +466,6 @@ export default function BuyReceiptForm({
     setBusy(null);
   }
 
-  /** Lock this browser on the server FIRST; only then is the tablet safe to hand over. */
-  async function enterCustomerMode() {
-    // Not on a saved draft: a refresh while locked lands on the plain New receipt
-    // address, and the form would come back without its draft.
-    if (modeBusy || busy || draftBusy || linked) return;
-    setModeBusy(true);
-    setModeError(null);
-    const started = await startCustomerMode();
-    setModeBusy(false);
-    if ('error' in started) {
-      setModeError(`${started.error} The tablet is not locked — do not hand it over yet.`);
-      return;
-    }
-    try {
-      // Tells this browser's other tabs to leave their admin pages (see CustomerModeTabGuard).
-      window.localStorage.setItem(CUSTOMER_MODE_MARKER_KEY, '1');
-    } catch {
-      // No storage: the server-side lock still holds for anything those tabs load.
-    }
-    setError(null);
-    setHandBackReason(null);
-    setCustomerMode({ phase: 'form', tried: false });
-  }
-
-  /** The server accepted the staff code: back to this form, with what the seller typed in it. */
-  function leaveCustomerMode(reason: CustomerHandBackReason) {
-    try {
-      window.sessionStorage.removeItem(CUSTOMER_MODE_STORAGE_KEY);
-      window.localStorage.removeItem(CUSTOMER_MODE_MARKER_KEY);
-    } catch {
-      // See above.
-    }
-    releaseCustomerModePage();
-    setHandBackReason(reason);
-    setCustomerMode(null);
-  }
-
   async function submit(action: Action) {
     if (busy || draftBusy) return;
     const check = normalizeBuyReceiptInput(draft);
@@ -663,13 +556,8 @@ export default function BuyReceiptForm({
     setSaved({ ...saved, receipt: result.receipt });
   }
 
-  // After a hand-over: a line only if the owner has something to finish (see customerHandBack).
-  const handBack = handBackReason ? customerHandBack(handBackReason, draft) : null;
-
-  // THE paper. Drawn once by this form, always; and a second time, in its seller's
-  // view, by the locked screen while the tablet is handed over. One function, so the
-  // two can never drift apart: same draft, same boxes, same ticks, same ID photo.
-  const sheet = (customer?: BuyReceiptCustomerView) => (
+  // THE paper.
+  const sheet = () => (
     <BuyReceiptSheet
       mode="edit"
       draft={draft}
@@ -713,38 +601,12 @@ export default function BuyReceiptForm({
       onEmailCopyChange={setEmailCopy}
       mailingList={mailingList}
       onMailingListChange={setMailingList}
-      customer={customer}
       trade={trade ? { credit: tradeSplit?.credit ?? null, payout: tradeSplit?.payout ?? null } : undefined}
     />
   );
 
-  // The tabs are drawn here, not by the page shell, because the one new button
-  // sits at the right end of their row and needs this form's state. Small on
-  // purpose: the form is the main thing, the hand-over is optional.
-  // Offered on a receipt that has not been saved yet — not after a save, and not on a saved draft (see enterCustomerMode).
-  const modeButton = saved || linked ? null : (
-          <button
-            type="button"
-            className="outline-button"
-            style={{ padding: '0.5rem 0.95rem', fontSize: '0.64rem' }}
-            title="Hand the tablet to the seller: they see only their own name, phone, address and email"
-            disabled={modeBusy || busy !== null || draftBusy}
-            aria-busy={modeBusy}
-            onClick={() => void enterCustomerMode()}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="4" y="2.5" width="16" height="19" rx="2.5" />
-              <path d="M11 18h2" />
-            </svg>
-            {modeBusy ? 'Locking…' : 'Customer input mode'}
-          </button>
-  );
-  // The trade screen has its own heading: the Buy Receipts tabs do not belong there, only the hand-over button.
-  const tabs = trade ? (
-    modeButton && <div className="mb-3 flex justify-end">{modeButton}</div>
-  ) : (
-    <BuyReceiptTabs adminBasePath={adminBasePath} active="new" end={modeButton} />
-  );
+  // The trade screen has its own heading: the Buy Receipts tabs do not belong there.
+  const tabs = trade ? null : <BuyReceiptTabs adminBasePath={adminBasePath} active="new" />;
 
   if (saved) {
     const { receipt } = saved;
@@ -826,6 +688,9 @@ export default function BuyReceiptForm({
           />
         </div>
 
+        {/* "Note for the thank-you email" (2026-11-25): typed after the save, beside the receipt — never on the paper. */}
+        <ThankYouNoteCard kind="buy_receipt" id={receipt.id} initial={{ ready: true, note: '' }} />
+
         <div className="grid gap-2 pt-1 sm:grid-cols-2">
           <button type="button" className="gold-button text-xs" onClick={savedTrade ? startOverTrade : startOver}>{savedTrade ? 'New trade-in sale' : 'New receipt'}</button>
           <Link href={`${adminBasePath}/buy-receipts/${receipt.id}`} className="outline-button text-xs">Open {receipt.receipt_number}</Link>
@@ -855,43 +720,12 @@ export default function BuyReceiptForm({
   return (
     <>
     {tabs}
-    {modeError && (
-      <p role="alert" className="mx-auto mb-3 border px-3 py-2 text-sm" style={{ width: 'min(8.5in, 100%)', borderColor: 'var(--color-error)', color: 'var(--color-error)', background: 'color-mix(in srgb, var(--color-error) 8%, transparent)' }}>
-        {modeError}
-      </p>
-    )}
-    {/* The only trace a hand-over leaves above the form, and only when boxes were left unfinished. */}
-    {handBack && (
-      <p role="status" className="mx-auto mb-3 px-3 py-2 text-sm" style={{ width: 'min(8.5in, 100%)', borderRadius: '0.625rem', background: '#fdf1d6', color: '#6a4a00' }}>
-        {handBack}
-      </p>
-    )}
     {/* A saved draft says so, with its number and when it was last saved. */}
     {linked && (
       <p role="status" className="mx-auto mb-3 px-3 py-2 text-sm" style={{ width: 'min(8.5in, 100%)', borderRadius: '0.625rem', background: '#fbf5dd', color: '#5c4a00' }}>
         <strong>Draft {linked.receipt_number}</strong> · saved {formatReceiptDateTime(linked.updated_at)}. Open it from the Log on any device to finish it.
         {draftNote && <span className="block" style={{ color: 'var(--color-error)' }}>{draftNote}</span>}
       </p>
-    )}
-    {/* In the server's HTML too, so a refresh in the mode never paints the admin page first. */}
-    {customerMode && <style>{CUSTOMER_MODE_PAGE_CSS}</style>}
-    {customerMode && restored && (
-      <BuyReceiptCustomerMode
-        values={draft}
-        onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))}
-        emailCopy={emailCopy}
-        mailingList={mailingList}
-        onAsk={(patch) => {
-          if (patch.emailCopy !== undefined) setEmailCopy(patch.emailCopy);
-          if (patch.mailingList !== undefined) setMailingList(patch.mailingList);
-        }}
-        phase={customerMode.phase}
-        tried={customerMode.tried}
-        onProgress={setCustomerMode}
-        onUnlocked={leaveCustomerMode}
-        lockPath={`${adminBasePath}/buy-receipts`}
-        paper={sheet}
-      />
     )}
     {trade ? (
       // The Trade-in sale screen: the paper on the left, the sale and the one save on the right.

@@ -12,11 +12,13 @@ import {
   itemPhrase,
   nextMorningAfter,
   nextSlotAtOrAfter,
+  optOutReason,
   relativeDayWord,
   renderFollowUp,
   settingsFromRow,
   settingsPatchToRow,
   step2SendAt,
+  strongerOptOut,
   templateFor,
   thankedRecently,
   type BuyerOrderState,
@@ -106,6 +108,14 @@ describe('the words', () => {
     expect(itemPhrase(['14K rope chain', 'Ring', 'Pin'], 'en')).toBe('14K rope chain and 2 more pieces');
     expect(itemPhrase(['Anillo', 'Broche'], 'es')).toBe('Anillo y 1 pieza más');
     expect(itemPhrase([], 'en')).toBe('piece');
+    // 2026-11-24 (10): a live title ended "Braceleter -"
+    expect(itemPhrase(['Marco Bicego Lariat Chain & Braceleter -'], 'en')).toBe('Marco Bicego Lariat Chain & Braceleter');
+    expect(itemPhrase(['Ring, ', ' – '], 'en')).toBe('Ring');
+  });
+
+  it('cleans a stored item name at render time too (rows queued before the fix)', () => {
+    const out = renderFollowUp(DEFAULT_FOLLOW_UP_TEMPLATES['buyer-1-en'], { ...baseInput, audience: 'buyer', name: 'Mary', item: 'Lariat Chain & Bracelet -' });
+    expect(out.text).toContain('Thank you for buying your Lariat Chain & Bracelet from us.');
   });
 });
 
@@ -121,17 +131,28 @@ const baseInput: FollowUpRenderInput = {
   unsubscribeUrl: 'https://naplesestatejewelry.com/unsubscribe?email=m%40example.com',
   businessName: 'Naples Estate Jewelry',
   mailingAddress: '6240 Shirley St, Ste 104, Naples, FL 34109',
+  guidesUrl: 'https://naplesestatejewelry.com/guides',
 };
 
-describe('renderFollowUp (style A)', () => {
-  it('fills the seller thank-you', () => {
-    const out = renderFollowUp(DEFAULT_FOLLOW_UP_TEMPLATES['seller-1-en'], baseInput);
+describe("renderFollowUp (Rob's blend, 2026-11-25)", () => {
+  it('fills the seller thank-you: standard opening, review button, help box below it, two cards, team sign-off', () => {
+    const out = renderFollowUp(DEFAULT_FOLLOW_UP_TEMPLATES['seller-1-en'], { ...baseInput, pieceCount: 1 });
     expect(out.subject).toBe('Thank you, Margaret');
     expect(out.text).toContain('Hi Margaret,');
-    expect(out.text).toContain('Thank you for coming in yesterday');
-    expect(out.text).toContain('share your experience on Google (https://naplesestatejewelry.com/review?f=11111111-2222-3333-4444-555555555555)');
+    expect(out.text).toContain('It was a pleasure meeting you yesterday. Thank you for coming in and trusting us with your piece.');
+    expect(out.text).not.toContain('with your jewelry'); // 2026-11-25: not every seller brings jewelry
+    expect(out.text).not.toMatch(/fairly|if you have a minute/i);
+    expect(out.text).toContain('Would you take a moment to share your experience?');
+    expect(out.text).toContain('Share your experience on Google: https://naplesestatejewelry.com/review?f=11111111-2222-3333-4444-555555555555');
     expect(out.html).toContain('href="https://naplesestatejewelry.com/review?f=11111111-2222-3333-4444-555555555555"');
-    expect(out.html).toContain('>share your experience on Google</a>');
+    expect(out.html).toContain('>Share your experience on Google</a>');
+    // the "Here whenever you need us" box comes AFTER the review button (Rob's note)
+    expect(out.html.indexOf('Here whenever you need us')).toBeGreaterThan(out.html.indexOf('Share your experience on Google'));
+    expect(out.html).toContain('6240 Shirley St, Ste 104, Naples, FL 34109');
+    expect(out.html).not.toContain('Sharon Lynch');
+    expect(out.html).toContain('href="https://naplesestatejewelry.com/guides"');
+    expect(out.html).toContain('Know someone with pieces to sell?');
+    expect(out.text).toContain('and the Naples Estate Jewelry Team');
     expect(out.html).toContain('Unsubscribe</a>');
     expect(out.html).toContain("You&#039;re receiving this because you sold to us.");
     expect(out.html).toContain('6240 Shirley St');
@@ -149,9 +170,35 @@ describe('renderFollowUp (style A)', () => {
     const out = renderFollowUp(DEFAULT_FOLLOW_UP_TEMPLATES['seller-1-es'], { ...baseInput, language: 'es', name: '' });
     expect(out.subject).toBe('Gracias');
     expect(out.text.startsWith('Hola:')).toBe(true);
-    expect(out.text).toContain('Gracias por visitarnos ayer');
-    expect(out.html).toContain('compartir su experiencia en Google</a>');
+    expect(out.text).toContain('Fue un placer conocerle ayer. Gracias por visitarnos y por confiarnos sus piezas.');
+    expect(out.html).toContain('Compartir su experiencia en Google</a>');
+    expect(out.html).toContain('Aquí cuando nos necesite');
+    expect(out.html).toContain('y el equipo de Naples Estate Jewelry');
     expect(out.html).toContain('Cancelar suscripción');
+  });
+
+  it('"your piece" for one receipt line, "your pieces" otherwise (or unknown)', () => {
+    expect(renderFollowUp(DEFAULT_FOLLOW_UP_TEMPLATES['seller-1-en'], { ...baseInput, pieceCount: 1 }).text).toContain('trusting us with your piece.');
+    expect(renderFollowUp(DEFAULT_FOLLOW_UP_TEMPLATES['seller-1-en'], { ...baseInput, pieceCount: 3 }).text).toContain('trusting us with your pieces.');
+    expect(renderFollowUp(DEFAULT_FOLLOW_UP_TEMPLATES['seller-1-en'], baseInput).text).toContain('trusting us with your pieces.');
+  });
+
+  it("uses the AI's / owner's opening in place of the standard one, filling {when} and escaping it", () => {
+    const out = renderFollowUp(DEFAULT_FOLLOW_UP_TEMPLATES['seller-1-en'], {
+      ...baseInput,
+      opening: "It was good to meet you {when}. Thank you for trusting us with your mother's <sapphire> ring.",
+    });
+    expect(out.text).toContain("It was good to meet you yesterday. Thank you for trusting us with your mother's <sapphire> ring.");
+    expect(out.text).not.toContain('It was a pleasure meeting you');
+    expect(out.html).toContain('&lt;sapphire&gt;');
+    expect(out.html).not.toContain('<sapphire>');
+  });
+
+  it('an owner-edited template from before still renders ({review_link} inline, no blocks)', () => {
+    const old = { subject: 'Thanks {first_name}', body: 'Hi {first_name},\n\nThanks for coming in {when}.\n\nA few words would help: {review_link}.\n\nThank you again,\nChris' };
+    const out = renderFollowUp(old, baseInput);
+    expect(out.html).toContain('>share your experience on Google</a>');
+    expect(out.html).toContain('Naples Estate Jewelry &middot;'); // the small name · phone line comes back without a help box
   });
 
   it('escapes what people typed (names, items) — never raw HTML', () => {
@@ -163,7 +210,7 @@ describe('renderFollowUp (style A)', () => {
 
   it('the signature line renders as the serif "Chris"', () => {
     const out = renderFollowUp(DEFAULT_FOLLOW_UP_TEMPLATES['seller-1-en'], baseInput);
-    expect(out.html).toMatch(/Thank you again,<br \/><span style="font-family:Georgia[^"]*">Chris<\/span>/);
+    expect(out.html).toMatch(/Thank you again,<br \/><span style="font-family:Georgia[^"]*">Chris<\/span><br \/>and the Naples Estate Jewelry Team/);
   });
 });
 
@@ -177,10 +224,43 @@ describe("Google's review policy (no gating, review only in step 1)", () => {
     }
   });
 
-  it('the review link is in step 1 only', () => {
+  it('the review is in step 1 only', () => {
     for (const key of keys) {
-      const hasLink = DEFAULT_FOLLOW_UP_TEMPLATES[key].body.includes('{review_link}');
+      const { body } = DEFAULT_FOLLOW_UP_TEMPLATES[key];
+      const hasLink = body.includes('{review_link}') || body.includes('{review_button}');
       expect(hasLink, key).toBe(key.includes('-1-'));
+    }
+  });
+
+  it('the review request is FIXED wording — only {opening} is written per person, and it comes before the review', () => {
+    for (const key of keys.filter((k) => k.includes('-1-'))) {
+      const { body } = DEFAULT_FOLLOW_UP_TEMPLATES[key];
+      expect(body.indexOf('{opening}'), key).toBeGreaterThan(-1);
+      expect(body.indexOf('{opening}'), key).toBeLessThan(body.indexOf('{review_button}'));
+      expect(body.indexOf('{review_button}'), key).toBeLessThan(body.indexOf('{help_box}'));
+    }
+  });
+
+  it('the phone number never breaks across lines in the HTML (thin phones, 2026-11-25 (4))', () => {
+    const rendered = renderFollowUp(DEFAULT_FOLLOW_UP_TEMPLATES['seller-1-en'], {
+      audience: 'seller', language: 'en', name: 'Margaret Ellison', eventAt: new Date('2026-11-24T17:00:00Z'), sendAt: new Date('2026-11-25T15:00:00Z'),
+      item: null, phone: '(239) 404-8505', reviewUrl: 'https://example.com/r', unsubscribeUrl: 'https://example.com/u', businessName: 'Naples Estate Jewelry', mailingAddress: '6240 Shirley St',
+    });
+    const all = rendered.html.split('(239) 404-8505').length - 1;
+    const kept = rendered.html.split('<span style="white-space:nowrap;">(239) 404-8505</span>').length - 1;
+    expect(all).toBeGreaterThanOrEqual(3);
+    expect(kept).toBe(all);
+    expect(rendered.text).not.toContain('white-space');
+  });
+
+  it('step 1 says "questions? just reply" in the body, between the opening and the review (owner, 2026-11-25 (2))', () => {
+    for (const key of keys.filter((k) => k.includes('-1-'))) {
+      const { body } = DEFAULT_FOLLOW_UP_TEMPLATES[key];
+      const questions = key.endsWith('-es') ? body.indexOf('Si le surge alguna pregunta') : body.indexOf('If any questions come up');
+      expect(questions, key).toBeGreaterThan(body.indexOf('{opening}'));
+      expect(questions, key).toBeLessThan(body.indexOf('{review_button}'));
+      expect(body.slice(questions), key).toContain('{phone}');
+      expect(body, key).toContain(key.startsWith('seller') ? (key.endsWith('-es') ? 'su visita o su recibo' : 'your visit or your receipt') : (key.endsWith('-es') ? 'su pedido' : 'your order'));
     }
   });
 
@@ -269,6 +349,26 @@ describe('buyer readiness', () => {
   });
 });
 
+describe('opt-out labels (2026-11-24 (10): Tina Soriano read "Unsubscribed" after a hard bounce)', () => {
+  it('a bounce beats an unsubscribe (a bounce also runs the unsubscribe code); the owner\'s Stop beats both', () => {
+    const unsub = { kind: 'unsubscribed' as const, at: null };
+    const bounced = { kind: 'bounced' as const, at: '2026-11-09T18:53:48Z' };
+    const stopped = { kind: 'stopped' as const, at: '2026-11-24T10:00:00Z' };
+    expect(strongerOptOut(unsub, bounced)).toBe(bounced);
+    expect(strongerOptOut(bounced, unsub)).toBe(bounced);
+    expect(strongerOptOut(bounced, stopped)).toBe(stopped);
+    expect(strongerOptOut(undefined, unsub)).toBe(unsub);
+    // same kind: the one with a date wins
+    expect(strongerOptOut(unsub, { kind: 'unsubscribed', at: '2026-10-01T00:00:00Z' })).toEqual({ kind: 'unsubscribed', at: '2026-10-01T00:00:00Z' });
+  });
+
+  it('log reasons', () => {
+    expect(optOutReason({ kind: 'bounced', at: null })).toBe('Email bounced — this address cannot receive mail.');
+    expect(optOutReason({ kind: 'unsubscribed', at: null })).toBe('Unsubscribed.');
+    expect(optOutReason({ kind: 'stopped', at: null })).toBe('Follow-ups stopped for this person.');
+  });
+});
+
 describe('90-day rule', () => {
   const at = et('2026-11-24T10:00:00');
   it('finds a thank-you inside 90 days, ignores older ones', () => {
@@ -295,6 +395,43 @@ describe('wiring', () => {
 
   it('an unsubscribe from any marketing email also stops follow-ups', () => {
     expect(src('lib/marketing.ts')).toContain('recordFollowUpUnsubscribe');
+  });
+
+  it('reads ONLY the buy-receipt columns the service-role grant allows (never ID data)', () => {
+    // 2026-11-24 (10): buy_receipts has no table grant for service_role on purpose (ID data);
+    // supabase/follow-ups-receipts-grant-2026-11.sql grants SELECT on nine columns, and
+    // supabase/follow-ups-ai-openings-2026-11.sql adds the item lines + the thank-you note (2026-11-25).
+    const granted = new Set<string>();
+    for (const file of ['follow-ups-receipts-grant-2026-11.sql', 'follow-ups-ai-openings-2026-11.sql']) {
+      const grantSql = readFileSync(join(process.cwd(), '..', 'supabase', file), 'utf8');
+      for (const match of grantSql.matchAll(/^grant select \(([^)]*)\) on public\.buy_receipts to service_role/gm)) {
+        for (const column of match[1].split(',')) granted.add(column.trim());
+      }
+    }
+    expect(granted.has('seller_email')).toBe(true);
+    expect(granted.has('items')).toBe(true);
+    for (const secret of ['seller_id_last4', 'seller_dob', 'seller_id_photo_path', 'seller_thumbprint_path', 'seller_street', 'seller_id_type', 'payments', 'notes']) {
+      expect(granted.has(secret), secret).toBe(false);
+    }
+
+    const server = src('lib/follow-ups-server.ts') + '\n' + src('lib/follow-up-opening-server.ts');
+    const receiptConstant = /const RECEIPT_COLUMNS = '([^']+)'/.exec(server)![1];
+    const used: string[] = [];
+    // every .from('buy_receipts').select(...) and every filter on it
+    for (const match of server.matchAll(/from\('buy_receipts'\)([\s\S]*?)(?:;|\n\s*\]|\),\n)/g)) {
+      const chain = match[1];
+      for (const select of chain.matchAll(/\.select\((RECEIPT_COLUMNS|'([^']*)')/g)) {
+        used.push(...(select[1] === 'RECEIPT_COLUMNS' ? receiptConstant : select[2]).split(','));
+      }
+      for (const filter of chain.matchAll(/\.(?:eq|neq|not|gte|gt|ilike|order|in)\('([a-z_]+)'/g)) used.push(filter[1]);
+    }
+    // selectIn(client, 'buy_receipts', '<columns>', '<key>', …)
+    for (const match of server.matchAll(/selectIn<[^>]*>\(client, 'buy_receipts', '([^']+)', '([^']+)'/g)) {
+      used.push(...match[1].split(','), match[2]);
+    }
+    const columns = [...new Set(used.map((c) => c.trim()).filter(Boolean))];
+    expect(columns.length).toBeGreaterThan(5); // positive control: the scan found the reads
+    expect(columns.filter((c) => !granted.has(c))).toEqual([]);
   });
 
   it('the sweep is guarded by the existing cron secret (no new env var)', () => {

@@ -1,9 +1,7 @@
 import type { Metadata } from 'next';
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { BUY_RECEIPT_DRAFT_COLUMNS, draftFormFromRow, receiptOfDraftRow, type BuyReceiptDraftRow } from '@/lib/buy-receipt-drafts';
 import { BUY_RECEIPT_COLUMNS, draftFromReceipt, isReceiptId, type BuyReceiptRow } from '@/lib/buy-receipts';
-import { CUSTOMER_MODE_COOKIE } from '@/lib/customer-mode-lock';
 import BuyReceiptsShell, { requireBuyReceiptsAdmin } from '@/components/admin/buy-receipts/BuyReceiptsShell';
 import BuyReceiptForm from '@/components/admin/buy-receipts/BuyReceiptForm';
 
@@ -21,19 +19,12 @@ interface Props {
  * receipt (the "Duplicate" link). `?draft=<id>` opens a saved DRAFT to carry on
  * with it — on any device (owner, 2026-10-09); a receipt that is no longer a
  * draft is sent on to its own page.
- *
- * This is also the one admin page a browser in customer input mode may open
- * (`lib/customer-mode-lock.ts`): with the lock cookie present the form starts
- * straight in the seller's screen, so a refresh or a typed admin address lands
- * there and nowhere else.
  */
 export default async function AdminBuyReceiptsPage({ params, searchParams }: Props) {
   const { locale } = await params;
   const { from, draft: draftId } = await searchParams;
-  const customerModeLocked = (await cookies()).has(CUSTOMER_MODE_COOKIE);
-  const { supabase, user, adminBasePath } = await requireBuyReceiptsAdmin(locale, { customerModeLocked });
-  // A locked browser shows the seller's screen and nothing else: no draft is opened into it.
-  const wantsDraft = !customerModeLocked && isReceiptId(draftId);
+  const { supabase, user, adminBasePath } = await requireBuyReceiptsAdmin(locale);
+  const wantsDraft = isReceiptId(draftId);
 
   const [{ count: unreadMessagesCount }, source, opened] = await Promise.all([
     supabase.from('admin_notifications').select('id', { count: 'exact', head: true }).eq('is_read', false),
@@ -58,7 +49,7 @@ export default async function AdminBuyReceiptsPage({ params, searchParams }: Pro
       userEmail={user.email}
       unreadMessagesCount={unreadMessagesCount ?? 0}
       activeTab="new"
-      // The form draws the tabs: its "Customer input mode" button sits at the end of their row.
+      // The form draws the tabs itself (the Trade-in screen uses the same form without them).
       showTabs={false}
       title="Buy Receipts"
       intro="Fill this in with the seller, save it, and send it to the desktop printer. The seller signs the printed copy."
@@ -70,7 +61,6 @@ export default async function AdminBuyReceiptsPage({ params, searchParams }: Pro
         nowIso={new Date().toISOString()}
         initialDraft={sourceRow ? draftFromReceipt(sourceRow) : undefined}
         duplicatedFrom={sourceRow ? { id: sourceRow.id, number: sourceRow.receipt_number } : null}
-        startInCustomerMode={customerModeLocked}
         draftReceipt={draftReceipt}
         draftForm={draftForm}
       />

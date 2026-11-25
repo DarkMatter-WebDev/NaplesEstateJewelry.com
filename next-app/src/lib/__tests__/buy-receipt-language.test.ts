@@ -5,7 +5,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildBuyReceiptEmail } from '@/lib/buy-receipt-email';
-import { readCustomerModeSnapshot, writeCustomerModeSnapshot } from '@/lib/buy-receipt-customer-mode';
 import { normalizeBuyReceiptDraftSave, sanitizeBuyReceiptDraft } from '@/lib/buy-receipt-drafts';
 import {
   BUY_RECEIPT_ATTESTATION_ES,
@@ -74,19 +73,12 @@ describe('seller language: the value', () => {
     expect(draftFromReceipt(ROW).sellerLanguage).toBe('en');
   });
 
-  it('survives a saved draft and a refresh in customer input mode', () => {
+  it('survives a saved draft', () => {
     expect(sanitizeBuyReceiptDraft({ ...filled(), sellerLanguage: 'es' }).sellerLanguage).toBe('es');
     expect(sanitizeBuyReceiptDraft({ sellerName: 'A B' }).sellerLanguage).toBe('en');
     const save = normalizeBuyReceiptDraftSave({ ...filled(), sellerLanguage: 'es' });
     if ('error' in save) throw new Error(save.error);
     expect(save.value.form.draft.sellerLanguage).toBe('es');
-
-    const draft = { ...filled(), sellerLanguage: 'es' as const };
-    const stored = writeCustomerModeSnapshot({ draft, emailCopy: false, mailingList: false, phase: 'form', tried: false });
-    expect(readCustomerModeSnapshot(stored)?.draft.sellerLanguage).toBe('es');
-    const older = JSON.parse(stored) as { draft: Record<string, unknown> };
-    delete older.draft.sellerLanguage;
-    expect(readCustomerModeSnapshot(JSON.stringify(older))?.draft.sellerLanguage).toBe('en');
   });
 });
 

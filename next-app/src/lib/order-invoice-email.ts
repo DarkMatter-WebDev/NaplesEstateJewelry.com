@@ -9,7 +9,6 @@ import {
   DEFAULT_STORE_HOURS,
   hoursSegmentsFull,
   hoursSummary,
-  landmarkPhrase,
   streetLine,
   type StoreHoursSchedule,
 } from '@/lib/business-location';
@@ -28,7 +27,7 @@ export type InvoiceEmailOrder = Order & { order_items: OrderItem[] };
  *
  * Until 2026-08-23 this was spliced into `note` as prose, so a receipt read
  * "…thank you. Pick up at 6240 Shirley St, Ste 104, Naples, FL 34109 · inside
- * Sharon Lynch Collections. Tue–Sat 11am–3pm, or by appointment. Call or text
+ * [the shared suite]. Tue–Sat 11am–3pm, or by appointment. Call or text
  * us at…" — one run-on block in which the address a buyer actually needs was
  * the least findable thing (owner report).
  *
@@ -37,15 +36,13 @@ export type InvoiceEmailOrder = Order & { order_items: OrderItem[] };
  * pre-joined string forces one of them to unpick the other's formatting.
  *
  * ⚠️ Every string here comes from `business-location.ts`. Do not retype the
- * address, and do not reintroduce `addressWithLandmark()` here: this block
- * needs the landmark on its OWN line, which that helper deliberately joins.
+ * address. (The shared-suite landmark line was removed
+ * 2026-11-25 — owner: proper signage now.)
  */
 export interface InvoicePickupBlock {
   label: string;
   /** Street+suite, then city/state/ZIP — one line each, as on an envelope. */
   addressLines: string[];
-  /** Set quieter than the address: a finding aid, not a postal line. */
-  landmark: string;
   hoursLabel: string;
   hours: string;
   byAppointment: string;
@@ -267,7 +264,7 @@ export function buildInvoiceEmailContent(
   // A pickup buyer is TOLD WHERE TO GO. Until 2026-08-17 this email said only
   // "call or text with any questions about pickup" — someone who had just paid
   // several thousand dollars had to phone up to learn the address. The showroom
-  // shares a suite, so the landmark belongs here, not just on the website.
+  // address belongs here, not just on the website.
   //
   // Laid out as a block since 2026-08-23 (owner request). The business name is
   // deliberately NOT a line: on an envelope it would be, but this is an email
@@ -276,7 +273,6 @@ export function buildInvoiceEmailContent(
     ? {
       label: es ? 'Lugar de recogida' : 'Pickup Location',
       addressLines: [streetLine(), cityLine()],
-      landmark: landmarkPhrase(es),
       hoursLabel: es ? 'Horario' : 'Hours',
       hours: opts?.pickupHours ?? formatPickupHours(DEFAULT_STORE_HOURS, language),
       byAppointment: byAppointmentLabel(es),
@@ -389,7 +385,6 @@ export function buildInvoiceEmailContent(
         ? [
           pickup.label.toUpperCase(),
           ...pickup.addressLines,
-          pickup.landmark,
           '',
           pickup.hoursLabel.toUpperCase(),
           pickup.hours,
@@ -547,8 +542,7 @@ function buildInvoiceEmailHtml({
  * is already proven in this template.
  *
  * ⚠️ Stacked `display:block` spans, not `<br/>`: each line carries its own
- * size and colour, and the landmark deliberately renders quieter than the
- * street lines — it is a finding aid, not part of the postal address.
+ * size and colour.
  */
 function pickupBlockHtml(pickup: InvoicePickupBlock) {
   const caps = 'display:block;color:#1d1a14;font-size:11px;letter-spacing:1px;text-transform:uppercase;font-weight:700;';
@@ -560,7 +554,6 @@ function pickupBlockHtml(pickup: InvoicePickupBlock) {
                       <td style="padding:16px 18px;">
                         <strong style="${caps}margin:0 0 10px;">${escapeHtml(pickup.label)}</strong>
                         ${pickup.addressLines.map((addressLine) => `<span style="${line}">${escapeHtml(addressLine)}</span>`).join('')}
-                        <span style="${muted}margin-top:2px;">${escapeHtml(pickup.landmark)}</span>
                         <div style="margin-top:12px;padding-top:12px;border-top:1px solid #eadfbd;">
                           <strong style="${caps}margin:0 0 5px;">${escapeHtml(pickup.hoursLabel)}</strong>
                           <span style="${line}">${escapeHtml(pickup.hours)}</span>

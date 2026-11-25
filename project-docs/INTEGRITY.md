@@ -111,6 +111,8 @@ Google's documented Ads hosts in BOTH `next.config.ts` and root
 
 ### Keep customer input mode locked on the server
 
+> ⛔ **REMOVED 2026-11-25** (owner: "we can remove customer mode from the buy receipts... I don't use it anymore now that the form gets filled from the ID"). The button, the locked screen, the lock cookie + proxy bounce, the `requireAdmin` lock check, the route, the tab guard and the staff code are all gone; what follows is history. How to bring it back: `CHANGELOG.md` 2026-11-25 (1) → *To reverse*.
+
 The buy receipt's customer input mode (2026-10-03) hands a signed-in admin
 tablet to a seller. A screen that covers the admin page is not a lock; the
 lock is the `nej_customer_mode` cookie, enforced by `src/proxy.ts` (admin and
@@ -199,9 +201,10 @@ the same session report to all four files.
       non-Florida shipping, invalid address/method tampering, and exact cents.
 - [ ] Public mutation changes preserve edge/distributed limits and server-only
       secrets.
-- [ ] A new admin page shows the admin menu (or renders `<CustomerModeTabGuard />`),
-      and a new admin route that answers a GET starts with `requireAdmin()` —
-      otherwise a tablet in customer input mode can still reach it.
+- [ ] A new admin route starts with `requireAdmin()` (the customer-input-mode
+      tab guard this line also asked for was removed with the mode, 2026-11-25).
+- [ ] Nothing new prints or emails `thank_you_note` (receipts / orders): it is
+      internal only (`follow-up-opening.test.ts` scans the print + email files).
 - [ ] No `zz-*` preview page is left under `src/app`.
 - [ ] Root `netlify.toml` still builds from `next-app`.
 - [ ] Production SQL/environment/manual steps are called out in `TASKS.md`.

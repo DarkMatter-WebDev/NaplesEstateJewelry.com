@@ -14,6 +14,9 @@ import {
   formatFollowUpTime,
   itemPhrase,
   nextSlotAtOrAfter,
+  optOutReason,
+  strongerOptOut,
+  type OptOut,
   renderFollowUp,
   settingsFromRow,
   step2SendAt,
@@ -31,7 +34,9 @@ import {
 } from '@/lib/follow-ups';
 import { getMarketingSettings, isValidEmail, normalizeEmail } from '@/lib/marketing';
 import { BUSINESS_PHONE, getSiteUrl } from '@/lib/order-email-branding';
-import { loadLatestOrderLanguageByEmail, loadOrderLanguage } from '@/lib/order-language-server';
+import { loadLatestOrderLanguageByEmail, loadOrderLanguage, loadSpanishItemTitles } from '@/lib/order-language-server';
+import type { OpeningSource } from '@/lib/follow-up-opening';
+import { aiOpeningsConfigured, loadOpenings, openingsReady, writeDueOpenings, writeOpeningNow } from '@/lib/follow-up-opening-server';
 
 /**
  * Admin → Follow-ups, the database + sending half (the pure rules are in
@@ -58,6 +63,9 @@ export const FOLLOW_UP_AUTOMATIC_LABEL = 'Automatic (follow-up)';
 /** Netlify's synchronous limit is 26 s; stop sending well before it. */
 const SEND_BUDGET_MS = 18_000;
 const SEND_BATCH = 10;
+/** AI openings per sweep: at most this many / this long, BEFORE the sending (which keeps its own budget from the start). */
+const OPENING_BUDGET_MS = 8_000;
+const OPENING_BATCH = 4;
 
 export type FollowUpMessageRow = {
   id: string;
@@ -84,6 +92,9 @@ export type FollowUpMessageRow = {
   review_clicked_at: string | null;
   created_at: string;
   updated_at: string;
+  /** Read on their own query (`loadOpenings`), never in MESSAGE_COLUMNS — absent before the SQL. */
+  opening?: string | null;
+  opening_source?: OpeningSource | null;
 };
 
 export const MESSAGE_COLUMNS =
@@ -133,48 +144,51 @@ async function selectIn<T>(client: SupabaseClient, table: string, columns: strin
 
 // ---- Opt-outs ---------------------------------------------------------------
 
-export type OptOut = { kind: 'unsubscribed' | 'stopped'; at: string | null };
+export type { OptOut } from '@/lib/follow-ups';
 
-/** Unsubscribed anywhere (newsletter, account, buyers list, follow-ups) or stopped by the owner. */
+/** Unsubscribed anywhere (newsletter, account, buyers list, follow-ups), bounced, or stopped by the owner. */
 export async function optOutFor(client: SupabaseClient, email: string): Promise<OptOut | null> {
   const normalized = normalizeEmail(email);
-  const [stop, subscriber, profile, buyer] = await Promise.all([
+  const [stop, subscriber, profile, buyer, bounce] = await Promise.all([
     client.from(STOPS).select('reason, stopped_at').eq('email', normalized).maybeSingle(),
     client.from('homepage_subscribers').select('subscribed, unsubscribed_at').eq('email', normalized).maybeSingle(),
     client.from('profiles').select('marketing_opt_out').eq('email', normalized).limit(1).maybeSingle(),
     client.from('buyers').select('marketing_opt_out').eq('email', normalized).maybeSingle(),
+    client.from('admin_notifications').select('created_at').eq('type', 'email_bounce').ilike('customer_email', likeExact(normalized)).order('created_at', { ascending: false }).limit(1),
   ]);
-  if (stop.data) {
-    return { kind: stop.data.reason === 'admin' ? 'stopped' : 'unsubscribed', at: (stop.data.stopped_at as string) ?? null };
-  }
+  let result: OptOut | undefined;
+  if (stop.data) result = strongerOptOut(result, { kind: stop.data.reason === 'admin' ? 'stopped' : 'unsubscribed', at: (stop.data.stopped_at as string) ?? null });
+  const bouncedAt = (bounce.data?.[0] as { created_at?: string } | undefined)?.created_at;
+  if (bouncedAt) result = strongerOptOut(result, { kind: 'bounced', at: bouncedAt });
   if (subscriber.data && subscriber.data.subscribed === false && subscriber.data.unsubscribed_at) {
-    return { kind: 'unsubscribed', at: subscriber.data.unsubscribed_at as string };
+    result = strongerOptOut(result, { kind: 'unsubscribed', at: subscriber.data.unsubscribed_at as string });
   }
-  if (profile.data?.marketing_opt_out === true) return { kind: 'unsubscribed', at: null };
-  if (buyer.data?.marketing_opt_out === true) return { kind: 'unsubscribed', at: null };
-  return null;
+  if (profile.data?.marketing_opt_out === true) result = strongerOptOut(result, { kind: 'unsubscribed', at: null });
+  if (buyer.data?.marketing_opt_out === true) result = strongerOptOut(result, { kind: 'unsubscribed', at: null });
+  return result ?? null;
 }
 
-/** Every opted-out / stopped email, for the People list. */
+/** Every opted-out / bounced / stopped email, for the People list. */
 async function loadOptOutMap(client: SupabaseClient): Promise<Map<string, OptOut>> {
   const map = new Map<string, OptOut>();
-  const [stops, subscribers, profiles, buyers] = await Promise.all([
+  const [stops, subscribers, profiles, buyers, bounces] = await Promise.all([
     client.from(STOPS).select('email, reason, stopped_at'),
     client.from('homepage_subscribers').select('email, unsubscribed_at').eq('subscribed', false).not('unsubscribed_at', 'is', null),
     client.from('profiles').select('email').eq('marketing_opt_out', true),
     client.from('buyers').select('email').eq('marketing_opt_out', true),
+    client.from('admin_notifications').select('customer_email, created_at').eq('type', 'email_bounce').not('customer_email', 'is', null),
   ]);
-  for (const row of (buyers.data ?? []) as Array<{ email: string | null }>) {
-    if (row.email) map.set(normalizeEmail(row.email), { kind: 'unsubscribed', at: null });
-  }
-  for (const row of (profiles.data ?? []) as Array<{ email: string | null }>) {
-    if (row.email) map.set(normalizeEmail(row.email), { kind: 'unsubscribed', at: null });
-  }
-  for (const row of (subscribers.data ?? []) as Array<{ email: string | null; unsubscribed_at: string | null }>) {
-    if (row.email) map.set(normalizeEmail(row.email), { kind: 'unsubscribed', at: row.unsubscribed_at });
-  }
+  const add = (email: string | null | undefined, optOut: OptOut) => {
+    if (!email) return;
+    const key = normalizeEmail(email);
+    map.set(key, strongerOptOut(map.get(key), optOut));
+  };
+  for (const row of (buyers.data ?? []) as Array<{ email: string | null }>) add(row.email, { kind: 'unsubscribed', at: null });
+  for (const row of (profiles.data ?? []) as Array<{ email: string | null }>) add(row.email, { kind: 'unsubscribed', at: null });
+  for (const row of (subscribers.data ?? []) as Array<{ email: string | null; unsubscribed_at: string | null }>) add(row.email, { kind: 'unsubscribed', at: row.unsubscribed_at });
+  for (const row of (bounces.data ?? []) as Array<{ customer_email: string | null; created_at: string }>) add(row.customer_email, { kind: 'bounced', at: row.created_at });
   for (const row of (stops.data ?? []) as Array<{ email: string; reason: string; stopped_at: string }>) {
-    map.set(normalizeEmail(row.email), { kind: row.reason === 'admin' ? 'stopped' : 'unsubscribed', at: row.stopped_at });
+    add(row.email, { kind: row.reason === 'admin' ? 'stopped' : 'unsubscribed', at: row.stopped_at });
   }
   return map;
 }
@@ -249,6 +263,25 @@ async function orderItemTitles(client: SupabaseClient, orderIds: string[]): Prom
   return map;
 }
 
+/**
+ * The piece(s) a buyer's email names, worked out when the email is built (not
+ * when it was queued): a Spanish email uses the listing's Spanish title where
+ * one exists (2026-11-24 (10) — Ronal Lopez's queued email named his chain in
+ * English). Falls back to the queued note.
+ */
+async function buyerItemForEmail(client: SupabaseClient, row: FollowUpMessageRow): Promise<string | null> {
+  if (row.source_type !== 'order') return row.source_note;
+  try {
+    const { data } = await client.from('order_items').select('title_snapshot, product_id').eq('order_id', row.source_id);
+    const items = (data ?? []) as Array<{ title_snapshot: string | null; product_id: string | null }>;
+    if (items.length === 0) return row.source_note;
+    const spanish = row.language === 'es' ? await loadSpanishItemTitles(client, items.map((item) => item.product_id)) : new Map<string, string>();
+    return itemPhrase(items.map((item) => (item.product_id && spanish.get(item.product_id)) || item.title_snapshot), row.language);
+  } catch {
+    return row.source_note;
+  }
+}
+
 /** Step-1 rows already queued / sent for these addresses (for the 90-day rule at queue time). */
 async function stepOneByEmail(client: SupabaseClient, emails: string[]): Promise<Map<string, Array<{ id: string; status: string; sent_at: string | null; source_ref: string | null }>>> {
   const map = new Map<string, Array<{ id: string; status: string; sent_at: string | null; source_ref: string | null }>>();
@@ -315,57 +348,64 @@ async function insertRows(client: SupabaseClient, rows: NewRow[]): Promise<numbe
   return created;
 }
 
-export type ReconcileResult = { created: number; readied: number; cancelled: number; step2: number };
+/** `problems` = parts that could not run (the rest still did). */
+export type ReconcileResult = { created: number; readied: number; cancelled: number; step2: number; problems: string[] };
 
 export async function reconcileFollowUps(client: SupabaseClient, settings: FollowUpSettings, now = new Date()): Promise<ReconcileResult> {
-  const result: ReconcileResult = { created: 0, readied: 0, cancelled: 0, step2: 0 };
+  const result: ReconcileResult = { created: 0, readied: 0, cancelled: 0, step2: 0, problems: [] };
   const nowIso = now.toISOString();
   const discoverySince = new Date(now.getTime() - FOLLOW_UP_DISCOVERY_DAYS * DAY_MS);
   const optOuts = await loadOptOutMap(client);
   const newRows: NewRow[] = [];
+  const problems = result.problems;
 
   // 1. Sellers — every recorded buy receipt (Trade-ins too) with an email.
   if (stepEnabled(settings, 'seller', 1)) {
-    const { data, error } = await client
-      .from('buy_receipts')
-      .select(RECEIPT_COLUMNS)
-      .eq('status', 'recorded')
-      .not('seller_email', 'is', null)
-      .gte('created_at', discoverySince.toISOString())
-      .order('created_at', { ascending: true });
-    if (error) throw new Error(`Could not read buy receipts: ${error.message}`);
-    const receipts = ((data ?? []) as ReceiptSource[]).filter((receipt) => isValidEmail(normalizeEmail(receipt.seller_email)));
-    const known = new Set(
-      (await selectIn<{ source_id: string }>(client, MESSAGES, 'source_id', 'source_id', receipts.map((r) => r.id))).map((row) => row.source_id),
-    );
-    const fresh = receipts.filter((receipt) => !known.has(receipt.id));
-    const byEmail = await stepOneByEmail(client, fresh.map((receipt) => normalizeEmail(receipt.seller_email)));
-    for (const receipt of fresh) {
-      const email = normalizeEmail(receipt.seller_email);
-      const eventAt = new Date(receipt.created_at);
-      const optOut = optOuts.get(email);
-      const duplicate = duplicateReason(byEmail.get(email), now);
-      const sendAt = computeSendAt(eventAt, delayFor(settings, 'seller'), now);
-      const row: NewRow = {
-        email,
-        name: receipt.seller_name,
-        audience: 'seller',
-        step: 1,
-        source_type: 'buy_receipt',
-        source_id: receipt.id,
-        source_ref: receipt.receipt_number,
-        source_note: `${money(receipt.total)} paid`,
-        language: receipt.seller_language === 'es' ? 'es' : 'en',
-        status: optOut || duplicate ? 'not_sent' : 'scheduled',
-        event_at: eventAt.toISOString(),
-        send_at: optOut || duplicate ? null : sendAt.toISOString(),
-        reason: optOut ? (optOut.kind === 'stopped' ? 'Follow-ups stopped for this person.' : 'Unsubscribed.') : duplicate,
-      };
-      newRows.push(row);
-      // The next receipt for the same person in this same run sees this one.
-      const list = byEmail.get(email) ?? [];
-      list.push({ id: 'new', status: row.status, sent_at: null, source_ref: row.source_ref });
-      byEmail.set(email, list);
+    try {
+      const { data, error } = await client
+        .from('buy_receipts')
+        .select(RECEIPT_COLUMNS)
+        .eq('status', 'recorded')
+        .not('seller_email', 'is', null)
+        .gte('created_at', discoverySince.toISOString())
+        .order('created_at', { ascending: true });
+      if (error) throw new Error(`Could not read buy receipts: ${error.message}`);
+      const receipts = ((data ?? []) as ReceiptSource[]).filter((receipt) => isValidEmail(normalizeEmail(receipt.seller_email)));
+      const known = new Set(
+        (await selectIn<{ source_id: string }>(client, MESSAGES, 'source_id', 'source_id', receipts.map((r) => r.id))).map((row) => row.source_id),
+      );
+      const fresh = receipts.filter((receipt) => !known.has(receipt.id));
+      const byEmail = await stepOneByEmail(client, fresh.map((receipt) => normalizeEmail(receipt.seller_email)));
+      for (const receipt of fresh) {
+        const email = normalizeEmail(receipt.seller_email);
+        const eventAt = new Date(receipt.created_at);
+        const optOut = optOuts.get(email);
+        const duplicate = duplicateReason(byEmail.get(email), now);
+        const sendAt = computeSendAt(eventAt, delayFor(settings, 'seller'), now);
+        const row: NewRow = {
+          email,
+          name: receipt.seller_name,
+          audience: 'seller',
+          step: 1,
+          source_type: 'buy_receipt',
+          source_id: receipt.id,
+          source_ref: receipt.receipt_number,
+          source_note: `${money(receipt.total)} paid`,
+          language: receipt.seller_language === 'es' ? 'es' : 'en',
+          status: optOut || duplicate ? 'not_sent' : 'scheduled',
+          event_at: eventAt.toISOString(),
+          send_at: optOut || duplicate ? null : sendAt.toISOString(),
+          reason: optOut ? optOutReason(optOut) : duplicate,
+        };
+        newRows.push(row);
+        // The next receipt for the same person in this same run sees this one.
+        const list = byEmail.get(email) ?? [];
+        list.push({ id: 'new', status: row.status, sent_at: null, source_ref: row.source_ref });
+        byEmail.set(email, list);
+      }
+    } catch (error) {
+      // A seller-side failure (e.g. the buy_receipts grant missing) must not stop the buyers below.
+      problems.push(error instanceof Error ? error.message : String(error));
     }
   }
 
@@ -406,7 +446,7 @@ export async function reconcileFollowUps(client: SupabaseClient, settings: Follo
       const language = await loadOrderLanguage(client, order.id).catch(() => 'en' as const);
       const optOut = optOuts.get(email);
       const duplicate = duplicateReason(byEmail.get(email), now);
-      const blocked = optOut ? (optOut.kind === 'stopped' ? 'Follow-ups stopped for this person.' : 'Unsubscribed.') : duplicate;
+      const blocked = optOut ? optOutReason(optOut) : duplicate;
       const row: NewRow = {
         email,
         name: order.customer_name,
@@ -445,9 +485,15 @@ export async function reconcileFollowUps(client: SupabaseClient, settings: Follo
   const open = (openData ?? []) as FollowUpMessageRow[];
 
   const receiptIds = open.filter((row) => row.source_type === 'buy_receipt').map((row) => row.source_id);
-  const receiptStatus = new Map(
-    (await selectIn<{ id: string; status: string }>(client, 'buy_receipts', 'id, status', 'id', receiptIds)).map((row) => [row.id, row.status]),
-  );
+  // null = the receipts could not be read: leave seller rows alone (never call one off on a failed read).
+  let receiptStatus: Map<string, string> | null = null;
+  try {
+    receiptStatus = new Map(
+      (await selectIn<{ id: string; status: string }>(client, 'buy_receipts', 'id, status', 'id', receiptIds)).map((row) => [row.id, row.status]),
+    );
+  } catch (error) {
+    problems.push(error instanceof Error ? error.message : String(error));
+  }
   const orderIds = open.filter((row) => row.source_type === 'order').map((row) => row.source_id);
   const orderRows = await selectIn<OrderSource>(client, 'orders', ORDER_COLUMNS, 'id', orderIds);
   const orderStates = await loadOrderStates(client, orderRows);
@@ -455,6 +501,7 @@ export async function reconcileFollowUps(client: SupabaseClient, settings: Follo
   for (const row of open) {
     let update: Record<string, unknown> | null = null;
     if (row.source_type === 'buy_receipt') {
+      if (!receiptStatus) continue;
       const status = receiptStatus.get(row.source_id);
       if (status !== 'recorded') update = { status: 'cancelled', reason: status === 'void' ? 'The buy receipt was voided.' : 'The buy receipt is gone.', send_at: null };
     } else {
@@ -530,7 +577,7 @@ export async function reconcileFollowUps(client: SupabaseClient, settings: Follo
         status: optOuts.has(step1.email) ? 'not_sent' : 'scheduled',
         event_at: step1.event_at,
         send_at: optOuts.has(step1.email) ? null : (due.getTime() < now.getTime() ? nextSlotAtOrAfter(now) : due).toISOString(),
-        reason: optOuts.has(step1.email) ? 'Unsubscribed.' : null,
+        reason: optOuts.has(step1.email) ? optOutReason(optOuts.get(step1.email)!) : null,
       });
     }
     result.step2 += await insertRows(client, rows);
@@ -551,14 +598,43 @@ export function trackedReviewUrl(token: string): string {
   return `${getSiteUrl()}/review?f=${encodeURIComponent(token)}`;
 }
 
-async function renderForRow(row: FollowUpMessageRow, template: FollowUpTemplate, mailingAddress: string, sendAt: Date): Promise<RenderedFollowUp> {
+/** The site's guides page in the email's language (the "Our free guides" card). */
+function guidesUrl(language: FollowUpLanguage): string {
+  return `${getSiteUrl()}${language === 'es' ? '/es' : ''}/guides`;
+}
+
+/** Lines on a seller's buy receipt ("your piece" / "your pieces"); null if they cannot be read (before the SQL's grant). */
+async function receiptPieceCount(client: SupabaseClient, row: FollowUpMessageRow): Promise<number | null> {
+  if (row.source_type !== 'buy_receipt') return null;
+  try {
+    const { data, error } = await client.from('buy_receipts').select('items').eq('id', row.source_id).maybeSingle();
+    if (error || !data || !Array.isArray(data.items)) return null;
+    return (data.items as unknown[]).length;
+  } catch {
+    return null;
+  }
+}
+
+/** The row's stored opening (AI / owner), or null for the standard line. */
+async function openingForRow(client: SupabaseClient, row: FollowUpMessageRow): Promise<string | null> {
+  if (row.step !== 1) return null;
+  const openings = await loadOpenings(client, [row.id]).catch(() => null);
+  const state = openings?.get(row.id);
+  return state && (state.source === 'ai' || state.source === 'owner') && state.opening ? state.opening : null;
+}
+
+async function renderForRow(client: SupabaseClient, row: FollowUpMessageRow, template: FollowUpTemplate, mailingAddress: string, sendAt: Date): Promise<RenderedFollowUp> {
+  const [opening, pieceCount] = await Promise.all([openingForRow(client, row), receiptPieceCount(client, row)]);
   return renderFollowUp(template, {
+    opening,
+    pieceCount,
+    guidesUrl: guidesUrl(row.language),
     audience: row.audience,
     language: row.language,
     name: row.name,
     eventAt: row.event_at ? new Date(row.event_at) : null,
     sendAt,
-    item: row.audience === 'buyer' ? row.source_note : null,
+    item: row.audience === 'buyer' ? await buyerItemForEmail(client, row) : null,
     phone: BUSINESS_PHONE,
     reviewUrl: trackedReviewUrl(row.click_token),
     unsubscribeUrl: unsubscribeUrl(row.email, row.language),
@@ -579,7 +655,7 @@ export async function previewFollowUp(client: SupabaseClient, id: string): Promi
   const { settings } = await loadFollowUpSettings(client);
   const marketing = await getMarketingSettings();
   const sendAt = row.send_at ? new Date(row.send_at) : new Date();
-  const rendered = await renderForRow(row, templateFor(settings, row.audience, row.step, row.language), marketing.mailingAddress ?? addressOneLine(), sendAt);
+  const rendered = await renderForRow(client, row, templateFor(settings, row.audience, row.step, row.language), marketing.mailingAddress ?? addressOneLine(), sendAt);
   return { ...rendered, saved: false };
 }
 
@@ -598,6 +674,8 @@ export async function previewTemplate(
     eventAt: new Date(now.getTime() - DAY_MS),
     sendAt: now,
     item: audience === 'buyer' ? (language === 'es' ? 'cadena de cuerda de 14K' : '14K rope chain') : null,
+    pieceCount: 1,
+    guidesUrl: guidesUrl(language),
     phone: BUSINESS_PHONE,
     reviewUrl: `${getSiteUrl()}/review`,
     unsubscribeUrl: unsubscribeUrl('example@example.com', language),
@@ -642,7 +720,7 @@ export async function sendFollowUp(
 
   const optOut = await optOutFor(client, email);
   if (optOut) {
-    const reason = optOut.kind === 'stopped' ? 'Follow-ups stopped for this person.' : 'Unsubscribed.';
+    const reason = optOutReason(optOut);
     await finish(client, id, { status: 'not_sent', reason, send_at: null });
     return { ok: false, status: 'not_sent', message: `Not sent: ${reason}` };
   }
@@ -689,17 +767,23 @@ export async function sendFollowUp(
     }
   }
 
+  const settings = options.settings ?? (await loadFollowUpSettings(client)).settings;
+  // "Send now" on a thank-you the AI has not written yet: write it first (a failure just means the standard line).
+  if (options.manual && row.step === 1 && settings.aiOpenings && aiOpeningsConfigured()) {
+    const state = (await loadOpenings(client, [row.id]).catch(() => null))?.get(row.id);
+    if (state && state.source === null) await writeOpeningNow(client, row.id).catch(() => null);
+  }
+
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) {
     await finish(client, id, { status: 'failed', reason: 'RESEND_API_KEY is not set on the server.' });
     return { ok: false, status: 'failed', message: 'Email is not set up on this server (RESEND_API_KEY).' };
   }
 
-  const settings = options.settings ?? (await loadFollowUpSettings(client)).settings;
   const marketing = await getMarketingSettings();
   const sender = marketing.senderProfiles.chris;
   const now = new Date();
-  const rendered = await renderForRow(row, templateFor(settings, row.audience, row.step, row.language), marketing.mailingAddress ?? addressOneLine(), now);
+  const rendered = await renderForRow(client, row, templateFor(settings, row.audience, row.step, row.language), marketing.mailingAddress ?? addressOneLine(), now);
 
   let resendId: string;
   try {
@@ -750,7 +834,7 @@ export async function sendFollowUp(
   return { ok: true, status: 'sent', message: `Sent to ${email}.` };
 }
 
-export type SweepResult = { ok: boolean; skipped?: string; reconcile?: ReconcileResult; sent: number; notSent: number; failed: number; paused: boolean; errors: string[] };
+export type SweepResult = { ok: boolean; skipped?: string; reconcile?: ReconcileResult; openings?: { written: number; failed: number }; sent: number; notSent: number; failed: number; paused: boolean; errors: string[] };
 
 /** The 15-minute job: find + queue, then send what is due (unless paused). */
 export async function sweepFollowUps(client: SupabaseClient, now = new Date()): Promise<SweepResult> {
@@ -760,8 +844,15 @@ export async function sweepFollowUps(client: SupabaseClient, now = new Date()): 
   const result: SweepResult = { ok: true, sent: 0, notSent: 0, failed: 0, paused: !settings.autoSend, errors: [] };
   try {
     result.reconcile = await reconcileFollowUps(client, settings, now);
+    result.errors.push(...result.reconcile.problems);
   } catch (error) {
     result.errors.push(error instanceof Error ? error.message : String(error));
+  }
+  // The AI-written openings for what is queued, soonest first (a few per run, kept short so sending still fits).
+  try {
+    result.openings = await writeDueOpenings(client, settings, { budgetMs: OPENING_BUDGET_MS, max: OPENING_BATCH });
+  } catch (error) {
+    result.errors.push(`Openings: ${error instanceof Error ? error.message : String(error)}`);
   }
   if (!settings.autoSend) return result;
 
@@ -963,12 +1054,15 @@ export type FollowUpPersonRow = {
     | { kind: 'waiting' }
     | { kind: 'thanked'; at: string }
     | { kind: 'unsubscribed'; at: string | null }
+    | { kind: 'bounced'; at: string | null }
     | { kind: 'stopped'; at: string | null }
     | { kind: 'none' };
 };
 
 export type FollowUpsPageData = {
   ready: boolean;
+  /** The opening columns exist (supabase/follow-ups-ai-openings-2026-11.sql) and the AI is set up on this server. */
+  openings: { ready: boolean; aiConfigured: boolean };
   settings: FollowUpSettings;
   upcoming: FollowUpMessageRow[];
   log: FollowUpMessageRow[];
@@ -978,11 +1072,12 @@ export type FollowUpsPageData = {
 
 export async function loadFollowUpsPage(client: SupabaseClient): Promise<FollowUpsPageData> {
   const { ready, settings } = await loadFollowUpSettings(client);
-  if (!ready) return { ready, settings, upcoming: [], log: [], people: [], reconcileError: null };
+  if (!ready) return { ready, settings, openings: { ready: false, aiConfigured: aiOpeningsConfigured() }, upcoming: [], log: [], people: [], reconcileError: null };
 
   let reconcileError: string | null = null;
   try {
-    await reconcileFollowUps(client, settings);
+    const reconciled = await reconcileFollowUps(client, settings);
+    if (reconciled.problems.length > 0) reconcileError = reconciled.problems.join(' · ');
   } catch (error) {
     reconcileError = error instanceof Error ? error.message : String(error);
   }
@@ -994,10 +1089,17 @@ export async function loadFollowUpsPage(client: SupabaseClient): Promise<FollowU
   if (upcomingResult.error) throw new Error(upcomingResult.error.message);
   if (logResult.error) throw new Error(logResult.error.message);
   const upcoming = (upcomingResult.data ?? []) as FollowUpMessageRow[];
+  // The openings, on their own query (none before the SQL).
+  const openings = await loadOpenings(client, upcoming.filter((row) => row.step === 1).map((row) => row.id)).catch(() => null);
+  for (const row of upcoming) {
+    const state = openings?.get(row.id);
+    row.opening = state?.opening ?? null;
+    row.opening_source = state?.source ?? null;
+  }
   const log = ((logResult.data ?? []) as FollowUpMessageRow[]).sort((a, b) => (b.sent_at ?? b.updated_at).localeCompare(a.sent_at ?? a.updated_at));
 
   const people = await loadPeople(client, upcoming);
-  return { ready, settings, upcoming, log, people, reconcileError };
+  return { ready, settings, openings: { ready: openings !== null && (await openingsReady(client)), aiConfigured: aiOpeningsConfigured() }, upcoming, log, people, reconcileError };
 }
 
 async function loadPeople(client: SupabaseClient, upcoming: FollowUpMessageRow[]): Promise<FollowUpPersonRow[]> {
@@ -1066,7 +1168,7 @@ async function loadPeople(client: SupabaseClient, upcoming: FollowUpMessageRow[]
     const optOut = optOuts.get(row.email);
     const next = queued.get(row.email);
     const thanked = lastThanked.get(row.email);
-    if (optOut) row.followUp = optOut.kind === 'stopped' ? { kind: 'stopped', at: optOut.at } : { kind: 'unsubscribed', at: optOut.at };
+    if (optOut) row.followUp = { kind: optOut.kind, at: optOut.at };
     else if (next) row.followUp = next.status === 'waiting' ? { kind: 'waiting' } : { kind: 'scheduled', at: next.send_at };
     else if (thanked) row.followUp = { kind: 'thanked', at: thanked };
     out.push({

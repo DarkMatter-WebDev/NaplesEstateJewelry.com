@@ -6,7 +6,7 @@ import { AppIcon } from '@/components/AppIcon';
 import PayPalOfferButton, { type OfferHeld } from '@/components/offers/PayPalOfferButton';
 import PayPalCheckoutButton from '@/components/checkout/PayPalCheckoutButton';
 import FormPrivacyNotice from '@/components/legal/FormPrivacyNotice';
-import { addressWithLandmark } from '@/lib/business-location';
+import { addressOneLine } from '@/lib/business-location';
 import { formatCheckoutCurrency, FL_TAX_RATE_LABEL, isFloridaState } from '@/lib/checkout-pricing';
 import {
   CHECKOUT_SHIPPING_OPTIONS,
@@ -324,8 +324,8 @@ export default function OfferCheckoutClient({
                   const selected = effectiveMethod === option.value;
                   const description = option.value === 'local-pickup'
                     ? (isEs
-                        ? `Recogida en persona en ${addressWithLandmark(true)}. ${pickupHoursLine}.`
-                        : `In-person pickup at ${addressWithLandmark(false)}. ${pickupHoursLine}.`)
+                        ? `Recogida en persona en ${addressOneLine()}. ${pickupHoursLine}.`
+                        : `In-person pickup at ${addressOneLine()}. ${pickupHoursLine}.`)
                     : option.value === 'express-overnight-insured'
                       ? (isEs ? 'Entrega al día siguiente, totalmente asegurada.' : 'Next-day delivery, fully insured.')
                       : (isEs ? 'Envío totalmente asegurado con firma de entrega.' : 'Fully insured shipping with delivery signature.');

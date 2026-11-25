@@ -102,9 +102,9 @@ export async function POST(req: Request) {
     }
   }
 
-  // "Add me to the mailing list" (owner, 2026-10-03): a seller ticked it on the
-  // customer input screen. Done here, on the save, so an email the owner
-  // corrected on the form is the one that joins. Like the emailed copy, a
+  // "Mailing list" (owner, 2026-10-03): the box beside "Email copy" is ticked.
+  // Done here, on the save, so an email the owner corrected on the form is the
+  // one that joins. Like the emailed copy, a
   // failure never costs the receipt — it is reported.
   let mailingList: 'added' | 'failed' | null = null;
   if (body?.mailingList === true && receipt.seller_email) {

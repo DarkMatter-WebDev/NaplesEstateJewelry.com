@@ -17,7 +17,7 @@
 import { BUY_RECEIPT_ID_TYPES, type BuyReceiptIdType } from '@/lib/buy-receipts';
 import { metalIn, orderDateLine, type OrderLanguage } from '@/lib/order-language';
 import { escapeHtml as esc } from '@/lib/marketing-email-html';
-import { cityLine, landmarkPhrase, SHOWROOM_TIME_ZONE, streetLine } from '@/lib/business-location';
+import { cityLine, SHOWROOM_TIME_ZONE, streetLine } from '@/lib/business-location';
 import { BUSINESS_PHONE, SITE_DOMAIN_LABEL } from '@/lib/order-email-branding';
 import { paperDateLine, type PaperReceipt } from '@/lib/order-receipt-paper';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
@@ -394,8 +394,8 @@ ${anyPhoto ? `<td class="ph">${image ? `<img src="${esc(image)}" alt="">` : ''}<
   const foot = store
     ? ''
     : es
-      ? `<div class="foot"><strong>¡Gracias!</strong> ¿Preguntas? Llame o envíe un texto al ${esc(BUSINESS_PHONE)} · Devoluciones: llame o envíe un texto dentro de los 5 días posteriores a la recogida · ${esc(SITE_DOMAIN_LABEL)}/es/returns-refunds${hoursEs ? `<br>Salón: ${esc(hoursEs)} · ${esc(landmarkPhrase(true))}` : ''}</div>`
-      : `<div class="foot"><strong>Thank you!</strong> Questions? Call or text ${esc(BUSINESS_PHONE)} · Returns: call or text within 5 days of pickup · ${esc(SITE_DOMAIN_LABEL)}/returns-refunds${opts.hoursLine ? `<br>Showroom: ${esc(opts.hoursLine)} · ${esc(landmarkPhrase(false))}` : ''}</div>`;
+      ? `<div class="foot"><strong>¡Gracias!</strong> ¿Preguntas? Llame o envíe un texto al ${esc(BUSINESS_PHONE)} · Devoluciones: llame o envíe un texto dentro de los 5 días posteriores a la recogida · ${esc(SITE_DOMAIN_LABEL)}/es/returns-refunds${hoursEs ? `<br>Salón: ${esc(hoursEs)}` : ''}</div>`
+      : `<div class="foot"><strong>Thank you!</strong> Questions? Call or text ${esc(BUSINESS_PHONE)} · Returns: call or text within 5 days of pickup · ${esc(SITE_DOMAIN_LABEL)}/returns-refunds${opts.hoursLine ? `<br>Showroom: ${esc(opts.hoursLine)}` : ''}</div>`;
   // A Spanish order's store copy: the statement in Spanish too, under the English one.
   const statement = es
     ? esc(PICKUP_STATEMENT_ES)

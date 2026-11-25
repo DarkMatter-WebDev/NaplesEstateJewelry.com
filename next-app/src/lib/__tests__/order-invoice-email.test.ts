@@ -118,11 +118,11 @@ describe('buildInvoiceEmailContent - footer address and phone', () => {
     expect(content.text).not.toContain('Sharon Lynch');
   });
 
-  it('keeps the landmark in the PICKUP directions, where it is wayfinding', () => {
-    // Deliberate asymmetry: the sign on the door reads Sharon Lynch
-    // Collections, so someone being sent to collect an order still needs it.
+  it('the PICKUP directions are the plain address — no shared-suite landmark (owner, 2026-11-25)', () => {
     const content = buildInvoiceEmailContent({ ...BASE_ORDER, shipping_method: 'pickup' });
-    expect(content.pickup?.landmark).toContain('Sharon Lynch Collections');
+    expect(content.pickup?.addressLines).toEqual(['6240 Shirley St, Ste 104', 'Naples, FL 34109']);
+    expect(content.html).not.toContain('Sharon Lynch');
+    expect(content.text).not.toContain('Sharon Lynch');
   });
 
   it('never lets the phone number break across lines', () => {
@@ -193,7 +193,7 @@ describe('buildInvoiceEmailContent - pickup block layout', () => {
 
   it('breaks the plain-text version onto separate lines too', () => {
     const content = buildInvoiceEmailContent(pickupOrder);
-    expect(content.text).toContain('PICKUP LOCATION\n6240 Shirley St, Ste 104\nNaples, FL 34109\ninside Sharon Lynch Collections');
+    expect(content.text).toContain('PICKUP LOCATION\n6240 Shirley St, Ste 104\nNaples, FL 34109\n\nHOURS');
     expect(content.text).toContain('HOURS\nMonday – Saturday, 10:00 AM – 4:00 PM\nor by appointment');
   });
 

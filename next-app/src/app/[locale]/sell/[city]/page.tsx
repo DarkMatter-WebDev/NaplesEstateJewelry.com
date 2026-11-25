@@ -290,7 +290,7 @@ export default async function SellCityPage({ params }: Props) {
         </section>
 
         {/* Showroom walk-in band — only the city that physically hosts the
-            showroom. Address, landmark, and hours render through their single
+            showroom. Address and hours render through their single
             sources (ShowroomAddress / ShowroomHours over the admin-editable
             schedule); never hardcode days or the address here. */}
         {area.hasShowroom && (

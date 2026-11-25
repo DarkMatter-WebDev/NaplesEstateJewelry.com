@@ -487,24 +487,18 @@ describe('buy receipts: database and storage rules', () => {
 describe('buy receipts: routes', () => {
   const files = routeFiles(join(root, 'src', 'app', 'api', 'admin', 'buy-receipts'));
 
-  it('has the eleven routes', () => {
-    // The eighth (2026-10-03) starts and ends customer input mode; the ninth (2026-10-06) keeps the seller's thumbprint;
-    // the tenth (2026-10-09) has the AI read the seller's ID for "Fill form from ID";
-    // the eleventh (2026-11-21) shows the seller's-copy email as it went out ([id]/email-copy).
-    expect(files).toHaveLength(11);
+  it('has the ten routes', () => {
+    // The thumbprint (2026-10-06), "Fill form from ID" (2026-10-09) and the seller's-copy email viewer
+    // ([id]/email-copy, 2026-11-21) are among them. The customer-input-mode route (2026-10-03) was
+    // removed on 2026-11-25.
+    expect(files).toHaveLength(10);
   });
 
   it('gates every handler on requireAdmin and never reaches for the service role', () => {
     for (const file of files) {
       const source = readFileSync(file, 'utf8');
       const handlers = source.match(/export async function (GET|POST|PUT|DELETE)/g) ?? [];
-      // Only the customer-mode route may ask to be answered on a locked browser:
-      // it is how the lock starts and ends. Every other route refuses one.
-      const lockRoute = file.replace(/\\/g, '/').endsWith('/customer-mode/route.ts');
-      const gate = lockRoute
-        ? /const admin = await requireAdmin\(\{ duringCustomerMode: true \}\);/g
-        : /const admin = await requireAdmin\(\);/g;
-      const gates = source.match(gate) ?? [];
+      const gates = source.match(/const admin = await requireAdmin\(\);/g) ?? [];
       expect(handlers.length, file).toBeGreaterThan(0);
       expect(gates.length, file).toBe(handlers.length);
       expect(source, file).not.toContain('createServiceClient');

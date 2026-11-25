@@ -7,7 +7,7 @@ export const BUY_RECEIPT_SUBSCRIBER_SOURCE = 'buy_receipt';
 export type MailingListResult = { ok: true } | { ok: false; error: string };
 
 /**
- * A seller ticked "Add me to the mailing list" on the customer input screen
+ * The "Mailing list" box beside "Email copy" on a buy receipt was ticked
  * (owner, 2026-10-03). Their email joins the same list as the homepage's
  * "Join the List", through the same function, so a returning subscriber is
  * re-activated rather than duplicated and an earlier unsubscribe is lifted by

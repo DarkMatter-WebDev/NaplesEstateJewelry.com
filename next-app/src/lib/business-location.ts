@@ -13,9 +13,6 @@
 
 export const BUSINESS_NAME = 'Naples Estate Jewelry';
 
-/** The business we share the suite with. See SHARED_SPACE_NOTE for why it is named. */
-export const SHARED_SPACE_NAME = 'Sharon Lynch Collections';
-
 export const ADDRESS = {
   street: '6240 Shirley St',
   suite: 'Ste 104',
@@ -147,53 +144,18 @@ export function addressOneLine(): string {
   return `${streetLine()}, ${cityLine()}`;
 }
 
-/**
- * `… · inside Sharon Lynch Collections`
- *
- * ⚠️ Naming the other business is WAYFINDING, not courtesy. The sign out front
- * reads Sharon Lynch Collections, so a customer looking for our name drives
- * past. "Inside" was chosen over "we share a space with" on purpose: it reads
- * as a destination rather than as a business arrangement, and it is the word
- * that actually helps someone find the door. Do not shorten this away.
+/*
+ * ⛔ No shared-suite landmark ("inside <the other business>") anywhere (owner, 2026-11-25: proper signage now, "we are just as much the shop").
+ * `addressWithLandmark()`, `landmarkPhrase()`, `landmarkParts()` and
+ * `SHARED_SPACE_NAME` were removed with it; every surface prints the plain
+ * address. A test (`no-shared-suite-name.test.ts`) fails if the name returns.
  */
-export function addressWithLandmark(isEs: boolean): string {
-  return `${addressOneLine()} · ${landmarkPhrase(isEs)}`;
-}
 
-/**
- * `inside Sharon Lynch Collections` — the landmark clause on its own.
- *
- * Split out of `addressWithLandmark()` so a display surface can lay the clause
- * out as its own line instead of letting it wrap mid-name ("… inside Sharon /
- * Lynch Collections", which is how the footer read until 2026-08-18). The two
- * functions share this one string so they cannot drift.
- *
- * Prefer `<ShowroomAddress>` for anything a visitor reads as an address block;
- * `addressWithLandmark()` remains correct inside a prose sentence or an email,
- * where a React element cannot go.
- */
-export function landmarkPhrase(isEs: boolean): string {
-  const { lead, name } = landmarkParts(isEs);
-  return `${lead}${name}`;
-}
-
-/**
- * The landmark clause split at the seam a layout needs: the preposition, which
- * may wrap, and the business name, which may not.
- *
- * `<ShowroomAddress>` renders these as two runs so "Sharon Lynch Collections"
- * can never break across lines while the clause as a whole still reflows in a
- * narrow column. `landmarkPhrase()` joins them back for prose and email.
- */
-export function landmarkParts(isEs: boolean): { lead: string; name: string } {
-  return { lead: isEs ? 'dentro de ' : 'inside ', name: SHARED_SPACE_NAME };
-}
-
-/** The full two-sentence version, for pages with room to explain the door. */
+/** The sentence for pages with room to explain the door (About, Estate Jewelry). */
 export function wayfindingSentence(isEs: boolean): string {
   return isEs
-    ? `Nuestro salón en Naples está dentro de ${SHARED_SPACE_NAME}, en ${ADDRESS.street}, Suite 104 — busque su letrero y luego la Suite 104.`
-    : `Our Naples showroom is inside ${SHARED_SPACE_NAME} at ${ADDRESS.street}, Suite 104 — look for their sign, then Suite 104.`;
+    ? `Nuestro salón en Naples está en ${ADDRESS.street}, Suite 104 — busque el letrero de ${BUSINESS_NAME}.`
+    : `Our Naples showroom is at ${ADDRESS.street}, Suite 104 — look for the ${BUSINESS_NAME} sign.`;
 }
 
 export function byAppointmentLabel(isEs: boolean): string {

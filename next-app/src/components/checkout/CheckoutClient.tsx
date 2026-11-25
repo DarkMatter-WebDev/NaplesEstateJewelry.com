@@ -8,7 +8,7 @@ import CheckoutGate, { hasChosenGuestCheckout, rememberGuestCheckout } from '@/c
 import { useCart, type CartItem } from '@/context/CartContext';
 import OrderSummary, { OrderTotals, computeOrderTotals } from '@/components/checkout/OrderSummary';
 import type { OrderQuote } from '@/lib/checkout-pricing';
-import { addressWithLandmark } from '@/lib/business-location';
+import { addressOneLine } from '@/lib/business-location';
 import PayPalCheckoutButton from '@/components/checkout/PayPalCheckoutButton';
 import DiscountCodeField from '@/components/checkout/DiscountCodeField';
 import type { AppliedDiscount } from '@/lib/discount-codes';
@@ -732,8 +732,8 @@ export default function CheckoutClient({ locale, paypalClientId, pickupHoursLine
                 // ever being shown where they would be driving.
                 const description = option.value === 'local-pickup'
                   ? (isEs
-                      ? `Recogida en persona en ${addressWithLandmark(true)}. ${pickupHoursLine}. No se necesita dirección de envío.`
-                      : `In-person pickup at ${addressWithLandmark(false)}. ${pickupHoursLine}. No shipping address needed.`)
+                      ? `Recogida en persona en ${addressOneLine()}. ${pickupHoursLine}. No se necesita dirección de envío.`
+                      : `In-person pickup at ${addressOneLine()}. ${pickupHoursLine}. No shipping address needed.`)
                   : option.value === 'express-overnight-insured'
                     ? (isEs ? 'Entrega al día siguiente, totalmente asegurada.' : 'Next-day delivery, fully insured.')
                     : (isEs ? 'Envío totalmente asegurado con firma de entrega.' : 'Fully insured shipping with delivery signature.');

@@ -17,12 +17,18 @@ function personType(row: FollowUpPersonRow): 'seller' | 'buyer' | 'both' {
   return row.isSeller ? 'seller' : 'buyer';
 }
 
+/** Unsubscribed, bounced or stopped — no follow-up goes to them. */
+function isBlocked(row: FollowUpPersonRow): boolean {
+  return row.followUp.kind === 'unsubscribed' || row.followUp.kind === 'stopped' || row.followUp.kind === 'bounced';
+}
+
 function FollowUpCell({ row }: { row: FollowUpPersonRow }) {
   const f = row.followUp;
   if (f.kind === 'scheduled') return <StatusText tone="wait">● Scheduled {formatFollowUpTime(f.at)}</StatusText>;
   if (f.kind === 'waiting') return <StatusText tone="muted">◷ Waiting for pickup / delivery</StatusText>;
   if (f.kind === 'thanked') return <StatusText tone="ok">✓ Thanked {shortDate(f.at)}</StatusText>;
   if (f.kind === 'unsubscribed') return <StatusText tone="bad">Unsubscribed{f.at ? ` ${shortDate(f.at)}` : ''}</StatusText>;
+  if (f.kind === 'bounced') return <StatusText tone="bad">Email bounced{f.at ? ` ${shortDate(f.at)}` : ''}</StatusText>;
   if (f.kind === 'stopped') return <StatusText tone="bad">Stopped by you</StatusText>;
   return <StatusText tone="muted">—</StatusText>;
 }
@@ -45,7 +51,7 @@ export default function FollowUpPeople({
     all: people.length,
     sellers: people.filter((row) => row.isSeller).length,
     buyers: people.filter((row) => row.isBuyer).length,
-    unsubscribed: people.filter((row) => row.followUp.kind === 'unsubscribed' || row.followUp.kind === 'stopped').length,
+    unsubscribed: people.filter((row) => isBlocked(row)).length,
   }), [people]);
 
   const rows = useMemo(() => {
@@ -53,7 +59,7 @@ export default function FollowUpPeople({
     return people.filter((row) => {
       if (filter === 'sellers' && !row.isSeller) return false;
       if (filter === 'buyers' && !row.isBuyer) return false;
-      if (filter === 'unsubscribed' && row.followUp.kind !== 'unsubscribed' && row.followUp.kind !== 'stopped') return false;
+      if (filter === 'unsubscribed' && !isBlocked(row)) return false;
       if (!q) return true;
       return row.email.includes(q) || (row.name ?? '').toLowerCase().includes(q) || (row.phone ?? '').includes(q);
     });
@@ -86,7 +92,7 @@ export default function FollowUpPeople({
         {chip('all', `All ${counts.all}`)}
         {chip('sellers', `Sellers ${counts.sellers}`)}
         {chip('buyers', `Buyers ${counts.buyers}`)}
-        {chip('unsubscribed', `Unsubscribed ${counts.unsubscribed}`)}
+        {chip('unsubscribed', `Can't email ${counts.unsubscribed}`)}
         <input
           type="search"
           className="form-field ml-auto"
@@ -216,6 +222,7 @@ function PersonModal({
 
   const stopped = detail?.optOut?.kind === 'stopped';
   const unsubscribed = detail?.optOut?.kind === 'unsubscribed';
+  const bounced = detail?.optOut?.kind === 'bounced';
 
   return (
     <AdminModal title={person.name || person.email} onClose={onClose} maxWidth="max-w-2xl">
@@ -230,14 +237,19 @@ function PersonModal({
                 Unsubscribed{detail.optOut?.at ? ` ${shortDate(detail.optOut.at)}` : ''} — no follow-ups go to this address. Only they can sign up again.
               </p>
             )}
+            {bounced && (
+              <p className="rounded px-3 py-2" style={{ background: '#fdf1e7', color: '#8a3b12' }}>
+                Email bounced{detail.optOut?.at ? ` ${shortDate(detail.optOut.at)}` : ''} — this address cannot receive mail (often a typo). Ask them for the right email and correct it on their order or receipt.
+              </p>
+            )}
             <div className="flex flex-wrap gap-2">
-              <button type="button" className="gold-button" style={SMALL_BUTTON} disabled={busy || unsubscribed || stopped} onClick={() => void act('send_now')}>
+              <button type="button" className="gold-button" style={SMALL_BUTTON} disabled={busy || unsubscribed || bounced || stopped} onClick={() => void act('send_now')}>
                 Send a thank-you now
               </button>
               {stopped ? (
                 <button type="button" className="outline-button" style={SMALL_BUTTON} disabled={busy} onClick={() => void act('resume')}>Turn follow-ups back on</button>
               ) : (
-                <button type="button" className="outline-button social-danger-button" style={SMALL_BUTTON} disabled={busy || unsubscribed} onClick={() => void act('stop')}>
+                <button type="button" className="outline-button social-danger-button" style={SMALL_BUTTON} disabled={busy || unsubscribed || bounced} onClick={() => void act('stop')}>
                   Stop all follow-ups for this person
                 </button>
               )}

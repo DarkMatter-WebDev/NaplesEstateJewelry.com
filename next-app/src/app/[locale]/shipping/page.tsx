@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import LegalPolicyPage from '@/components/legal/LegalPolicyPage';
 import { getLegalMetadata } from '@/lib/legal-metadata';
 import { getSpanishLegalCopy, spanishShippingSections } from '@/lib/spanish-legal-copy';
-import { addressWithLandmark, hoursLine } from '@/lib/business-location';
+import { addressOneLine, hoursLine } from '@/lib/business-location';
 import { getStoreHours } from '@/lib/store-hours';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -35,7 +35,7 @@ export default async function ShippingPage({ params }: Props) {
         {
           title: isEs ? 'Opciones de Entrega' : 'Fulfillment Options',
           bullets: [
-            `Free local pickup at our showroom, ${addressWithLandmark(false)} — ${hoursLine(schedule, false)}.`,
+            `Free local pickup at our showroom, ${addressOneLine()} — ${hoursLine(schedule, false)}.`,
             'Priority insured and express overnight insured shipping for eligible items.',
             'Every shipped order is fully insured for its purchase price.',
             'Items ship in discreet, unbranded packaging for your privacy and security.',

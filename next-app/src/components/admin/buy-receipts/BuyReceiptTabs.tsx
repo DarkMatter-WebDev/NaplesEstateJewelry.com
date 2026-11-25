@@ -7,8 +7,8 @@ import Link from 'next/link';
  * until that computer is chosen as the station, so opening it here is harmless.
  *
  * `end` is drawn at the right end of the row (it wraps under the tabs on a
- * narrow screen). The New receipt form puts its "Customer input mode" button
- * there (owner, 2026-10-03).
+ * narrow screen). Nothing uses it since "Customer input mode" was removed
+ * (2026-11-25); kept for the next small control that belongs there.
  */
 export type BuyReceiptTab = 'new' | 'log' | 'station';
 

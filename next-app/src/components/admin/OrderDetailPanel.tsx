@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -30,6 +30,13 @@ import { paperDateLine } from '@/lib/order-receipt-paper';
 import { isPickupOrder, type OrderPickupState } from '@/lib/order-pickup';
 import type { OrderLanguage } from '@/lib/order-language';
 import ReceiptLanguageSwitch from '@/components/admin/instant-sale/ReceiptLanguageSwitch';
+import EditOrderWindow from '@/components/admin/order-edit/EditOrderWindow';
+import FixItemName from '@/components/admin/order-edit/FixItemName';
+import OrderChangeHistory from '@/components/admin/order-edit/OrderChangeHistory';
+import ThankYouNoteCard from '@/components/admin/ThankYouNoteCard';
+import type { ThankYouNoteState } from '@/lib/thank-you-note';
+import type { OrderChangeRow } from '@/lib/order-edit-server';
+import type { OrderRowForEdit } from '@/lib/order-edit';
 
 const GOLD = '#735c00';
 const BORDER = 'var(--color-outline-variant)';
@@ -115,6 +122,10 @@ interface Props {
   customerLanguage?: { value: OrderLanguage; ready: boolean };
   /** Listing id → Spanish title, for the Spanish email preview. */
   spanishTitles?: Record<string, string>;
+  /** Edit order / Fix name history (lib/order-edit-server.ts, 2026-11-24); `ready: false` until its SQL runs. */
+  orderChanges?: { ready: boolean; rows: OrderChangeRow[] };
+  /** "Note for the thank-you email" (lib/thank-you-note.ts, 2026-11-25) — internal only; `ready: false` until its SQL runs. */
+  thankYouNote?: ThankYouNoteState;
 }
 
 export default function OrderDetailPanel({
@@ -137,6 +148,8 @@ export default function OrderDetailPanel({
   pickupHoursEs,
   customerLanguage: initialCustomerLanguage = { value: 'en', ready: false },
   spanishTitles = {},
+  orderChanges = { ready: true, rows: [] },
+  thankYouNote,
 }: Props) {
   const router = useRouter();
   const supabase = createClient();
@@ -156,6 +169,31 @@ export default function OrderDetailPanel({
   const [saving, setSaving] = useState<string | null>(null);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  // "✎ Edit order" (2026-11-24 (11)).
+  const [showEditOrder, setShowEditOrder] = useState(false);
+  const editableOrder = order as unknown as OrderRowForEdit & { id: string; order_number: string };
+  // A message carried across the reload that follows an edit.
+  useEffect(() => {
+    try {
+      const key = `order-edit-flash-${initialOrder.id}`;
+      const saved = sessionStorage.getItem(key);
+      if (saved) {
+        sessionStorage.removeItem(key);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setMessage(JSON.parse(saved) as { text: string; ok: boolean });
+      }
+    } catch {
+      // ignore
+    }
+  }, [initialOrder.id]);
+  function reloadWithMessage(text: string, ok = true) {
+    try {
+      sessionStorage.setItem(`order-edit-flash-${initialOrder.id}`, JSON.stringify({ text, ok }));
+    } catch {
+      // ignore
+    }
+    window.location.reload();
+  }
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   // A Trade-in sale (2026-11-21): the buy receipt its credit came from. Moving the sale to the
   // Recycle Bin ASKS whether that receipt is voided too (owner pick 5) — unticked unless ticked.
@@ -768,6 +806,7 @@ export default function OrderDetailPanel({
           </div>
           <div className="flex flex-col gap-2">
             <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => setShowEditOrder(true)} className="outline-button text-sm" disabled={Boolean(order.deleted_at)} title={order.deleted_at ? 'Restore the order before editing' : 'Fix the customer, items, delivery or notes'}>✎ Edit order</button>
               <button type="button" onClick={() => setShowEmailInvoice(true)} className="outline-button text-sm">Email {invoiceDocLabel}{languageTag}</button>
               <button type="button" onClick={openOrderPrintPreview} className="outline-button text-sm">Print Order</button>
               <button
@@ -1120,6 +1159,16 @@ export default function OrderDetailPanel({
                               Bullion · no tax
                             </span>
                           )}
+                          {!order.deleted_at && (
+                            <FixItemName
+                              order={editableOrder}
+                              gift={gift}
+                              taxExempt={Boolean(taxExemption)}
+                              itemId={item.id}
+                              title={item.title_snapshot}
+                              onSaved={(text) => reloadWithMessage(text)}
+                            />
+                          )}
                         </td>
                         <td className="px-3 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
                           {meltValue != null ? formatUsdPrice(meltValue) : '-'}
@@ -1459,6 +1508,10 @@ export default function OrderDetailPanel({
 
           {taxExemption && <OrderTaxExemptionPanel snapshot={taxExemption} adminBasePath={adminBasePath} editor={taxExemptionEditor} />}
 
+          <OrderChangeHistory ready={orderChanges.ready} rows={orderChanges.rows} createdAt={order.created_at} />
+
+          {thankYouNote && <ThankYouNoteCard kind="order" id={order.id} initial={thankYouNote} compact />}
+
           <section className="border p-5" style={{ borderColor: BORDER, background: 'white' }}>
             <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>Email History</h2>
             {orderEmails.length > 0 ? (
@@ -1514,6 +1567,21 @@ export default function OrderDetailPanel({
         </div>
       </div>
 
+      {showEditOrder && (
+        <EditOrderWindow
+          order={editableOrder}
+          gift={gift}
+          taxExempt={Boolean(taxExemption)}
+          onClose={() => setShowEditOrder(false)}
+          onSaved={({ changes, warnings, emailed, historySaved }) => {
+            const parts = [changes === 0 ? 'Nothing changed.' : `Order updated (${changes} change${changes === 1 ? '' : 's'}).`];
+            if (emailed) parts.push(`Corrected copy emailed to ${emailed}.`);
+            if (!historySaved) parts.push('Change history was not kept (its SQL has not run).');
+            parts.push(...warnings);
+            reloadWithMessage(parts.join(' '), warnings.length === 0);
+          }}
+        />
+      )}
       {showEmailInvoice && (
         <div className="fixed inset-0 z-50 overflow-y-auto px-4 py-6" style={{ background: 'rgba(0, 0, 0, 0.42)' }}>
           <div className="relative mx-auto w-full max-w-3xl border bg-white shadow-2xl" style={{ borderColor: BORDER }}>
@@ -1627,7 +1695,6 @@ export default function OrderDetailPanel({
                       {emailContent.pickup.addressLines.map((addressLine) => (
                         <span key={addressLine} className="block">{addressLine}</span>
                       ))}
-                      <span className="block opacity-70">{emailContent.pickup.landmark}</span>
                       <div className="mt-3 border-t pt-3" style={{ borderColor: BORDER }}>
                         <strong className="block text-[11px] font-bold uppercase tracking-wider">{emailContent.pickup.hoursLabel}</strong>
                         <span className="block">{emailContent.pickup.hours}</span>

@@ -10,6 +10,8 @@ import {
   skipFollowUp,
   unskipFollowUp,
 } from '@/lib/follow-ups-server';
+import { normalizeOwnerOpening } from '@/lib/follow-up-opening';
+import { setOpening, writeOpeningNow } from '@/lib/follow-up-opening-server';
 
 export const runtime = 'nodejs';
 
@@ -33,14 +35,14 @@ export async function GET(_req: Request, { params }: Params) {
   }
 }
 
-/** Send now · Change time · Skip · Put back. */
+/** Send now · Change time · Skip · Put back · the opening line: Edit (own words) · Rewrite (AI again) · Standard wording. */
 export async function POST(req: Request, { params }: Params) {
   const { user, error } = await requireAdmin();
   if (error) return error;
   const { id } = await params;
   if (!UUID.test(id)) return NextResponse.json({ error: 'Unknown email.' }, { status: 404 });
 
-  const body = (await req.json().catch(() => null)) as { action?: string; sendAt?: string } | null;
+  const body = (await req.json().catch(() => null)) as { action?: string; sendAt?: string; text?: string } | null;
   const service = createServiceClient();
   const byEmail = user.email ?? null;
 
@@ -65,6 +67,20 @@ export async function POST(req: Request, { params }: Params) {
       case 'unskip': {
         const failure = await unskipFollowUp(service, id);
         return failure ? NextResponse.json({ error: failure }, { status: 409 }) : NextResponse.json({ ok: true });
+      }
+      case 'set_opening': {
+        const opening = normalizeOwnerOpening(body.text);
+        if ('error' in opening) return NextResponse.json({ error: opening.error }, { status: 400 });
+        const failure = await setOpening(service, id, { source: 'owner', text: opening.value });
+        return failure ? NextResponse.json({ error: failure }, { status: 409 }) : NextResponse.json({ ok: true });
+      }
+      case 'standard_opening': {
+        const failure = await setOpening(service, id, { source: 'standard' });
+        return failure ? NextResponse.json({ error: failure }, { status: 409 }) : NextResponse.json({ ok: true });
+      }
+      case 'rewrite_opening': {
+        const written = await writeOpeningNow(service, id);
+        return written.ok ? NextResponse.json({ ok: true, opening: written.opening }) : NextResponse.json({ error: written.error }, { status: 409 });
       }
       default:
         return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });

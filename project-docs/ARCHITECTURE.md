@@ -905,6 +905,8 @@ Laptop (admin form)                      Supabase                         Deskto
 
 ### Customer input mode: a per-browser lock (2026-10-03)
 
+> ⛔ **REMOVED 2026-11-25** (owner: "we can remove customer mode from the buy receipts... I don't use it anymore now that the form gets filled from the ID"). The button, the locked screen, the lock cookie + proxy bounce, the `requireAdmin` lock check, the route, the tab guard and the staff code are all gone; what follows is history. How to bring it back: `CHANGELOG.md` 2026-11-25 (1) → *To reverse*.
+
 One optional button on the New receipt form hands the tablet to the seller on
 a locked screen. Since the same-form build (2026-10-03, night) that screen is
 the form's own paper with only the seller's seven contact boxes switched on
@@ -1032,6 +1034,13 @@ Visitor lands with ?gclid=… (auto-tagging)      Visitor lands without one
 - **Local Pickup log (2026-11-21):** `order_pickups` (one row per order, admin-only RLS; `supabase/order-pickups-2026-11.sql`) holds who picked up, ID type / last 4, and PATHS to the ID photo + finger signature in the private `buy-receipt-ids` bucket (`order-pickups/<order id>/`). Saved through `POST /api/admin/orders/[id]/pickup` (multipart; marks the order Picked Up; first-log email `order-pickup-email.ts`, logged in `order_emails` as `pickup_receipt`); the store + customer copies are built by `buildPickupPaper` and print here or through the Print Station's `sale_print_requests` queue, private pictures filled at print time. Runbook `features/local-pickup-log.md`.
 - **Data:** `order_tracking` (one row per order, service-role writes, admin read via RLS); scan times kept as EasyPost's raw strings (local offset). Automatic emails logged in `order_emails` (`fulfillment_update`, status `expected_delivery` (2026-11-19, once, in transit, carrier date as given in `order_tracking.est_delivery_date`, claim `expected_email_at`) / `out_for_delivery` / `delivered`, `sent_by_email` "Automatic (delivery tracking)").
 - **Config:** `EASYPOST_API_KEY`, `EASYPOST_WEBHOOK_SECRET` (Netlify); webhook registered from Admin → Settings → Delivery Tracking → Connect (`/api/admin/easypost`). Runbook `features/delivery-tracking.md`.
+
+## Order editing — Edit order / Fix name / Change history (2026-11-24 (11))
+
+- **Rules (pure, `lib/order-edit.ts`):** `orderEditRules` — details on any order; money (items, prices, qty, discounts, tax on/off) only while unpaid; shipping fee also on paid orders not paid by PayPal, not split, not refunded; Trade-in money always locked. `computeEditTotals` = 6% FL on subtotal − discount + shipping with bullion lines (and their shipping share) untaxed (`inStoreTotals`); exempt → 0 + `taxNotCharged`.
+- **Save:** `POST /api/admin/orders/[id]/edit` (`?source=fix_name` for the inline fix) → `applyOrderEdit` (`lib/order-edit-server.ts`): re-checks `editRefusal`, writes `order_items` then `orders`, flips listings via `adminUpdateProductsStatus` (eBay / Etsy hooks + shop cache), refreshes an existing invoice record (`upsertOrderInvoice`), recomputes Buyers rows for a paid order's email / total change, moves `follow_up_messages` to a new email, and inserts `order_changes`. `GET` the same route = available listings for "+ Add a listed piece".
+- **UI:** `components/admin/order-edit/` (`EditOrderWindow`, `FixItemName`, `OrderChangeHistory`) inside `OrderDetailPanel.tsx`; "Email the corrected invoice/receipt" reuses `POST /api/admin/orders/[id]/email-invoice`.
+- **Data:** `order_changes` (`supabase/order-changes-2026-11.sql`), admin read, service insert.
 
 ## Follow-ups — thank-you emails to sellers and shop buyers (2026-11-24)
 

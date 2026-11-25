@@ -53,11 +53,8 @@ export function getOrderLookupUrl(orderNumber?: string | null, language: 'en' | 
  * updates): a link back to the buyer's account and to the storefront domain,
  * so recipients always have a clickable way back to naplesestatejewelry.com.
  *
- * ⚠️ `addressOneLine()`, NOT `addressWithLandmark()` (owner, 2026-08-23). This
- * is the sender's contact block, not directions — "· inside Sharon Lynch
- * Collections" made an already-wrapping line longer for no navigational
- * benefit. The landmark is still WAYFINDING where someone is actually being
- * sent to the door: the pickup sentence in `order-invoice-email.ts` keeps it.
+ * ⚠️ `addressOneLine()` — the sender's contact block, the plain address (the
+ * shared-suite landmark was dropped here 2026-08-23 and everywhere 2026-11-25).
  *
  * ⚠️ The phone is `white-space:nowrap` because it was breaking mid-number
  * across lines ("(239)" / "404-8505"), which is unreadable and unclickable as a

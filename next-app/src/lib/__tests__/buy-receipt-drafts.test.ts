@@ -251,10 +251,9 @@ describe('drafts: the form, the Log and the pages', () => {
     expect(form).toContain('const result = await uploadThumbprint(linked.id, blob);');
   });
 
-  it('offers customer input mode only before the first save', () => {
-    // A refresh while locked lands on the plain address and would lose the draft.
-    expect(form).toContain('saved || linked ? null : (');
-    expect(form).toContain('if (modeBusy || busy || draftBusy || linked) return;');
+  it('has no customer input mode any more (removed 2026-11-25)', () => {
+    expect(form).not.toContain('Customer input mode</');
+    expect(form).not.toContain('enterCustomerMode');
   });
 
   it('lists a draft with one button, Continue, and no print buttons', () => {
@@ -272,7 +271,6 @@ describe('drafts: the form, the Log and the pages', () => {
     expect(detail).toContain('if (isDraftReceipt(receipt)) redirect(draftContinuePath(adminBasePath, receipt.id));');
     const page = read('src', 'app', '[locale]', 'admin', 'buy-receipts', 'page.tsx');
     expect(page).toContain("if (openedRow && openedRow.status !== 'draft') redirect(`${adminBasePath}/buy-receipts/${openedRow.id}`);");
-    // A locked browser never opens a draft.
-    expect(page).toContain('const wantsDraft = !customerModeLocked && isReceiptId(draftId);');
+    expect(page).toContain('const wantsDraft = isReceiptId(draftId);');
   });
 });

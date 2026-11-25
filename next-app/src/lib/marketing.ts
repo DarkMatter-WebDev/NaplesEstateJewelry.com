@@ -321,10 +321,7 @@ export async function getMarketingSettings(): Promise<MarketingSettings> {
     // showroom address is the final fallback, so compliance does not depend on
     // data entry. An admin value or a Netlify override still wins.
     //
-    // ⚠️ Deliberately `addressOneLine()`, NOT `addressWithLandmark()`. CAN-SPAM
-    // wants the sender's valid physical address; "inside Sharon Lynch
-    // Collections" is wayfinding for a visitor and does not belong in a legal
-    // footer.
+    // ⚠️ `addressOneLine()`: CAN-SPAM wants the sender's valid physical address.
     mailingAddress: (data?.mailing_address || process.env.MARKETING_MAILING_ADDRESS || '').trim()
       || addressOneLine(),
     siteUrl: marketingSiteUrl(),

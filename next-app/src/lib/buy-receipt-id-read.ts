@@ -4,9 +4,8 @@ import { BUY_RECEIPT_ID_TYPES, easternDayKey, type BuyReceiptDraft, type BuyRece
  * "Fill form from ID" on the buy receipt (owner, 2026-10-09).
  *
  * With the box ticked, the photo of the seller's ID is read by the AI and the
- * seller boxes that are still EMPTY are filled in. Anything already typed — by
- * the owner, or by the seller in customer input mode — is left exactly as it
- * is. Phone and email are not on a license, so they are never filled.
+ * seller boxes that are still EMPTY are filled in. Anything already typed is left
+ * exactly as it is. Phone and email are not on a license, so they are never filled.
  *
  * This file is the pure half: what the AI is asked for, how its answer is
  * checked, and which boxes may be written. The call itself lives in

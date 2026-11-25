@@ -162,8 +162,8 @@ or **Trade-in sale →** at the end of the Buy Receipts tabs.
 
 **At the counter:**
 
-1. **Left — the buy receipt**, exactly as on Buy Receipts: seller boxes (or
-   **Customer input mode**), ID photo + Fill from ID, thumbprint, the gold and
+1. **Left — the buy receipt**, exactly as on Buy Receipts: seller boxes, ID
+   photo + Fill from ID, thumbprint, the gold and
    what you pay for it. **Paid by** starts with a locked line, *Trade-in credit
    toward this sale* — it fills in from the right side.
 2. **Right — what they buy** (starts on *Listed item*). A listing that shows a
@@ -192,9 +192,8 @@ the item sold — use *Move to Recycle Bin and return to inventory* on the order
 when the piece is back in the case.
 
 **Good to know:** pickup only (ship it? do two receipts); no drafts; no
-store-credit balance — leftover value is paid out the same day. A refresh while
-the tablet is locked in Customer input mode lands on Buy Receipts (the seller's
-boxes come back; re-enter the sale half). Code: `lib/trade-in-sale.ts`,
+store-credit balance — leftover value is paid out the same day. (Customer input
+mode, which this screen also had, was removed on 2026-11-25.) Code: `lib/trade-in-sale.ts`,
 `app/api/admin/trade-in-sales/route.ts`, `components/admin/instant-sale/TradeInSaleForm.tsx`
 (+ `BuyReceiptForm`'s `trade` prop).
 

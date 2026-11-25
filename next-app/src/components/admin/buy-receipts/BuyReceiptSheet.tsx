@@ -1,15 +1,8 @@
 'use client';
 
 import { useId, useLayoutEffect, useRef } from 'react';
-import type { ChangeEvent, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { BUSINESS_NAME, cityLine, streetLine } from '@/lib/business-location';
-import {
-  CUSTOMER_FIELDS,
-  CUSTOMER_FIELD_CAPITALS,
-  customerFlagNote,
-  customerFlagPlaceholder,
-  type CustomerField,
-} from '@/lib/buy-receipt-customer-mode';
 import {
   BUY_RECEIPT_ATTESTATION_ES,
   BUY_RECEIPT_PAPER_WORDS,
@@ -61,23 +54,10 @@ import { BUY_RECEIPT_SHEET_CSS } from './buy-receipt-sheet-css';
  * - `seller` — the copy handed over: the owner's signature printed in cursive
  *   on the "Received by" line, no seller line, never the ID photo.
  *
- * And one more way to show the `edit` paper (owner, 2026-10-03): the SELLER's
- * view, for customer input mode — the same paper, with only the seven seller
- * boxes and the two small email boxes switched on and every other part faded
- * and switched off. It is a prop (`customer`), given only by the locked screen
- * (`BuyReceiptCustomerMode`). Without it — the owner's form, the edit view of a
- * saved receipt — this component draws exactly what it always drew.
+ * (The seller's view for "Customer input mode", 2026-10-03, was removed on
+ * 2026-11-25 — owner: "I don't use it anymore now that the form gets filled
+ * from the ID". `CHANGELOG.md` 2026-11-25 says how to bring it back.)
  */
-
-/** What the locked screen hands the paper so it can draw the seller's view. */
-export type BuyReceiptCustomerView = {
-  /** The boxes the last "Save" found unfinished, each with its short reason. */
-  flags: Partial<Record<CustomerField, string>>;
-  /** The seller typed in one of their boxes (the screen formats phone, state and ZIP as they go). */
-  onType: (field: CustomerField, input: HTMLInputElement) => void;
-  /** The seller left one of their boxes. */
-  onLeave: (field: CustomerField) => void;
-};
 
 type EditProps = {
   mode: 'edit';
@@ -96,8 +76,6 @@ type EditProps = {
   /** "Mailing list" (owner, 2026-10-03): a second screen-only box beside it; the email joins the list when the receipt is saved. */
   mailingList?: boolean;
   onMailingListChange?: (checked: boolean) => void;
-  /** Draw the seller's view (customer input mode). Leave out everywhere else. */
-  customer?: BuyReceiptCustomerView;
   /**
    * The Trade-in sale screen (owner, 2026-11-21): "Paid by" starts with a
    * locked line — the credit put toward the sale, worked out from both halves
@@ -279,7 +257,6 @@ function EditSheet({
   onEmailCopyChange,
   mailingList = false,
   onMailingListChange,
-  customer,
   trade,
 }: EditProps) {
   // Set when the owner picks "Check", so the check-number field takes focus as it appears.
@@ -287,38 +264,6 @@ function EditSheet({
   const emailId = useId();
 
   const set = (patch: Partial<BuyReceiptDraft>) => onChange({ ...draft, ...patch });
-
-  // ── The seller's view (customer input mode). Each of the three helpers gives
-  // nothing at all on the owner's form, so that form is drawn exactly as before. ──
-  /** What one of the seven seller boxes gains: the typing helpers, and its flag after a Save that found it unfinished. */
-  const seat = (field: CustomerField) => {
-    if (!customer) return undefined;
-    const problem = customer.flags[field];
-    const placeholder = customerFlagPlaceholder(field, problem);
-    return {
-      'data-customer-field': field,
-      // One seller must never be offered another's details, and nothing here is to be remembered.
-      autoCorrect: 'off',
-      autoCapitalize: CUSTOMER_FIELD_CAPITALS[field],
-      spellCheck: false,
-      'data-1p-ignore': '',
-      'data-lpignore': 'true',
-      'data-form-type': 'other',
-      enterKeyHint: field === CUSTOMER_FIELDS[CUSTOMER_FIELDS.length - 1] ? ('done' as const) : ('next' as const),
-      'aria-invalid': problem ? true : undefined,
-      onChange: (event: ChangeEvent<HTMLInputElement>) => customer.onType(field, event.currentTarget),
-      onBlur: () => customer.onLeave(field),
-      ...(placeholder ? { placeholder } : null),
-    };
-  };
-  /** The reason beside a flagged box's label: "NAME — add your last name". */
-  const why = (field: CustomerField) => {
-    const words = customer ? customerFlagNote(field, customer.flags[field]) : '';
-    return words ? <span className="brs-why"> — {words}</span> : null;
-  };
-  /** The owner's parts are switched off (and faded, `brs-off`) while the seller has the tablet. */
-  const off = customer ? true : undefined;
-  const offCell = customer ? ' brs-off' : '';
 
   const setItem = (index: number, patch: Partial<BuyReceiptDraftItem>) =>
     set({ items: draft.items.map((item, i) => (i === index ? { ...item, ...patch } : item)) });
@@ -348,7 +293,7 @@ function EditSheet({
   const payoutMatches = payout != null && Math.round(payoutPaid * 100) === Math.round(payout * 100);
 
   // Everything under the seller's boxes — the ID photo and thumbprint strips, the items, the money,
-  // the notes, the signatures. One piece, so the seller's view can switch the whole of it off at once.
+  // the notes, the signatures.
   const ownerPart = (
     <>
       {idPhotoSlot}
@@ -495,15 +440,15 @@ function EditSheet({
       <div className="brs-grid">
         {/* `brs-cell-name` / `brs-cell-email`: layout B — on the form the Email box is one column wider, the Name box one narrower. */}
         <label className="brs-c5 brs-cell-name">
-          <input className="sheet-input" value={draft.sellerName} autoComplete="off" onChange={(e) => set({ sellerName: e.target.value })} {...seat('sellerName')} />
-          <span className="brs-label">Name{why('sellerName')}</span>
+          <input className="sheet-input" value={draft.sellerName} autoComplete="off" onChange={(e) => set({ sellerName: e.target.value })} />
+          <span className="brs-label">Name</span>
         </label>
         <label className="brs-c3">
-          <input className="sheet-input" value={draft.sellerPhone} inputMode="tel" autoComplete="off" onChange={(e) => set({ sellerPhone: e.target.value })} {...seat('sellerPhone')} />
-          <span className="brs-label">Phone{why('sellerPhone')}</span>
+          <input className="sheet-input" value={draft.sellerPhone} inputMode="tel" autoComplete="off" onChange={(e) => set({ sellerPhone: e.target.value })} />
+          <span className="brs-label">Phone</span>
         </label>
         <div className="brs-c4 brs-cell-email">
-          <input id={emailId} className="sheet-input" value={draft.sellerEmail} inputMode="email" autoComplete="off" placeholder="name@example.com" onChange={(e) => set({ sellerEmail: e.target.value })} {...seat('sellerEmail')} />
+          <input id={emailId} className="sheet-input" value={draft.sellerEmail} inputMode="email" autoComplete="off" placeholder="name@example.com" onChange={(e) => set({ sellerEmail: e.target.value })} />
           {/* `brs-two`: with both small boxes on the line, "(optional)" gives way when the box is narrow (see the styles). */}
           <div className={onEmailCopyChange && onMailingListChange ? 'brs-label-row brs-two' : 'brs-label-row'}>
             <label className="brs-label" htmlFor={emailId}>Email<span className="brs-opt"> (optional)</span></label>
@@ -534,24 +479,23 @@ function EditSheet({
           </div>
         </div>
         <label className="brs-c6">
-          <input className="sheet-input" value={draft.sellerStreet} autoComplete="off" onChange={(e) => set({ sellerStreet: e.target.value })} {...seat('sellerStreet')} />
-          <span className="brs-label">Street{why('sellerStreet')}</span>
+          <input className="sheet-input" value={draft.sellerStreet} autoComplete="off" onChange={(e) => set({ sellerStreet: e.target.value })} />
+          <span className="brs-label">Street</span>
         </label>
         <label className="brs-c3">
-          <input className="sheet-input" value={draft.sellerCity} autoComplete="off" onChange={(e) => set({ sellerCity: e.target.value })} {...seat('sellerCity')} />
-          <span className="brs-label">City{why('sellerCity')}</span>
+          <input className="sheet-input" value={draft.sellerCity} autoComplete="off" onChange={(e) => set({ sellerCity: e.target.value })} />
+          <span className="brs-label">City</span>
         </label>
         <label className="brs-c1 brs-cell-state">
-          <input className="sheet-input" value={draft.sellerState} maxLength={2} autoComplete="off" onChange={(e) => set({ sellerState: e.target.value.toUpperCase() })} {...seat('sellerState')} />
+          <input className="sheet-input" value={draft.sellerState} maxLength={2} autoComplete="off" onChange={(e) => set({ sellerState: e.target.value.toUpperCase() })} />
           <span className="brs-label">State</span>
         </label>
         <label className="brs-c2 brs-cell-zip">
-          <input className="sheet-input" value={draft.sellerZip} inputMode="numeric" maxLength={10} autoComplete="off" onChange={(e) => set({ sellerZip: e.target.value })} {...seat('sellerZip')} />
-          <span className="brs-label">ZIP{why('sellerZip')}</span>
+          <input className="sheet-input" value={draft.sellerZip} inputMode="numeric" maxLength={10} autoComplete="off" onChange={(e) => set({ sellerZip: e.target.value })} />
+          <span className="brs-label">ZIP</span>
         </label>
-        {/* From here down the paper is the owner's: off (and faded) in the seller's view. */}
-        <label className={`brs-c4 brs-cell-idtype${offCell}`} inert={off}>
-          <select className="sheet-input" value={draft.sellerIdType} disabled={off} onChange={(e) => set({ sellerIdType: e.target.value })}>
+        <label className="brs-c4 brs-cell-idtype">
+          <select className="sheet-input" value={draft.sellerIdType} onChange={(e) => set({ sellerIdType: e.target.value })}>
             <option value="">Choose…</option>
             {BUY_RECEIPT_ID_TYPES.map((type) => (
               <option key={type} value={type}>{type}</option>
@@ -559,24 +503,16 @@ function EditSheet({
           </select>
           <span className="brs-label">ID type</span>
         </label>
-        <label className={`brs-c2 brs-cell-idlast4${offCell}`} inert={off}>
-          <input className="sheet-input" value={draft.sellerIdLast4} maxLength={4} autoComplete="off" disabled={off} onChange={(e) => set({ sellerIdLast4: e.target.value })} />
+        <label className="brs-c2 brs-cell-idlast4">
+          <input className="sheet-input" value={draft.sellerIdLast4} maxLength={4} autoComplete="off" onChange={(e) => set({ sellerIdLast4: e.target.value })} />
           <span className="brs-label">ID last 4</span>
         </label>
-        <label className={`brs-c3${offCell}`} inert={off}>
-          <input className="sheet-input" type="date" value={draft.sellerDob} disabled={off} onChange={(e) => set({ sellerDob: e.target.value })} />
+        <label className="brs-c3">
+          <input className="sheet-input" type="date" value={draft.sellerDob} onChange={(e) => set({ sellerDob: e.target.value })} />
           <span className="brs-label">Date of birth</span>
         </label>
       </div>
-      {customer ? (
-        // One switch for everything below the seller's boxes: a disabled fieldset turns off every
-        // control inside it — the ID photo buttons included — on every browser.
-        <fieldset className="brs-off brs-rest" disabled inert>
-          {ownerPart}
-        </fieldset>
-      ) : (
-        ownerPart
-      )}
+      {ownerPart}
     </div>
   );
 }

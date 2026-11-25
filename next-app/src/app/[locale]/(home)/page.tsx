@@ -517,13 +517,13 @@ export default async function HomePage({ params }: Props) {
                 ? [
                     { q: '¿Compran joyería además de venderla?', a: 'Sí. Compramos joyería, oro, plata esterlina y cubertería, desde piezas de uso diario hasta colecciones heredadas completas. Evaluaciones gratuitas y privadas en nuestro salón de Naples o en su casa en todo el suroeste de Florida.' },
                     { q: '¿Cómo funciona el envío?', a: 'Cada pedido enviado viaja totalmente asegurado con confirmación de firma, y los pedidos de $5,000+ se envían por USPS Registered Mail. Las tarifas según el valor se muestran al pagar.' },
-                    { q: '¿Puedo ver una pieza en persona?', a: 'Sí — visite nuestro salón en 6240 Shirley St, Ste 104, dentro de Sharon Lynch Collections, durante el horario del salón o con cita (el horario actual aparece arriba y en nuestra página de contacto). La recogida local es gratuita: elija Recogida local al pagar o llame para coordinar.' },
+                    { q: '¿Puedo ver una pieza en persona?', a: 'Sí — visite nuestro salón en 6240 Shirley St, Ste 104, durante el horario del salón o con cita (el horario actual aparece arriba y en nuestra página de contacto). La recogida local es gratuita: elija Recogida local al pagar o llame para coordinar.' },
                     { q: '¿Cómo fijan sus precios?', a: 'La mayoría de las piezas se calculan directamente contra el mercado de metales en vivo, con el valor de rescate junto al precio; algunas tienen un precio fijo. En ambos casos, lo que ve es transparente — no un margen arbitrario.' },
                   ]
                 : [
                     { q: 'Do you buy jewelry as well as sell it?', a: 'Yes. We buy jewelry, gold, sterling silver and flatware, from everyday pieces to complete inherited collections. Free, private evaluations at our Naples showroom or at your home across Southwest Florida.' },
                     { q: 'How does shipping work?', a: 'Every shipped order travels fully insured with signature confirmation, and orders of $5,000+ ship USPS Registered Mail. Value-based rates are shown at checkout.' },
-                    { q: 'Can I see a piece in person?', a: 'Yes — visit our Naples showroom at 6240 Shirley St, Ste 104, inside Sharon Lynch Collections, during showroom hours or by appointment (current hours are listed just above and on our contact page). Local pickup is free: choose Local Pickup at checkout, or call to arrange a viewing.' },
+                    { q: 'Can I see a piece in person?', a: 'Yes — visit our Naples showroom at 6240 Shirley St, Ste 104, during showroom hours or by appointment (current hours are listed just above and on our contact page). Local pickup is free: choose Local Pickup at checkout, or call to arrange a viewing.' },
                     { q: 'How are your prices set?', a: 'Most pieces are priced directly against the live metals market, with the scrap value shown right beside the price; some carry a set price instead. Either way, what you see is transparent — not an arbitrary markup.' },
                   ]
               ).map((faq) => (
@@ -687,9 +687,8 @@ export default async function HomePage({ params }: Props) {
                 </a>
                 <CopyAddressButton locale={locale} />
               </div>
-              {/* City only. The shared-suite landmark was removed here on
-                  2026-08-23 at the owner's request — it is not part of the
-                  postal address, and he does not want it on this block. */}
+              {/* City only — no shared-suite landmark (removed here 2026-08-23,
+                  sitewide 2026-11-25). */}
               <p className="mt-2 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
                 {cityLine()}
               </p>

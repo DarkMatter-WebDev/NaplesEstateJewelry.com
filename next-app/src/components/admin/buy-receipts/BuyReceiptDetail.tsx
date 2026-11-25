@@ -16,6 +16,8 @@ import {
   type BuyReceiptDraft,
   type BuyReceiptRow,
 } from '@/lib/buy-receipts';
+import ThankYouNoteCard from '@/components/admin/ThankYouNoteCard';
+import type { ThankYouNoteState } from '@/lib/thank-you-note';
 import BuyReceiptSheet from './BuyReceiptSheet';
 import IdPhotoField from './IdPhotoField';
 import ReceiptPrintControls from './ReceiptPrintControls';
@@ -43,7 +45,16 @@ import {
 const hintStyle = { color: 'var(--color-on-surface-variant)' } as const;
 const cardStyle = { borderColor: 'var(--color-outline-variant)' } as const;
 
-export default function BuyReceiptDetail({ adminBasePath, initialReceipt }: { adminBasePath: string; initialReceipt: BuyReceiptRow }) {
+export default function BuyReceiptDetail({
+  adminBasePath,
+  initialReceipt,
+  thankYouNote,
+}: {
+  adminBasePath: string;
+  initialReceipt: BuyReceiptRow;
+  /** "Note for the thank-you email" (2026-11-25): beside the paper, never on it. */
+  thankYouNote?: ThankYouNoteState;
+}) {
   const [receipt, setReceipt] = useState(initialReceipt);
   /** The "Emailed to …" viewer pop-up (2026-11-21). */
   const [viewingEmail, setViewingEmail] = useState(false);
@@ -88,6 +99,13 @@ export default function BuyReceiptDetail({ adminBasePath, initialReceipt }: { ad
     }
     setReceipt(result.receipt);
     setDraft(null);
+    // The items may have changed: its queued thank-you's AI opening is written again (2026-11-25).
+    // Through the follow-ups route — the buy-receipt routes never use the service role. Best effort.
+    void fetch('/api/admin/follow-ups/openings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: 'buy_receipt', id: receipt.id }),
+    }).catch(() => null);
   }
 
   async function pickPhoto(photo: Blob) {
@@ -249,6 +267,9 @@ export default function BuyReceiptDetail({ adminBasePath, initialReceipt }: { ad
             <div className="border bg-white p-4" style={cardStyle}>
               <ReceiptPrintControls receipt={receipt} onChanged={setReceipt} />
             </div>
+
+            {/* Internal only: beside the paper, never part of it (lib/thank-you-note.ts). */}
+            {!isVoid && thankYouNote && <ThankYouNoteCard kind="buy_receipt" id={receipt.id} initial={thankYouNote} compact />}
 
             {emailNote && (
               <p role={emailNote.ok ? 'status' : 'alert'} className="text-right text-sm" style={{ color: emailNote.ok ? 'var(--color-primary)' : 'var(--color-error)' }}>

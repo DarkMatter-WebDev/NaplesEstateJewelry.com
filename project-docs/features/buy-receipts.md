@@ -9,6 +9,9 @@
 > forwarded too). Same day: **Cash App and PayPal** added to "Paid by", and a
 > **Delete** button on every Log row (see *Deleting*). Deployed the same
 > afternoon (owner: "pushed and deployed, verified live"); no SQL.
+> 2026-11-25 — **Customer input mode REMOVED** (owner: no longer used since
+> "Fill form from ID"); **"Note for the thank-you email"** box added beside the
+> paper (internal only, never printed — see *Note for the thank-you email*).
 > 2026-10-03, later: **Customer input mode** — one optional button on the New
 > receipt form that hands the tablet to the seller on a locked screen (see
 > *Customer input mode*). **DEPLOYED** that evening (owner: "pushed and
@@ -180,7 +183,20 @@ thumbprint strip). The phone rules lay the strips out by their own classes
 (`brs-strip`, `brs-strip-text`, `brs-strip-check`, `brs-strip-btn`) instead.
 Guard: `lib/__tests__/buy-receipt-phone-layout.test.ts`.
 
+## Note for the thank-you email (2026-11-25)
+
+An optional one-line note (e.g. *"her late mother's ring"*) that only the AI
+writing the follow-up thank-you's opening reads (`features/follow-ups.md`). It
+sits in a card BESIDE the paper — the "Receipt saved" panel after a save, and the
+receipt's own page (not on a void receipt). ⛔ **Never printed, never emailed as
+written:** not on the shop copy, the seller's copy, the Print Station or the
+emailed copy. It is a separate column (`buy_receipts.thank_you_note`), not the
+receipt's **Notes** field — Notes PRINTS on the receipt. Needs
+`supabase/follow-ups-ai-openings-2026-11.sql`.
+
 ## Customer input mode (2026-10-03)
+
+> ⛔ **REMOVED 2026-11-25** (owner: "we can remove customer mode from the buy receipts... I don't use it anymore now that the form gets filled from the ID"). The button, the locked screen, the lock cookie + proxy bounce, the `requireAdmin` lock check, the route, the tab guard and the staff code are all gone; what follows is history. How to bring it back: `CHANGELOG.md` 2026-11-25 (1) → *To reverse*.
 
 Owner: *"i want to be able to enter a 'customer input mode' on the buy receipt
 input… show the customer entry fields only… lock the screen to be

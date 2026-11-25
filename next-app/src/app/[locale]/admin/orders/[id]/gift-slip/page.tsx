@@ -5,7 +5,6 @@ import { getVerifiedUser } from '@/lib/auth-claims';
 import { loadOrderGift } from '@/lib/order-gift-server';
 import { loadOrderLanguage, loadSpanishItemTitles } from '@/lib/order-language-server';
 import { itemTitleIn, printLanguage } from '@/lib/order-language';
-import CustomerModeTabGuard from '@/components/admin/buy-receipts/CustomerModeTabGuard';
 import GiftSlipClient from './GiftSlipClient';
 
 export const metadata: Metadata = { title: 'Gift Slip' };
@@ -66,7 +65,6 @@ export default async function AdminOrderGiftSlipPage({ params, searchParams }: P
         basePath={`${adminBasePath}/orders/${id}/gift-slip`}
       />
       {/* No admin menu on this page, so the guard the menu carries is added here. Draws nothing. */}
-      <CustomerModeTabGuard />
     </>
   );
 }

@@ -34,7 +34,7 @@ import type { BuyReceiptRow } from '@/lib/buy-receipts';
  * Admin → Instant Sale → Trade-in sale (owner, 2026-11-21, option C mockup 1:
  * "Yes, build it"). A customer trades gold toward a purchase:
  * - LEFT, the buy receipt — the very form Buy Receipts uses (`BuyReceiptForm`
- *   in trade mode): seller boxes, ID photo, thumbprint, customer input mode,
+ *   in trade mode): seller boxes, ID photo, thumbprint,
  *   the Spanish copy, print sets. Its "Paid by" starts with the locked
  *   trade-in credit.
  * - RIGHT, what they buy (the In-store sale's item box, pickup only) and the

@@ -63,8 +63,8 @@ const FAQ_ITEMS = [
   {
     questionEn: 'What areas do you serve?',
     questionEs: '¿Qué áreas sirven?',
-    answerEn: 'Our showroom is at 6240 Shirley St, Ste 104 in Naples, inside Sharon Lynch Collections — open during showroom hours or by appointment. We also buy throughout Southwest Florida — Marco Island, Bonita Springs, Estero, Fort Myers, Cape Coral, and surrounding communities — with home visits on request, and for larger collections or estate liquidations we will travel further.',
-    answerEs: 'Nuestro salón está en 6240 Shirley St, Ste 104 en Naples, dentro de Sharon Lynch Collections — abierto durante el horario del salón o con cita. También compramos en todo el suroeste de Florida — Marco Island, Bonita Springs, Estero, Fort Myers, Cape Coral y comunidades aledañas — con visitas a domicilio a pedido, y para colecciones más grandes o liquidaciones de patrimonio viajamos más lejos.',
+    answerEn: 'Our showroom is at 6240 Shirley St, Ste 104 in Naples — open during showroom hours or by appointment. We also buy throughout Southwest Florida — Marco Island, Bonita Springs, Estero, Fort Myers, Cape Coral, and surrounding communities — with home visits on request, and for larger collections or estate liquidations we will travel further.',
+    answerEs: 'Nuestro salón está en 6240 Shirley St, Ste 104 en Naples — abierto durante el horario del salón o con cita. También compramos en todo el suroeste de Florida — Marco Island, Bonita Springs, Estero, Fort Myers, Cape Coral y comunidades aledañas — con visitas a domicilio a pedido, y para colecciones más grandes o liquidaciones de patrimonio viajamos más lejos.',
   },
   {
     questionEn: 'Do I need a formal evaluation before contacting you?',

@@ -8,12 +8,16 @@
  * so all of it is tested without a database. The database / sending half is
  * `lib/follow-ups-server.ts`.
  *
- * ⛔ Google's review policy: every seller / buyer gets the SAME email. The
- * review is asked "if you have a minute", never "if you enjoyed it", and there
- * is no happy → Google / unhappy → private split ("review gating"). No reward
- * for reviewing (FTC 16 CFR 465). The review link is in step 1 only.
+ * ⛔ Google's review policy: every seller / buyer gets the SAME review request
+ * (2026-11-25: a direct ask with a button — "Would you take a moment to share
+ * your experience?" — on a friend's advice, owner's yes), never "if you enjoyed
+ * it", and there is no happy → Google / unhappy → private split ("review
+ * gating"). No reward for reviewing (FTC 16 CFR 465). The review is in step 1
+ * only. Only the OPENING line is written per person (by the AI, from the
+ * receipt / order — `lib/follow-up-opening.ts`); the review request is fixed.
  */
 
+import { addressOneLine } from '@/lib/business-location';
 import { escapeHtml } from '@/lib/marketing-email-html';
 import { formatSocialScheduleInput, parseSocialScheduleInput } from '@/lib/social-queue-schedule';
 
@@ -69,6 +73,8 @@ export type FollowUpSettings = {
   buyerStep2: boolean;
   sellerDelay: FollowUpDelay;
   buyerDelay: FollowUpDelay;
+  /** The AI writes each thank-you's opening line (2026-11-25); off = the standard line for everyone. */
+  aiOpenings: boolean;
   /** Only the templates the owner edited; the rest use DEFAULT_FOLLOW_UP_TEMPLATES. */
   templates: Partial<Record<FollowUpTemplateKey, FollowUpTemplate>>;
   startedAt: string | null;
@@ -84,6 +90,7 @@ export const DEFAULT_FOLLOW_UP_SETTINGS: FollowUpSettings = {
   buyerStep2: false,
   sellerDelay: 'next_morning',
   buyerDelay: 'next_morning',
+  aiOpenings: true,
   templates: {},
   startedAt: null,
   updatedAt: null,
@@ -125,6 +132,8 @@ export function settingsFromRow(row: Record<string, unknown> | null | undefined)
     buyerStep2: bool(row.buyer_step2, false),
     sellerDelay: normalizeDelay(row.seller_delay),
     buyerDelay: normalizeDelay(row.buyer_delay),
+    // Before supabase/follow-ups-ai-openings-2026-11.sql the column is missing → on (the code then finds nothing to store into and uses the standard line).
+    aiOpenings: bool(row.ai_openings, true),
     templates: normalizeTemplates(row.templates),
     startedAt: typeof row.started_at === 'string' ? row.started_at : null,
     updatedAt: typeof row.updated_at === 'string' ? row.updated_at : null,
@@ -132,7 +141,7 @@ export function settingsFromRow(row: Record<string, unknown> | null | undefined)
   };
 }
 
-export type FollowUpSettingsPatch = Partial<Pick<FollowUpSettings, 'autoSend' | 'sellerStep1' | 'sellerStep2' | 'buyerStep1' | 'buyerStep2' | 'sellerDelay' | 'buyerDelay'>> & {
+export type FollowUpSettingsPatch = Partial<Pick<FollowUpSettings, 'autoSend' | 'sellerStep1' | 'sellerStep2' | 'buyerStep1' | 'buyerStep2' | 'sellerDelay' | 'buyerDelay' | 'aiOpenings'>> & {
   /** One template to save; `null` resets that one to the default. */
   template?: { key: FollowUpTemplateKey; value: FollowUpTemplate | null };
 };
@@ -151,6 +160,7 @@ export function settingsPatchToRow(
     ['sellerStep2', 'seller_step2'],
     ['buyerStep1', 'buyer_step1'],
     ['buyerStep2', 'buyer_step2'],
+    ['aiOpenings', 'ai_openings'],
   ];
   for (const [key, column] of flags) {
     if (input[key] === undefined) continue;
@@ -299,7 +309,11 @@ export const FOLLOW_UP_TOKENS: Array<{ token: string; help: string }> = [
   { token: '{when}', help: 'today · yesterday · on Monday · recently' },
   { token: '{item}', help: 'Buyers: the piece they bought ("14K rope chain and 1 more piece")' },
   { token: '{phone}', help: '(239) 404-8505' },
+  { token: '{opening}', help: 'The personal opening line the AI wrote for this person (or the standard line) — shown in Upcoming' },
+  { token: '{review_button}', help: 'On its own line: the "Share your experience on Google" button' },
   { token: '{review_link}', help: 'The Google review link, as the words "share your experience on Google"' },
+  { token: '{help_box}', help: 'On its own line: the "Here whenever you need us" box (phone + address)' },
+  { token: '{extras}', help: 'On its own line: "A couple of things for later" — the guides + pass the number along' },
 ];
 
 const KNOWN_TOKENS = new Set(FOLLOW_UP_TOKENS.map((entry) => entry.token));
@@ -313,9 +327,13 @@ export function findUnknownToken(text: string): string | null {
 }
 
 /**
- * The built-in wording (mockup 1, style A — "a note from Chris"). The owner can
- * edit any of them in Admin → Follow-ups → Edit emails; an edit is stored in
- * `follow_up_settings.templates` and "Reset to ours" removes it.
+ * The built-in wording. Step 1 = "Rob's blend" (owner, 2026-11-25, mockup 1):
+ * the personal opening ({opening} — AI-written per person, or the standard
+ * line), the review as a direct ask with a button, the "Here whenever you need
+ * us" box BELOW the review, two small cards for later, and "Chris, and the
+ * Naples Estate Jewelry Team". Was style A ("a note from Chris", 2026-11-24).
+ * The owner can edit any of them in Admin → Follow-ups → Edit emails; an edit
+ * is stored in `follow_up_settings.templates` and "Reset to ours" removes it.
  * Spanish: written here, ◻ translator review open (TASKS).
  */
 export const DEFAULT_FOLLOW_UP_TEMPLATES: Record<FollowUpTemplateKey, FollowUpTemplate> = {
@@ -323,20 +341,26 @@ export const DEFAULT_FOLLOW_UP_TEMPLATES: Record<FollowUpTemplateKey, FollowUpTe
     subject: 'Thank you, {first_name}',
     body: [
       'Hi {first_name},',
-      'Thank you for coming in {when} and trusting us with your jewelry. I hope the visit was easy and that you left feeling you were treated fairly.',
-      "If any question comes up about your receipt — or you find more pieces you'd like us to look at — just reply to this email, or call or text me at {phone}.",
-      'And if you have a minute, a few words about your visit on Google would mean a lot. It helps other families in Naples find someone they can trust: {review_link}.',
-      'Thank you again,\nChris',
+      '{opening}',
+      'If any questions come up about your visit or your receipt, just reply to this email, or call or text me at {phone}.',
+      "As a small local business, your review means the world to us. It's how other Naples families find someone they can trust. Would you take a moment to share your experience?",
+      '{review_button}',
+      '{help_box}',
+      '{extras}',
+      'Thank you again,\nChris\nand the Naples Estate Jewelry Team',
     ].join('\n\n'),
   },
   'seller-1-es': {
     subject: 'Gracias, {first_name}',
     body: [
       'Hola {first_name}:',
-      'Gracias por visitarnos {when} y por confiarnos sus joyas. Espero que la visita haya sido sencilla y que se haya ido sintiendo que lo tratamos con justicia.',
-      'Si le surge cualquier pregunta sobre su recibo — o encuentra más piezas que quiera que veamos — simplemente responda a este correo, o llámeme o envíeme un mensaje de texto al {phone}.',
-      'Y si tiene un minuto, unas palabras sobre su visita en Google significarían mucho. Ayudan a otras familias de Naples a encontrar a alguien de confianza: {review_link}.',
-      'Gracias de nuevo,\nChris',
+      '{opening}',
+      'Si le surge alguna pregunta sobre su visita o su recibo, solo responda a este correo, o llámeme o envíeme un mensaje de texto al {phone}.',
+      'Como pequeño negocio local, su reseña significa muchísimo para nosotros. Así es como otras familias de Naples encuentran a alguien de confianza. ¿Podría tomarse un momento para compartir su experiencia?',
+      '{review_button}',
+      '{help_box}',
+      '{extras}',
+      'Gracias de nuevo,\nChris\ny el equipo de Naples Estate Jewelry',
     ].join('\n\n'),
   },
   'seller-2-en': {
@@ -361,20 +385,26 @@ export const DEFAULT_FOLLOW_UP_TEMPLATES: Record<FollowUpTemplateKey, FollowUpTe
     subject: 'Thank you, {first_name} — I hope you love it',
     body: [
       'Hi {first_name},',
-      "Thank you for buying your {item} from us. I hope it's everything you hoped for.",
-      "If anything isn't right, or you have a question about it, just reply to this email or call or text me at {phone}.",
-      'And if you have a minute, a few words on Google would mean a lot — it helps other people find us: {review_link}.',
-      'Thank you again,\nChris',
+      '{opening}',
+      'If any questions come up about your order, just reply to this email, or call or text me at {phone}.',
+      "As a small local business, your review means the world to us. It's how other people find someone they can trust. Would you take a moment to share your experience?",
+      '{review_button}',
+      '{help_box}',
+      '{extras}',
+      'Thank you again,\nChris\nand the Naples Estate Jewelry Team',
     ].join('\n\n'),
   },
   'buyer-1-es': {
     subject: 'Gracias, {first_name} — espero que le encante',
     body: [
       'Hola {first_name}:',
-      'Gracias por comprarnos su {item}. Espero que sea todo lo que esperaba.',
-      'Si algo no está bien, o tiene alguna pregunta, simplemente responda a este correo o llámeme o envíeme un mensaje de texto al {phone}.',
-      'Y si tiene un minuto, unas palabras en Google significarían mucho — ayudan a otras personas a encontrarnos: {review_link}.',
-      'Gracias de nuevo,\nChris',
+      '{opening}',
+      'Si le surge alguna pregunta sobre su pedido, solo responda a este correo, o llámeme o envíeme un mensaje de texto al {phone}.',
+      'Como pequeño negocio local, su reseña significa muchísimo para nosotros. Así es como otras personas encuentran a alguien de confianza. ¿Podría tomarse un momento para compartir su experiencia?',
+      '{review_button}',
+      '{help_box}',
+      '{extras}',
+      'Gracias de nuevo,\nChris\ny el equipo de Naples Estate Jewelry',
     ].join('\n\n'),
   },
   'buyer-2-en': {
@@ -417,9 +447,14 @@ export function firstNameOf(name: string | null | undefined): string | null {
   return first.toLowerCase().replace(/(^|[-'’])(\p{L})/gu, (_, sep: string, letter: string) => `${sep}${letter.toUpperCase()}`);
 }
 
+/** A listing title as an email names it: no stray trailing " -", ",", "|" (2026-11-24 (10): "…Braceleter -"). */
+export function cleanItemTitle(title: string | null | undefined): string {
+  return String(title ?? '').trim().replace(/[\s\-–—,;:/|]+$/u, '').trim();
+}
+
 /** "14K rope chain" / "14K rope chain and 2 more pieces" / "piece". */
 export function itemPhrase(titles: Array<string | null | undefined>, language: FollowUpLanguage): string {
-  const clean = titles.map((title) => String(title ?? '').trim()).filter(Boolean);
+  const clean = titles.map(cleanItemTitle).filter(Boolean);
   if (clean.length === 0) return language === 'es' ? 'pieza' : 'piece';
   const first = clean[0].length > 80 ? `${clean[0].slice(0, 77).trimEnd()}…` : clean[0];
   const more = clean.length - 1;
@@ -446,6 +481,29 @@ const FOOTER_WORDS: Record<FollowUpLanguage, { seller: string; buyer: string; un
   },
 };
 
+/** "your piece" / "your pieces" — the standard line names no piece (2026-11-25: not every seller brings jewelry — tea sets, flatware…). */
+export function piecesWord(count: number | null | undefined, language: FollowUpLanguage): string {
+  const one = count === 1;
+  if (language === 'es') return one ? 'su pieza' : 'sus piezas';
+  return one ? 'your piece' : 'your pieces';
+}
+
+/**
+ * The opening used when there is no AI-written / owner-written one: the AI is
+ * off or not set up, its text failed a check, or the SQL has not run.
+ * `{when}` / `{item}` are filled by the renderer.
+ */
+export function standardOpening(audience: FollowUpAudience, language: FollowUpLanguage, pieceCount: number | null | undefined): string {
+  if (audience === 'buyer') {
+    return language === 'es'
+      ? 'Gracias por comprarnos su {item}. Espero que sea todo lo que esperaba.'
+      : "Thank you for buying your {item} from us. I hope it's everything you hoped for.";
+  }
+  return language === 'es'
+    ? `Fue un placer conocerle {when}. Gracias por visitarnos y por confiarnos ${piecesWord(pieceCount, 'es')}.`
+    : `It was a pleasure meeting you {when}. Thank you for coming in and trusting us with ${piecesWord(pieceCount, 'en')}.`;
+}
+
 export type FollowUpRenderInput = {
   audience: FollowUpAudience;
   language: FollowUpLanguage;
@@ -458,6 +516,12 @@ export type FollowUpRenderInput = {
   unsubscribeUrl: string;
   businessName: string;
   mailingAddress: string;
+  /** The AI- or owner-written opening (may hold {when} / {first_name}); null/blank = the standard line. */
+  opening?: string | null;
+  /** Lines on the buy receipt — "your piece" vs "your pieces" in the standard line. Unknown = plural. */
+  pieceCount?: number | null;
+  /** `/guides` on the site (the "Our free guides" card). */
+  guidesUrl?: string;
 };
 
 export type RenderedFollowUp = { subject: string; html: string; text: string };
@@ -474,13 +538,69 @@ function tidy(text: string): string {
     .trim();
 }
 
-/** The email as it goes out: style A (a plain note), the footer added here. */
+const REVIEW_BUTTON_WORDS: Record<FollowUpLanguage, string> = {
+  en: 'Share your experience on Google',
+  es: 'Compartir su experiencia en Google',
+};
+
+type BlockWords = {
+  helpTitle: string;
+  help: Record<FollowUpAudience, string>;
+  laterIntro: string;
+  guidesTitle: string;
+  guidesLink: string;
+  passTitle: Record<FollowUpAudience, string>;
+  pass: Record<FollowUpAudience, string>;
+};
+
+const BLOCK_WORDS: Record<FollowUpLanguage, BlockWords> = {
+  en: {
+    helpTitle: 'Here whenever you need us',
+    help: {
+      seller: 'More pieces to look at, now or down the road? Come by the showroom, or call / text {phone}.',
+      buyer: 'Sizing, a cleaning or a clasp check? Bring it by, or call / text {phone}.',
+    },
+    laterIntro: 'A couple of things for later:',
+    guidesTitle: 'Our free guides',
+    guidesLink: 'How to read gold and silver marks, and more',
+    passTitle: { seller: 'Know someone with pieces to sell?', buyer: 'Ready to sell something?' },
+    pass: { seller: "Pass along {phone} — I'm happy to help.", buyer: 'We buy too — call or text {phone}.' },
+  },
+  es: {
+    helpTitle: 'Aquí cuando nos necesite',
+    help: {
+      seller: '¿Más piezas para que veamos, ahora o más adelante? Venga a la tienda, o llame / envíe un mensaje de texto al {phone}.',
+      buyer: '¿La talla, una limpieza o revisar el broche? Tráigala, o llame / envíe un mensaje de texto al {phone}.',
+    },
+    laterIntro: 'Un par de cosas para más adelante:',
+    guidesTitle: 'Nuestras guías gratuitas',
+    guidesLink: 'Cómo leer las marcas del oro y la plata, y más',
+    passTitle: { seller: '¿Conoce a alguien con piezas para vender?', buyer: '¿Listo para vender algo?' },
+    pass: { seller: 'Compártale el {phone} — con gusto le ayudo.', buyer: 'También compramos — llame o envíe un mensaje de texto al {phone}.' },
+  },
+};
+
+const BLOCK_TOKENS = ['{review_button}', '{help_box}', '{extras}'] as const;
+type BlockToken = (typeof BLOCK_TOKENS)[number];
+
+const FONT = 'font-family:Arial,Helvetica,sans-serif;';
+const GOLD = '#735c00';
+
+/**
+ * The email as it goes out. Paragraphs are separated by a blank line; a
+ * paragraph that is exactly `{review_button}`, `{help_box}` or `{extras}` is a
+ * block (button / box / cards). The footer is added here.
+ */
 export function renderFollowUp(template: FollowUpTemplate, input: FollowUpRenderInput): RenderedFollowUp {
   const firstName = firstNameOf(input.name);
   const when = relativeDayWord(input.eventAt, input.sendAt, input.language);
-  const item = input.item ?? itemPhrase([], input.language);
+  const item = cleanItemTitle(input.item) || itemPhrase([], input.language);
   const reviewWords = REVIEW_WORDS[input.language];
+  const buttonWords = REVIEW_BUTTON_WORDS[input.language];
   const footer = FOOTER_WORDS[input.language];
+  const words = BLOCK_WORDS[input.language];
+  const guidesUrl = input.guidesUrl ?? '';
+  const helpAddress = addressOneLine();
 
   const plainValues: Record<string, string> = {
     '{first_name}': firstName ?? (input.language === 'es' ? '' : 'there'),
@@ -488,15 +608,34 @@ export function renderFollowUp(template: FollowUpTemplate, input: FollowUpRender
     '{item}': item,
     '{phone}': input.phone,
   };
+  const customOpening = String(input.opening ?? '').replace(/\s+/g, ' ').trim();
+  // The opening may itself hold {when} / {first_name} / {item}: filled in its own pass.
+  plainValues['{opening}'] = tidy(fillTokens(customOpening || standardOpening(input.audience, input.language, input.pieceCount), plainValues));
 
   // Subject: plain text, and a missing name drops cleanly ("Thank you, " → "Thank you").
-  const subjectRaw = fillTokens(template.subject, { ...plainValues, '{first_name}': firstName ?? '', '{review_link}': reviewWords });
+  const subjectRaw = fillTokens(template.subject, { ...plainValues, '{first_name}': firstName ?? '', '{review_link}': reviewWords, '{review_button}': reviewWords, '{help_box}': '', '{extras}': '' });
   const subject = subjectRaw.replace(/,\s*(—|$)/, (_m, dash: string) => (dash ? ` ${dash}` : '')).replace(/\s{2,}/g, ' ').trim();
 
   const paragraphs = template.body.replace(/\r\n/g, '\n').split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+  const isBlock = (paragraph: string): paragraph is BlockToken => (BLOCK_TOKENS as readonly string[]).includes(paragraph);
+  const hasHelpBox = paragraphs.includes('{help_box}');
+  // Inline (not on their own line) the block words read as plain words.
+  const inlineText = { '{review_button}': `${reviewWords} (${input.reviewUrl})`, '{help_box}': '', '{extras}': '' };
 
+  // ---- Plain text ----
+  const textBlock = (token: BlockToken): string => {
+    if (token === '{review_button}') return `${buttonWords}: ${input.reviewUrl}`;
+    if (token === '{help_box}') return [words.helpTitle, fillTokens(words.help[input.audience], plainValues), helpAddress].join('\n');
+    return [
+      words.laterIntro,
+      `- ${words.guidesTitle} — ${words.guidesLink}${guidesUrl ? `: ${guidesUrl}` : ''}`,
+      `- ${words.passTitle[input.audience]} ${fillTokens(words.pass[input.audience], plainValues)}`,
+    ].join('\n');
+  };
   const textParagraphs = paragraphs.map((paragraph) =>
-    tidy(fillTokens(paragraph, { ...plainValues, '{review_link}': `${reviewWords} (${input.reviewUrl})` })),
+    isBlock(paragraph)
+      ? textBlock(paragraph)
+      : tidy(fillTokens(paragraph, { ...plainValues, ...inlineText, '{review_link}': `${reviewWords} (${input.reviewUrl})` })),
   );
   const text = [
     ...textParagraphs,
@@ -506,30 +645,86 @@ export function renderFollowUp(template: FollowUpTemplate, input: FollowUpRender
     `${footer.unsubscribe}: ${input.unsubscribeUrl}`,
   ].join('\n\n');
 
-  const link = `<a href="${escapeHtml(input.reviewUrl)}" style="color:#735c00;text-decoration:underline;">${escapeHtml(reviewWords)}</a>`;
+  // ---- HTML ----
+  const link = `<a href="${escapeHtml(input.reviewUrl)}" style="color:${GOLD};text-decoration:underline;">${escapeHtml(reviewWords)}</a>`;
   // The link goes in AFTER escaping, through a marker escaping leaves alone.
   const marker = '\u0000review\u0000';
-  const paragraphStyle = 'margin:0 0 16px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.6;color:#222222;';
+  const paragraphStyle = `margin:0 0 16px;${FONT}font-size:16px;line-height:1.6;color:#222222;`;
+  // The phone number never breaks across lines on a narrow phone ("(239) 404-" / "8505", 2026-11-25 (4)).
+  const phoneEscaped = escapeHtml(input.phone);
+  const keepPhone = (html: string): string =>
+    phoneEscaped ? html.split(phoneEscaped).join(`<span style="white-space:nowrap;">${phoneEscaped}</span>`) : html;
+  const htmlBlock = (token: BlockToken): string => {
+    if (token === '{review_button}') {
+      return `<p style="margin:4px 0 22px;"><a href="${escapeHtml(input.reviewUrl)}" style="display:inline-block;border:2px solid ${GOLD};color:${GOLD};padding:11px 20px;${FONT}font-size:15px;font-weight:bold;text-decoration:none;border-radius:3px;text-align:center;">${escapeHtml(buttonWords)}</a></p>`;
+    }
+    if (token === '{help_box}') {
+      return `<div style="border:1px solid #e7dfcf;background:#fcfaf4;padding:14px 16px;margin:0 0 22px;border-radius:3px;">`
+        + `<p style="margin:0 0 4px;${FONT}font-size:15px;font-weight:bold;color:#222222;">${escapeHtml(words.helpTitle)}</p>`
+        + `<p style="margin:0;${FONT}font-size:14.5px;line-height:1.55;color:#333333;">${keepPhone(escapeHtml(fillTokens(words.help[input.audience], plainValues)))}<br />${escapeHtml(helpAddress)}</p>`
+        + '</div>';
+    }
+    const card = (icon: string, title: string, body: string) =>
+      `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e7dfcf;border-collapse:separate;border-radius:3px;margin:0 0 10px;">`
+      + `<tr><td width="44" valign="top" style="padding:11px 0 11px 14px;"><div style="width:30px;height:30px;border-radius:15px;background:#f3ead0;color:${GOLD};font-family:Georgia,'Times New Roman',serif;font-size:15px;line-height:30px;text-align:center;">${icon}</div></td>`
+      + `<td valign="top" style="padding:11px 14px 11px 10px;${FONT}"><div style="font-size:14.5px;font-weight:bold;color:#222222;margin:0 0 2px;">${escapeHtml(title)}</div>${body}</td></tr></table>`;
+    const guides = guidesUrl
+      ? `<a href="${escapeHtml(guidesUrl)}" style="font-size:14px;color:${GOLD};text-decoration:underline;">${escapeHtml(words.guidesLink)}</a>`
+      : `<span style="font-size:14px;color:#333333;">${escapeHtml(words.guidesLink)}</span>`;
+    return `<p style="margin:0 0 10px;${FONT}font-size:15px;color:#444444;">${escapeHtml(words.laterIntro)}</p>`
+      + card('G', words.guidesTitle, guides)
+      + card('&#9742;', words.passTitle[input.audience], `<span style="font-size:14px;color:#333333;">${keepPhone(escapeHtml(fillTokens(words.pass[input.audience], plainValues)))}</span>`)
+      + '<div style="height:12px;line-height:12px;font-size:1px;">&nbsp;</div>';
+  };
   const htmlParagraphs = paragraphs.map((paragraph) => {
-    const lines = tidy(fillTokens(paragraph, { ...plainValues, '{review_link}': marker })).split('\n').map((line) => line.trim());
+    if (isBlock(paragraph)) return htmlBlock(paragraph);
+    const lines = tidy(fillTokens(paragraph, { ...plainValues, '{review_button}': marker, '{help_box}': '', '{extras}': '', '{review_link}': marker })).split('\n').map((line) => line.trim());
     const rendered = lines.map((line) => {
       if (line === 'Chris') return `<span style="font-family:Georgia,'Times New Roman',serif;font-size:19px;color:#222222;">Chris</span>`;
-      return escapeHtml(line).split(marker).join(link);
+      return keepPhone(escapeHtml(line)).split(marker).join(link);
     });
     return `<p style="${paragraphStyle}">${rendered.join('<br />')}</p>`;
   });
+
+  // The small name · phone line under the sign-off — not needed when the help box already gives the phone.
+  const signLine = hasHelpBox
+    ? ''
+    : `<p style="margin:4px 0 0;${FONT}font-size:13px;line-height:1.5;color:#666666;">${escapeHtml(input.businessName)} &middot; <span style="white-space:nowrap;">${escapeHtml(input.phone)}</span></p>\n`;
 
   const html = `<!DOCTYPE html><html lang="${input.language}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(subject)}</title></head>
 <body style="margin:0;padding:0;background:#ffffff;">
 <div style="max-width:560px;margin:0 auto;padding:28px 22px 24px;">
 ${htmlParagraphs.join('\n')}
-<p style="margin:4px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;color:#666666;">${escapeHtml(input.businessName)} &middot; <span style="white-space:nowrap;">${escapeHtml(input.phone)}</span></p>
-<hr style="border:0;border-top:1px solid #e7dfcf;margin:26px 0 14px;" />
-<p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.55;color:#6f675c;">${escapeHtml(input.businessName)}<br />${escapeHtml(input.mailingAddress)}<br />${escapeHtml(footer[input.audience])} <a href="${escapeHtml(input.unsubscribeUrl)}" style="color:#735c00;">${escapeHtml(footer.unsubscribe)}</a></p>
+${signLine}<hr style="border:0;border-top:1px solid #e7dfcf;margin:26px 0 14px;" />
+<p style="margin:0;${FONT}font-size:12px;line-height:1.55;color:#6f675c;">${escapeHtml(input.businessName)}<br />${escapeHtml(input.mailingAddress)}<br />${escapeHtml(footer[input.audience])} <a href="${escapeHtml(input.unsubscribeUrl)}" style="color:${GOLD};">${escapeHtml(footer.unsubscribe)}</a></p>
 </div>
 </body></html>`;
 
   return { subject, html, text };
+}
+
+// ---- Opt-outs (pure) ----
+
+export type OptOut = { kind: 'unsubscribed' | 'stopped' | 'bounced'; at: string | null };
+
+/** The reason a blocked follow-up shows in the log. */
+export function optOutReason(optOut: OptOut): string {
+  if (optOut.kind === 'stopped') return 'Follow-ups stopped for this person.';
+  if (optOut.kind === 'bounced') return 'Email bounced — this address cannot receive mail.';
+  return 'Unsubscribed.';
+}
+
+/**
+ * Which wins when an address is blocked for more than one reason: the owner's
+ * own Stop, then a bounce (2026-11-24 (10): Tina Soriano read "Unsubscribed"
+ * when her receipt had hard-bounced — a bounce ALSO runs the unsubscribe code,
+ * so it must be named first), then an unsubscribe.
+ */
+export function strongerOptOut(current: OptOut | undefined, next: OptOut): OptOut {
+  const rank = { stopped: 3, bounced: 2, unsubscribed: 1 } as const;
+  if (!current || rank[next.kind] > rank[current.kind]) return next;
+  if (rank[next.kind] === rank[current.kind] && !current.at && next.at) return next;
+  return current;
 }
 
 // ---- Buyer readiness --------------------------------------------------------

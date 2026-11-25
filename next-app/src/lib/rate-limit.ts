@@ -29,9 +29,8 @@ export type RateLimitState = 'ok' | 'limited' | 'unavailable';
  * "the limiter itself could not be reached". `checkRateLimit` treats both as a
  * refusal (fails closed); a caller that reads this instead decides for itself.
  *
- * Added for the buy receipt's staff-code keypad (2026-10-03): the code is
- * already behind an admin sign-in, and a limiter outage must not leave a
- * tablet that the right code cannot unlock.
+ * Added for the buy receipt's staff-code keypad (2026-10-03; that keypad went
+ * with "customer input mode" on 2026-11-25). Kept as a general helper.
  */
 export async function rateLimitState(
   key: string,

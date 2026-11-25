@@ -8,7 +8,6 @@ import {
   type BuyReceiptDraft,
   type BuyReceiptRow,
 } from '@/lib/buy-receipts';
-import { CUSTOMER_MODE_API } from '@/lib/buy-receipt-customer-mode';
 import { DRAFT_NOT_SAVED } from '@/lib/buy-receipt-drafts';
 import type { IdReadFields } from '@/lib/buy-receipt-id-read';
 import { THUMBPRINT_MAX_EDGE_PX } from '@/lib/buy-receipt-thumbprint';
@@ -45,8 +44,7 @@ export type CreateReceiptResult =
 /**
  * `emailCopy` asks the server to email the seller their copy as part of the
  * save; `mailingList` asks it to add the seller's email to the mailing list
- * (the "Mailing list" box is ticked — by the owner on the form, or by the
- * seller in customer input mode).
+ * (the "Mailing list" box is ticked on the form).
  */
 export async function createReceipt(
   draft: BuyReceiptDraft,
@@ -101,39 +99,6 @@ export async function finishDraftReceipt(id: string, draft: BuyReceiptDraft, ema
     return await recorded(await fetch(`/api/admin/buy-receipts/${id}`, json('PUT', { ...draft, emailCopy, mailingList })));
   } catch {
     return { error: OFFLINE };
-  }
-}
-
-/** Customer input mode: lock this browser before the tablet is handed over. */
-export async function startCustomerMode(): Promise<{ locked: true } | { error: string }> {
-  try {
-    const res = await fetch(CUSTOMER_MODE_API, { method: 'POST' });
-    const data = (await res.json().catch(() => ({}))) as { locked?: boolean; error?: string };
-    if (!res.ok || data.locked !== true) return { error: data.error ?? 'Could not start customer input mode.' };
-    return { locked: true };
-  } catch {
-    return { error: OFFLINE };
-  }
-}
-
-export type EndCustomerModeResult =
-  | { unlocked: true }
-  | { error: string; reason: 'wrong' | 'wait' | 'signed-out' | 'offline'; waitSeconds?: number };
-
-/** Customer input mode: the staff code, checked on the server. Only a right code unlocks the browser. */
-export async function endCustomerMode(code: string): Promise<EndCustomerModeResult> {
-  try {
-    const res = await fetch(CUSTOMER_MODE_API, json('DELETE', { code }));
-    const data = (await res.json().catch(() => ({}))) as { locked?: boolean; error?: string; waitSeconds?: number };
-    if (res.ok && data.locked === false) return { unlocked: true };
-    if (res.status === 429) {
-      return { error: data.error ?? 'Too many tries. Wait half a minute, then try again.', reason: 'wait', waitSeconds: data.waitSeconds ?? 30 };
-    }
-    if (res.status === 401) return { error: 'The sign-in on this device has ended. Sign in again, then enter the code.', reason: 'signed-out' };
-    if (res.status === 403) return { error: data.error ?? 'That code is not right.', reason: 'wrong' };
-    return { error: data.error ?? 'The code could not be checked. Try again.', reason: 'offline' };
-  } catch {
-    return { error: OFFLINE, reason: 'offline' };
   }
 }
 

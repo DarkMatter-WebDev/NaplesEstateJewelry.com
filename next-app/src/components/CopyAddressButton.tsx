@@ -15,11 +15,8 @@ const CONFIRM_MS = 2200;
 /**
  * Small icon button that copies the showroom address to the clipboard.
  *
- * ⚠️ It copies `addressOneLine()` — the street and city ONLY, with no landmark
- * and no business name. What gets pasted almost always goes into a maps app or
- * a GPS, and "· inside Sharon Lynch Collections" is wayfinding for a human
- * reading the page, not something a geocoder should be handed. The landmark
- * stays visible next to the button; it just does not travel.
+ * ⚠️ It copies `addressOneLine()` — the street and city ONLY, with no business
+ * name. What gets pasted almost always goes into a maps app or a GPS.
  *
  * Uses the existing `lib/clipboard` helper rather than calling
  * `navigator.clipboard` directly: that helper already falls back to a hidden

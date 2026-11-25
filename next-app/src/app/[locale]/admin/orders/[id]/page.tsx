@@ -18,6 +18,8 @@ import { SPLIT_PAYMENTS_COLUMN, TRADE_IN_COLUMN, withBullionFlags } from '@/lib/
 import { loadBullionLineIds } from '@/lib/bullion-sale-server';
 import AdminHeader from '@/components/admin/AdminHeader';
 import type { Order, OrderItem } from '@/types/sales';
+import { loadOrderChanges } from '@/lib/order-edit-server';
+import { loadThankYouNote } from '@/lib/thank-you-note-server';
 import type { Product } from '@/types/product';
 import { calcSpotMeltValue } from '@/lib/pricing';
 import { fetchSpotData } from '@/lib/spot-price';
@@ -293,6 +295,8 @@ export default async function AdminOrderDetailPage({ params }: Props) {
         deliveryTrackingEnabled={isDeliveryTrackingConfigured()}
         deliveryEmails={await loadDeliveryEmailSetting(supabase, id)}
         pickup={isPickupOrder(order as unknown as Order) ? await loadOrderPickup(supabase, id) : undefined}
+        orderChanges={await loadOrderChanges(supabase, id)}
+        thankYouNote={await loadThankYouNote(createServiceClient(), 'order', id)}
       />
     </div>
   );

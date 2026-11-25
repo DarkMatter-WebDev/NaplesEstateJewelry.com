@@ -1,19 +1,14 @@
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getVerifiedUser } from '@/lib/auth-claims';
-import { CUSTOMER_MODE_COOKIE } from '@/lib/customer-mode-lock';
 
 /**
  * The gate every admin API route starts with.
  *
- * A browser in the buy receipt's customer input mode is refused even though it
- * is signed in as an admin (see `lib/customer-mode-lock.ts`): a seller holding
- * the tablet must not be able to read the back end by typing an API address.
- * `duringCustomerMode` is for the two calls that start and end that mode — no
- * other route may pass it.
+ * (Until 2026-11-25 it also refused a browser in the buy receipt's "customer
+ * input mode"; that mode and its lock cookie were removed — CHANGELOG.md.)
  */
-export async function requireAdmin(options: { duringCustomerMode?: boolean } = {}) {
+export async function requireAdmin() {
   const supabase = await createClient();
   const user = await getVerifiedUser(supabase);
 
@@ -29,15 +24,6 @@ export async function requireAdmin(options: { duringCustomerMode?: boolean } = {
 
   if (!profile?.is_admin) {
     return { error: NextResponse.json({ error: 'Admin access required.' }, { status: 403 }) };
-  }
-
-  if (!options.duringCustomerMode && (await cookies()).has(CUSTOMER_MODE_COOKIE)) {
-    return {
-      error: NextResponse.json(
-        { error: 'This device is in customer input mode. Open Buy Receipts and enter the staff code to unlock it.' },
-        { status: 423 },
-      ),
-    };
   }
 
   return { supabase, user };

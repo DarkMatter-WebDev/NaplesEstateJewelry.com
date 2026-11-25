@@ -1,8 +1,23 @@
 # Follow-ups — thank-you emails to sellers and shop buyers
 
-> Status: **BUILT + STAGED 2026-11-24 (9), not pushed.** ⛔ SQL
-> `supabase/follow-ups-2026-11.sql` must be run (owner) before the page works and
-> before anything is sent. No new environment variables. Owner-approved design:
+> **2026-11-25 (1) — BUILT + STAGED, not pushed; ⛔ SQL `supabase/follow-ups-ai-openings-2026-11.sql`:**
+> step 1 is now **Rob's blend** (a friend's review of mockups A/B/C, owner's yes):
+> a personal **opening line written by the AI** per person, the review as a direct
+> ask with a **button**, the **"Here whenever you need us"** box BELOW it, two small
+> cards (guides · pass the number along), and "Chris / and the Naples Estate
+> Jewelry Team". Plus the **"Note for the thank-you email"** box (internal only)
+> on receipts and orders. See *The opening line* below. `CHANGELOG.md` 2026-11-25 (1).
+> **2026-11-25 (2):** owner asked for the *"If any questions come up about your visit or
+> your receipt (buyers: your order), just reply to this email, or call or text me at {phone}."* line back —
+> it now sits right after the opening, BEFORE the review ask, so the email is not all
+> about the review; the help box no longer repeats it.
+>
+> Status before that: **PUSHED + DEPLOYED 2026-11-24 (10)** (owner ran `supabase/follow-ups-2026-11.sql`).
+> 🔴 The production check found the sweep cannot read `buy_receipts` (no
+> service-role grant, on purpose) → ⛔ owner runs
+> `supabase/follow-ups-receipts-grant-2026-11.sql` (nine columns, read only, no ID
+> data); until then nothing is queued. Sturdier sweep staged for the next push.
+> No new environment variables. Owner-approved design:
 > mockup 1 (2026-11-24), email style **A — a note from Chris**, all seven default
 > answers. Record `CHANGELOG.md` 2026-11-24 (9); rules `DECISIONS.md` →
 > *Follow-ups*.
@@ -11,8 +26,9 @@
 
 Admin → **Follow-ups** (top bar, after Buyers). Every seller who gave an email on
 a buy receipt, and every shop buyer who paid an order with an email, gets one
-thank-you email. The Google review is one soft line near the end, never the
-point of the email.
+thank-you email. Since 2026-11-25 it opens with a line written for that person
+(from the receipt / order), then asks for a Google review with a button — the
+same request for everyone.
 
 | Group | Step 1 (on) | Step 2 (built, OFF until switched on) |
 |---|---|---|
@@ -61,20 +77,61 @@ by "Send a thank-you now".
 
 ## Google's rules (why the wording is what it is)
 
-Every person gets the same email. The review is asked "if you have a minute" —
-never "if you enjoyed it" — and there is no "happy → Google / unhappy → tell us"
-split (review gating). No reward for reviewing (FTC 16 CFR 465). The review link
+Every person gets the same review request (since 2026-11-25 a direct one: "As a
+small local business, your review means the world to us… Would you take a moment
+to share your experience?" + the button; before, "if you have a minute"). Only the
+OPENING line differs per person, and it never mentions the review. Never "if you
+enjoyed it", and there is no "happy → Google / unhappy → tell us" split (review
+gating). No reward for reviewing (FTC 16 CFR 465). The review link
 is in step 1 only. A test in `follow-ups.test.ts` fails the build gate if a
 default email ever says "if you enjoyed / loved / were happy". The owner's
 **Skip** is for dealers, regulars or someone who asked not to be emailed — not
 for leaving out unhappy customers.
+
+## The opening line (AI) and the "Note for the thank-you email" (2026-11-25)
+
+- **What the AI writes:** only the first 1–2 sentences after "Hi Margaret,". It
+  is given the first name, the language, the item NAMES (prices, weights, sizes
+  and "3 ×" cut out first — `cleanItemForAi`) and the owner's note. Never the
+  receipt's printed Notes, an amount, an address, ID data, a phone or an email.
+  Model: `AI_FOLLOW_UP_MODEL` → `AI_TRANSLATE_MODEL` → `AI_MODEL` (Anthropic,
+  the same key as the listing assistant; no new env var).
+- **Checks before it is stored** (`checkAiOpening`, `lib/follow-up-opening.ts`):
+  20–320 characters, ≤ 3 sentences, `{when}` at most once and no other `{…}`, no
+  digits except karat marks (14K), no money / pricing / payment words, no
+  review / Google / stars, no offers / promises / "free", no day names (the day
+  is the `{when}` placeholder, so Change time never makes it wrong), no greeting,
+  sign-off, link or emoji. A refused answer is tried again; after 3 tries the
+  row gets the standard line.
+- **When:** the 15-minute sweep writes openings for queued step-1 emails,
+  soonest first, at most 4 / 8 s per run, BEFORE sending. "Send now" on a row
+  without one writes it first. Upcoming shows it (gold dashed box) with **Edit**
+  (your own words; `{when}` / `{first_name}` / `{item}` allowed) · **Rewrite**
+  (ask the AI again) · **Use standard wording**.
+- **Standard line** (AI off / not set up / failed / before the SQL): sellers
+  "It was a pleasure meeting you {when}. Thank you for coming in and trusting
+  us with your piece / your pieces." (one receipt line → "piece"; owner: not
+  every seller brings jewelry); buyers "Thank you for buying your {item} from
+  us. I hope it's everything you hoped for." Spanish: "su pieza / sus piezas".
+- **Switch:** "AI-written opening lines" on the Follow-ups page (setting
+  `ai_openings`, on).
+- **Note for the thank-you email** — a box beside the paper, never on it: the
+  receipt's "Receipt saved" panel, the receipt's own page (not void), and the
+  order page (`ThankYouNoteCard`). ⛔ Internal only: never on either paper copy,
+  the Print Station, the seller's emailed copy, an invoice, a print-out or a gift
+  slip — its column is read only by `lib/thank-you-note-server.ts` and the
+  opening writer, never by `BUY_RECEIPT_COLUMNS`; a test fails if any print /
+  email file names it; the card is `print:hidden`. Saving it (or editing the
+  receipt / order) clears that person's AI opening so it is written again; an
+  opening you typed yourself is never replaced.
 
 ## How it runs
 
 - pg_cron `nej-follow-ups-sweep` every 15 minutes → `POST /api/admin/follow-ups/sweep`
   (header `x-cron-secret` = `TEXT_ALERTS_CRON_SECRET`, already in Vault + Netlify):
   queue new thank-yous → move waiting buyers along → call off voided / cancelled
-  ones → queue step 2 (if on) → send what is due (≤ 10 per run, 18 s budget).
+  ones → queue step 2 (if on) → write AI openings (≤ 4, 8 s) → send what is due
+  (≤ 10 per run, 18 s budget from the start).
 - Opening the page runs the same "queue" part, so a receipt saved a minute ago is
   already in Upcoming.
 - Sending claims the row first (`scheduled → sending`), so two runs never send
@@ -88,6 +145,13 @@ for leaving out unhappy customers.
 - `lib/follow-ups.ts` (pure: timing, wording, rendering, readiness) +
   `lib/__tests__/follow-ups.test.ts` (33 tests).
 - `lib/follow-ups-server.ts` (database + sending).
+- 2026-11-25: `supabase/follow-ups-ai-openings-2026-11.sql`; `lib/follow-up-opening.ts`
+  (pure: prompt, item cleaner, checks) + `lib/follow-up-opening-server.ts` (AI call,
+  store, sweep step, resets) + `lib/__tests__/follow-up-opening.test.ts`;
+  `lib/thank-you-note.ts` + `lib/thank-you-note-server.ts`; `components/admin/ThankYouNoteCard.tsx`,
+  `components/admin/follow-ups/OpeningLine.tsx`; routes `api/admin/thank-you-note`,
+  `api/admin/follow-ups/openings` (receipt edited → reset) and the `[id]` route's
+  `set_opening` / `rewrite_opening` / `standard_opening` actions.
 - `app/[locale]/admin/follow-ups/page.tsx`, `components/admin/follow-ups/*`.
 - `app/api/admin/follow-ups/{sweep,settings,[id],preview,people}/route.ts`.
 - Touched: `AdminHeader.tsx` (link), `app/review/route.ts` (click), `lib/marketing.ts`
@@ -101,3 +165,5 @@ for leaving out unhappy customers.
 - Remove the job: `select cron.unschedule('nej-follow-ups-sweep');` — the page
   still works, nothing is sent automatically.
 - Full rollback SQL is at the bottom of the SQL file.
+- AI openings only: switch "AI-written opening lines" off (everyone gets the
+  standard line). The 2026-11-25 SQL has its own rollback block.

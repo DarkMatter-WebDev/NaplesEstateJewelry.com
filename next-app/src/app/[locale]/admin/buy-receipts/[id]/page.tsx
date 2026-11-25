@@ -4,6 +4,7 @@ import { draftContinuePath, isDraftReceipt } from '@/lib/buy-receipt-drafts';
 import { BUY_RECEIPT_COLUMNS, isReceiptId, type BuyReceiptRow } from '@/lib/buy-receipts';
 import BuyReceiptsShell, { requireBuyReceiptsAdmin } from '@/components/admin/buy-receipts/BuyReceiptsShell';
 import BuyReceiptDetail from '@/components/admin/buy-receipts/BuyReceiptDetail';
+import { loadThankYouNote } from '@/lib/thank-you-note-server';
 
 export const metadata: Metadata = { title: 'Admin - Buy Receipt' };
 
@@ -35,7 +36,7 @@ export default async function AdminBuyReceiptPage({ params }: Props) {
       title={`Receipt ${receipt.receipt_number}`}
       intro="Print it here or on the desktop, change it, duplicate it, or void it."
     >
-      <BuyReceiptDetail adminBasePath={adminBasePath} initialReceipt={receipt} />
+      <BuyReceiptDetail adminBasePath={adminBasePath} initialReceipt={receipt} thankYouNote={await loadThankYouNote(supabase, 'buy_receipt', receipt.id)} />
     </BuyReceiptsShell>
   );
 }
