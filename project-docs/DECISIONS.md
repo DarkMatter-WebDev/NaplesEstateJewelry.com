@@ -4,7 +4,7 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-11-26 (6)**. Before that **2026-11-26 (5)**. Before that **2026-11-25 (5)**. Before that **2026-11-25 (1)**. Before that **2026-11-24 (11)**. Before that **2026-11-24 (10)**. Before that **2026-11-24 (9)**. Before that **2026-11-24 (4)**. Before that **2026-11-24 (3)**. Before that **2026-11-24 (2)** (docs only, no new decision). Before that **2026-11-24 (1)**. Before that **2026-11-23 (1)**. Before that **2026-11-22 (2)**. Before that **2026-11-22 (1)**. Before that **2026-11-21 (6)**. Before that **2026-11-21 (5)**. Before that, **2026-11-21 (3)**. Before that, **2026-11-21 (2)**. Before that, **2026-11-19 (7)**. Before that, **2026-11-19 (2)**. Before that, **2026-11-18 (12)**. Before that, **2026-11-18 (10)**. Before that, **2026-11-18 (6)**. Before that, **2026-11-18 (4)**. Before that, **2026-11-18 (2)**. Before that, **2026-11-16 (5)**. Before that, **2026-11-16 (1)**. Before that, **2026-11-10 (2)**. Before that, **2026-11-09 (3)**. Before that, **2026-11-09 (1)**. Before that, **2026-11-08 (1)**. Before that, **2026-11-05 (5)**. Before that, **2026-11-05 (2)**. Before that, **2026-11-02 (2)**.
+> compaction. Last reconciled: **2026-11-27 (1)**. Before that **2026-11-26 (6)**. Before that **2026-11-26 (5)**. Before that **2026-11-25 (5)**. Before that **2026-11-25 (1)**. Before that **2026-11-24 (11)**. Before that **2026-11-24 (10)**. Before that **2026-11-24 (9)**. Before that **2026-11-24 (4)**. Before that **2026-11-24 (3)**. Before that **2026-11-24 (2)** (docs only, no new decision). Before that **2026-11-24 (1)**. Before that **2026-11-23 (1)**. Before that **2026-11-22 (2)**. Before that **2026-11-22 (1)**. Before that **2026-11-21 (6)**. Before that **2026-11-21 (5)**. Before that, **2026-11-21 (3)**. Before that, **2026-11-21 (2)**. Before that, **2026-11-19 (7)**. Before that, **2026-11-19 (2)**. Before that, **2026-11-18 (12)**. Before that, **2026-11-18 (10)**. Before that, **2026-11-18 (6)**. Before that, **2026-11-18 (4)**. Before that, **2026-11-18 (2)**. Before that, **2026-11-16 (5)**. Before that, **2026-11-16 (1)**. Before that, **2026-11-10 (2)**. Before that, **2026-11-09 (3)**. Before that, **2026-11-09 (1)**. Before that, **2026-11-08 (1)**. Before that, **2026-11-05 (5)**. Before that, **2026-11-05 (2)**. Before that, **2026-11-02 (2)**.
 
 ## Get Directions: phone/tablet menu + top of /contact (2026-11-26)
 
@@ -2466,6 +2466,20 @@ field an inline or `!important` size under 16px on touch screens. Desktop keeps
 double-tap are handled separately (`touch-action: manipulation` + the
 non-passive two-finger `touchmove` guard in `AdminShell`, because React's
 touch props are passive and `preventDefault` there is a no-op).
+
+### ⛔ A sideways-scroll box that holds anything `position:absolute` (incl. `sr-only`) must itself be positioned (2026-11-27)
+
+iPhone report: the admin order page sat ZOOMED OUT after ✎ Edit order →
+Save / Cancel, a blank strip on the right. Cause: the Items table's
+`<span className="sr-only">` (absolute) inside a non-positioned
+`overflow-x-auto` box escaped the box and stretched the page to 562px on a
+440px phone. `html { overflow-x: clip }` hides the strip (so it looks blank)
+but iOS Safari still allows zooming out to it. Fix: `relative overflow-x-auto`.
+**Rule:** any `overflow-x-auto` / `overflow-auto` wrapper around a table or row
+that contains `sr-only` or other absolute children gets `relative`. To check a
+page: at a phone width in device emulation, `innerWidth` must equal
+`document.documentElement.clientWidth` and `scrollWidth` — if `innerWidth` is
+larger, something is stretching the page. Guard: `order-edit.test.ts` (wiring).
 
 ### ⛔ Never put `touch-action: pan-x pan-y` on an ANCESTOR of a scroller — use `manipulation`
 

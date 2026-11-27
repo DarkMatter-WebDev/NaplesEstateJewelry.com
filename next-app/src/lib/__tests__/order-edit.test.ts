@@ -281,6 +281,11 @@ describe('addresses', () => {
 
 describe('wiring', () => {
   const src = (path: string) => readFileSync(join(process.cwd(), 'src', path), 'utf8');
+  it('the Items table scroll box is positioned, so its sr-only label cannot widen the page on a phone (2026-11-27)', () => {
+    const panel = src('components/admin/OrderDetailPanel.tsx');
+    expect(panel).toMatch(/<div className="relative overflow-x-auto">\s*<table className="w-full min-w-\[620px\]/);
+    expect(panel).toContain('<span className="sr-only">Line discount for');
+  });
   it('the order page has Edit order, Fix name and Change history', () => {
     const panel = src('components/admin/OrderDetailPanel.tsx');
     expect(panel).toContain('✎ Edit order');

@@ -1,6 +1,15 @@
 
 # Changelog
 
+## 2026-11-27 (1) — 📱 Admin order page sat zoomed out on iPhone after ✎ Edit order (blank strip on the right) — FIXED, BUILT + STAGED, not pushed; no SQL, no env vars
+
+- **Owner (iPhone 17 Pro Max, live, after pushing the 11-26 set):** after editing an order and then saving OR cancelling, the order page came back zoomed out — content in the left ~80%, a blank strip on the right. *"keep it centered in full screened properly"*. Plan repeated back → *"Yes, do the plan"* (+ "it appeared after saving or cancelling").
+- **Cause (measured, not guessed):** the Items table's "Line discount for …" label (`<span className="sr-only">`, `position:absolute`) sat inside the table's `overflow-x-auto` box, which was NOT positioned — so the absolute label escaped the scroll box and stretched the WHOLE page: at 440px wide the page measured **562px** (`innerWidth` 562, `scrollWidth` 562; 390px phone → also 562). The site's `html { overflow-x: clip }` hides that extra strip (hence blank), but iPhone Safari still lets the page zoom out to it — and opening the Edit window / tapping its fields (then Save's reload or Cancel) is where it ended up zoomed out. /contact measured 440 = 440 for comparison. The Edit window itself did NOT overflow.
+- **Fix (`components/admin/OrderDetailPanel.tsx`, one class):** the Items scroll box is `relative overflow-x-auto` (comment says why it is load-bearing). No layout or look change. `order-edit.test.ts` → one wiring test.
+- **Verified (headless Chrome, phone emulation, a TEMPORARY local page rendering the real order page + Edit window with a made-up order — deleted afterwards; nothing written anywhere):** widths 320, 330, 340, 350, 360, 375, 390, 393, 402, 414, 420, 430, 440 × {order page, ✎ Edit order open, after Edit → Cancel, Email Receipt, Mark Refunded, Mark Partially Refunded, Cancel Order, Delete Order, ✎ Fix name}: **0 problems** — page width = phone width every time and nothing scrolls sideways inside a pop-up (text inside a field excepted; the Items table keeps its own sideways scroll). ⚠️ Chrome cannot reproduce Safari's zoom itself — the owner's iPhone after the push is the real proof.
+- **Gate (from `next-app`, dev server stopped; stale `.next/dev` types from the deleted page cleared):** `npx tsc --noEmit` 0 · `npm run lint` 0 errors (4 old warnings) · `npx vitest run` **2655/2655** (219 files) · `npm run build` 0.
+- **To reverse:** `relative overflow-x-auto` → `overflow-x-auto` on the Items wrapper + drop the test (brings the 562px page back — don't).
+
 ## 2026-11-26 (6) — 📱 Menu toggle: three-line icon only below 430px; the worded MENU / CLOSE pill is back from 430 to 1279px — BUILT + STAGED, not pushed; no SQL, no env vars
 
 - **Why (owner):** *"only replaces menu where we struggled to COMFORTABLY fit the ES button … at any TABLET/MOBILE viewports THAT HAVE A DECENT AMOUNT OF ROOM, we still use the FULL "menu" button"*. Plan repeated back and confirmed → *"go ahead AND DO IT"* (the owner's go-ahead covered the build; no separate mockup — the pill is the pre-(4) look, and the proof image was sent).

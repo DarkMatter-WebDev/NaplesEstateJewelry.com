@@ -1106,7 +1106,11 @@ export default function OrderDetailPanel({
               <div className="border-b px-5 py-4" style={{ borderColor: BORDER }}>
                 <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>Items</h2>
               </div>
-              <div className="overflow-x-auto">
+              {/* `relative` is load-bearing (2026-11-27): the "Line discount for …" label below is
+                  `sr-only` (position:absolute). Without a positioned box here it escaped this
+                  sideways-scroll box and made the WHOLE page 562px wide on a 440px iPhone, which
+                  Safari then showed zoomed out with a blank strip on the right. */}
+              <div className="relative overflow-x-auto">
                 <table className="w-full min-w-[620px] text-sm">
                   <thead style={{ background: 'var(--color-surface-container-low)' }}>
                     <tr>
