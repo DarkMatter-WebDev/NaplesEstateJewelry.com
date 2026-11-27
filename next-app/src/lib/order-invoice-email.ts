@@ -13,6 +13,7 @@ import {
   type StoreHoursSchedule,
 } from '@/lib/business-location';
 import { describeOrderShippingService } from '@/lib/checkout-shipping';
+import { chrisSignatureHtml, chrisSignatureText } from '@/lib/email-signature';
 import { BULLION_LAW_LINE, BULLION_LINE_LABEL, IN_STORE_PAYMENT_LABELS, bullionTaxLabel, formatSalePayments, orderBullionTaxFree,readSalePaymentParts, readSaleTradeIn, salePaymentPartLabel, tradeInReceiptLine, type SalePaymentMethod } from '@/lib/in-store-sale';
 import { paperDateLine } from '@/lib/order-receipt-paper';
 import { type TaxExemptSnapshot } from '@/lib/tax-exempt';
@@ -64,7 +65,7 @@ export interface InvoicePaymentBlock {
   /** Shown when the tax can still come off (shipping, no address yet). */
   taxHint: string | null;
   otherWays: string[];
-  /** The owner's own words, printed as typed and signed "— Chris". */
+  /** The owner's own words, printed as typed; the email then ends with Chris's signature block. */
   message: string | null;
 }
 
@@ -355,7 +356,7 @@ export function buildInvoiceEmailContent(
     text: [
       greeting,
       intro,
-      ...(payment?.message ? ['', payment.message, '— Chris'] : []),
+      ...(payment?.message ? ['', payment.message] : []),
       ...(paid ? ['', es ? 'PAGO RECIBIDO — PAGADO EN SU TOTALIDAD' : 'PAYMENT RECEIVED — PAID IN FULL'] : []),
       '',
       es ? 'Artículos:' : 'Items:',
@@ -395,6 +396,8 @@ export function buildInvoiceEmailContent(
       contactNote,
       closing,
       '',
+      // Chris's signature — only when the owner typed a message (owner, 2026-11-26).
+      ...(payment?.message ? [chrisSignatureText(es ? 'es' : 'en'), ''] : []),
       ...buildOrderEmailFooterTextLines(order.order_number, language),
     ].join('\n'),
   };
@@ -519,6 +522,7 @@ function buildInvoiceEmailHtml({
                   ${pickup ? pickupBlockHtml(pickup) : ''}
                   <p style="margin:0 0 18px;font-size:15px;line-height:1.55;">${pinPhoneToOneLine(escapeHtml(contactNote))}</p>
                   <p style="margin:0;font-size:15px;line-height:1.55;">${escapeHtml(closing)}</p>
+                  ${payment?.message ? chrisSignatureHtml(es ? 'es' : 'en', { marginTop: 22 }) : ''}
                   ${buildOrderEmailFooterHtml(orderNumber, language)}
                 </td>
               </tr>
@@ -565,13 +569,16 @@ function pickupBlockHtml(pickup: InvoicePickupBlock) {
   `;
 }
 
-/** The owner's message on a remote-sale invoice: quoted as typed, signed. */
+/**
+ * The owner's message on a remote-sale invoice, quoted as typed. No "— Chris"
+ * here any more (owner, 2026-11-26): Chris's signature block sits at the end.
+ */
 function paymentMessageHtml(message: string) {
   return `
                   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 20px;background:#fbf7e8;border-left:3px solid #d4af37;">
                     <tr>
                       <td style="padding:12px 14px;color:#1d1a14;font-size:14px;line-height:1.55;font-style:italic;">
-                        ${escapeHtml(message).replace(/\n/g, '<br/>')}<br/>— Chris
+                        ${escapeHtml(message).replace(/\n/g, '<br/>')}
                       </td>
                     </tr>
                   </table>

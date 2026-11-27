@@ -2,6 +2,7 @@ import { escapeHtml } from '@/lib/marketing-email-html';
 import { addressOneLine } from '@/lib/business-location';
 import { BUSINESS_PHONE, SITE_DOMAIN_LABEL, getSiteUrl, pinPhoneToOneLine } from '@/lib/order-email-branding';
 import { formatCheckoutCurrency } from '@/lib/checkout-pricing';
+import { chrisSignatureHtml, chrisSignatureText } from '@/lib/email-signature';
 import {
   formatOfferDeadline,
   percentOfListed,
@@ -29,7 +30,7 @@ export type OfferEmailInput = {
   total: number;
   expiresAt: string | null;
   counterAmount?: number | null;
-  /** The owner's message (counter or decline), quoted and signed "— Chris". */
+  /** The owner's message (counter or decline), quoted; Chris's signature block then follows the button. */
   ownerNote?: string | null;
   counterUrl?: string | null;
   counterExpiresAt?: string | null;
@@ -152,8 +153,9 @@ export function buildOfferBuyerEmail(input: OfferEmailInput): BuiltEmail {
       const cta = input.kind === 'item_sold'
         ? button(`${getSiteUrl()}${isEs ? '/es' : ''}/shop`, isEs ? 'Ver la tienda' : 'Browse the shop')
         : button(input.productUrl, isEs ? 'Ver la pieza' : 'View the piece');
-      const html = frame(isEs ? 'Su oferta' : 'Your offer', heading, lines.map(p).join('') + cta, isEs);
-      const text = [heading, '', ...lines.map(stripTags), '', input.productUrl, '', ...textFooter].join('\n');
+      const signed = note.length > 0;
+      const html = frame(isEs ? 'Su oferta' : 'Your offer', heading, lines.map(p).join('') + cta + signatureHtml(signed, isEs), isEs);
+      const text = [heading, '', ...lines.map(stripTags), '', input.productUrl, ...signatureText(signed, isEs), '', ...textFooter].join('\n');
       return { subject, html, text };
     }
     case 'countered': {
@@ -171,8 +173,9 @@ export function buildOfferBuyerEmail(input: OfferEmailInput): BuiltEmail {
           : `This price is just for you until <strong>${escapeHtml(until)}</strong>. It's one of a kind, so it goes to whoever pays first.`,
       ];
       const label = isEs ? `Comprar ahora por ${counter}` : `Buy now at ${counter}`;
-      const html = frame(isEs ? 'Contraoferta' : 'Counter-offer', heading, lines.map(p).join('') + button(input.counterUrl ?? input.productUrl, label), isEs);
-      const text = [heading, '', ...lines.map(stripTags), '', `${label}: ${input.counterUrl ?? input.productUrl}`, '', ...textFooter].join('\n');
+      const signed = Boolean(input.ownerNote);
+      const html = frame(isEs ? 'Contraoferta' : 'Counter-offer', heading, lines.map(p).join('') + button(input.counterUrl ?? input.productUrl, label) + signatureHtml(signed, isEs), isEs);
+      const text = [heading, '', ...lines.map(stripTags), '', `${label}: ${input.counterUrl ?? input.productUrl}`, ...signatureText(signed, isEs), '', ...textFooter].join('\n');
       return { subject, html, text };
     }
   }
@@ -277,8 +280,9 @@ export function buildAvailabilityBuyerEmail(input: AvailabilityEmailInput): Buil
     ];
     const label = isEs ? `Comprar ahora por ${price}` : `Buy now at ${price}`;
     const url = input.buyUrl ?? input.productUrl;
-    const html = frame(eyebrow, heading, lines.map(p).join('') + button(url, label), isEs);
-    const text = [heading, '', ...lines.map(stripTags), '', `${label}: ${url}`, '', ...textFooter].join('\n');
+    const signed = note.length > 0;
+    const html = frame(eyebrow, heading, lines.map(p).join('') + button(url, label) + signatureHtml(signed, isEs), isEs);
+    const text = [heading, '', ...lines.map(stripTags), '', `${label}: ${url}`, ...signatureText(signed, isEs), '', ...textFooter].join('\n');
     return { subject, html, text };
   }
 
@@ -304,8 +308,9 @@ export function buildAvailabilityBuyerEmail(input: AvailabilityEmailInput): Buil
   const cta = unanswered
     ? button(input.productUrl, isEs ? 'Ver la pieza' : 'View the piece')
     : button(shopUrl, isEs ? 'Ver la tienda' : 'Browse the shop');
-  const html = frame(eyebrow, heading, lines.map(p).join('') + cta, isEs);
-  const text = [heading, '', ...lines.map(stripTags), '', unanswered ? input.productUrl : shopUrl, '', ...textFooter].join('\n');
+  const signed = input.kind === 'declined' && note.length > 0;
+  const html = frame(eyebrow, heading, lines.map(p).join('') + cta + signatureHtml(signed, isEs), isEs);
+  const text = [heading, '', ...lines.map(stripTags), '', unanswered ? input.productUrl : shopUrl, ...signatureText(signed, isEs), '', ...textFooter].join('\n');
   return { subject, html, text };
 }
 
@@ -348,8 +353,21 @@ export function buildOwnerAvailabilityEmail(input: OwnerAvailabilityEmailInput):
   return { subject, html, text };
 }
 
+/**
+ * The owner's note, quoted. No "— Chris" any more (owner, 2026-11-26): an
+ * email with a note gets Chris's signature block after the button instead.
+ */
 function ownerNoteLine(note: string): string {
-  return `<em>&ldquo;${escapeHtml(note)}&rdquo; — Chris</em>`;
+  return `<em>&ldquo;${escapeHtml(note)}&rdquo;</em>`;
+}
+
+/** Chris's signature block — only when the owner typed a note. */
+function signatureHtml(signed: boolean, isEs: boolean): string {
+  return signed ? chrisSignatureHtml(isEs ? 'es' : 'en', { marginTop: 24 }) : '';
+}
+
+function signatureText(signed: boolean, isEs: boolean): string[] {
+  return signed ? ['', chrisSignatureText(isEs ? 'es' : 'en')] : [];
 }
 
 function stripTags(html: string): string {

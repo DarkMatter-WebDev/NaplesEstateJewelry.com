@@ -61,7 +61,7 @@ hold — they are never charged.
      everyone (first to pay gets it). If the email fails, the page shows the link
      to send yourself; **Send the link again** makes a fresh one.
    - **Decline** → asks first, with an optional **Message to <name>** (same box as
-     Counter's) → hold released, polite email with your message signed "— Chris".
+     Counter's) → hold released, polite email with your message, then Chris's signature block (2026-11-26).
      The Declined / Countered tabs show "Your message: …".
 5. Do nothing → after 72 hours the offer expires and releases by itself.
 6. **Clear out old offers:** a red trash-can on each finished offer, or **Delete all N**

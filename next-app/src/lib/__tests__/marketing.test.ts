@@ -9,6 +9,7 @@ import {
   unsubscribeUrlFor,
 } from '@/lib/marketing';
 import { withMarketingFooter } from '@/lib/marketing-email-html';
+import { chrisSignatureHtml, chrisSignatureText, isChrisSignOffLine, isTeamLine } from '@/lib/email-signature';
 
 describe('combineSource', () => {
   it('combines two distinct sources into a sorted, +-joined string', () => {
@@ -112,6 +113,42 @@ describe('buildMarketingAudience language (2026-11-22, owner "4A")', () => {
     expect(es).toContain('Recibe este correo de mercadeo porque se suscribió o tiene una cuenta en Naples Estate Jewelry.');
     expect(es).toContain('>Cancelar suscripción</a>');
     expect(es).not.toContain('Unsubscribe<');
+  });
+
+  it('a campaign sent as "Chris" gets his signature block ABOVE the footer; none without it (2026-11-26)', () => {
+    const signed = withMarketingFooter('<p>Hi</p>', 'https://x.com/u', '1 Main St', 'en', { signatureHtml: chrisSignatureHtml('en') });
+    expect(signed.indexOf('&mdash;&nbsp;Chris Surette')).toBeGreaterThan(signed.indexOf('<p>Hi</p>'));
+    expect(signed.indexOf('&mdash;&nbsp;Chris Surette')).toBeLessThan(signed.indexOf('<hr'));
+    expect(withMarketingFooter('<p>Hi</p>', 'https://x.com/u', '1 Main St')).not.toContain('Chris Surette');
+  });
+});
+
+describe('Chris signature block (lib/email-signature.ts)', () => {
+  it('English and Spanish, HTML and text, one design', () => {
+    const en = chrisSignatureHtml('en');
+    expect(en).toContain('Call or text <a href="tel:2394048505"');
+    expect(en).toContain('href="mailto:info@naplesestatejewelry.com"');
+    // The address breaks only after "Ste 104," (a 320 px phone); each half never breaks.
+    expect(en).toContain('<span style="white-space:nowrap;">6240 Shirley St, Ste 104,</span> <span style="white-space:nowrap;">Naples, FL 34109</span>');
+    expect(en).toContain('width="56" height="43"');
+    // Phone-only spacing (mockup 7, 2026-11-26): hooks on the two cells + the rules.
+    expect(en).toContain('class="nej-sig-logo"');
+    expect(en).toContain('class="nej-sig-text"');
+    expect(en).toContain('.nej-sig-logo{width:56px !important;padding:11px 0 11px 10px !important;}');
+    expect(en).toContain('@media only screen and (max-width:340px){.nej-sig-logo{display:none !important;}');
+    // 12px business name with 0.4px spacing — the size that fits the invoice on a 375 px phone.
+    expect(en).toContain('font-size:12px;line-height:14px;letter-spacing:0.4px;text-transform:uppercase;');
+    expect(en).toContain('.nej-sig-strip{text-align:center !important;}');
+    expect(chrisSignatureHtml('es')).toContain('Llame o escriba al <a href="tel:2394048505"');
+    expect(chrisSignatureText('en')).toBe('— Chris Surette\nNaples Estate Jewelry\nCall or text (239) 404-8505\ninfo@naplesestatejewelry.com\n6240 Shirley St, Ste 104, Naples, FL 34109\nNaplesEstateJewelry.com');
+  });
+
+  it('knows the sign-off line and the old team line', () => {
+    for (const line of ['Chris', 'chris', ' Chris ', 'Chris Surette', '— Chris', 'Chris,']) expect(isChrisSignOffLine(line), line).toBe(true);
+    for (const line of ['Thank you, Chris', 'Christopher', 'Chris and the team']) expect(isChrisSignOffLine(line), line).toBe(false);
+    expect(isTeamLine('and the Naples Estate Jewelry Team')).toBe(true);
+    expect(isTeamLine('y el equipo de Naples Estate Jewelry')).toBe(true);
+    expect(isTeamLine('the Naples Estate Jewelry Team')).toBe(false);
   });
 });
 

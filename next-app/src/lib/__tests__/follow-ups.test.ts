@@ -152,7 +152,8 @@ describe("renderFollowUp (Rob's blend, 2026-11-25)", () => {
     expect(out.html).not.toContain('Sharon Lynch');
     expect(out.html).toContain('href="https://naplesestatejewelry.com/guides"');
     expect(out.html).toContain('Know someone with pieces to sell?');
-    expect(out.text).toContain('and the Naples Estate Jewelry Team');
+    expect(out.text).toContain('Thank you again,\n\n— Chris Surette\nNaples Estate Jewelry\nCall or text (239) 404-8505');
+    expect(out.text).not.toContain('Naples Estate Jewelry Team');
     expect(out.html).toContain('Unsubscribe</a>');
     expect(out.html).toContain("You&#039;re receiving this because you sold to us.");
     expect(out.html).toContain('6240 Shirley St');
@@ -173,7 +174,9 @@ describe("renderFollowUp (Rob's blend, 2026-11-25)", () => {
     expect(out.text).toContain('Fue un placer conocerle ayer. Gracias por visitarnos y por confiarnos sus piezas.');
     expect(out.html).toContain('Compartir su experiencia en Google</a>');
     expect(out.html).toContain('Aquí cuando nos necesite');
-    expect(out.html).toContain('y el equipo de Naples Estate Jewelry');
+    expect(out.html).not.toContain('y el equipo de Naples Estate Jewelry');
+    expect(out.html).toContain('&mdash;&nbsp;Chris Surette');
+    expect(out.html).toContain('Llame o escriba al');
     expect(out.html).toContain('Cancelar suscripción');
   });
 
@@ -198,7 +201,23 @@ describe("renderFollowUp (Rob's blend, 2026-11-25)", () => {
     const old = { subject: 'Thanks {first_name}', body: 'Hi {first_name},\n\nThanks for coming in {when}.\n\nA few words would help: {review_link}.\n\nThank you again,\nChris' };
     const out = renderFollowUp(old, baseInput);
     expect(out.html).toContain('>share your experience on Google</a>');
-    expect(out.html).toContain('Naples Estate Jewelry &middot;'); // the small name · phone line comes back without a help box
+    expect(out.html).toContain('&mdash;&nbsp;Chris Surette'); // its "Chris" line becomes the signature block
+    expect(out.html).not.toContain('Naples Estate Jewelry &middot;'); // so no small name · phone line
+  });
+
+  it('an owner-saved template with the old team line: the line is dropped under the block (2026-11-26)', () => {
+    const saved = { subject: 'Thanks', body: 'Hi {first_name},\n\nThank you again,\nChris\nand the Naples Estate Jewelry Team' };
+    const out = renderFollowUp(saved, baseInput);
+    expect(out.html).toContain('Thank you again,</p>');
+    expect(out.html).toContain('&mdash;&nbsp;Chris Surette');
+    expect(out.html).not.toContain('Naples Estate Jewelry Team');
+    expect(out.text).not.toContain('Naples Estate Jewelry Team');
+  });
+
+  it('a template with no "Chris" line: no block, and the small name · phone line comes back', () => {
+    const out = renderFollowUp({ subject: 'Hi', body: 'Hi {first_name},\n\nSee you soon.' }, baseInput);
+    expect(out.html).not.toContain('Chris Surette');
+    expect(out.html).toContain('Naples Estate Jewelry &middot;');
   });
 
   it('escapes what people typed (names, items) — never raw HTML', () => {
@@ -208,9 +227,15 @@ describe("renderFollowUp (Rob's blend, 2026-11-25)", () => {
     expect(out.html).not.toContain('<b>Eve');
   });
 
-  it('the signature line renders as the serif "Chris"', () => {
-    const out = renderFollowUp(DEFAULT_FOLLOW_UP_TEMPLATES['seller-1-en'], baseInput);
-    expect(out.html).toMatch(/Thank you again,<br \/><span style="font-family:Georgia[^"]*">Chris<\/span><br \/>and the Naples Estate Jewelry Team/);
+  it('the "Chris" line renders as the signature block (owner, 2026-11-26, mockup 6 "4c at 12 px")', () => {
+    for (const key of Object.keys(DEFAULT_FOLLOW_UP_TEMPLATES) as FollowUpTemplateKey[]) {
+      const out = renderFollowUp(DEFAULT_FOLLOW_UP_TEMPLATES[key], { ...baseInput, language: key.endsWith('-es') ? 'es' : 'en', audience: key.startsWith('buyer') ? 'buyer' : 'seller' });
+      expect(out.html.split('&mdash;&nbsp;Chris Surette').length - 1, key).toBe(1);
+      expect(out.html, key).toContain('/assets/images/branding/email-signature-logo.png');
+      expect(out.html, key).toContain('class="nej-sig-strip"');
+      expect(out.html, key).not.toMatch(/>Chris<|Team|equipo/);
+      expect(out.text, key).toContain('— Chris Surette');
+    }
   });
 });
 
@@ -247,7 +272,8 @@ describe("Google's review policy (no gating, review only in step 1)", () => {
       item: null, phone: '(239) 404-8505', reviewUrl: 'https://example.com/r', unsubscribeUrl: 'https://example.com/u', businessName: 'Naples Estate Jewelry', mailingAddress: '6240 Shirley St',
     });
     const all = rendered.html.split('(239) 404-8505').length - 1;
-    const kept = rendered.html.split('<span style="white-space:nowrap;">(239) 404-8505</span>').length - 1;
+    // A plain nowrap span, or the signature block's nowrap tel: link.
+    const kept = rendered.html.split('white-space:nowrap;">(239) 404-8505<').length - 1;
     expect(all).toBeGreaterThanOrEqual(3);
     expect(kept).toBe(all);
     expect(rendered.text).not.toContain('white-space');

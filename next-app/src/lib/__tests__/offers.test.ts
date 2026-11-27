@@ -230,13 +230,21 @@ describe('statuses, filters, emails', () => {
     }
   });
 
-  it('a decline carries the owner’s message, quoted and signed; without one it is the plain email', () => {
+  it('a decline carries the owner’s message, quoted, then Chris’s signature block after the button; without one it is the plain email', () => {
     const withNote = buildOfferBuyerEmail({ ...base, kind: 'declined', ownerNote: 'The lowest I can go is $45.' });
-    expect(withNote.text).toContain('"The lowest I can go is $45." — Chris');
-    expect(withNote.html).toContain('&ldquo;The lowest I can go is $45.&rdquo; — Chris');
-    expect(withNote.text.indexOf('— Chris')).toBeLessThan(withNote.text.indexOf('hold has been released'));
+    expect(withNote.text).toContain('"The lowest I can go is $45."');
+    expect(withNote.html).toContain('&ldquo;The lowest I can go is $45.&rdquo;</em>'); // no "— Chris" on the note (2026-11-26)
+    expect(withNote.text.indexOf('The lowest I can go')).toBeLessThan(withNote.text.indexOf('hold has been released'));
+    // The block comes after the button, once.
+    expect(withNote.html.split('&mdash;&nbsp;Chris Surette').length - 1).toBe(1);
+    expect(withNote.html.indexOf('Chris Surette')).toBeGreaterThan(withNote.html.indexOf('View the piece'));
+    expect(withNote.text).toContain('— Chris Surette\nNaples Estate Jewelry\nCall or text (239) 404-8505');
     const plain = buildOfferBuyerEmail({ ...base, kind: 'declined' });
-    expect(plain.text).not.toContain('— Chris');
+    expect(plain.text).not.toContain('Chris');
+    expect(plain.html).not.toContain('Chris Surette');
+    const counter = buildOfferBuyerEmail({ ...base, kind: 'countered', counterAmount: 50, ownerNote: 'Best I can do.', counterUrl: 'https://x/c' });
+    expect(counter.html.indexOf('Chris Surette')).toBeGreaterThan(counter.html.indexOf('Buy now at'));
+    expect(buildOfferBuyerEmail({ ...base, kind: 'countered', counterAmount: 50, counterUrl: 'https://x/c' }).html).not.toContain('Chris Surette');
     // Only a decline shows the note: an expired or sold email never does.
     expect(buildOfferBuyerEmail({ ...base, kind: 'expired', ownerNote: 'x note' }).text).not.toContain('x note');
     const escaped = buildOfferBuyerEmail({ ...base, kind: 'declined', ownerNote: '<b>hi</b>' });

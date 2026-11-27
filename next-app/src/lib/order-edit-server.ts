@@ -7,16 +7,23 @@ import { loadOrderGift } from '@/lib/order-gift-server';
 import { loadBullionLineIds } from '@/lib/bullion-sale-server';
 import { getProductImages, getProductMetal, getProductWeight, getSnapshotPrice } from '@/lib/sales';
 import { fetchSpotData } from '@/lib/spot-price';
-import { readSalePaymentParts, SPLIT_PAYMENTS_COLUMN, TRADE_IN_COLUMN, withBullionFlags } from '@/lib/in-store-sale';
+import { BULLION_SQL_FILE, bullionColumnReady } from '@/lib/instant-sale-server';
+import { SALE_TRADE_CREDIT, salePaymentReference, SPLIT_PAYMENTS_COLUMN, TRADE_IN_COLUMN, withBullionFlags } from '@/lib/in-store-sale';
 import {
   addressObject,
-  computeEditTotals,
   describeChanges,
   editRefusal,
   editStateFromOrder,
+  editTotals,
+  isPaidStatus,
+  keepFixedMoney,
   moneyChanged,
   orderEditRules,
+  paymentsChanged,
   readEditBody,
+  refundPaymentStatus,
+  settlePayments,
+  totalsChanges,
   type OrderChange,
   type OrderEditState,
   type OrderRowForEdit,
@@ -35,7 +42,7 @@ import type { Product } from '@/types/product';
 const ORDER_COLUMNS = [
   'id', 'order_number', 'customer_name', 'customer_email', 'customer_phone',
   'subtotal', 'tax', 'shipping_fee', 'discount', 'total',
-  'payment_status', 'payment_method', 'refund_amount', 'deleted_at', 'tax_exempt', 'tax_exempt_snapshot',
+  'payment_status', 'order_status', 'payment_method', 'refund_amount', 'deleted_at', 'tax_exempt', 'tax_exempt_snapshot',
   'shipping_method', 'shipping_address', 'billing_address', 'customer_notes', 'payment_response',
   SPLIT_PAYMENTS_COLUMN, TRADE_IN_COLUMN,
   'order_items(id, product_id, inventory_number, title_snapshot, price_snapshot, quantity, discount)',
@@ -82,32 +89,49 @@ export async function applyOrderEdit(
 
   const read = readEditBody(body);
   if ('error' in read) return { ok: false, status: 400, error: read.error };
-  const after: OrderEditState = { ...read.state, isGift: before.isGift };
+  const rules = orderEditRules(order);
+  let after: OrderEditState = keepFixedMoney(rules, before, { ...read.state, isGift: before.isGift });
 
   // Items must be this order's own (or new); a listing number can never be swapped in.
   const ownIds = new Set(before.items.map((item) => item.id));
   for (const item of after.items) {
     if (item.id && !ownIds.has(item.id)) return { ok: false, status: 400, error: 'An item does not belong to this order. Reload the page and try again.' };
   }
-  // Existing lines keep their saved listing link and bullion mark.
+  // Existing lines keep their saved listing link; the bullion mark is the window's (2026-11-26).
   const beforeById = new Map(before.items.map((item) => [item.id as string, item]));
   after.items = after.items.map((item) => {
     const was = item.id ? beforeById.get(item.id) : undefined;
-    return was ? { ...item, productId: was.productId, bullion: was.bullion, inventoryNumber: was.inventoryNumber } : { ...item, bullion: false };
+    return was ? { ...item, productId: was.productId, inventoryNumber: was.inventoryNumber } : item;
   });
   // Lines left out of the request stay as they are.
   for (const was of before.items) {
     if (!after.items.some((item) => item.id === was.id)) after.items.push({ ...was });
   }
 
-  const rules = orderEditRules(order);
-  const refusal = editRefusal(rules, before, after);
+  const money = moneyChanged(before, after);
+  const taxExempt = Boolean(order.tax_exempt);
+  // Unchanged numbers keep the order's saved totals (a name fix never re-figures an old order's tax).
+  const totals = money
+    ? editTotals(after, taxExempt)
+    : { subtotal: Number(order.subtotal), discount: Number(order.discount), shippingFee: Number(order.shipping_fee), tax: Number(order.tax), total: Number(order.total), taxNotCharged: 0 };
+  after = { ...after, payments: settlePayments(after.payments, totals.total) };
+  const refusal = editRefusal(rules, after, totals);
   if (refusal) return { ok: false, status: 409, error: refusal };
 
-  const changes = describeChanges(before, after);
+  const payments = rules.paymentsEditable && paymentsChanged(before, after);
+  const refund = rules.refundEditable && Math.round(before.refundAmount * 100) !== Math.round(after.refundAmount * 100);
+  const changes = [...describeChanges(before, after), ...(money ? totalsChanges(order, totals) : [])];
   if (changes.length === 0) return { ok: true, changes: [], historySaved: true, warnings: [], emailChanged: false };
-  const money = moneyChanged(before, after);
   const warnings: string[] = [];
+
+  // A bullion mark needs its column (order-items-bullion-2026-11.sql) — refused before anything is written.
+  const bullionTouched = after.items.some((item) => {
+    const was = item.id ? beforeById.get(item.id) : undefined;
+    return !item.removed && (was ? was.bullion !== item.bullion : item.bullion);
+  });
+  if (bullionTouched && !(await bullionColumnReady(service))) {
+    return { ok: false, status: 409, error: `Bullion — no sales tax needs a one-time database update first (${BULLION_SQL_FILE}).` };
+  }
 
   // ---- 1. Items --------------------------------------------------------------
   const addedProductIds: string[] = [];
@@ -123,18 +147,17 @@ export async function applyOrderEdit(
     if (was) {
       const update: Record<string, unknown> = {};
       if (was.title.trim() !== item.title.trim()) update.title_snapshot = item.title.trim();
-      if (rules.moneyAllowed) {
-        if (was.price !== item.price) update.price_snapshot = item.price;
-        if (was.quantity !== item.quantity) update.quantity = item.quantity;
-        if (was.discount !== item.discount) update.discount = item.discount;
-      }
+      if (was.price !== item.price) update.price_snapshot = item.price;
+      if (was.quantity !== item.quantity) update.quantity = item.quantity;
+      if (was.discount !== item.discount) update.discount = item.discount;
+      if (was.bullion !== item.bullion) update.tax_free_bullion = item.bullion;
       if (Object.keys(update).length === 0) continue;
       const { error } = await service.from('order_items').update(update).eq('id', item.id as string).eq('order_id', orderId);
       if (error) return { ok: false, status: 500, error: `Could not save "${item.title}": ${error.message}` };
       continue;
     }
     if (item.removed) continue;
-    // A new line (unpaid orders only — editRefusal already checked).
+    // A new line (any order since 2026-11-26).
     let insert: Record<string, unknown> = {
       order_id: orderId,
       product_id: null,
@@ -143,6 +166,8 @@ export async function applyOrderEdit(
       price_snapshot: item.price,
       quantity: item.quantity,
       discount: item.discount,
+      // Only when ticked: an order without bullion still saves before the bullion SQL.
+      ...(item.bullion ? { tax_free_bullion: true } : {}),
     };
     if (item.productId) {
       const { data: product, error: productError } = await service.from('products').select(ADD_PRODUCT_COLUMNS).eq('id', item.productId).maybeSingle();
@@ -182,13 +207,6 @@ export async function applyOrderEdit(
     update.gift_message = after.giftMessage || null;
   }
   if (money) {
-    const totals = computeEditTotals({
-      items: after.items,
-      orderDiscount: after.orderDiscount,
-      shippingFee: after.shippingFee,
-      chargesTax: after.chargesTax,
-      taxExempt: Boolean(order.tax_exempt),
-    });
     Object.assign(update, {
       subtotal: totals.subtotal,
       discount: totals.discount,
@@ -199,14 +217,28 @@ export async function applyOrderEdit(
     if (order.tax_exempt && order.tax_exempt_snapshot && typeof order.tax_exempt_snapshot === 'object') {
       update.tax_exempt_snapshot = { ...(order.tax_exempt_snapshot as Record<string, unknown>), taxNotCharged: totals.taxNotCharged };
     }
-    // A paid order paid in ONE part (shipping fee change): that part follows the new total.
-    if (rules.paid) {
-      const parts = readSalePaymentParts((order.payment_response as { payments?: unknown } | null)?.payments, 1);
-      if (parts && parts.length === 1 && order.payment_response && typeof order.payment_response === 'object') {
-        const response = order.payment_response as Record<string, unknown>;
-        update.payment_response = { ...response, payments: [{ ...(response.payments as unknown[])[0] as object, amount: totals.total }] };
-      }
-    }
+  }
+  // "Paid by" (paid outside the site): saved the way Instant Sale saves it — the
+  // method value, the readable reference and the parts on `payment_response`.
+  if (rules.paymentsEditable && rules.paymentPrefix && (payments || money)) {
+    const parts = after.payments;
+    const hasTrade = parts.some((part) => part.method === SALE_TRADE_CREDIT);
+    const paidBy = parts.length > 1 ? 'split' : parts[0].method;
+    const response = order.payment_response && typeof order.payment_response === 'object' ? { ...(order.payment_response as Record<string, unknown>) } : {};
+    response.paid_by = paidBy;
+    if (paidBy === 'split' || hasTrade) response.payments = parts;
+    else delete response.payments;
+    update.payment_method = `${rules.paymentPrefix}_${paidBy}`;
+    update.payment_reference = salePaymentReference(rules.paymentPrefix === 'remote' ? 'Invoice' : 'In store', paidBy, parts);
+    update.payment_response = response;
+  }
+  // Refunded (paid, not PayPal): the amount and the status it gives.
+  if (rules.refundEditable && (refund || money)) {
+    const status = refundPaymentStatus(after.refundAmount, totals.total);
+    update.refund_amount = after.refundAmount > 0 ? after.refundAmount : null;
+    update.payment_status = status;
+    if (status === 'refunded') update.order_status = 'refunded';
+    else if (String(order.order_status ?? '') === 'refunded') update.order_status = 'completed';
   }
   let { error: orderError } = await service.from('orders').update(update).eq('id', orderId);
   if (orderError && /gift_/.test(orderError.message)) {
@@ -216,22 +248,33 @@ export async function applyOrderEdit(
   }
   if (orderError) return { ok: false, status: 500, error: `The items were saved but the order was not: ${orderError.message}. Open Edit order again and save.` };
 
-  // ---- 3. Listings (unpaid orders) -----------------------------------------------
+  // ---- 3. Listings -------------------------------------------------------------------
+  // A removed listed piece goes back on sale (held for an unpaid order, or sold on a
+  // paid one — owner pick 4); an added one is held (unpaid) or marked Sold (paid).
+  const paidOrder = isPaidStatus(order.payment_status);
   if (removedProductIds.length > 0) {
     const { data } = await service.from('products').select('id, status').in('id', removedProductIds);
-    const held = (data ?? []).filter((row) => String(row.status ?? '').toLowerCase() === 'pending_payment').map((row) => String(row.id));
-    if (held.length > 0) {
-      const result = await adminUpdateProductsStatus(held, 'available');
+    const backOnSale = (data ?? [])
+      .filter((row) => {
+        const status = String(row.status ?? '').toLowerCase();
+        return status === 'pending_payment' || (paidOrder && status === 'sold');
+      })
+      .map((row) => String(row.id));
+    if (backOnSale.length > 0) {
+      const result = await adminUpdateProductsStatus(backOnSale, 'available');
       if (result.error) warnings.push(`A removed piece could not be put back on sale: ${result.error}`);
     }
   }
   if (addedProductIds.length > 0) {
-    const result = await adminUpdateProductsStatus(addedProductIds, 'pending_payment');
-    if (result.error) warnings.push(`An added piece could not be held for this order: ${result.error}`);
+    const soldPrices = Object.fromEntries(after.items.filter((item) => item.productId && !item.id && !item.removed).map((item) => [item.productId as string, item.price]));
+    const result = paidOrder
+      ? await adminUpdateProductsStatus(addedProductIds, 'sold', soldPrices)
+      : await adminUpdateProductsStatus(addedProductIds, 'pending_payment');
+    if (result.error) warnings.push(`An added piece could not be ${paidOrder ? 'marked Sold' : 'held for this order'}: ${result.error}`);
   }
 
   // ---- 4. Invoice record ------------------------------------------------------------
-  if (money) {
+  if (money || payments || refund) {
     const { data: hasInvoice } = await service.from('invoices').select('id').eq('order_id', orderId).limit(1);
     if ((hasInvoice ?? []).length > 0) {
       const invoice = await upsertOrderInvoice(service, orderId);
@@ -243,7 +286,7 @@ export async function applyOrderEdit(
   const oldEmail = (before.customerEmail || '').toLowerCase();
   const newEmail = (after.customerEmail || '').toLowerCase();
   const emailChanged = oldEmail !== newEmail;
-  if (rules.paid && (emailChanged || money)) {
+  if (rules.paid && (emailChanged || money || refund)) {
     for (const email of new Set([oldEmail, newEmail].filter(Boolean))) {
       const problem = await recomputeBuyer(service, email);
       if (problem) warnings.push(problem);
@@ -262,7 +305,7 @@ export async function applyOrderEdit(
   }
 
   // ---- 6. History ---------------------------------------------------------------------
-  const historySaved = await recordOrderChange(service, orderId, byEmail, source, changes, money);
+  const historySaved = await recordOrderChange(service, orderId, byEmail, source, changes, money || payments || refund);
   return { ok: true, changes, historySaved, warnings, emailChanged };
 }
 

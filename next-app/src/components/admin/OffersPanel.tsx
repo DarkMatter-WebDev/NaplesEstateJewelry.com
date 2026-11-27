@@ -32,7 +32,8 @@ import { AppIcon } from '@/components/AppIcon';
  * Open offers first, soonest deadline on top. Accept charges the held money at
  * once (paid order, item SOLD); Counter releases the hold and emails a private
  * Buy-now link; Decline releases the hold. Counter and Decline each take an
- * optional message to the buyer (signed "— Chris"), kept on the offer.
+ * optional message to the buyer (the email then carries Chris's signature
+ * block, lib/email-signature.ts), kept on the offer.
  *
  * ONE card, two layouts (mockup v3): a row on a computer, and on a phone a
  * single column in the order the owner decides in — what, how much, how long,
@@ -111,7 +112,7 @@ function MessageBox({ id, first, value, onChange }: { id: string; first: string;
         onChange={(event) => onChange(event.target.value)}
       />
       <p className="mt-1 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-        Goes in the email, signed &ldquo;— Chris&rdquo;. Up to {OWNER_NOTE_MAX} characters.
+        Goes in the email, with your signature block after the button. Up to {OWNER_NOTE_MAX} characters.
       </p>
     </>
   );

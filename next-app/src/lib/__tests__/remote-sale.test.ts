@@ -134,7 +134,13 @@ describe('the invoice email carries the pay link only when a remote sale sends i
     expect(content.html).toContain('Pay $2,871.54 securely');
     expect(content.html).toContain('Other ways to pay');
     expect(content.html).toContain('Zelle to <span style="white-space:nowrap;">(239) 304-6229</span>');
-    expect(content.html).toContain('Margaret — here is the invoice.<br/>Thank you!<br/>— Chris');
+    expect(content.html).toContain('Margaret — here is the invoice.<br/>Thank you!\n');
+    expect(content.html).not.toContain('<br/>— Chris');
+    // Chris's signature block at the end, before the order footer (owner, 2026-11-26).
+    expect(content.html.split('&mdash;&nbsp;Chris Surette').length - 1).toBe(1);
+    expect(content.html.indexOf('Chris Surette')).toBeLessThan(content.html.indexOf('/order-lookup'));
+    expect(content.text).toContain('— Chris Surette');
+    expect(content.text).not.toMatch(/^— Chris$/m);
     expect(content.text).toContain(payment.payUrl);
     expect(content.text).toContain('OTHER WAYS TO PAY');
     expect(content.intro).toBe('Here is your invoice from Naples Estate Jewelry for order NEJ-20261021-K7QM2.');
@@ -147,6 +153,8 @@ describe('the invoice email carries the pay link only when a remote sale sends i
     const paid = buildInvoiceEmailContent({ ...order, payment_status: 'paid' } as InvoiceEmailOrder, null, { payment });
     expect(paid.html).not.toContain('/pay/');
     expect(paid.html).not.toContain('— Chris');
+    expect(paid.html).not.toContain('Chris Surette');
+    expect(plain.html).not.toContain('Chris Surette');
   });
 });
 

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { AudienceScope, MarketingSenderProfile } from '@/lib/marketing';
 import { withMarketingFooter } from '@/lib/marketing-email-html';
+import { chrisSignatureHtml } from '@/lib/email-signature';
 import { addressOneLine } from '@/lib/business-location';
 
 type SettingsState = {
@@ -279,7 +280,9 @@ export default function MarketingComposer() {
   <body>
     <div class="email-shell">
       <div class="email-paper">
-        ${withMarketingFooter(previewIsEs ? htmlEs : html, previewUnsubscribeUrl, previewMailingAddress, previewLanguage)}
+        ${withMarketingFooter(previewIsEs ? htmlEs : html, previewUnsubscribeUrl, previewMailingAddress, previewLanguage, {
+          signatureHtml: senderProfile === 'chris' ? chrisSignatureHtml(previewLanguage) : undefined,
+        })}
       </div>
     </div>
   </body>

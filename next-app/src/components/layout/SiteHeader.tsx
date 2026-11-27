@@ -8,7 +8,7 @@ import { useTranslations, useLocale } from 'next-intl';
 import { useWishlist } from '@/context/WishlistContext';
 import { useCart } from '@/context/CartContext';
 import { AppIcon } from '@/components/AppIcon';
-import { CONTACT_PHONE_DISPLAY, TEL_HREF, smsHref } from '@/lib/contact-links';
+import { CONTACT_PHONE_DISPLAY, TEL_HREF, directionsHref, smsHref } from '@/lib/contact-links';
 
 const GOLD = '#735c00';
 const SECONDARY = '#5e5e5d';
@@ -142,8 +142,10 @@ const HEADER_STYLES = `
      2.9vw is sized so this is >= the old value at every width (320px: 9.28 vs
      8.8; 350px: 10.15 vs 9.63; 11px cap from ~379px, where the old rules only
      reached 11px at 400px), i.e. nothing got smaller to make room for the mark.
-     That is affordable only because the ES/EN chip left this row for the mobile
-     menu on the same day; before that it had to be 2.35vw to fit.
+     The ES/EN chip left this row on phones that day (2026-08-17) and came back
+     on 2026-11-26, paid for by turning the worded MENU/CERRAR toggle into a
+     32px three-line icon: re-measured 320-1279px, every width fits with >= 8px
+     to spare (Spanish, menu open included).
 
      Floor stays 8.75px, the floor this header already used at 320px.
      ⚠️ Re-measure the 320-430px band in Spanish WITH THE MENU OPEN before
@@ -159,8 +161,8 @@ const HEADER_STYLES = `
       height: clamp(1.75rem, 7vw, 2rem);
     }
   }
-  /* No .site-header-language rules in the narrow blocks below: that chip is
-     display:none under md now, so anything sizing it here would be dead code.
+  /* The ES/EN chip shows at every width (2026-11-26). It needs no narrow-band
+     rules: the row has >= 8px spare at 320-1279px with today's spacing.
      (Never use a backtick in this block — these styles are a template literal
      and a stray one ends the string mid-CSS.) */
   @media (max-width: 399px) {
@@ -171,27 +173,93 @@ const HEADER_STYLES = `
     .site-header-actions {
       gap: 0.25rem;
     }
-    .menu-toggle {
-      padding-inline: 0.5rem;
-    }
   }
 
-  /* Menu toggle (mobile) */
+  /* Menu toggle (below xl), two looks chosen by width (owner, 2026-11-26):
+     - below 430px: a three-line icon, an X while the menu is open. Same box
+       and icon size as the phone and cart buttons. It replaced the worded
+       pill there so the ES/EN chip fits and the cart badge (which overhangs
+       the cart by 4px) is not against an outline.
+     - 430px to 1279px: the worded MENU / CLOSE (MENU / CERRAR) pill, as before.
+       Measured with the ES chip in place: the pill first fits with 8px spare
+       and the badge clear of its outline at 422px, in the widest case
+       (Spanish CERRAR, menu open); 430 is the round step above that.
+     The label lives in aria-label in both looks; the word span is aria-hidden. */
   .menu-toggle {
-    border: 1px solid rgba(115, 92, 0, 0.5);
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     border-radius: var(--radius-lg);
     color: ${GOLD};
-    font-family: var(--font-label);
-    /* Set the size explicitly: a button ignores the text-[10px] utility because
-       the global 'button { font: inherit }' reset (unlayered) overrides Tailwind's
-       layered utilities. 12px at md matches the language chip it sits beside
-       there; below md that chip is hidden and this is the only labelled control
-       in the row, so 10px is on its own. */
-    font-size: 0.625rem;
-    transition: background 150ms ease, color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+    cursor: pointer;
+    transition: color 150ms ease, background 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+  }
+  .menu-toggle-word {
+    display: none;
+  }
+  .menu-toggle > .app-icon {
+    transition: transform 150ms ease;
+  }
+  .menu-toggle:hover > .app-icon {
+    transform: translateY(-1px);
+  }
+  .menu-toggle:active > .app-icon {
+    transform: scale(0.88);
+    transition-duration: 0.05s;
+  }
+  .menu-toggle:focus-visible {
+    outline: 2px solid ${GOLD};
+    outline-offset: 2px;
+  }
+  @media (min-width: 430px) {
+    .menu-toggle {
+      width: auto;
+      height: auto;
+      border: 1px solid rgba(115, 92, 0, 0.5);
+      font-family: var(--font-label);
+      font-size: 0.625rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 0.375rem 0.625rem;
+    }
+    .menu-toggle > .app-icon {
+      display: none;
+    }
+    .menu-toggle-word {
+      display: inline;
+    }
+    .menu-toggle:hover {
+      background: rgba(212, 175, 55, 0.1);
+      border-color: rgba(115, 92, 0, 0.75);
+      transform: translateY(-1px);
+    }
+    .menu-toggle:active {
+      transform: scale(0.96);
+      transition-duration: 0.05s;
+    }
+    .menu-toggle[data-open="true"] {
+      background: linear-gradient(135deg, #dcb336, #b5890c);
+      border-color: transparent;
+      color: #fffdf7;
+      box-shadow: 0 8px 20px rgba(181, 137, 12, 0.2);
+    }
   }
   @media (min-width: 768px) {
-    .menu-toggle { font-size: 0.75rem; }
+    .menu-toggle {
+      font-size: 0.75rem;
+      padding: 0.5rem 0.75rem;
+    }
+  }
+  /* ⛔ The display:flex above is unlayered, so it beats the Tailwind xl:hidden
+     on the button: without this rule the icon showed at 1280px and up, where
+     the menu panel never opens. Do not drop it. */
+  @media (min-width: 1280px) {
+    .menu-toggle {
+      display: none;
+    }
   }
   @media (max-width: 349px) {
     .site-header-row {
@@ -205,7 +273,8 @@ const HEADER_STYLES = `
       gap: 0.125rem;
     }
     .site-header-call-button,
-    .site-header-icon-button {
+    .site-header-icon-button,
+    .menu-toggle {
       width: 1.75rem;
       height: 1.75rem;
     }
@@ -216,17 +285,6 @@ const HEADER_STYLES = `
       height: 0.875rem;
       font-size: 0.4375rem;
     }
-    .menu-toggle {
-      border-radius: 0.625rem;
-      font-size: 0.5625rem;
-      padding: 0.25rem 0.4rem;
-    }
-  }
-  .menu-toggle[data-open="true"] {
-    background: linear-gradient(135deg, #dcb336, #b5890c);
-    border-color: transparent;
-    color: #fffdf7;
-    box-shadow: 0 8px 20px rgba(181, 137, 12, 0.2);
   }
 
   /* Mobile menu panel — elevated, warm-tinted, rounded */
@@ -527,20 +585,17 @@ export default function SiteHeader() {
 
         {/* Actions */}
         <div className="site-header-actions flex items-center gap-2 md:gap-3 flex-shrink-0">
-          {/* Language — md and up only (owner, 2026-08-17), to buy back header
-              space on phones. Below md it is NOT lost: the mobile menu has
-              carried its own language item all along (the `Español`/`English`
-              MobileLink at the foot of the panel), so this chip was a duplicate
-              control on exactly the widths that could least afford one.
+          {/* Language — every width (owner, 2026-11-26). It was md-and-up only
+              from 2026-08-17 to buy back phone header space; the three-line
+              menu toggle below paid that space back, so it returned. The mobile
+              menu keeps its own `Español`/`English` MobileLink as well.
 
-              Safe for SEO despite Google indexing mobile-first: hreflang is
-              declared in the HEAD by `pageMetadata()`/`alternatesFor()` on every
-              page (verified: en, es and x-default all present), and every locale
-              URL is in the sitemap. Alternate-language discovery never depended
-              on this body link. */}
+              hreflang is declared in the HEAD by `pageMetadata()`/`alternatesFor()`
+              on every page and every locale URL is in the sitemap, so
+              alternate-language discovery never depended on this body link. */}
           <Link
             href={altHref}
-            className="site-header-language hover-chip hidden md:inline-block text-xs font-bold tracking-widest uppercase px-1.5 py-1 transition-colors"
+            className="site-header-language hover-chip inline-block text-xs font-bold tracking-widest uppercase px-1.5 py-1 transition-colors"
             style={{ color: GOLD, fontFamily: 'var(--font-label)' }}
           >
             {locale === 'en' ? 'ES' : 'EN'}
@@ -687,12 +742,19 @@ export default function SiteHeader() {
             onClick={() => {
               if (menuOpen) { closeAll(); } else { setMenuOpen(true); }
             }}
-            className="menu-toggle xl:hidden px-2.5 py-1.5 md:px-3 md:py-2 text-[10px] md:text-xs font-bold tracking-widest uppercase"
+            className="menu-toggle xl:hidden"
             data-open={menuOpen ? 'true' : 'false'}
             aria-expanded={menuOpen}
             aria-label={menuOpen ? t('close') : t('menu')}
           >
-            {menuOpen ? t('close') : t('menu')}
+            {/* Both are rendered; CSS picks one by width (no JS, no flash):
+                the icon below 430px, the word from 430px up. */}
+            <AppIcon
+              name={menuOpen ? 'close' : 'menu'}
+              className="menu-toggle-icon"
+              style={{ fontSize: 'var(--site-header-action-icon-size, 20px)', lineHeight: 1 }}
+            />
+            <span className="menu-toggle-word" aria-hidden="true">{menuOpen ? t('close') : t('menu')}</span>
           </button>
         </div>
       </div>
@@ -788,6 +850,22 @@ export default function SiteHeader() {
               >
                 <AppIcon name="sms" className="text-[1rem]" />
                 {locale === 'en' ? 'Text Us' : 'Enviar Texto'}
+              </a>
+            </div>
+            {/* Get Directions (owner, 2026-11-26): same order as the phone
+                contact bar — Call, Text, Directions. Opens Google Maps in a
+                new tab, so the panel closes itself first. */}
+            <div className="mobile-row">
+              <a
+                href={directionsHref()}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={closeAll}
+                className="mobile-nav-link text-xs font-bold uppercase tracking-[0.08em]"
+                style={{ color: GOLD, justifyContent: 'flex-start', gap: '0.5rem' }}
+              >
+                <AppIcon name="location_on" className="text-[1rem]" />
+                {locale === 'en' ? 'Get Directions' : 'Cómo Llegar'}
               </a>
             </div>
 

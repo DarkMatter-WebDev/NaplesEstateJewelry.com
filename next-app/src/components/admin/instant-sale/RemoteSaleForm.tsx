@@ -383,7 +383,7 @@ export default function RemoteSaleForm({
           <label className="block">
             <span className={label} style={labelStyle}>Message to the customer<Optional /></span>
             <textarea className="form-field" rows={3} value={message} maxLength={REMOTE_MESSAGE_MAX} onChange={(e) => setMessage(e.target.value)} placeholder="Here is the invoice for the pieces we talked about. Thank you!" />
-            <span className="mt-1 block text-xs" style={hintStyle}>Shown in the email, signed &ldquo;— Chris&rdquo;.</span>
+            <span className="mt-1 block text-xs" style={hintStyle}>Shown in the email, which then ends with your signature block.</span>
           </label>
         </section>
       </div>

@@ -51,6 +51,21 @@ describe('Text Us links', () => {
     expect(header.match(/site-header-call-button/g)?.length).toBeGreaterThanOrEqual(1);
     expect(header).not.toContain('site-header-text-button');
   });
+
+  // Owner, 2026-11-26 (mockup A): Get Directions in the phone/tablet menu and
+  // beside Call at the top of /contact — the one Google Maps link, so the
+  // site-wide Ads listener counts it.
+  it('puts Get Directions in the menu (after Text) and beside Call on /contact', () => {
+    const header = read('src', 'components', 'layout', 'SiteHeader.tsx');
+    expect(header).toContain('href={directionsHref()}');
+    expect(header.indexOf('href={directionsHref()}')).toBeGreaterThan(header.indexOf('href={smsHref()}'));
+    expect(header).toContain("'Get Directions' : 'Cómo Llegar'");
+    const form = read('src', 'components', 'contact', 'MessageUsForm.tsx');
+    expect(form).toContain('href={TEL_HREF}');
+    expect(form).toContain('href={directionsHref()}');
+    expect(form.indexOf('href={directionsHref()}')).toBeGreaterThan(form.indexOf('href={TEL_HREF}'));
+    expect(form).toContain("'Cómo Llegar' : 'Get Directions'");
+  });
 });
 
 describe('/bullion hero', () => {

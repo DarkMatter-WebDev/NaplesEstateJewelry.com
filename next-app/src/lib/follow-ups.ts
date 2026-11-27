@@ -19,6 +19,7 @@
 
 import { addressOneLine } from '@/lib/business-location';
 import { escapeHtml } from '@/lib/marketing-email-html';
+import { chrisSignatureHtml, chrisSignatureText, isChrisSignOffLine, isTeamLine } from '@/lib/email-signature';
 import { formatSocialScheduleInput, parseSocialScheduleInput } from '@/lib/social-queue-schedule';
 
 export const FOLLOW_UPS_SQL_FILE = 'supabase/follow-ups-2026-11.sql';
@@ -330,8 +331,11 @@ export function findUnknownToken(text: string): string | null {
  * The built-in wording. Step 1 = "Rob's blend" (owner, 2026-11-25, mockup 1):
  * the personal opening ({opening} — AI-written per person, or the standard
  * line), the review as a direct ask with a button, the "Here whenever you need
- * us" box BELOW the review, two small cards for later, and "Chris, and the
- * Naples Estate Jewelry Team". Was style A ("a note from Chris", 2026-11-24).
+ * us" box BELOW the review, two small cards for later, and the sign-off.
+ * Was style A ("a note from Chris", 2026-11-24).
+ * The sign-off: a line that is just "Chris" becomes Chris's signature block
+ * (lib/email-signature.ts, owner 2026-11-26); "and the Naples Estate Jewelry
+ * Team" was dropped then (and is dropped from owner-saved templates too).
  * The owner can edit any of them in Admin → Follow-ups → Edit emails; an edit
  * is stored in `follow_up_settings.templates` and "Reset to ours" removes it.
  * Spanish: written here, ◻ translator review open (TASKS).
@@ -347,7 +351,7 @@ export const DEFAULT_FOLLOW_UP_TEMPLATES: Record<FollowUpTemplateKey, FollowUpTe
       '{review_button}',
       '{help_box}',
       '{extras}',
-      'Thank you again,\nChris\nand the Naples Estate Jewelry Team',
+      'Thank you again,\nChris',
     ].join('\n\n'),
   },
   'seller-1-es': {
@@ -360,7 +364,7 @@ export const DEFAULT_FOLLOW_UP_TEMPLATES: Record<FollowUpTemplateKey, FollowUpTe
       '{review_button}',
       '{help_box}',
       '{extras}',
-      'Gracias de nuevo,\nChris\ny el equipo de Naples Estate Jewelry',
+      'Gracias de nuevo,\nChris',
     ].join('\n\n'),
   },
   'seller-2-en': {
@@ -391,7 +395,7 @@ export const DEFAULT_FOLLOW_UP_TEMPLATES: Record<FollowUpTemplateKey, FollowUpTe
       '{review_button}',
       '{help_box}',
       '{extras}',
-      'Thank you again,\nChris\nand the Naples Estate Jewelry Team',
+      'Thank you again,\nChris',
     ].join('\n\n'),
   },
   'buyer-1-es': {
@@ -404,7 +408,7 @@ export const DEFAULT_FOLLOW_UP_TEMPLATES: Record<FollowUpTemplateKey, FollowUpTe
       '{review_button}',
       '{help_box}',
       '{extras}',
-      'Gracias de nuevo,\nChris\ny el equipo de Naples Estate Jewelry',
+      'Gracias de nuevo,\nChris',
     ].join('\n\n'),
   },
   'buyer-2-en': {
@@ -616,8 +620,29 @@ export function renderFollowUp(template: FollowUpTemplate, input: FollowUpRender
   const subjectRaw = fillTokens(template.subject, { ...plainValues, '{first_name}': firstName ?? '', '{review_link}': reviewWords, '{review_button}': reviewWords, '{help_box}': '', '{extras}': '' });
   const subject = subjectRaw.replace(/,\s*(—|$)/, (_m, dash: string) => (dash ? ` ${dash}` : '')).replace(/\s{2,}/g, ' ').trim();
 
-  const paragraphs = template.body.replace(/\r\n/g, '\n').split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
   const isBlock = (paragraph: string): paragraph is BlockToken => (BLOCK_TOKENS as readonly string[]).includes(paragraph);
+  // The sign-off (owner, 2026-11-26): the first line that is just "Chris"
+  // becomes the signature block; an "and the Naples Estate Jewelry Team" line
+  // right under it is dropped. Anything after it in the same paragraph stays.
+  const SIGNATURE = '\u0000signature\u0000';
+  const paragraphs: string[] = [];
+  let signed = false;
+  for (const paragraph of template.body.replace(/\r\n/g, '\n').split(/\n{2,}/).map((p) => p.trim()).filter(Boolean)) {
+    const lines = paragraph.split('\n');
+    const at = signed || isBlock(paragraph) ? -1 : lines.findIndex(isChrisSignOffLine);
+    if (at < 0) {
+      paragraphs.push(paragraph);
+      continue;
+    }
+    signed = true;
+    const after = lines.slice(at + 1);
+    if (after.length > 0 && isTeamLine(after[0])) after.shift();
+    const beforeText = lines.slice(0, at).join('\n').trim();
+    const afterText = after.join('\n').trim();
+    if (beforeText) paragraphs.push(beforeText);
+    paragraphs.push(SIGNATURE);
+    if (afterText) paragraphs.push(afterText);
+  }
   const hasHelpBox = paragraphs.includes('{help_box}');
   // Inline (not on their own line) the block words read as plain words.
   const inlineText = { '{review_button}': `${reviewWords} (${input.reviewUrl})`, '{help_box}': '', '{extras}': '' };
@@ -633,7 +658,9 @@ export function renderFollowUp(template: FollowUpTemplate, input: FollowUpRender
     ].join('\n');
   };
   const textParagraphs = paragraphs.map((paragraph) =>
-    isBlock(paragraph)
+    paragraph === SIGNATURE
+      ? chrisSignatureText(input.language)
+      : isBlock(paragraph)
       ? textBlock(paragraph)
       : tidy(fillTokens(paragraph, { ...plainValues, ...inlineText, '{review_link}': `${reviewWords} (${input.reviewUrl})` })),
   );
@@ -677,17 +704,16 @@ export function renderFollowUp(template: FollowUpTemplate, input: FollowUpRender
       + '<div style="height:12px;line-height:12px;font-size:1px;">&nbsp;</div>';
   };
   const htmlParagraphs = paragraphs.map((paragraph) => {
+    if (paragraph === SIGNATURE) return chrisSignatureHtml(input.language);
     if (isBlock(paragraph)) return htmlBlock(paragraph);
     const lines = tidy(fillTokens(paragraph, { ...plainValues, '{review_button}': marker, '{help_box}': '', '{extras}': '', '{review_link}': marker })).split('\n').map((line) => line.trim());
-    const rendered = lines.map((line) => {
-      if (line === 'Chris') return `<span style="font-family:Georgia,'Times New Roman',serif;font-size:19px;color:#222222;">Chris</span>`;
-      return keepPhone(escapeHtml(line)).split(marker).join(link);
-    });
+    const rendered = lines.map((line) => keepPhone(escapeHtml(line)).split(marker).join(link));
     return `<p style="${paragraphStyle}">${rendered.join('<br />')}</p>`;
   });
 
-  // The small name · phone line under the sign-off — not needed when the help box already gives the phone.
-  const signLine = hasHelpBox
+  // The small name · phone line — only for an owner-edited email with no
+  // "Chris" line (so no signature block) and no help box giving the phone.
+  const signLine = hasHelpBox || signed
     ? ''
     : `<p style="margin:4px 0 0;${FONT}font-size:13px;line-height:1.5;color:#666666;">${escapeHtml(input.businessName)} &middot; <span style="white-space:nowrap;">${escapeHtml(input.phone)}</span></p>\n`;
 

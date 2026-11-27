@@ -11,6 +11,8 @@ import { LeadSendError, leadSendErrorMessage } from '@/lib/lead-form-errors';
 import { leadPhotoCapHint } from '@/lib/lead-photo-limits';
 import { leadPhotosTooLargeMessage, shrinkFormPhotos } from '@/lib/lead-photo-prep';
 import { phoneHoursLabel } from '@/lib/business-location';
+import { AppIcon } from '@/components/AppIcon';
+import { TEL_HREF, directionsHref } from '@/lib/contact-links';
 import { appendAdClickFields, sendAdsConversion } from '@/lib/ads-tracking-browser';
 import { FormGrid, PageContainer, Section } from '@/components/layout/ResponsiveLayout';
 import AppointmentRequestField from '@/components/contact/AppointmentRequestField';
@@ -136,10 +138,23 @@ export default function MessageUsForm({ locale, storeHours }: Props) {
               ? 'Envíenos un mensaje y adjunte fotos si lo desea — nos dan un primer vistazo. Le responderemos lo antes posible.'
               : 'Send us a note and attach photos if you like — they give us a first look. We\'ll get back to you as soon as we can.'}
           </p>
+          {/* Call + Get Directions, side by side (they stack on a phone) —
+              owner-approved mockup A, 2026-11-26. Before this, the only
+              directions button on /contact sat far down in Visit Us, and on a
+              desktop the site had no quick directions link at all. Same
+              Google Maps link as every directions button, so the site-wide
+              Ads listener counts it with no extra wiring. Call stays first. */}
           <div className="mb-8 flex flex-col items-center gap-2">
-            <a href="tel:2394048505" className="outline-button">
-              {isEs ? 'Llamar (239) 404-8505' : 'Call (239) 404-8505'}
-            </a>
+            <div className="flex flex-wrap justify-center gap-3">
+              <a href={TEL_HREF} className="outline-button">
+                <AppIcon name="call" className="text-[1rem]" />
+                {isEs ? 'Llamar (239) 404-8505' : 'Call (239) 404-8505'}
+              </a>
+              <a href={directionsHref()} target="_blank" rel="noopener noreferrer" className="outline-button">
+                <AppIcon name="location_on" className="text-[1rem]" />
+                {isEs ? 'Cómo Llegar' : 'Get Directions'}
+              </a>
+            </div>
             <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>{phoneHoursLabel(isEs)}</p>
           </div>
         </div>

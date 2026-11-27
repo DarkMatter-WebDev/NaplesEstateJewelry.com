@@ -146,7 +146,7 @@ export default function FollowUpEditor({
               <li key={entry.token}><code style={{ color: 'var(--color-primary)' }}>{entry.token}</code> <span style={MUTED}>— {entry.help}</span></li>
             ))}
           </ul>
-          <p className="mt-1" style={MUTED}>The address and the Unsubscribe link are added under every email. Keep the review a soft ask: &ldquo;if you have a minute&rdquo; — never &ldquo;if you enjoyed it&rdquo; (Google&rsquo;s rules).</p>
+          <p className="mt-1" style={MUTED}>A line that is just <b>Chris</b> becomes your signature block (name, logo, phone, email, address). The address and the Unsubscribe link are added under every email. Keep the review a soft ask: &ldquo;if you have a minute&rdquo; — never &ldquo;if you enjoyed it&rdquo; (Google&rsquo;s rules).</p>
         </div>
 
         {error && <p role="alert" className="text-sm font-semibold" style={{ color: 'var(--color-error)' }}>{error}</p>}

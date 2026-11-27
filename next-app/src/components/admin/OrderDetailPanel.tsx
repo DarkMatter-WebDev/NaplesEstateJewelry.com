@@ -401,7 +401,10 @@ export default function OrderDetailPanel({
       order_status: 'refunded',
       refund_amount: order.total,
     }, 'refunded');
-    if (ok) setMessage({ text: 'Order marked refunded. Products were not returned to available automatically.', ok: true });
+    if (ok) {
+      setShowFullRefundConfirm(false);
+      setMessage({ text: 'Order marked refunded. Products were not returned to available automatically.', ok: true });
+    }
   }
 
   async function markPartiallyRefunded() {
@@ -822,13 +825,10 @@ export default function OrderDetailPanel({
               <button
                 type="button"
                 onClick={() => {
-                  if (isPayPalOrder) {
-                    setShowFullRefundConfirm(true);
-                    setShowPartialRefund(false);
-                    setMessage(null);
-                  } else {
-                    void markRefunded();
-                  }
+                  // Both kinds ask first (2026-11-26): PayPal moves money; any other only writes a refund down.
+                  setShowFullRefundConfirm(true);
+                  setShowPartialRefund(false);
+                  setMessage(null);
                 }}
                 disabled={saving === 'refunded' || order.payment_status === 'refunded' || remainingRefundAmount <= 0}
                 className="outline-button text-sm disabled:opacity-50"
@@ -944,7 +944,12 @@ export default function OrderDetailPanel({
             {showFullRefundConfirm && (
               <div className="flex flex-wrap items-center gap-3 border px-4 py-3" style={{ borderColor: 'var(--color-error)', background: 'white' }}>
                 <span className="text-sm" style={{ color: 'var(--color-on-surface)' }}>
-                  Refund the remaining {formatCurrency(remainingRefundAmount)} through PayPal? This moves real money and does not restore inventory.
+                  {isPayPalOrder ? (
+                    <>Refund the remaining {formatCurrency(remainingRefundAmount)} through PayPal? This moves real money and does not restore inventory.</>
+                  ) : (
+                    // 2026-11-26: a one-click "Mark Refunded" wrote down a refund that never happened.
+                    <>Record that <b>{formatCurrency(order.total)}</b> was given back to {order.customer_name || 'the customer'}? This only writes it down; no money moves. Give the money back first (cash, Zelle…). It can be undone in ✎ Edit order → Refunded.</>
+                  )}
                 </span>
                 <button
                   type="button"
@@ -953,7 +958,7 @@ export default function OrderDetailPanel({
                   className="outline-button text-sm disabled:opacity-50"
                   style={{ borderColor: 'var(--color-error)', color: 'var(--color-error)' }}
                 >
-                  {saving === 'refunded' ? 'Refunding...' : 'Confirm PayPal Refund'}
+                  {saving === 'refunded' ? (isPayPalOrder ? 'Refunding...' : 'Saving...') : isPayPalOrder ? 'Confirm PayPal Refund' : 'Mark refunded'}
                 </button>
                 <button type="button" onClick={() => setShowFullRefundConfirm(false)} className="outline-button text-sm">
                   Keep Payment

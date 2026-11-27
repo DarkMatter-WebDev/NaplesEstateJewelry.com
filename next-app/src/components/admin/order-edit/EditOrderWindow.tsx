@@ -3,33 +3,55 @@
 import { useMemo, useState } from 'react';
 import AdminModal from '@/components/admin/AdminModal';
 import {
-  computeEditTotals,
   describeChanges,
   EDIT_LIMITS,
+  editRefusal,
   editStateFromOrder,
+  editTotals,
+  moneyChanged,
   orderEditRules,
+  settlePayments,
   SHIPPING_METHOD_LABELS,
+  taxReason,
+  totalsChanges,
   type EditableAddress,
   type EditItem,
+  type EditTotals,
   type OrderEditState,
   type OrderRowForEdit,
   type ShippingMethodValue,
 } from '@/lib/order-edit';
 import type { AddableProduct } from '@/lib/order-edit-server';
 import { formatCurrency } from '@/types/sales';
-import { paymentMethodLabel } from '@/lib/in-store-sale';
+import {
+  IN_STORE_PAYMENT_LABELS,
+  IN_STORE_PAYMENT_METHODS,
+  paymentMethodLabel,
+  SALE_PAYMENTS_MAX,
+  SALE_TRADE_CREDIT,
+  salePaymentPartLabel,
+  salePaymentsMismatch,
+  type SalePaymentMethod,
+  type SalePaymentPart,
+} from '@/lib/in-store-sale';
 
 /**
- * Admin → Orders → "✎ Edit order" (owner, 2026-11-24 (11), mockup 2, option B).
- * Details on any order; money only while unpaid; the shipping fee also on paid
- * non-PayPal single-payment orders; Trade-in money always locked
- * (lib/order-edit.ts). The window previews the new totals and the change list;
- * the server re-checks everything on Save.
+ * Admin → Orders → "✎ Edit order" — FULL CONTROL (owner, 2026-11-26, mockup 1
+ * "Yes, build it"): nothing is locked on a paid order. Items, prices, the
+ * "Bullion — no sales tax" box per line, discounts, shipping, the tax, "Paid by"
+ * and Refunded can all change; the tax follows every change at once
+ * (lib/order-edit.ts `editTotals` / `taxApplies`). PayPal and Trade-in orders
+ * get warnings, not locks. The server re-checks everything on Save.
  */
 
 const SMALL = { padding: '0.45rem 0.9rem', fontSize: '0.6rem', letterSpacing: '0.1em' } as const;
 const MUTED = { color: 'var(--color-on-surface-variant)' } as const;
 const GROUP = 'mb-1 text-[0.62rem] font-bold uppercase tracking-[0.18em]';
+const CHANGED = { borderColor: 'var(--color-primary)', boxShadow: '0 0 0 3px rgba(115,92,0,.1)' } as const;
+const NOTE = 'mt-2 rounded border px-3 py-2 text-[12.5px] leading-snug';
+const WARN = { background: '#fff6e0', borderColor: '#e8c27a', color: '#6b4b00' } as const;
+const GOOD = { background: '#eef7f1', borderColor: '#b9dcc6', color: '#0f4f2e' } as const;
+const BAD = { background: '#fdf0ee', borderColor: '#e3b4ae', color: '#8a1f17' } as const;
 
 let keySeq = 0;
 type Row = EditItem & { key: string };
@@ -64,11 +86,34 @@ export default function EditOrderWindow({
   const [error, setError] = useState<string | null>(null);
   const [picker, setPicker] = useState<{ state: 'closed' } | { state: 'loading' } | { state: 'open'; products: AddableProduct[]; query: string } | { state: 'error'; message: string }>({ state: 'closed' });
 
-  const after: OrderEditState = { ...draft, items: rows.map(stripKey) };
-  const changes = describeChanges(before, after);
-  const totals = computeEditTotals({ items: after.items, orderDiscount: after.orderDiscount, shippingFee: after.shippingFee, chargesTax: after.chargesTax, taxExempt });
+  const typed: OrderEditState = { ...draft, items: rows.map(stripKey) };
+  const money = moneyChanged(before, typed);
+  // Unchanged numbers show the order's saved totals; any money change re-figures them (and the tax) at once.
+  const savedTotals: EditTotals = { subtotal: Number(order.subtotal), discount: Number(order.discount), shippingFee: Number(order.shipping_fee), tax: Number(order.tax), total: Number(order.total), taxNotCharged: 0 };
+  const totals = money ? editTotals(typed, taxExempt) : savedTotals;
+  const after: OrderEditState = { ...typed, payments: settlePayments(typed.payments, totals.total) };
+  const changes = [...describeChanges(before, after), ...(money ? totalsChanges(order, totals) : [])];
+  const problem = editRefusal(rules, after, totals);
   const paidTotal = Number(order.total) || 0;
   const docLabel = rules.paid ? 'receipt' : 'invoice';
+  const paymentsSum = Math.round(after.payments.reduce((sum, part) => sum + part.amount, 0) * 100) / 100;
+  const paymentsGap = rules.paymentsEditable && after.payments.length > 0 ? salePaymentsMismatch(paymentsSum, totals.total) : null;
+
+  function setPayment(index: number, patch: Partial<SalePaymentPart>) {
+    setDraft((current) => ({ ...current, payments: current.payments.map((part, i) => (i === index ? { ...part, ...patch } : part)) }));
+  }
+  function addPayment() {
+    setDraft((current) => {
+      // Going from one payment to two: the first keeps the total so far, the new one starts empty.
+      const first = current.payments.length === 1 && current.payments[0].method !== SALE_TRADE_CREDIT
+        ? [{ ...current.payments[0], amount: totals.total }]
+        : current.payments;
+      return { ...current, payments: [...first, { method: 'cash' as SalePaymentMethod, amount: 0 }] };
+    });
+  }
+  function removePayment(index: number) {
+    setDraft((current) => ({ ...current, payments: current.payments.filter((_, i) => i !== index) }));
+  }
 
   function set<K extends keyof OrderEditState>(key: K, value: OrderEditState[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -134,13 +179,6 @@ export default function EditOrderWindow({
     }
   }
 
-  const lockNote = (text: string) => (
-    <p className="mt-2 flex gap-2 rounded border px-3 py-2 text-[12.5px] leading-snug" style={{ background: '#f3efe2', borderColor: '#e2d8b8', color: '#5b4b10' }}>
-      <span aria-hidden>🔒</span>
-      <span>{text}</span>
-    </p>
-  );
-
   const field = (label: string, value: string, onChange: (value: string) => void, opts: { max?: number; type?: string; placeholder?: string } = {}) => (
     <label className="block">
       <span className="form-label">{label}</span>
@@ -205,14 +243,10 @@ export default function EditOrderWindow({
               <div>{addressBlock('shippingAddress', draft.shippingMethod === 'pickup' ? 'Address (optional)' : 'Ship to')}</div>
               <label className="block">
                 <span className="form-label">Shipping fee</span>
-                <input className="form-field" type="number" min="0" step="0.01" value={String(draft.shippingFee)} disabled={!rules.shippingFeeAllowed}
+                <input className="form-field" type="number" min="0" step="0.01" value={String(draft.shippingFee)}
                   onChange={(e) => set('shippingFee', Math.max(0, Number(e.target.value) || 0))} />
               </label>
             </div>
-            {!rules.shippingFeeAllowed && rules.shippingLockReason && lockNote(rules.shippingLockReason)}
-            {rules.paid && rules.shippingFeeAllowed && draft.shippingFee !== before.shippingFee && (
-              <p className="mt-1 text-xs" style={{ color: '#8a3b12' }}>This order is paid: the new total ({formatCurrency(totals.total)}) will not match what was collected ({formatCurrency(paidTotal)}). Collect or give back the difference yourself.</p>
-            )}
             <details className="mt-2">
               <summary className="cursor-pointer text-xs font-semibold" style={{ color: 'var(--color-primary)' }}>Billing address</summary>
               {addressBlock('billingAddress', 'Billing address')}
@@ -234,32 +268,41 @@ export default function EditOrderWindow({
                     </label>
                     <div className="mt-2 grid grid-cols-[1fr_4.5rem_1fr_auto] items-end gap-2 sm:grid-cols-[8rem_4.5rem_7rem_auto]">
                       <label className="block"><span className="form-label">Price</span>
-                        <input className="form-field" type="number" min="0" step="0.01" value={String(row.price)} disabled={!rules.moneyAllowed || row.removed} onChange={(e) => setRow(row.key, { price: Number(e.target.value) || 0 })} /></label>
+                        <input className="form-field" type="number" min="0" step="0.01" value={String(row.price)} disabled={row.removed} onChange={(e) => setRow(row.key, { price: Number(e.target.value) || 0 })}
+                          style={was && was.price !== row.price ? CHANGED : undefined} /></label>
                       <label className="block"><span className="form-label">Qty</span>
-                        <input className="form-field" type="number" min="1" max={EDIT_LIMITS.quantity} step="1" value={String(row.quantity)} disabled={!rules.moneyAllowed || row.removed} onChange={(e) => setRow(row.key, { quantity: Math.max(1, Math.floor(Number(e.target.value) || 1)) })} /></label>
+                        <input className="form-field" type="number" min="1" max={EDIT_LIMITS.quantity} step="1" value={String(row.quantity)} disabled={row.removed} onChange={(e) => setRow(row.key, { quantity: Math.max(1, Math.floor(Number(e.target.value) || 1)) })} /></label>
                       <label className="block"><span className="form-label">Line disc.</span>
-                        <input className="form-field" type="number" min="0" step="0.01" value={String(row.discount)} disabled={!rules.moneyAllowed || row.removed} onChange={(e) => setRow(row.key, { discount: Math.max(0, Number(e.target.value) || 0) })} /></label>
-                      {rules.moneyAllowed && (
-                        row.removed ? (
-                          <button type="button" className="outline-button" style={SMALL} onClick={() => setRow(row.key, { removed: false })}>Undo</button>
-                        ) : (
-                          <button type="button" aria-label={`Remove ${row.title}`} title="Remove this item" onClick={() => (row.id ? setRow(row.key, { removed: true }) : setRows((current) => current.filter((r) => r.key !== row.key)))}
-                            className="mb-1 inline-flex h-8 w-8 items-center justify-center rounded-full border text-sm transition-transform hover:-translate-y-px active:translate-y-0" style={{ borderColor: '#e3c4c0', color: 'var(--color-error)' }}>✕</button>
-                        )
+                        <input className="form-field" type="number" min="0" step="0.01" value={String(row.discount)} disabled={row.removed} onChange={(e) => setRow(row.key, { discount: Math.max(0, Number(e.target.value) || 0) })} /></label>
+                      {row.removed ? (
+                        <button type="button" className="outline-button" style={SMALL} onClick={() => setRow(row.key, { removed: false })}>Undo</button>
+                      ) : (
+                        <button type="button" aria-label={`Remove ${row.title}`} title="Remove this item" onClick={() => (row.id ? setRow(row.key, { removed: true }) : setRows((current) => current.filter((r) => r.key !== row.key)))}
+                          className="mb-1 inline-flex h-8 w-8 items-center justify-center rounded-full border text-sm transition-transform hover:-translate-y-px active:translate-y-0" style={{ borderColor: '#e3c4c0', color: 'var(--color-error)' }}>✕</button>
                       )}
                     </div>
                     <p className="mt-1 text-[11.5px]" style={MUTED}>
                       {row.removed && 'Will be removed. '}
-                      {renamed && <>was <s style={{ color: 'var(--color-error)' }}>{was?.title}</s>{row.inventoryNumber ? ' · ' : ''}</>}
+                      {renamed && <>was <s style={{ color: 'var(--color-error)' }}>{was?.title}</s>{row.inventoryNumber || (was && was.price !== row.price) ? ' · ' : ''}</>}
+                      {was && was.price !== row.price && <>price was <s style={{ color: 'var(--color-error)' }}>{formatCurrency(was.price)}</s>{row.inventoryNumber ? ' · ' : ''}</>}
                       {row.inventoryNumber ? `listing #${row.inventoryNumber}` : ''}
-                      {row.bullion && ' · Bullion — not taxed'}
                     </p>
+                    {!row.removed && (
+                      <label className="mt-2 flex cursor-pointer items-start gap-2.5 rounded border px-3 py-2"
+                        style={row.bullion ? { borderColor: '#16653c', background: '#eef7f1' } : { borderColor: 'var(--color-outline-variant)', background: '#fff' }}>
+                        <input type="checkbox" className="mt-0.5 h-5 w-5 flex-shrink-0" style={{ accentColor: '#16653c' }} checked={row.bullion}
+                          onChange={(e) => setRow(row.key, { bullion: e.target.checked })} />
+                        <span className="grid gap-0.5">
+                          <span className="text-sm font-bold" style={{ color: 'var(--color-on-surface)' }}>Bullion — no sales tax</span>
+                          <span className="text-xs" style={MUTED}>Bars, rounds, ingots, bullion coins (stamped weight &amp; purity). Not jewelry, sterling or collectibles.</span>
+                        </span>
+                      </label>
+                    )}
                   </li>
                 );
               })}
             </ul>
-            {rules.moneyAllowed ? (
-              <div className="mt-2">
+            <div className="mt-2">
                 <div className="flex flex-wrap gap-2">
                   <button type="button" className="outline-button" style={SMALL} onClick={() => void openPicker()} disabled={picker.state === 'loading'}>
                     {picker.state === 'loading' ? 'Loading…' : '+ Add a listed piece'}
@@ -286,10 +329,7 @@ export default function EditOrderWindow({
                     <button type="button" className="mt-1 text-xs font-semibold underline-offset-2 hover:underline" style={{ color: 'var(--color-primary)' }} onClick={() => setPicker({ state: 'closed' })}>Close the list</button>
                   </div>
                 )}
-              </div>
-            ) : (
-              rules.moneyLockReason && lockNote(rules.moneyLockReason)
-            )}
+            </div>
           </section>
 
           <section>
@@ -309,30 +349,92 @@ export default function EditOrderWindow({
 
         <div className="space-y-4 px-4 py-4" style={{ background: '#fcfbf7' }}>
           <section>
-            <h3 className={GROUP} style={{ color: 'var(--color-primary)' }}>{rules.moneyAllowed ? 'Totals (worked out again)' : 'Totals'}</h3>
-            {rules.moneyAllowed && (
-              <div className="mb-2 grid grid-cols-2 gap-2">
-                <label className="block"><span className="form-label">Order discount</span>
-                  <input className="form-field" type="number" min="0" step="0.01" value={String(draft.orderDiscount)} onChange={(e) => set('orderDiscount', Math.max(0, Number(e.target.value) || 0))} /></label>
-                <label className="flex items-end gap-2 pb-2 text-xs font-semibold">
-                  <input type="checkbox" checked={draft.chargesTax && !taxExempt} disabled={taxExempt} onChange={(e) => set('chargesTax', e.target.checked)} style={{ accentColor: 'var(--color-primary)', width: '1rem', height: '1rem' }} />
-                  {taxExempt ? 'Tax exempt' : 'Charge FL sales tax (6%)'}
-                </label>
-              </div>
-            )}
+            <h3 className={GROUP} style={{ color: 'var(--color-primary)' }}>Totals (worked out again)</h3>
+            <div className="mb-2">
+              <label className="block"><span className="form-label">Order discount</span>
+                <input className="form-field" type="number" min="0" step="0.01" value={String(draft.orderDiscount)} onChange={(e) => set('orderDiscount', Math.max(0, Number(e.target.value) || 0))} /></label>
+            </div>
             <dl className="grid grid-cols-[1fr_auto] gap-y-1 text-sm">
-              <dt style={MUTED}>Subtotal</dt><dd>{formatCurrency(totals.subtotal)}</dd>
-              {totals.discount > 0 && (<><dt style={MUTED}>Discount</dt><dd>−{formatCurrency(totals.discount)}</dd></>)}
-              <dt style={MUTED}>Shipping</dt><dd>{formatCurrency(totals.shippingFee)}</dd>
-              <dt style={MUTED}>{taxExempt ? 'Tax · exempt' : 'FL sales tax'}</dt><dd>{formatCurrency(totals.tax)}</dd>
-              <dt className="border-t pt-2 font-bold" style={{ borderColor: 'var(--color-outline-variant)' }}>{rules.paid ? 'Paid' : 'New total'}</dt>
-              <dd className="border-t pt-2 text-base font-bold" style={{ borderColor: 'var(--color-outline-variant)' }}>{formatCurrency(rules.paid && totals.total === paidTotal ? paidTotal : totals.total)}</dd>
+              <dt style={MUTED}>Subtotal</dt><dd className="text-right">{formatCurrency(totals.subtotal)}</dd>
+              {totals.discount > 0 && (<><dt style={MUTED}>Discount</dt><dd className="text-right">−{formatCurrency(totals.discount)}</dd></>)}
+              <dt style={MUTED}>Shipping</dt><dd className="text-right">{formatCurrency(totals.shippingFee)}</dd>
+              <dt style={MUTED}>
+                {taxExempt ? 'Tax · exempt' : 'FL sales tax'}
+                <span className="block text-[11.5px]" style={{ color: totals.tax > 0 ? 'var(--color-on-surface-variant)' : '#16653c' }}>{taxReason(after, totals, taxExempt)}</span>
+              </dt>
+              <dd className="text-right">{formatCurrency(totals.tax)}</dd>
+              <dt className="border-t pt-2 font-bold" style={{ borderColor: 'var(--color-outline-variant)' }}>{money ? 'New total' : rules.paid ? 'Paid' : 'Total'}</dt>
+              <dd className="border-t pt-2 text-right text-base font-bold" style={{ borderColor: 'var(--color-outline-variant)' }}>{formatCurrency(totals.total)}</dd>
             </dl>
             <p className="mt-1 text-xs" style={MUTED}>
               {Math.abs(totals.total - paidTotal) < 0.005 ? `Total before: ${formatCurrency(paidTotal)} · no change` : `Total before: ${formatCurrency(paidTotal)} → ${formatCurrency(totals.total)}`}
             </p>
-            {rules.paid && !rules.moneyAllowed && lockNote(`Paid ${formatCurrency(paidTotal)}${order.payment_method ? ` by ${paymentMethodLabel(order.payment_method)}` : ''}. ${rules.shippingFeeAllowed ? 'Only the shipping fee can change the amount.' : 'Amounts cannot change here.'}`)}
+            {!taxExempt && (
+              <label className="mt-2 flex cursor-pointer items-start gap-2 text-[12.5px]">
+                <input type="checkbox" checked={draft.chargesTax} onChange={(e) => set('chargesTax', e.target.checked)} style={{ accentColor: 'var(--color-primary)', width: '1rem', height: '1rem', marginTop: 2 }} />
+                <span><b>Charge FL sales tax when it applies</b><span className="block text-[11.5px]" style={MUTED}>Pickup or a Florida address: 6%. Out of state and bullion: none. Untick to charge none on this order.</span></span>
+              </label>
+            )}
+            {rules.notes.map((note) => <p key={note} className={NOTE} style={WARN}>{note}</p>)}
+            {rules.paid && !rules.paymentsEditable && Math.abs(totals.total - paidTotal) >= 0.005 && (
+              <p className={NOTE} style={WARN}>This order is paid ({formatCurrency(paidTotal)}{order.payment_method ? `, ${paymentMethodLabel(order.payment_method)}` : ''}). The new total ({formatCurrency(totals.total)}) is only our record — collect or give back any difference yourself.</p>
+            )}
           </section>
+
+          {rules.paymentsEditable && (
+            <section>
+              <h3 className={GROUP} style={{ color: 'var(--color-primary)' }}>Paid by</h3>
+              <ul className="space-y-1.5">
+                {draft.payments.map((part, index) => {
+                  const trade = part.method === SALE_TRADE_CREDIT;
+                  const follows = draft.payments.length === 1 && !trade;
+                  const wasPart = before.payments[index];
+                  return (
+                    <li key={index} className="grid grid-cols-[1fr_6.5rem_2rem] items-center gap-1.5">
+                      {trade ? (
+                        <span className="form-field text-sm" style={{ background: '#f6f4ee', ...MUTED }}>{salePaymentPartLabel(part)}</span>
+                      ) : (
+                        <select className="form-field text-sm" aria-label={`Payment ${index + 1} method`} value={part.method} onChange={(e) => setPayment(index, { method: e.target.value as SalePaymentMethod })}>
+                          {IN_STORE_PAYMENT_METHODS.map((method) => <option key={method} value={method}>{IN_STORE_PAYMENT_LABELS[method]}</option>)}
+                        </select>
+                      )}
+                      <input className="form-field text-sm" type="number" min="0" step="0.01" aria-label={`Payment ${index + 1} amount`}
+                        value={follows ? String(after.payments[0]?.amount ?? 0) : String(part.amount)}
+                        readOnly={trade || follows} title={follows ? 'One payment follows the total' : trade ? 'The trade credit is the buy receipt amount' : undefined}
+                        style={trade || follows ? { background: '#f6f4ee' } : wasPart && wasPart.amount !== part.amount ? CHANGED : undefined}
+                        onChange={(e) => setPayment(index, { amount: Math.max(0, Number(e.target.value) || 0) })} />
+                      {!trade && draft.payments.length > 1 ? (
+                        <button type="button" aria-label={`Remove payment ${index + 1}`} title="Remove this payment" onClick={() => removePayment(index)}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-full border text-xs transition-transform hover:-translate-y-px active:translate-y-0" style={{ borderColor: '#e3c4c0', color: 'var(--color-error)' }}>✕</button>
+                      ) : <span />}
+                    </li>
+                  );
+                })}
+              </ul>
+              {draft.payments.length < SALE_PAYMENTS_MAX && (
+                <button type="button" className="outline-button mt-2" style={SMALL} onClick={addPayment}>+ Add a payment</button>
+              )}
+              {draft.payments.length === 1 && draft.payments[0].method !== SALE_TRADE_CREDIT
+                ? <p className="mt-1 text-[11.5px]" style={MUTED}>One payment follows the total. Add a payment to split it.</p>
+                : paymentsGap
+                  ? <p className={NOTE} style={BAD} role="alert">{paymentsGap} Fix a payment so the receipt&rsquo;s &ldquo;Paid by&rdquo; matches.</p>
+                  : <p className={NOTE} style={GOOD}>✓ The payments add up to {formatCurrency(paymentsSum)}, the {money ? 'new ' : ''}total.</p>}
+            </section>
+          )}
+
+          {rules.refundEditable && (
+            <section>
+              <div className="grid grid-cols-[1fr_7rem] items-end gap-2">
+                <span className="text-sm"><b>Refunded</b><span className="block text-[11.5px]" style={MUTED}>Money given back to the customer. 0 = none.</span></span>
+                <input className="form-field text-sm" type="number" min="0" step="0.01" aria-label="Refunded amount" value={String(draft.refundAmount)}
+                  style={draft.refundAmount !== before.refundAmount ? CHANGED : undefined}
+                  onChange={(e) => set('refundAmount', Math.max(0, Number(e.target.value) || 0))} />
+              </div>
+              {draft.refundAmount !== before.refundAmount && (
+                <p className="mt-1 text-right text-[11.5px]" style={MUTED}>was {before.refundAmount > 0 ? <s style={{ color: 'var(--color-error)' }}>{formatCurrency(before.refundAmount)}</s> : 'none'}</p>
+              )}
+            </section>
+          )}
 
           <section>
             <h3 className={GROUP} style={{ color: 'var(--color-primary)' }}>What will change</h3>
@@ -351,14 +453,15 @@ export default function EditOrderWindow({
             <input type="checkbox" checked={emailCustomer} onChange={(e) => setEmailCustomer(e.target.checked)} style={{ accentColor: 'var(--color-primary)', width: '1rem', height: '1rem', marginTop: 2 }} />
             <span>Email the corrected {docLabel} to {(draft.customerEmail || order.customer_email || 'the customer').trim()}</span>
           </label>
+          {problem && !paymentsGap && <p role="alert" className="text-sm font-semibold" style={{ color: 'var(--color-error)' }}>{problem}</p>}
           {error && <p role="alert" className="text-sm font-semibold" style={{ color: 'var(--color-error)' }}>{error}</p>}
         </div>
       </div>
       <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-2 border-t bg-white px-4 py-3" style={{ borderColor: 'var(--color-outline-variant)' }}>
-        <span className="text-xs" style={MUTED}>Saved changes are listed in Change history.</span>
+        <span className="text-xs" style={MUTED}>Saved changes are listed in Change history. Editing never charges or refunds anyone.</span>
         <span className="flex gap-2">
           <button type="button" className="outline-button" style={SMALL} disabled={busy} onClick={() => { if (changes.length === 0 || window.confirm('Close without saving your changes?')) onClose(); }}>Cancel</button>
-          <button type="button" className="gold-button" style={SMALL} disabled={busy || changes.length === 0} aria-busy={busy} onClick={() => void save()}>
+          <button type="button" className="gold-button" style={SMALL} disabled={busy || changes.length === 0 || Boolean(problem)} aria-busy={busy} title={problem ?? undefined} onClick={() => void save()}>
             {busy ? 'Saving…' : 'Save changes'}
           </button>
         </span>

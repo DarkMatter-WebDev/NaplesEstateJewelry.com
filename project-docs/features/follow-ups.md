@@ -1,5 +1,10 @@
 # Follow-ups — thank-you emails to sellers and shop buyers
 
+> **2026-11-26 (2) — sign-off:** the line that is just "Chris" now renders as
+> Chris's signature block ("— Chris Surette" + logo card, `lib/email-signature.ts`);
+> "and the Naples Estate Jewelry Team" is gone from the defaults and is dropped
+> from owner-saved templates too. `CHANGELOG.md` 2026-11-26 (2).
+
 > **2026-11-25 (1) — BUILT + STAGED, not pushed; ⛔ SQL `supabase/follow-ups-ai-openings-2026-11.sql`:**
 > step 1 is now **Rob's blend** (a friend's review of mockups A/B/C, owner's yes):
 > a personal **opening line written by the AI** per person, the review as a direct

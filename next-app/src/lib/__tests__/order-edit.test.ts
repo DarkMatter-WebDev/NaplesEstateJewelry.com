@@ -9,10 +9,17 @@ import {
   describeChanges,
   editRefusal,
   editStateFromOrder,
+  editTotals,
+  keepFixedMoney,
   moneyChanged,
   orderEditRules,
   readEditBody,
+  refundPaymentStatus,
+  settlePayments,
+  taxReason,
+  totalsChanges,
   type EditItem,
+  type OrderEditState,
   type OrderRowForEdit,
 } from '@/lib/order-edit';
 
@@ -42,34 +49,148 @@ function order(patch: Partial<OrderRowForEdit> = {}): OrderRowForEdit {
 
 const item = (patch: Partial<EditItem> = {}): EditItem => ({ id: null, productId: null, title: 'Ring', price: 100, quantity: 1, discount: 0, bullion: false, removed: false, ...patch });
 
-describe('what can change (option B + owner changes, 2026-11-24 (11))', () => {
-  it('unpaid: everything', () => {
-    const rules = orderEditRules(order());
-    expect(rules).toMatchObject({ paid: false, moneyAllowed: true, shippingFeeAllowed: true, moneyLockReason: null });
+/** NEJ-20261124-LL8G0 as it was on 2026-11-26: $2,076 + $124.56 tax = $2,200.56, split cash + Zelle, a refund only marked. */
+function dennis(): OrderRowForEdit {
+  return order({
+    payment_status: 'refunded',
+    order_status: 'refunded',
+    payment_method: 'in_store_split',
+    refund_amount: 2200.56,
+    subtotal: 2076,
+    tax: 124.56,
+    total: 2200.56,
+    shipping_method: 'pickup',
+    shipping_address: null,
+    split_payments: [{ method: 'cash', amount: 800 }, { method: 'zelle', amount: 1400.56 }],
+    order_items: [{ id: 'bar', product_id: null, title_snapshot: 'gold bullion bar', price_snapshot: 2076, quantity: 1, discount: 0, tax_free_bullion: false }],
+  });
+}
+
+describe('full control (owner, 2026-11-26: "near god mode") — warnings, never locks', () => {
+  it('unpaid: everything; no "Paid by" / Refunded', () => {
+    expect(orderEditRules(order())).toMatchObject({ paid: false, paymentsEditable: false, refundEditable: false, notes: [] });
   });
 
-  it('paid by PayPal: money AND shipping fee locked (refund works from the total)', () => {
+  it('paid in store (split): "Paid by" and Refunded can be edited', () => {
+    expect(orderEditRules(dennis())).toMatchObject({ paid: true, paymentsEditable: true, paymentPrefix: 'in_store', refundEditable: true });
+    expect(orderEditRules(order({ payment_status: 'paid', payment_method: 'remote_zelle' })).paymentPrefix).toBe('remote');
+  });
+
+  it('PayPal: editable with a warning; "Paid by" and Refunded stay PayPal\'s', () => {
     const rules = orderEditRules(order({ payment_status: 'paid', payment_method: 'paypal' }));
-    expect(rules.moneyAllowed).toBe(false);
-    expect(rules.shippingFeeAllowed).toBe(false);
-    expect(rules.shippingLockReason).toMatch(/PayPal/);
+    expect(rules).toMatchObject({ paymentsEditable: false, refundEditable: false, paypal: true });
+    expect(rules.notes.join(' ')).toMatch(/doesn't charge or refund anything in PayPal/);
   });
 
-  it('paid in store, one payment: shipping fee CAN change (owner), items cannot', () => {
-    const rules = orderEditRules(order({ payment_status: 'paid', payment_method: 'cash' }));
-    expect(rules).toMatchObject({ moneyAllowed: false, shippingFeeAllowed: true, shippingLockReason: null });
+  it('Trade-in: editable with a warning naming the credit', () => {
+    const rules = orderEditRules(order({ payment_status: 'paid', payment_method: 'in_store_split', trade_in: { buy_receipt_id: 'r1', receipt_number: 'BUY-1', description: 'gold', value: 500 } }));
+    expect(rules.paymentsEditable).toBe(true);
+    expect(rules.notes.join(' ')).toMatch(/BUY-1 credited \$500\.00/);
   });
 
-  it('paid in several parts, or already refunded: shipping fee locked', () => {
-    expect(orderEditRules(order({ payment_status: 'paid', payment_method: 'split', split_payments: [{ method: 'cash', amount: 1 }, { method: 'zelle', amount: 2 }] })).shippingFeeAllowed).toBe(false);
-    expect(orderEditRules(order({ payment_status: 'partially_refunded', payment_method: 'cash', refund_amount: 50 })).shippingFeeAllowed).toBe(false);
+  it('PayPal / unpaid keep their payments and refund; a Trade-in credit part always stays as saved', () => {
+    const paypal = order({ payment_status: 'paid', payment_method: 'paypal', refund_amount: 0 });
+    const before = editStateFromOrder(paypal, null);
+    const kept = keepFixedMoney(orderEditRules(paypal), before, { ...before, refundAmount: 99, payments: [{ method: 'cash', amount: 1 }] });
+    expect(kept).toMatchObject({ refundAmount: 0, payments: [] });
+
+    const trade = order({ payment_status: 'paid', payment_method: 'in_store_split', total: 1000, split_payments: [{ method: 'trade_credit', amount: 600, reference: 'BUY-1' }, { method: 'cash', amount: 400 }] });
+    const tBefore = editStateFromOrder(trade, null);
+    const tKept = keepFixedMoney(orderEditRules(trade), tBefore, { ...tBefore, payments: [{ method: 'trade_credit', amount: 1, reference: 'BUY-9' }, { method: 'zelle', amount: 400 }] });
+    expect(tKept.payments).toEqual([{ method: 'trade_credit', amount: 600, reference: 'BUY-1' }, { method: 'zelle', amount: 400 }]);
+  });
+});
+
+describe('the tax follows every change at once', () => {
+  const state = (patch: Partial<OrderEditState> = {}): OrderEditState => ({ ...editStateFromOrder(order({ shipping_method: 'pickup', shipping_address: null }), null), ...patch });
+
+  it('ticking "Bullion — no sales tax" takes the tax off right away', () => {
+    const s = state();
+    expect(editTotals(s, false).tax).toBe(147);
+    const bullion = { ...s, items: s.items.map((i) => ({ ...i, bullion: true })) };
+    expect(editTotals(bullion, false)).toMatchObject({ tax: 0, total: 2450 });
+    expect(taxReason(bullion, editTotals(bullion, false), false)).toBe('none: bullion, no sales tax');
+    expect(moneyChanged(s, bullion)).toBe(true);
   });
 
-  it('Trade-in: money and shipping locked even while unpaid (owner: "your recommendation on 5")', () => {
-    const rules = orderEditRules(order({ trade_in: { buy_receipt_id: 'r1', receipt_number: 'BUY-1', value: 500 } }));
-    expect(rules.moneyAllowed).toBe(false);
-    expect(rules.shippingFeeAllowed).toBe(false);
-    expect(rules.moneyLockReason).toMatch(/Trade-in/);
+  it('Pickup → Ship out of state: no tax (the problem the owner hit); to Florida: taxed with shipping', () => {
+    const s = state();
+    const georgia = { ...s, shippingMethod: 'shipping' as const, shippingAddress: { ...s.shippingAddress, state: 'GA' } };
+    expect(editTotals(georgia, false).tax).toBe(0);
+    expect(taxReason(georgia, editTotals(georgia, false), false)).toBe('none: ships out of state (GA)');
+    expect(moneyChanged(s, georgia)).toBe(true);
+    const florida = { ...s, shippingMethod: 'shipping' as const, shippingFee: 25, shippingAddress: { ...s.shippingAddress, state: 'Florida' } };
+    expect(editTotals(florida, false).tax).toBe(148.5);
+  });
+
+  it('Ship with no state yet keeps the tax; the box turns it off by hand', () => {
+    const s = state();
+    expect(editTotals({ ...s, shippingMethod: 'shipping' }, false).tax).toBe(147);
+    expect(editTotals({ ...s, chargesTax: false }, false).tax).toBe(0);
+    expect(taxReason({ ...s, chargesTax: false }, editTotals({ ...s, chargesTax: false }, false), false)).toBe('none: turned off for this order');
+  });
+
+  it('a saved out-of-state order with no tax starts with the box ON (the rule gives none anyway)', () => {
+    const shippedGa = order({ tax: 0, total: 2450, shipping_address: { line1: '1 Peach St', city: 'Atlanta', state: 'GA', postal_code: '30301' } });
+    expect(defaultChargesTax(shippedGa)).toBe(true);
+    expect(editTotals(editStateFromOrder(shippedGa, null), false).tax).toBe(0);
+  });
+});
+
+describe("Dennis's order, fixed in one save (2026-11-26)", () => {
+  it('starts with the split payments and the marked refund', () => {
+    const before = editStateFromOrder(dennis(), null);
+    expect(before.payments).toEqual([{ method: 'cash', amount: 800 }, { method: 'zelle', amount: 1400.56 }]);
+    expect(before.refundAmount).toBe(2200.56);
+    expect(before.chargesTax).toBe(true);
+  });
+
+  it('$2,200 bullion, no tax, Zelle $1,400, refund 0 → saves, and the order is Paid again', () => {
+    const o = dennis();
+    const rules = orderEditRules(o);
+    const before = editStateFromOrder(o, null);
+    const typed: OrderEditState = {
+      ...before,
+      items: before.items.map((i) => ({ ...i, price: 2200, bullion: true })),
+      payments: [{ method: 'cash', amount: 800 }, { method: 'zelle', amount: 1400 }],
+      refundAmount: 0,
+    };
+    const totals = editTotals(typed, false);
+    expect(totals).toMatchObject({ subtotal: 2200, tax: 0, total: 2200 });
+    const after = { ...typed, payments: settlePayments(typed.payments, totals.total) };
+    expect(editRefusal(rules, after, totals)).toBeNull();
+    expect(refundPaymentStatus(after.refundAmount, totals.total)).toBe('paid');
+    expect([...describeChanges(before, after), ...totalsChanges(o, totals)]).toEqual([
+      { label: 'Price · gold bullion bar', before: '$2,076.00', after: '$2,200.00' },
+      { label: 'Bullion, no sales tax · gold bullion bar', before: 'No', after: 'Yes' },
+      { label: 'Paid by', before: 'Cash $800.00 + Zelle $1,400.56', after: 'Cash $800.00 + Zelle $1,400.00' },
+      { label: 'Refunded', before: '$2,200.56', after: 'none' },
+      { label: 'FL sales tax', before: '$124.56', after: '$0.00' },
+      { label: 'Total', before: '$2,200.56', after: '$2,200.00' },
+    ]);
+  });
+
+  it('payments that do not add up wait; a refund over the total is refused', () => {
+    const o = dennis();
+    const rules = orderEditRules(o);
+    const before = editStateFromOrder(o, null);
+    const typed = { ...before, items: before.items.map((i) => ({ ...i, price: 2200, bullion: true })), refundAmount: 0 };
+    const totals = editTotals(typed, false);
+    expect(editRefusal(rules, typed, totals)).toMatch(/\$0\.56 over the \$2,200\.00 total/);
+    const fixed = { ...typed, payments: [{ method: 'cash' as const, amount: 800 }, { method: 'zelle' as const, amount: 1400 }] };
+    expect(editRefusal(rules, { ...fixed, refundAmount: 2500 }, totals)).toMatch(/can't be more than/);
+  });
+
+  it('one payment follows the total by itself', () => {
+    expect(settlePayments([{ method: 'zelle', amount: 2200.56 }], 2200)).toEqual([{ method: 'zelle', amount: 2200 }]);
+    const cash = order({ payment_status: 'paid', payment_method: 'in_store_cash', total: 500 });
+    expect(editStateFromOrder(cash, null).payments).toEqual([{ method: 'cash', amount: 500 }]);
+  });
+
+  it('refund status: none → paid, part → partially refunded, all → refunded', () => {
+    expect(refundPaymentStatus(0, 100)).toBe('paid');
+    expect(refundPaymentStatus(40, 100)).toBe('partially_refunded');
+    expect(refundPaymentStatus(100, 100)).toBe('refunded');
   });
 });
 
@@ -119,24 +240,24 @@ describe('state, changes and refusals', () => {
     expect(moneyChanged(before, after)).toBe(false);
   });
 
-  it('a paid order refuses item / price changes but takes a name fix', () => {
+  it('a paid PayPal order takes price, item and shipping changes now (2026-11-26)', () => {
     const paid = order({ payment_status: 'paid', payment_method: 'paypal' });
     const rules = orderEditRules(paid);
     const before = editStateFromOrder(paid, null);
-    const renamed = { ...before, items: before.items.map((i) => ({ ...i, title: 'Fixed' })) };
-    expect(editRefusal(rules, before, renamed)).toBeNull();
-    const repriced = { ...before, items: before.items.map((i) => ({ ...i, price: 2000 })) };
-    expect(editRefusal(rules, before, repriced)).toMatch(/Paid orders keep/);
-    const added = { ...before, items: [...before.items, item()] };
-    expect(editRefusal(rules, before, added)).toMatch(/Paid orders keep/);
-    const shipped = { ...before, shippingFee: 25 };
-    expect(editRefusal(rules, before, shipped)).toMatch(/PayPal/);
+    for (const after of [
+      { ...before, items: before.items.map((i) => ({ ...i, price: 2000 })) },
+      { ...before, items: [...before.items, item()] },
+      { ...before, shippingFee: 25 },
+    ]) {
+      expect(editRefusal(rules, after, editTotals(after, false))).toBeNull();
+    }
   });
 
   it('a deleted order cannot be edited', () => {
     const deleted = order({ deleted_at: '2026-11-24T00:00:00Z' });
     const before = editStateFromOrder(deleted, null);
-    expect(editRefusal(orderEditRules(deleted), before, { ...before, customerName: 'X' })).toMatch(/Recycle Bin/);
+    const after = { ...before, customerName: 'X' };
+    expect(editRefusal(orderEditRules(deleted), after, editTotals(after, false))).toMatch(/Recycle Bin/);
   });
 
   it('reads the request and refuses bad input', () => {
@@ -167,9 +288,28 @@ describe('wiring', () => {
     expect(panel).toContain('<OrderChangeHistory');
     expect(src('app/[locale]/admin/orders/[id]/page.tsx')).toContain('orderChanges={await loadOrderChanges(supabase, id)}');
   });
-  it('the save route re-checks the rules on the server', () => {
+  it('the save route re-checks the rules on the server and saves the new money fields', () => {
     const server = src('lib/order-edit-server.ts');
-    expect(server).toContain('editRefusal(rules, before, after)');
+    expect(server).toContain('keepFixedMoney(rules, before,');
+    expect(server).toContain('editRefusal(rules, after, totals)');
+    expect(server).toContain('update.tax_free_bullion = item.bullion');
+    expect(server).toContain('bullionColumnReady(service)');
     expect(server).toContain("adminUpdateProductsStatus(addedProductIds, 'pending_payment')");
+    expect(server).toContain("adminUpdateProductsStatus(addedProductIds, 'sold', soldPrices)");
+    expect(server).toContain('refundPaymentStatus(after.refundAmount, totals.total)');
+    expect(server).toContain('salePaymentReference(');
+  });
+  it('the window has the bullion box, the tax reason, Paid by and Refunded — and no locks', () => {
+    const win = src('components/admin/order-edit/EditOrderWindow.tsx');
+    for (const text of ['Bullion — no sales tax', 'taxReason(after, totals, taxExempt)', 'Charge FL sales tax when it applies', 'Paid by', '+ Add a payment', 'Refunded', 'Editing never charges or refunds anyone']) {
+      expect(win).toContain(text);
+    }
+    expect(win).not.toContain('moneyAllowed');
+    expect(win).not.toContain('🔒');
+  });
+  it('"Mark Refunded" asks first on orders not paid through PayPal', () => {
+    const panel = src('components/admin/OrderDetailPanel.tsx');
+    expect(panel).toContain('This only writes it down; no money moves.');
+    expect(panel).not.toMatch(/\} else \{\s*void markRefunded\(\);/);
   });
 });

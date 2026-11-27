@@ -233,7 +233,8 @@ describe('sending: each person in their own language', () => {
     expect(send).toContain('spanish,\n    });');
     const marketing = read('lib/marketing.ts');
     expect(marketing).toContain('const version = campaignVersionFor(recipient, { subject, html }, spanish);');
-    expect(marketing).toContain('withMarketingFooter(version.html, unsubscribeUrl, settings.mailingAddress, version.language)');
+    expect(marketing).toContain('withMarketingFooter(version.html, unsubscribeUrl, settings.mailingAddress, version.language, {');
+    expect(marketing).toContain("signatureHtml: senderProfile === 'chris' ? chrisSignatureHtml(version.language) : undefined,");
   });
 
   it('the SQL adds every column the app writes, and keeps the tables service-role only', () => {

@@ -4,7 +4,27 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-11-25 (5)**. Before that **2026-11-25 (1)**. Before that **2026-11-24 (11)**. Before that **2026-11-24 (10)**. Before that **2026-11-24 (9)**. Before that **2026-11-24 (4)**. Before that **2026-11-24 (3)**. Before that **2026-11-24 (2)** (docs only, no new decision). Before that **2026-11-24 (1)**. Before that **2026-11-23 (1)**. Before that **2026-11-22 (2)**. Before that **2026-11-22 (1)**. Before that **2026-11-21 (6)**. Before that **2026-11-21 (5)**. Before that, **2026-11-21 (3)**. Before that, **2026-11-21 (2)**. Before that, **2026-11-19 (7)**. Before that, **2026-11-19 (2)**. Before that, **2026-11-18 (12)**. Before that, **2026-11-18 (10)**. Before that, **2026-11-18 (6)**. Before that, **2026-11-18 (4)**. Before that, **2026-11-18 (2)**. Before that, **2026-11-16 (5)**. Before that, **2026-11-16 (1)**. Before that, **2026-11-10 (2)**. Before that, **2026-11-09 (3)**. Before that, **2026-11-09 (1)**. Before that, **2026-11-08 (1)**. Before that, **2026-11-05 (5)**. Before that, **2026-11-05 (2)**. Before that, **2026-11-02 (2)**.
+> compaction. Last reconciled: **2026-11-26 (6)**. Before that **2026-11-26 (5)**. Before that **2026-11-25 (5)**. Before that **2026-11-25 (1)**. Before that **2026-11-24 (11)**. Before that **2026-11-24 (10)**. Before that **2026-11-24 (9)**. Before that **2026-11-24 (4)**. Before that **2026-11-24 (3)**. Before that **2026-11-24 (2)** (docs only, no new decision). Before that **2026-11-24 (1)**. Before that **2026-11-23 (1)**. Before that **2026-11-22 (2)**. Before that **2026-11-22 (1)**. Before that **2026-11-21 (6)**. Before that **2026-11-21 (5)**. Before that, **2026-11-21 (3)**. Before that, **2026-11-21 (2)**. Before that, **2026-11-19 (7)**. Before that, **2026-11-19 (2)**. Before that, **2026-11-18 (12)**. Before that, **2026-11-18 (10)**. Before that, **2026-11-18 (6)**. Before that, **2026-11-18 (4)**. Before that, **2026-11-18 (2)**. Before that, **2026-11-16 (5)**. Before that, **2026-11-16 (1)**. Before that, **2026-11-10 (2)**. Before that, **2026-11-09 (3)**. Before that, **2026-11-09 (1)**. Before that, **2026-11-08 (1)**. Before that, **2026-11-05 (5)**. Before that, **2026-11-05 (2)**. Before that, **2026-11-02 (2)**.
+
+## Get Directions: phone/tablet menu + top of /contact (2026-11-26)
+
+- **Decision (owner, proposal 1 → "Build A"):** the phone/tablet menu carries a "Get Directions" / "Cómo Llegar" row right after Call and Text (map pin, gold, like them). The top of /contact shows Call and Get Directions as two matching outline pills in one row (stacked on phones), Call first, the hours line under both.
+- **Why:** walk-ins are the strongest channel, and a desktop visitor had no quick directions link (the only one on /contact sat far down in Visit Us). A quieter text link (B) was offered and not picked.
+- **How to apply:** ⛔ every directions link uses `directionsHref()` (Google Maps) — never an Apple Maps or hand-built URL: the site-wide Ads listener (`isDirectionsHref`) counts only Google Maps links, and every directions button should behave the same. Keep Call first wherever the two sit together.
+
+## Site header below 1280px: three-line menu icon, ES/EN at every width (2026-11-26)
+
+- **Amended same day (owner, 2026-11-26 (6)):** the three-line icon is used ONLY below **430px**, where the worded button can't fit comfortably beside ES. From 430 to 1279px the worded MENU / CLOSE (MENÚ / CERRAR) pill is back, in its old look. "Comfortably" = name not clipped with 8px to spare and the cart badge ≥ 4px off the pill's outline, in the widest case (Spanish CERRAR, open) — first true at 422px. ⛔ Don't move the 430 switch down without re-measuring that worst case; ⛔ choose the look in CSS (both the icon and the word are rendered), never with a JS width check (flash on load). The points below still hold for the icon below 430.
+
+- **Decision (owner, mockups 1–5 → "Yes, build it"):** the worded menu toggle (MENU / CLOSE, MENÚ / CERRAR) is a **three-line icon** (Lucide `menu`, an **X** — `close` — while the menu is open) on every width where it shows (below `xl`, 1280px). Same box and icon size as the phone and cart buttons (32px, 28px below 350px), gold like the phone icon, label in `aria-label` (`t('menu')` / `t('close')`). The **ES/EN chip shows at every width** (it was `md:` and up since 2026-08-17). The cart count badge stays where it always was (`-top-1 -right-1`).
+- **Why:** owner wanted ES visible on phones. The worded pill was the widest control in the row (CERRAR worst). Proposals 1–4 squeezed spacing and then nudged the badge inward; the owner rejected the badge nudge and asked for a hamburger instead, which made ALL the spacing changes unnecessary: with today's spacing every width 320–1279px has ≥ 8px spare, and the badge sits ≥ 8.9px from the icon's lines (before, it sat flush against the MENU outline below 400px).
+- **How to apply:** ⛔ don't bring back a worded toggle or a bordered pill below `xl` without re-measuring 320–430px with the ES chip in place. ⛔ Don't add narrow-band `.site-header-language` rules — none are needed. ⛔ Don't move the cart badge inward to buy room (owner: badge stays out to the right, not over the cart). Rules live in `HEADER_STYLES` in `SiteHeader.tsx` (`.menu-toggle` block) — still no backticks in that template literal. ⛔ Keep the `@media (min-width:1280px){ .menu-toggle{display:none} }` rule: the block's unlayered `display:flex` beats Tailwind's `xl:hidden`, and without it the icon showed on desktop (caught 2026-11-26 before any push). Reverses the 2026-08-17 "chip below md hidden" call (second postscript in *"The header brand row is full on a phone"* below).
+
+## Chris's email signature: ONE block, from `lib/email-signature.ts` (2026-11-26)
+
+- **Decision (owner, mockups 1–6 → "Build 4c at 12 px"):** every customer email signed by Chris ends with the same block — "— Chris Surette" (Georgia 20px) above a white card with a 3px gold top bar: octopus logo left (56×43, `email-signature-logo.png`), NAPLES ESTATE JEWELRY (12px, 0.4px spacing), "Call or text (239) 404-8505", info@; then a cream strip with the one-line address + NaplesEstateJewelry.com (centred when it wraps on a phone). No "and the Naples Estate Jewelry Team".
+- **Where:** thank-you follow-ups (the line "Chris" in a template); offer, Check Availability and remote-sale invoice emails ONLY when the owner typed a note (the note itself is no longer signed "— Chris"); Email Campaigns sent with the "Chris" sender (above the unsubscribe footer). No-reply campaigns and all other order / receipt emails: no block.
+- **How to apply:** ⛔ never hand-write a "— Chris" / "Chris" sign-off in an email builder — call `chrisSignatureHtml` / `chrisSignatureText`. ⛔ Don't widen the business-name spacing, the logo cell or the padding without re-measuring the invoice on a 360 px phone (12px at the old 1.4px spacing wrapped). Phones get tighter cells from the ≤480px rule in `EMAIL_SIGNATURE_STYLE`, and the logo hides at ≤340px (owner, mockup 7, 2026-11-26 (3)); computers keep the full spacing. A changed logo = a new file name.
 
 ## Google Ads work runs only through this project's agent (2026-11-25)
 
@@ -38,7 +58,13 @@
 - **What went:** the button, the locked screen, the staff code, the lock cookie + proxy bounce, `requireAdmin`'s 423 lock check and its `duringCustomerMode` option, the tab guard (and the account layout that only held it). The 2026-10-03 entries below are history. The "Mailing list" box stays on the form.
 - **How to apply:** don't re-add a per-browser lock for a hand-over without a fresh mockup; to restore the old mode, take the files from the GitHub commit before the 2026-11-25 push (`CHANGELOG.md` 2026-11-25 (1) lists them).
 
-## Editing an order: details always, money only while unpaid; shipping fee also on paid non-PayPal single-payment orders; Trade-in money never (2026-11-24 (11))
+## Editing an order: FULL CONTROL — nothing locked, the tax follows every change, warnings instead of locks (2026-11-26 (1)) — SUPERSEDES the 2026-11-24 (11) entry below
+
+- **Decision (owner, mockup 1 "Yes, build it" + all 5 recommended picks):** ✎ Edit order can change everything on any non-deleted order, paid or not: items, prices, quantities, discounts, shipping, "Bullion — no sales tax" per line, the tax, "Paid by" (orders paid outside the site) and Refunded (paid, not PayPal). Picks: (1) the payments must add up to the new total to save; (2) PayPal and Trade-in orders are editable with warnings — PayPal's "Paid by" + Refunded and the Trade-in credit part stay as saved; (3) keep a manual "Charge FL sales tax when it applies" box; (4) removing a listed piece from a paid order puts it back on sale, adding one marks it Sold; (5) a payment's type can change as well as its amount. "Mark Refunded" on a non-PayPal order asks first.
+- **Why:** the owner rang NEJ-20261124-LL8G0 before the bullion box existed and had to fudge the price so price + tax ≈ $2,200; the 11-24 locks left no way to correct it, and pressing "Mark Refunded" to get around them wrote a refund that never happened. Editing records what happened — it never moves money — so the locks protected nothing the warnings don't.
+- **How to apply:** the rules stay in ONE place (`lib/order-edit.ts`: `orderEditRules`, `taxApplies`, `editTotals`, `keepFixedMoney`, `editRefusal`) and the server re-checks them. ⛔ Never re-add money locks without the owner's word. ⛔ The tax rule is `taxApplies` = Instant Sale / checkout's `inStoreChargesTax` — never a second copy. ⛔ PayPal orders: never write `refund_amount` / payment parts from an edit (`apply_paypal_refund` owns them). ⛔ A name-only fix never re-figures an old order's totals (unchanged numbers keep the saved ones). "Paid by" is saved exactly as Instant Sale saves it (`payment_method`, `payment_reference`, `payment_response.payments`).
+
+## (SUPERSEDED 2026-11-26 (1)) Editing an order: details always, money only while unpaid; shipping fee also on paid non-PayPal single-payment orders; Trade-in money never (2026-11-24 (11))
 
 - **Decision (owner, mockup 2, option B + "allow shipping fee to change" + "your recommendation on 5"):** Admin → Orders → "✎ Edit order" fixes customer name / email / phone, addresses, delivery, item names, gift message and customer's note on ANY order (not a deleted one). Items, prices, quantities, discounts and the tax on/off switch change only while the order is UNPAID; the server works the totals out again (`computeEditTotals`). The shipping fee may also change on a PAID order unless it was paid by PayPal, split between several payments, or already refunded. A Trade-in order keeps all its money locked. "✎ Fix name" is the one-click item-name fix. Every save writes `order_changes` (who / when / before → after).
 - **Why:** PayPal captured a fixed amount and Refund + `apply_paypal_refund` cap at `orders.total` — a different total lets a refund try money never charged, or blocks refunding what was. Split payments must add up to the total (`salePaymentsMismatch`) and nothing tells which part moved. The buy receipt of a Trade-in is tied to the sale amount (buy-receipt edit already refuses, 409). Item names are only words, so fixing them is always safe; emails already sent keep their saved copies.
@@ -4356,6 +4382,13 @@ no body link to the other locale. Safe here because hreflang is declared in the
 HEAD by `pageMetadata()`/`alternatesFor()` on every page and every locale URL is
 in the sitemap — but that is the check to repeat before removing any other
 locale link, not an assumption to inherit.
+
+**Second postscript, 2026-11-26 — the chip came back.** The owner wanted ES on
+phones. The menu toggle became a three-line icon (an X when open), which freed
+more than the chip costs: ES/EN now shows at every width with today's spacing,
+≥ 8px spare from 320 to 1279px. Trap 1 above no longer applies as written (there
+is no CERRAR label any more); the widest state is now the same open or closed.
+See *"Site header below 1280px: three-line menu icon"* at the top.
 
 ⚠️ **Never put a backtick in a comment inside `HEADER_STYLES`.** That block is a
 template literal; a stray backtick terminates the string mid-CSS and Turbopack
@@ -8912,8 +8945,9 @@ header wordmark 2026-08-01) plus the language, call, cart, and menu
 controls visible without horizontal overflow. Below 400px, compact
 micro-spacing and fluid brand typography are preferred over truncating the
 brand or hiding a primary action. Below 350px, proportionally reduce the visible
-call/cart controls, glyph/count badge, and outlined menu while keeping every
-action present and usable; regular mobile/tablet sizes remain unchanged.
+call/cart controls, glyph/count badge, and menu icon (a three-line icon since
+2026-11-26, no longer an outlined pill) while keeping every action present and
+usable; regular mobile/tablet sizes remain unchanged.
 
 ### iOS format detection stays off; tappable numbers are explicit anchors
 

@@ -93,7 +93,7 @@
      address or brought in.
    - **Call to pay by card** — (239) 404-8505.
    - **Link good for** 3 / 7 / 14 days (default 7). **Message** (optional,
-     ≤ 300 characters) is printed in the email, signed "— Chris".
+     ≤ 300 characters) is printed in the email, which then ends with Chris's signature block (`lib/email-signature.ts`, 2026-11-26).
 5. **Email invoice.** It becomes an **unpaid order** in Orders at once, and its
    card appears under Open invoices.
 

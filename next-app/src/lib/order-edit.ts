@@ -1,24 +1,45 @@
 /**
- * Admin → Orders → "Edit order" + "Fix name" (owner, 2026-11-24 (11), mockup 2,
- * option B with two owner changes): the pure rules, shared by the edit window
- * (live preview) and the save route (`lib/order-edit-server.ts`).
+ * Admin → Orders → "Edit order" + "Fix name": the pure rules, shared by the
+ * edit window (live preview) and the save route (`lib/order-edit-server.ts`).
  *
- * - DETAILS (customer, email, phone, addresses, item names, delivery, gift
- *   message, customer's note) can be fixed on ANY order.
- * - MONEY (items, prices, quantities, line / order discount, tax on/off) only
- *   while the order is UNPAID — then the totals are worked out again here.
- * - SHIPPING FEE (owner: "allow shipping fee to change"): unpaid orders, AND
- *   paid orders that were not paid through PayPal, are not split between
- *   several payments, and have no refund yet. ⛔ A PayPal order keeps it locked:
- *   PayPal charged a fixed amount and the refund button / ledger work from
- *   `orders.total` (`buildPayPalRefundPlan`, `apply_paypal_refund`).
- * - ⛔ TRADE-IN orders keep ALL money locked, paid or not (owner: "go with your
- *   recommendation on 5 if my choice will break things") — the buy receipt's
- *   trade credit is tied to the sale amount, exactly as buy-receipt editing
- *   already refuses (`api/admin/buy-receipts/[id]` 409).
+ * FULL CONTROL (owner, 2026-11-26, mockup 1 "Yes, build it" — "near god mode"):
+ * nothing is locked on a paid order any more (the 2026-11-24 (11) money locks
+ * are gone). Details, items, prices, quantities, discounts, the shipping fee,
+ * "Bullion — no sales tax" per line, the tax, how it was paid ("Paid by") and
+ * the Refunded amount can all change. Editing NEVER moves money: it records
+ * what really happened.
+ *
+ * - TAX follows every change at once, by the same rule as Instant Sale and web
+ *   checkout (`inStoreChargesTax`): pickup / local delivery / a Florida address
+ *   = 6% on items + shipping; shipped out of state = none; bullion lines = none
+ *   (with their share of shipping); a tax-exempt certificate = none. Ship with
+ *   no state typed yet keeps the tax on. "Charge FL sales tax when it applies"
+ *   (`chargesTax`) turns it off by hand.
+ * - PAID BY (orders paid outside the site: `in_store_*` / `remote_*`): the
+ *   payments must add up to the new total to save (owner pick 1). One payment
+ *   follows the total by itself. A Trade-in credit part stays as it is (it is
+ *   the buy receipt's amount).
+ * - REFUNDED (paid, not PayPal): a refund that was only marked can be set back
+ *   to 0. ⛔ PayPal orders keep "Paid by" and Refunded read-only — PayPal's own
+ *   refunds (`apply_paypal_refund`) keep that number right — and get a warning
+ *   that changing the total charges / refunds nothing in PayPal.
  */
 
-import { inStoreTotals } from '@/lib/in-store-sale';
+import {
+  IN_STORE_PAYMENT_METHODS,
+  inStoreChargesTax,
+  inStoreTotals,
+  readSalePaymentParts,
+  readSaleTradeIn,
+  SALE_PAYMENTS_MAX,
+  SALE_TRADE_CREDIT,
+  salePaymentPartLabel,
+  salePaymentsMismatch,
+  formatSalePayments,
+  type SalePaymentMethod,
+  type SalePaymentPart,
+} from '@/lib/in-store-sale';
+import { normalizeUsState } from '@/lib/us-address';
 
 export const ORDER_CHANGES_SQL_FILE = 'supabase/order-changes-2026-11.sql';
 
@@ -35,6 +56,7 @@ export const EDIT_LIMITS = {
 } as const;
 
 const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+const money = (value: number) => `$${round2(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export type ShippingMethodValue = 'pickup' | 'shipping' | 'local_delivery';
 export const SHIPPING_METHOD_LABELS: Record<ShippingMethodValue, string> = {
@@ -99,6 +121,7 @@ export type OrderForEdit = {
   shipping_fee: number;
   tax: number;
   total: number;
+  order_status?: string | null;
   /** `payment_response->trade` (a Trade-in sale) — any truthy value. */
   trade_in?: unknown;
   /** `payment_response->payments` (split payment parts). */
@@ -107,12 +130,17 @@ export type OrderForEdit = {
 
 export type OrderEditRules = {
   paid: boolean;
-  moneyAllowed: boolean;
-  shippingFeeAllowed: boolean;
-  /** Why the money is locked (shown in the window), or null. */
-  moneyLockReason: string | null;
-  shippingLockReason: string | null;
   deleted: boolean;
+  paypal: boolean;
+  tradeIn: boolean;
+  /** Paid outside the site (`in_store_*` / `remote_*`): "Paid by" can be edited. */
+  paymentsEditable: boolean;
+  /** `in_store` / `remote` — the prefix a changed payment method is saved with. */
+  paymentPrefix: 'in_store' | 'remote' | null;
+  /** Paid, not PayPal: the Refunded amount can be edited (e.g. a refund only marked). */
+  refundEditable: boolean;
+  /** Warnings shown in the window — never locks (owner, 2026-11-26). */
+  notes: string[];
 };
 
 export function isPaidStatus(status: string | null | undefined): boolean {
@@ -120,45 +148,87 @@ export function isPaidStatus(status: string | null | undefined): boolean {
   return s === 'paid' || s === 'refunded' || s === 'partially_refunded';
 }
 
-function splitCount(value: unknown): number {
-  return Array.isArray(value) ? value.length : 0;
-}
+const OFFLINE_METHOD = /^(in_store|remote)_(\w+)$/;
 
 export function orderEditRules(order: OrderForEdit): OrderEditRules {
   const paid = isPaidStatus(order.payment_status);
+  const trade = readSaleTradeIn(order.trade_in);
   const tradeIn = Boolean(order.trade_in);
   const paypal = String(order.payment_method ?? '').toLowerCase() === 'paypal';
-  const refunded = Number(order.refund_amount ?? 0) > 0;
-  const split = splitCount(order.split_payments) >= 2;
-  const moneyAllowed = !paid && !tradeIn;
-
-  let moneyLockReason: string | null = null;
-  if (tradeIn) moneyLockReason = 'A Trade-in sale keeps its items, prices and totals: the buy receipt is tied to the amount. Names and details can still be fixed.';
-  else if (paid) moneyLockReason = 'Paid orders keep their items, prices and quantities — only names can be fixed. To give money back use Refund; to change what was sold, Cancel the order and ring the sale again.';
-
-  let shippingLockReason: string | null = null;
-  if (!moneyAllowed) {
-    if (tradeIn) shippingLockReason = 'Locked on a Trade-in sale.';
-    else if (paypal) shippingLockReason = 'Locked: PayPal charged a fixed amount, and Refund works from the order total.';
-    else if (refunded) shippingLockReason = 'Locked: this order already has a refund.';
-    else if (split) shippingLockReason = 'Locked: paid in several parts — change it with a Refund or ring the sale again.';
+  const offline = OFFLINE_METHOD.exec(String(order.payment_method ?? ''));
+  const paymentsEditable = paid && Boolean(offline);
+  const notes: string[] = [];
+  if (paid && paypal) {
+    notes.push(`PayPal charged ${money(Number(order.total) || 0)}. Changing the total here doesn't charge or refund anything in PayPal — it only changes our record. To give money back, use Refund in PayPal (it can't return more than PayPal took).`);
   }
-
+  if (tradeIn) {
+    notes.push(trade
+      ? `Trade-in ${trade.receipt_number} credited ${money(trade.value)} toward this sale. That credit stays ${money(trade.value)} (it is the buy receipt's amount) — change the other payments so they add up to the new total.`
+      : 'This is a Trade-in sale: its trade credit stays as it is — change the other payments so they add up to the new total.');
+  }
   return {
     paid,
-    moneyAllowed,
-    shippingFeeAllowed: moneyAllowed || (paid && shippingLockReason === null),
-    moneyLockReason,
-    shippingLockReason,
     deleted: Boolean(order.deleted_at),
+    paypal,
+    tradeIn,
+    paymentsEditable,
+    paymentPrefix: offline ? (offline[1] as 'in_store' | 'remote') : null,
+    refundEditable: paid && !paypal,
+    notes,
   };
 }
 
-/** Was Florida tax charged on this order? (Exempt → no; tax > 0 → yes; nothing taxable yet → yes.) */
-export function defaultChargesTax(order: Pick<OrderForEdit, 'tax_exempt' | 'tax' | 'subtotal' | 'discount' | 'shipping_fee'>): boolean {
+/**
+ * Does Florida sales tax apply to this order? The same rule as Instant Sale and
+ * web checkout: pickup and local delivery yes; a shipment yes when it goes to
+ * Florida OR no state is typed yet (a half-typed address never drops the tax),
+ * no when it ships out of state.
+ */
+export function taxApplies(state: Pick<OrderEditState, 'shippingMethod' | 'shippingAddress'>): { applies: boolean; stateCode: string | null } {
+  if (state.shippingMethod !== 'shipping') return { applies: true, stateCode: null };
+  const stateCode = normalizeUsState(state.shippingAddress.state);
+  if (!stateCode) return { applies: true, stateCode: null };
+  return { applies: inStoreChargesTax('ship', stateCode), stateCode };
+}
+
+/** The order's numbers for an edit state: `computeEditTotals` with the tax rule applied. */
+export function editTotals(state: OrderEditState, taxExempt: boolean): EditTotals {
+  return computeEditTotals({
+    items: state.items,
+    orderDiscount: state.orderDiscount,
+    shippingFee: state.shippingFee,
+    chargesTax: state.chargesTax && taxApplies(state).applies,
+    taxExempt,
+  });
+}
+
+/** Why the tax line reads what it does — shown under "FL sales tax" in the window. */
+export function taxReason(state: OrderEditState, totals: EditTotals, taxExempt: boolean): string {
+  if (taxExempt) return 'none: tax-exempt certificate on file';
+  const rule = taxApplies(state);
+  if (!rule.applies) return `none: ships out of state (${rule.stateCode})`;
+  if (!state.chargesTax) return 'none: turned off for this order';
+  const live = state.items.filter((item) => !item.removed);
+  const bullion = live.some((item) => item.bullion);
+  if (totals.tax <= 0) return bullion ? 'none: bullion, no sales tax' : 'none: nothing taxable';
+  const where = state.shippingMethod === 'shipping' ? (rule.stateCode ? `ships to ${rule.stateCode}` : 'no ship-to state yet') : state.shippingMethod === 'local_delivery' ? 'local delivery' : 'pickup';
+  return `6%${totals.shippingFee > 0 ? ' on items + shipping' : ''}${bullion ? ', bullion left out' : ''} · ${where}`;
+}
+
+/**
+ * The starting "Charge FL sales tax when it applies" box: on, unless the order
+ * was saved with NO tax where the rule would charge some (a choice made then is
+ * kept). Exempt orders: off (the certificate decides).
+ */
+function chargesTaxFor(order: OrderRowForEdit, base: OrderEditState): boolean {
   if (order.tax_exempt) return false;
   if (Number(order.tax) > 0) return true;
-  return round2(Number(order.subtotal) - Number(order.discount) + Number(order.shipping_fee)) <= 0;
+  return editTotals({ ...base, chargesTax: true }, false).tax <= 0;
+}
+
+/** Was Florida tax meant to be charged on this order? (see `chargesTaxFor`) */
+export function defaultChargesTax(order: OrderRowForEdit): boolean {
+  return chargesTaxFor(order, baseStateFromOrder(order, null));
 }
 
 // ---- Items + totals ------------------------------------------------------------
@@ -171,7 +241,7 @@ export type EditItem = {
   price: number;
   quantity: number;
   discount: number;
-  /** "Bullion — not taxed" (existing lines keep their mark; read only here). */
+  /** "Bullion — no sales tax": this line is left out of the Florida tax (editable since 2026-11-26). */
   bullion: boolean;
   removed: boolean;
   /** Listing number shown under a listed piece. */
@@ -226,12 +296,17 @@ export type OrderEditState = {
   shippingMethod: ShippingMethodValue;
   shippingFee: number;
   orderDiscount: number;
+  /** "Charge FL sales tax when it applies" — the rule (`taxApplies`) still decides where it applies. */
   chargesTax: boolean;
   items: EditItem[];
   isGift: boolean;
   giftRecipient: string;
   giftMessage: string;
   customerNotes: string;
+  /** "Paid by" (orders paid outside the site; empty otherwise). One part follows the total. */
+  payments: SalePaymentPart[];
+  /** Money given back (0 = none). */
+  refundAmount: number;
 };
 
 export type OrderRowForEdit = OrderForEdit & {
@@ -258,7 +333,22 @@ export function normalizeShippingMethod(value: unknown): ShippingMethodValue {
   return value === 'shipping' || value === 'local_delivery' ? value : 'pickup';
 }
 
+/** The "Paid by" an order starts with: its saved parts, or its one method for the whole total. */
+function paymentsFromOrder(order: OrderRowForEdit): SalePaymentPart[] {
+  if (!orderEditRules(order).paymentsEditable) return [];
+  const parts = readSalePaymentParts(order.split_payments, 1);
+  if (parts) return parts;
+  const method = OFFLINE_METHOD.exec(String(order.payment_method ?? ''))?.[2] ?? '';
+  const known = (IN_STORE_PAYMENT_METHODS as readonly string[]).includes(method) || method === SALE_TRADE_CREDIT;
+  return known ? [{ method: method as SalePaymentMethod, amount: round2(Number(order.total) || 0) }] : [];
+}
+
 export function editStateFromOrder(order: OrderRowForEdit, gift: { recipientName: string | null; message: string | null } | null): OrderEditState {
+  const base = baseStateFromOrder(order, gift);
+  return { ...base, chargesTax: chargesTaxFor(order, base) };
+}
+
+function baseStateFromOrder(order: OrderRowForEdit, gift: { recipientName: string | null; message: string | null } | null): OrderEditState {
   const items: EditItem[] = (order.order_items ?? []).map((item) => ({
     id: item.id,
     productId: item.product_id,
@@ -280,18 +370,37 @@ export function editStateFromOrder(order: OrderRowForEdit, gift: { recipientName
     shippingMethod: normalizeShippingMethod(order.shipping_method),
     shippingFee: round2(Number(order.shipping_fee) || 0),
     orderDiscount: round2(Math.max(0, (Number(order.discount) || 0) - lineDiscounts)),
-    chargesTax: defaultChargesTax(order),
+    chargesTax: true,
     items,
     isGift: Boolean(gift),
     giftRecipient: gift?.recipientName ?? '',
     giftMessage: gift?.message ?? '',
     customerNotes: order.customer_notes ?? '',
+    payments: paymentsFromOrder(order),
+    refundAmount: round2(Math.max(0, Number(order.refund_amount ?? 0) || 0)),
   };
+}
+
+/** One payment (not a trade credit) follows the total by itself; several are kept as typed. */
+export function settlePayments(payments: SalePaymentPart[], total: number): SalePaymentPart[] {
+  if (payments.length === 1 && payments[0].method !== SALE_TRADE_CREDIT) return [{ ...payments[0], amount: round2(total) }];
+  return payments.map((part) => ({ ...part, amount: round2(Number(part.amount) || 0) }));
+}
+
+/** How "Paid by" reads in the change list: one payment by its name, several with their amounts. */
+function paymentsText(payments: SalePaymentPart[]): string {
+  if (payments.length === 0) return '—';
+  if (payments.length === 1 && payments[0].method !== SALE_TRADE_CREDIT) return salePaymentPartLabel(payments[0]);
+  return formatSalePayments(payments);
+}
+
+/** "Paid by" changed (after settling both against their totals). */
+export function paymentsChanged(before: OrderEditState, after: OrderEditState): boolean {
+  return paymentsText(before.payments) !== paymentsText(after.payments);
 }
 
 export type OrderChange = { label: string; before: string; after: string };
 
-const money = (value: number) => `$${round2(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const shown = (value: string) => (value.trim() ? value.trim() : '—');
 
 /** Every difference, worded for the "What will change" list and the history. */
@@ -324,11 +433,16 @@ export function describeChanges(before: OrderEditState, after: OrderEditState): 
     if (round2(was.price) !== round2(item.price)) changes.push({ label: `Price · ${item.title.trim()}`, before: money(was.price), after: money(item.price) });
     if (was.quantity !== item.quantity) changes.push({ label: `Qty · ${item.title.trim()}`, before: String(was.quantity), after: String(item.quantity) });
     if (round2(was.discount) !== round2(item.discount)) changes.push({ label: `Line discount · ${item.title.trim()}`, before: money(was.discount), after: money(item.discount) });
+    if (was.bullion !== item.bullion) changes.push({ label: `Bullion, no sales tax · ${item.title.trim()}`, before: was.bullion ? 'Yes' : 'No', after: item.bullion ? 'Yes' : 'No' });
   }
 
   if (round2(before.shippingFee) !== round2(after.shippingFee)) changes.push({ label: 'Shipping fee', before: money(before.shippingFee), after: money(after.shippingFee) });
   if (round2(before.orderDiscount) !== round2(after.orderDiscount)) changes.push({ label: 'Order discount', before: money(before.orderDiscount), after: money(after.orderDiscount) });
-  if (before.chargesTax !== after.chargesTax) changes.push({ label: 'Florida sales tax', before: before.chargesTax ? 'Charged' : 'Not charged', after: after.chargesTax ? 'Charged' : 'Not charged' });
+  if (before.chargesTax !== after.chargesTax) changes.push({ label: 'Charge FL sales tax when it applies', before: before.chargesTax ? 'On' : 'Off', after: after.chargesTax ? 'On' : 'Off' });
+  if (paymentsChanged(before, after)) changes.push({ label: 'Paid by', before: paymentsText(before.payments), after: paymentsText(after.payments) });
+  if (round2(before.refundAmount) !== round2(after.refundAmount)) {
+    changes.push({ label: 'Refunded', before: before.refundAmount > 0 ? money(before.refundAmount) : 'none', after: after.refundAmount > 0 ? money(after.refundAmount) : 'none' });
+  }
   if (before.isGift) {
     text('Gift recipient', before.giftRecipient, after.giftRecipient);
     text('Gift message', before.giftMessage, after.giftMessage);
@@ -337,11 +451,24 @@ export function describeChanges(before: OrderEditState, after: OrderEditState): 
   return changes;
 }
 
-/** True when the edit touches money (items, prices, quantities, discounts, shipping fee, tax). */
+/** "FL sales tax" and "Total" lines, from the order as saved to the new totals (only the ones that move). */
+export function totalsChanges(saved: { tax: number; total: number }, totals: EditTotals): OrderChange[] {
+  const changes: OrderChange[] = [];
+  if (round2(Number(saved.tax) || 0) !== round2(totals.tax)) changes.push({ label: 'FL sales tax', before: money(Number(saved.tax) || 0), after: money(totals.tax) });
+  if (round2(Number(saved.total) || 0) !== round2(totals.total)) changes.push({ label: 'Total', before: money(Number(saved.total) || 0), after: money(totals.total) });
+  return changes;
+}
+
+/**
+ * True when the edit touches the order's numbers (items, prices, quantities,
+ * discounts, shipping fee, bullion marks, the tax box, or a delivery / state
+ * change that moves the tax rule) — then the totals are worked out again.
+ */
 export function moneyChanged(before: OrderEditState, after: OrderEditState): boolean {
   if (round2(before.shippingFee) !== round2(after.shippingFee)) return true;
   if (round2(before.orderDiscount) !== round2(after.orderDiscount)) return true;
   if (before.chargesTax !== after.chargesTax) return true;
+  if (taxApplies(before).applies !== taxApplies(after).applies) return true;
   const beforeById = new Map(before.items.filter((item) => item.id).map((item) => [item.id as string, item]));
   for (const item of after.items) {
     const was = item.id ? beforeById.get(item.id) : undefined;
@@ -350,20 +477,15 @@ export function moneyChanged(before: OrderEditState, after: OrderEditState): boo
       continue;
     }
     if (item.removed) return true;
-    if (round2(was.price) !== round2(item.price) || was.quantity !== item.quantity || round2(was.discount) !== round2(item.discount)) return true;
+    if (round2(was.price) !== round2(item.price) || was.quantity !== item.quantity || round2(was.discount) !== round2(item.discount) || was.bullion !== item.bullion) return true;
   }
   return false;
 }
 
-/** True when anything other than item names / details changed in the items or money. */
-export function itemsOtherThanNamesChanged(before: OrderEditState, after: OrderEditState): boolean {
-  if (after.items.some((item) => !item.id && !item.removed)) return true;
-  const beforeById = new Map(before.items.filter((item) => item.id).map((item) => [item.id as string, item]));
-  return after.items.some((item) => {
-    const was = item.id ? beforeById.get(item.id) : undefined;
-    if (!was) return false;
-    return item.removed || round2(was.price) !== round2(item.price) || was.quantity !== item.quantity || round2(was.discount) !== round2(item.discount);
-  });
+/** The payment status a refund amount gives a paid order. */
+export function refundPaymentStatus(refundAmount: number, total: number): 'paid' | 'partially_refunded' | 'refunded' {
+  if (round2(refundAmount) <= 0) return 'paid';
+  return round2(refundAmount) >= round2(total) ? 'refunded' : 'partially_refunded';
 }
 
 // ---- Reading the request ---------------------------------------------------------
@@ -434,6 +556,21 @@ export function readEditBody(body: unknown): { state: Omit<OrderEditState, 'isGi
   }
   if (!items.some((item) => !item.removed)) return { error: 'An order needs at least one item. To drop the whole sale, Cancel the order instead.' };
 
+  const payments: SalePaymentPart[] = [];
+  const rawPayments = Array.isArray(b.payments) ? b.payments : [];
+  if (rawPayments.length > SALE_PAYMENTS_MAX) return { error: `Up to ${SALE_PAYMENTS_MAX} payments on one order.` };
+  for (const raw of rawPayments) {
+    const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+    const method = String(r.method ?? '');
+    if (!(IN_STORE_PAYMENT_METHODS as readonly string[]).includes(method) && method !== SALE_TRADE_CREDIT) return { error: 'Pick how each payment was made.' };
+    const amount = num(r.amount);
+    if (amount === null || amount < 0 || amount > EDIT_LIMITS.price) return { error: 'Check the payment amounts.' };
+    const reference = typeof r.reference === 'string' && r.reference.trim() ? r.reference.trim().slice(0, 30) : null;
+    payments.push(reference ? { method: method as SalePaymentMethod, amount: round2(amount), reference } : { method: method as SalePaymentMethod, amount: round2(amount) });
+  }
+  const refundAmount = num(b.refundAmount ?? 0);
+  if (refundAmount === null || refundAmount < 0 || refundAmount > EDIT_LIMITS.price) return { error: 'Enter a refunded amount of $0 or more.' };
+
   return {
     state: {
       customerName: str(b.customerName, EDIT_LIMITS.name),
@@ -449,24 +586,38 @@ export function readEditBody(body: unknown): { state: Omit<OrderEditState, 'isGi
       giftRecipient: str(b.giftRecipient, EDIT_LIMITS.name),
       giftMessage: str(b.giftMessage, EDIT_LIMITS.giftMessage),
       customerNotes: str(b.customerNotes, EDIT_LIMITS.notes),
+      payments,
+      refundAmount: round2(refundAmount),
     },
   };
 }
 
 /**
- * What the rules refuse in an edit (null = fine). The UI never offers these;
- * this is the server's own check.
+ * The parts of a request the rules keep as saved (the server applies this
+ * before anything else): PayPal / unpaid orders keep their "Paid by" and
+ * Refunded; a Trade-in credit part always stays exactly as saved.
  */
-export function editRefusal(rules: OrderEditRules, before: OrderEditState, after: OrderEditState): string | null {
+export function keepFixedMoney(rules: OrderEditRules, before: OrderEditState, after: OrderEditState): OrderEditState {
+  const tradeParts = before.payments.filter((part) => part.method === SALE_TRADE_CREDIT);
+  const payments = rules.paymentsEditable
+    ? [...tradeParts, ...after.payments.filter((part) => part.method !== SALE_TRADE_CREDIT)]
+    : before.payments;
+  return { ...after, payments, refundAmount: rules.refundEditable ? after.refundAmount : before.refundAmount };
+}
+
+/**
+ * What an edit cannot save (null = fine) — nothing is locked any more
+ * (2026-11-26); these keep the record readable. Run on settled payments.
+ */
+export function editRefusal(rules: OrderEditRules, after: OrderEditState, totals: EditTotals): string | null {
   if (rules.deleted) return 'This order is in the Recycle Bin. Restore it before editing.';
-  if (!rules.moneyAllowed) {
-    if (itemsOtherThanNamesChanged(before, after)) return rules.moneyLockReason ?? 'The items on this order cannot change.';
-    if (round2(before.orderDiscount) !== round2(after.orderDiscount) || before.chargesTax !== after.chargesTax) {
-      return rules.moneyLockReason ?? 'The money on this order cannot change.';
-    }
+  if (rules.paymentsEditable) {
+    if (after.payments.length === 0) return 'Add how this order was paid ("Paid by").';
+    if (after.payments.length > 1 && after.payments.some((part) => part.amount <= 0)) return 'Every payment needs an amount (or remove it).';
+    const sum = round2(after.payments.reduce((total, part) => total + part.amount, 0));
+    const mismatch = salePaymentsMismatch(sum, totals.total);
+    if (mismatch) return `${mismatch} Fix a payment so the receipt's "Paid by" matches.`;
   }
-  if (!rules.shippingFeeAllowed && round2(before.shippingFee) !== round2(after.shippingFee)) {
-    return rules.shippingLockReason ?? 'The shipping fee on this order cannot change.';
-  }
+  if (rules.refundEditable && round2(after.refundAmount) > round2(totals.total)) return `The refund can't be more than the ${money(totals.total)} total.`;
   return null;
 }

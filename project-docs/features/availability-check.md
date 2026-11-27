@@ -24,7 +24,7 @@ first** on the item and:
   **Admin → Offers** marked **Availability check**, with two buttons:
   - **Available — send Buy link** → the buyer is emailed "Good news — it's
     available" with a private **Buy now at $X** button: today's price, good for
-    **48 hours**, optional note signed "— Chris". They pay through the normal
+    **48 hours**, optional note (the email then ends with Chris's signature block, `lib/email-signature.ts`, 2026-11-26). They pay through the normal
     checkout (pickup or shipping, card or PayPal) and the sale completes by
     itself. Nobody else can buy the piece meanwhile.
   - **Not available** → "This piece has sold — you were never charged" email,

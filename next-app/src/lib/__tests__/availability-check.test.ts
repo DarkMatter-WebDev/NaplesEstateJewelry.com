@@ -53,7 +53,10 @@ describe('buyer emails', () => {
     expect(email.html).toContain('Buy now at $6,009.00');
     expect(email.html).toContain('href="https://naplesestatejewelry.com/offer/counter/abc"');
     expect(email.html).toContain('held just for you until <strong>Sat Nov 7, 11:02 AM</strong>');
-    expect(email.html).toContain('&ldquo;Yes, the clasp is original.&rdquo; — Chris');
+    expect(email.html).toContain('&ldquo;Yes, the clasp is original.&rdquo;</em>');
+    // Chris's signature block after the button (owner, 2026-11-26) — only because there is a note.
+    expect(email.html.indexOf('&mdash;&nbsp;Chris Surette')).toBeGreaterThan(email.html.indexOf('Buy now at $6,009.00'));
+    expect(email.text).toContain('— Chris Surette');
     expect(email.text).toContain('Buy now at $6,009.00: https://naplesestatejewelry.com/offer/counter/abc');
     expect(email.html).not.toContain('counter-offer');
   });

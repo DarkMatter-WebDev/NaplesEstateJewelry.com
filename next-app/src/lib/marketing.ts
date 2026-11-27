@@ -2,6 +2,7 @@ import { createHash } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createServiceClient } from '@/lib/supabase/service';
 import { withMarketingFooter } from '@/lib/marketing-email-html';
+import { chrisSignatureHtml } from '@/lib/email-signature';
 import { addressOneLine } from '@/lib/business-location';
 import { loadLatestOrderLanguageByEmail } from '@/lib/order-language-server';
 
@@ -408,7 +409,10 @@ export async function sendDirectMarketingCampaign({
         from: sender.fromAddress,
         to: recipient.email,
         subject: version.subject,
-        html: withMarketingFooter(version.html, unsubscribeUrl, settings.mailingAddress, version.language),
+        // Sent as "Chris": his signature block above the footer (owner, 2026-11-26).
+        html: withMarketingFooter(version.html, unsubscribeUrl, settings.mailingAddress, version.language, {
+          signatureHtml: senderProfile === 'chris' ? chrisSignatureHtml(version.language) : undefined,
+        }),
         replyTo: sender.replyTo ?? undefined,
         headers: {
           'List-Unsubscribe': `<${unsubscribeUrl}>`,
