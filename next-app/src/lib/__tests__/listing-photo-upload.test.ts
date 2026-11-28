@@ -8,6 +8,8 @@ import {
   canSendOriginal,
   insertBatchPhoto,
   listingPhotoUploadSummary,
+  PHOTO_CONNECTION_DROPPED,
+  prepareSinglePhoto,
   uploadListingPhotos,
   type ListingPhotoUploadDeps,
 } from '../listing-photo-upload';
@@ -245,5 +247,48 @@ describe('the listing editor upload', () => {
   it('the shrinker releases the decoded photo and the canvas on every path', () => {
     const fn = prep.slice(prep.indexOf('export async function shrinkPhotoFile'), prep.indexOf('async function encodeIntermediate'));
     expect(fn).toMatch(/finally \{\s*if \('close' in source\) source\.close\(\);\s*canvas\.width = 0;\s*canvas\.height = 0;/);
+  });
+});
+
+// Owner, 2026-11-27 (iPhone): Text Deals said "Load failed" — it sent the
+// full-size photo, over Netlify's ~4.5 MB request ceiling. One photo is now
+// shrunk first, and only a safely small original may go as it is.
+describe('one admin photo before upload (Text Deals)', () => {
+  const MB = 1024 * 1024;
+  const photo = (bytes: number, type = 'image/jpeg', name = 'IMG_0001.jpeg') => new File([new Uint8Array(bytes)], name, { type });
+  const shrunkTo = (bytes: number) => async () => new Blob([new Uint8Array(bytes)], { type: 'image/jpeg' });
+  const cannotShrink = async () => { throw new Error('decode failed'); };
+
+  it('a 9 MB iPhone photo goes as the shrunk copy', async () => {
+    const out = await prepareSinglePhoto(photo(9 * MB), shrunkTo(900 * 1024));
+    expect(out.size).toBe(900 * 1024);
+  });
+
+  it('a small original that would not get smaller goes as it is', async () => {
+    const file = photo(200 * 1024);
+    expect(await prepareSinglePhoto(file, shrunkTo(300 * 1024))).toBe(file);
+  });
+
+  it('when shrinking fails, a small JPEG/PNG/WebP original still goes', async () => {
+    const file = photo(2 * MB, 'image/png', 'shot.png');
+    expect(await prepareSinglePhoto(file, cannotShrink)).toBe(file);
+  });
+
+  it('when shrinking fails on a big or unreadable original, it says so in plain words', async () => {
+    await expect(prepareSinglePhoto(photo(9 * MB), cannotShrink)).rejects.toThrow('IMG_0001.jpeg could not be made small enough to upload');
+    await expect(prepareSinglePhoto(photo(MB, 'image/heic', 'IMG_2.HEIC'), cannotShrink)).rejects.toThrow('IMG_2.HEIC could not be made small enough');
+  });
+
+  it('never sends anything over the ceiling, even a "shrunk" copy', async () => {
+    await expect(prepareSinglePhoto(photo(20 * MB), shrunkTo(LISTING_PHOTO_ORIGINAL_MAX_BYTES + 1))).rejects.toThrow('could not be made small enough');
+  });
+
+  it('the Text Deals screen shrinks every photo and words a dropped connection', () => {
+    const manager = readFileSync(join(process.cwd(), 'src', 'components', 'admin', 'TextDealsManager.tsx'), 'utf8');
+    const onPhotos = manager.slice(manager.indexOf('async function onPhotos'), manager.indexOf('async function changePhotos'));
+    expect(onPhotos).toContain('prepareSinglePhoto(file, (f) => shrinkPhotoFile(f, LISTING_PHOTO_TIER))');
+    expect(onPhotos).toContain('throw new Error(PHOTO_CONNECTION_DROPPED)');
+    expect(onPhotos).not.toMatch(/body: file/);
+    expect(PHOTO_CONNECTION_DROPPED).not.toMatch(/load failed/i);
   });
 });

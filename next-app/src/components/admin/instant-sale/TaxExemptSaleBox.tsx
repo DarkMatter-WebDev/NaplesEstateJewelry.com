@@ -156,7 +156,7 @@ export default function TaxExemptSaleBox({ box, onChange }: { box: TaxExemptBoxS
     if (file.type !== 'application/pdf' && file instanceof File) {
       try { body = (await prepareLeadPhotos([file])).files[0] ?? file; } catch { body = file; }
     }
-    if (body.size > TAX_CERT_MAX_BYTES) { setNote({ ok: false, text: 'That file is too large (5 MB at most). Take a photo instead.' }); return; }
+    if (body.size > TAX_CERT_MAX_BYTES) { setNote({ ok: false, text: 'That file is too large (4 MB at most). Take a photo instead.' }); return; }
     setReading(true);
     if (preview) URL.revokeObjectURL(preview);
     setPreview(body.type.startsWith('image/') ? URL.createObjectURL(body) : null);

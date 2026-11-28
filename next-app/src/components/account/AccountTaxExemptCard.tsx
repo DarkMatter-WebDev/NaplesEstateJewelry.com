@@ -125,7 +125,7 @@ export default function AccountTaxExemptCard({ locale, initial }: { locale: stri
       }
     }
     if (body.size > TAX_CERT_MAX_BYTES) {
-      setMessage(isEs ? 'El archivo es muy grande (máximo 5 MB). Tome una foto en su lugar.' : 'That file is too large (5 MB at most). Take a photo instead.');
+      setMessage(isEs ? 'El archivo es muy grande (máximo 4 MB). Tome una foto en su lugar.' : 'That file is too large (4 MB at most). Take a photo instead.');
       return;
     }
     const replacing = phase === 'read' ? token : null;
@@ -264,8 +264,8 @@ export default function AccountTaxExemptCard({ locale, initial }: { locale: stri
         {phase !== 'rejected' && errorLine}
         <span className="text-xs" style={hint}>
           {isEs
-            ? 'Solo certificados emitidos por Florida. Máximo 5 MB. Se guarda en privado y solo se usa para sus compras y nuestros registros. '
-            : 'Florida-issued certificates only. 5 MB at most. Kept private and used only for your purchases and our records. '}
+            ? 'Solo certificados emitidos por Florida. Máximo 4 MB. Se guarda en privado y solo se usa para sus compras y nuestros registros. '
+            : 'Florida-issued certificates only. 4 MB at most. Kept private and used only for your purchases and our records. '}
           <button type="button" className="underline" onClick={() => void closeUpload()}>{isEs ? 'Cancelar' : 'Cancel'}</button>
         </span>
       </>

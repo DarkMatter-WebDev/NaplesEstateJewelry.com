@@ -39,8 +39,13 @@ export const TAX_EXEMPT_UPLOADS_PER_HOUR = 6;
  */
 export const TAX_EXEMPT_AI_READS_PER_DAY = 30;
 export const TAX_EXEMPT_AI_READS_PER_ACCOUNT_DAY = 5;
-/** Largest certificate file accepted (Netlify's request body tops out near 6 MB). */
-export const TAX_CERT_MAX_BYTES = 5 * 1024 * 1024;
+/**
+ * Largest certificate file accepted. Netlify caps a request at 6 MB and
+ * base64-encodes a binary body (~33%), so ~4.5 MB is the real ceiling; it was
+ * 5 MB until 2026-11-27, which let a 4.5–5 MB PDF fail as a dropped connection
+ * instead of this message. Photos are shrunk in the browser first; PDFs are not.
+ */
+export const TAX_CERT_MAX_BYTES = 4 * 1024 * 1024;
 export const TAX_EXEMPT_DECLINE_MAX = 300;
 
 export const STORE_TEXT_NUMBER = '(239) 404-8505';

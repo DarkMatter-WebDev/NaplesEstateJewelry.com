@@ -56,7 +56,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: isEs ? 'No recibimos el archivo.' : 'No file was received.' }, { status: 400 });
   }
   if (file.size > TAX_CERT_MAX_BYTES) {
-    return NextResponse.json({ error: isEs ? 'El archivo es muy grande (máximo 5 MB).' : 'That file is too large (5 MB at most).' }, { status: 413 });
+    return NextResponse.json({ error: isEs ? 'El archivo es muy grande (máximo 4 MB).' : 'That file is too large (4 MB at most).' }, { status: 413 });
   }
   const buffer = Buffer.from(await file.arrayBuffer());
   const user = await getVerifiedUser(await createClient()).catch(() => null);

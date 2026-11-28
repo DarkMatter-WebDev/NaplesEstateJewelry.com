@@ -1,6 +1,34 @@
 
 # Changelog
 
+## 2026-11-27 (4) — 📷 Text Deals "Load failed" on iPhone FIXED (photos shrunk before upload) + every photo-upload spot scanned; certificate cap 5 → 4 MB — BUILT + STAGED, not pushed; no SQL, no env vars
+
+- **Owner (iPhone, live, today):** Admin → Text Deals → Add photos → red "Load failed"; no photo saved. Asked: investigate, then (after the cause) *"yes, build the fix, and also scan the project for any other photo areas that may have this problem still not fixed"*.
+- **Cause (code, not a production probe):** `TextDealsManager.tsx` `onPhotos` POSTed the camera ORIGINAL (`body: file`) to `/api/admin/text-deals/photo`. Netlify caps a function request at 6 MB and base64-encodes a binary body (~33%), so ~4.5 MB is the real ceiling — the same limit the lead forms hit on 2026-09-20 (7). A full-size iPhone 17 Pro Max photo (24/48 MP JPEG) is 5–12 MB → Netlify refuses it before our route runs, no response comes back, and Safari's wording for that is "Load failed". The route's own friendly 413 (5 MB) could never fire. Text Deals photos were added 2026-10-07, after the September shrink fix, and never got it; small photos and screenshots still went through. The draft deal itself saves BEFORE the photo upload, so only the photo was lost.
+- **Fix:** each photo is shrunk to 2048 px (`shrinkPhotoFile(file, LISTING_PHOTO_TIER)` — the listing editor's shrinker) before its request, through a new shared `prepareSinglePhoto` in `lib/listing-photo-upload.ts`: shrunk copy if smaller; the original only if shrinking fails/would grow AND it is a ≤ 4 MB JPEG/PNG/WebP; otherwise a plain message ("… could not be made small enough to upload. Try a different photo, or a screenshot of it."). A dropped connection now reads "The photo did not upload — the connection dropped. Check the signal and try again." (`PHOTO_CONNECTION_DROPPED`), never the bare "Load failed". The server still re-encodes to WebP — what the texts show is unchanged.
+- **Scan of every photo/file upload in `next-app/src`** (every `type="file"`, `FormData`, raw `body:` upload, and storage upload):
+  - ✅ already shrunk before the request: Free Evaluation + contact forms (`shrinkFormPhotos`), listing editor (`shrinkPhotoFile`), Instant Sale item photo (`sale-client.ts` `prepareLeadPhotos`), Buy Receipt + Log Pickup ID photo (`prepareIdPhoto`), tax-exempt certificate PHOTOS in checkout / My Account / Instant Sale box / certificate editor (`prepareLeadPhotos`).
+  - ✅ small by nature: webcam captures (`IdPhotoCapture`, canvas JPEG), thumbprint (BMP → PNG), pickup signature (canvas PNG).
+  - ✅ not through Netlify: product video (tus straight to Cloudflare Stream; our route only provisions the upload).
+  - ✅ server-side only (no browser upload): Instagram / Etsy image pushes.
+  - 🔧 **one smaller gap, fixed:** tax-exempt certificate **PDFs** are not shrunk (they can't be), and the cap `TAX_CERT_MAX_BYTES` was 5 MB — above the ~4.5 MB ceiling, so a 4.5–5 MB PDF failed as a dropped connection instead of the size message. Now 4 MB, and every message says "4 MB" (EN + ES: checkout, My Account, both read routes, Instant Sale box, certificate editor).
+- **Tests:** `listing-photo-upload.test.ts` +6 (shrunk copy used; small original kept; fallback original; plain-words refusal incl. HEIC; never over the ceiling; Text Deals source wiring); `tax-exempt.test.ts` +1 (cap ≤ 4.2 MB, no "5 MB" left in the six files).
+- **Real-browser check (dev, Chromium, nothing uploaded):** a worst-case 48 MP (8064×6048) pure-noise JPEG of **44.3 MB** → the same steps as `shrinkPhotoFile` at 2048 / 0.92 → **1.47 MB**, `image/jpeg`, 2048×1536 — under the 4 MB ceiling. A real photo shrinks further (noise is JPEG's worst case).
+- **Gate (from `next-app`):** `npx tsc --noEmit` 0 errors · `npm run lint` 0 errors (the 4 old `<img>` warnings in `TextDealsManager.tsx`) · `npx vitest run` **2662/2662** (219 files) · `npm run build` exit 0 (dev stopped first, restarted after).
+- **Not seen:** a real upload on the owner's iPhone (needs the push), and the admin page itself behind the sign-in. ⛔ Owner's iPhone test after the push is the proof — `TASKS.md` 2026-11-27 (4).
+
+## 2026-11-27 (3) — 📝 Docs only: two stale spots fixed (owner's yes); no code, no SQL, no env vars
+
+- `PROJECT_OVERVIEW.md` → Owner / Contact → Showroom no longer says "inside Sharon Lynch Collections" (contradicted the 2026-11-25 (5) removal); it now says "under our own Naples Estate Jewelry sign" with the ⛔ never-re-add note.
+- `TASKS.md`: the five 2026-11-26 blocks ((1), (2), (4), (5), (6)) still read "BUILT + STAGED, not pushed" — now "PUSHED + DEPLOYED (owner-reported 2026-11-27 (1); not checked live by Claude)", and each item 1 "Owner: push + deploy" is ✅ DONE. Their first-look and check-up items stay open.
+
+## 2026-11-27 (2) — ✅ Order-page zoom fix pushed + deployed (owner); LIVE check in the owner's Chrome — pass; nothing changed
+
+- Owner: *"pushed and deployed, verify it live with chrome"*. Admin → Orders → NEJ-20261124-LL8G0 (Dennis Gray). Read-only: nothing clicked that saves.
+- **Fix is live:** the Items table's box has class `relative overflow-x-auto`, computed `position: relative`; the one "Line discount for …" `sr-only` label is inside it.
+- **Width check:** the site refuses to be framed (`X-Frame-Options: DENY`, `frame-ancestors 'none'` — good), so the live page's own HTML + stylesheets were loaded into a scripts-off test frame at 320, 360, 375, 390, 393, 402, 414, 430, 440px: page width = frame width at **every** width (measured with `html` overflow unclipped). **Control** (same page, `relative` removed in the frame only): the page stretched to **545px** at every width — the measurement catches the bug, and the live fix removes it.
+- **Not covered live:** the Edit window itself at phone width (needs the app's scripts; it was measured locally in 2026-11-27 (1) — no sideways overflow 320–440) and Safari's zoom — the owner's iPhone check (TASKS 2026-11-27 (1) item 2) is still the last word.
+
 ## 2026-11-27 (1) — 📱 Admin order page sat zoomed out on iPhone after ✎ Edit order (blank strip on the right) — FIXED, BUILT + STAGED, not pushed; no SQL, no env vars
 
 - **Owner (iPhone 17 Pro Max, live, after pushing the 11-26 set):** after editing an order and then saving OR cancelling, the order page came back zoomed out — content in the left ~80%, a blank strip on the right. *"keep it centered in full screened properly"*. Plan repeated back → *"Yes, do the plan"* (+ "it appeared after saving or cancelling").

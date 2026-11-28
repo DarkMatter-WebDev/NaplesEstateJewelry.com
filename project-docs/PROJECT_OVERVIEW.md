@@ -41,9 +41,9 @@ discretion and a personal relationship over a storefront transaction.
 
 - **Owner**: Chris (15+ years experience, born and raised in Naples).
 - **Phone / text**: (239) 404-8505
-- **Showroom**: 6240 Shirley St, Ste 104, Naples, FL 34109 — **inside Sharon
-  Lynch Collections** (shared suite; name the landmark, the sign out front is
-  theirs). Open **Mon–Sat 10:00–16:00, Sunday closed, or by appointment**
+- **Showroom**: 6240 Shirley St, Ste 104, Naples, FL 34109 — under our own
+  Naples Estate Jewelry sign. ⛔ Never describe it as "inside Sharon Lynch
+  Collections" (removed sitewide 2026-11-25; `DECISIONS.md` top entries). Open **Mon–Sat 10:00–16:00, Sunday closed, or by appointment**
   as of 2026-10-30 (was Mon–Fri 11–3 / Sat 11–4 from 2026-08-29).
   ⛔ Hours are ADMIN-EDITABLE and the owner changes them on the fly — the DB
   (`shop_settings.store_hours`, Admin → Settings → Store Hours) is the source

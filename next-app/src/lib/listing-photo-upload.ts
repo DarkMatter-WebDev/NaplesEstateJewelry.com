@@ -61,6 +61,32 @@ export function canSendOriginal(file: File): boolean {
   return file.size > 0 && file.size <= LISTING_PHOTO_ORIGINAL_MAX_BYTES && ORIGINAL_FALLBACK_TYPES.has(file.type);
 }
 
+/**
+ * ONE admin photo → a body small enough for one request (Text Deals, owner
+ * 2026-11-27: "Load failed" on the iPhone). Shrunk to LISTING_PHOTO_TIER; the
+ * original is used only when shrinking fails or would not make it smaller, and
+ * only while it is safely under the ceiling above. Throws a plain-words Error
+ * otherwise, so the screen never shows the browser's bare "Load failed".
+ * `shrink` = `shrinkPhotoFile(file, LISTING_PHOTO_TIER)` (injected for tests).
+ */
+export async function prepareSinglePhoto(file: File, shrink: (file: File) => Promise<Blob>): Promise<Blob> {
+  const name = file.name || 'the photo';
+  let shrunk: Blob | null = null;
+  try {
+    shrunk = await shrink(file);
+  } catch {
+    shrunk = null;
+  }
+  if (shrunk && shrunk.size > 0 && (shrunk.size < file.size || !canSendOriginal(file)) && shrunk.size <= LISTING_PHOTO_ORIGINAL_MAX_BYTES) {
+    return shrunk;
+  }
+  if (canSendOriginal(file)) return file;
+  throw new Error(`${name} could not be made small enough to upload. Try a different photo, or a screenshot of it.`);
+}
+
+/** What to show when the request itself never got an answer (Safari: "Load failed"; Chrome: "Failed to fetch"). */
+export const PHOTO_CONNECTION_DROPPED = 'The photo did not upload — the connection dropped. Check the signal and try again.';
+
 async function attempt(
   file: File,
   deps: ListingPhotoUploadDeps,

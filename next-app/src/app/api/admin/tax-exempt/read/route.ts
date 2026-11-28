@@ -26,7 +26,7 @@ export async function POST(req: Request) {
   const form = await req.formData().catch(() => null);
   const file = form?.get('certificate');
   if (!(file instanceof File) || file.size === 0) return NextResponse.json({ error: 'No file was received.' }, { status: 400 });
-  if (file.size > TAX_CERT_MAX_BYTES) return NextResponse.json({ error: 'That file is too large (5 MB at most). Take a photo instead.' }, { status: 413 });
+  if (file.size > TAX_CERT_MAX_BYTES) return NextResponse.json({ error: 'That file is too large (4 MB at most). Take a photo instead.' }, { status: 413 });
   const buffer = Buffer.from(await file.arrayBuffer());
 
   const service = createServiceClient();

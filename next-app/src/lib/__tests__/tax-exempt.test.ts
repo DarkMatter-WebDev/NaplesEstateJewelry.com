@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  TAX_CERT_MAX_BYTES,
   certificateIsUsable,
   certificateProblemMessage,
   certificateUsableThrough,
@@ -406,5 +407,25 @@ describe('adding the photo and details after the sale (2026-11-09)', () => {
     // Uploads go through the same WebP-verified store as Instant Sale.
     const editor = readFileSync(join(process.cwd(), 'src', 'components', 'admin', 'tax-exempt', 'CertificatePhotoEditor.tsx'), 'utf8');
     expect(editor).toContain("'/api/admin/tax-exempt/read'");
+  });
+});
+
+// 2026-11-27: the cap was 5 MB, above Netlify's real ~4.5 MB request ceiling,
+// so a 4.5–5 MB PDF failed as a dropped connection instead of the size message.
+describe('certificate file size cap', () => {
+  it('stays safely under the ~4.5 MB request ceiling, and every message says 4 MB', () => {
+    expect(TAX_CERT_MAX_BYTES).toBeLessThanOrEqual(4.2 * 1024 * 1024);
+    const files = [
+      ['app', 'api', 'admin', 'tax-exempt', 'read', 'route.ts'],
+      ['app', 'api', 'tax-exempt', 'read', 'route.ts'],
+      ['components', 'account', 'AccountTaxExemptCard.tsx'],
+      ['components', 'admin', 'instant-sale', 'TaxExemptSaleBox.tsx'],
+      ['components', 'admin', 'tax-exempt', 'CertificatePhotoEditor.tsx'],
+      ['components', 'checkout', 'CheckoutTaxExempt.tsx'],
+    ];
+    for (const parts of files) {
+      const source = readFileSync(join(process.cwd(), 'src', ...parts), 'utf8');
+      expect(source, parts.join('/')).not.toMatch(/5 MB|máximo 5|Máximo 5/);
+    }
   });
 });

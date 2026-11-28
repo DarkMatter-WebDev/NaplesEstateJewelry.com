@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
 import { formatUsPhone } from '@/lib/subscriber-phone';
+import { shrinkPhotoFile } from '@/lib/lead-photo-prep';
+import { LISTING_PHOTO_TIER, PHOTO_CONNECTION_DROPPED, prepareSinglePhoto } from '@/lib/listing-photo-upload';
 import {
   DEAL_DESCRIPTION_MAX,
   DEAL_LEAVE_OFF,
@@ -243,9 +245,18 @@ export default function TextDealsManager({ configured, forwardTo }: { configured
     try {
       const id = await saveDraft();
       // One photo per request, in the order picked: the first photo on a deal is the main one.
+      // Each photo is shrunk to 2048px first (owner, 2026-11-27: a full-size iPhone photo
+      // is over Netlify's ~4.5 MB request ceiling, which Safari reports as "Load failed").
       for (const file of files) {
         setUploading(`Uploading ${added + 1} of ${files.length}…`);
-        const data = await readJson(await fetch(`/api/admin/text-deals/photo?dealId=${encodeURIComponent(id)}`, { method: 'POST', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file }));
+        const body = await prepareSinglePhoto(file, (f) => shrinkPhotoFile(f, LISTING_PHOTO_TIER));
+        let response: Response;
+        try {
+          response = await fetch(`/api/admin/text-deals/photo?dealId=${encodeURIComponent(id)}`, { method: 'POST', headers: { 'Content-Type': body.type || 'application/octet-stream' }, body });
+        } catch {
+          throw new Error(PHOTO_CONNECTION_DROPPED);
+        }
+        const data = await readJson(response);
         setPhotos(data.photos ?? []);
         setPictures(null);
         added += 1;

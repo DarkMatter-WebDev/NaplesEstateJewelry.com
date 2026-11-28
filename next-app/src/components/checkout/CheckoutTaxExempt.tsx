@@ -211,7 +211,7 @@ export default function CheckoutTaxExempt({
       }
     }
     if (body.size > TAX_CERT_MAX_BYTES) {
-      setMessage(isEs ? 'El archivo es muy grande (máximo 5 MB). Tome una foto en su lugar.' : 'That file is too large (5 MB at most). Take a photo instead.');
+      setMessage(isEs ? 'El archivo es muy grande (máximo 4 MB). Tome una foto en su lugar.' : 'That file is too large (4 MB at most). Take a photo instead.');
       return;
     }
     setPhase('reading');
